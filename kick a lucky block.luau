@@ -1358,7 +1358,7 @@ supervisorEnabled = {
 		return state.AAutoFav
 	end,
 	WebhookStatus = function()
-		return state.AutoStatusWebhook or runtime.nextStatusWebhook == 0
+		return state.AutoStatusWebhook
 	end,
 	Battle = function()
 		return state.AAutoBattle
@@ -3264,7 +3264,7 @@ task.spawn(function()
 			diagnosticsStatus:Update("Last Update", build and formatRobloxTimestamp(build.Updated) or "--")
 			diagnosticsStatus:Update("Error Count", tostring(totalLoggedErrors()))
 			diagnosticsStatus:Update("Last Error", runtime.lastError or runtime.lastLoopError or "--")
-			diagnosticsStatus:Update("Recent Error", runtime.errorLog[2] or "--")
+			diagnosticsStatus:Update("Recent Error", runtime.errorLog[1] or "--")
 		end
 		task.wait(2)
 	end
@@ -3927,7 +3927,7 @@ local function isWeatherActive(recipe)
 	end
 	if modules.weatherService and modules.weatherService.Events then
 		local expiresAt = modules.weatherService.Events[recipe]
-		if tonumber(expiresAt) and tonumber(expiresAt) > Workspace:GetServerTimeNow() then
+		if tonumber(expiresAt) and tonumber(expiresAt) > os.time() then
 			return true
 		end
 	end
