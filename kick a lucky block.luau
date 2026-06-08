@@ -1,6 +1,6 @@
 getgenv().LuxyHub_State = getgenv().LuxyHub_State or {}
 
-local VERSION = "5.1"
+local VERSION = "5.2"
 
 type AnyMap = { [any]: any }
 type StringList = { string }
@@ -78,6 +78,14 @@ local runtime: RuntimeState = {
 	errorCounts = {},
 	errorLastSeen = {},
 	performanceMode = "Balanced",
+	sessionStart = tick(),
+	sessionKicks = 0,
+	sessionResets = 0,
+	sessionMatches = 0,
+	sessionBestCps = 0,
+	sessionBestName = "--",
+	kickRateWindow = {},
+	kicksPerMin = 0,
 }
 
 local Players = game:GetService("Players")
@@ -281,36 +289,115 @@ local function notify(title: string?, text: string?, duration: number?)
 	end)
 end
 
-local function safeFileApi(name: string): any?
-	local executorName = "unknown"
-	if identifyexecutor then
-		pcall(function()
-			executorName = tostring(identifyexecutor()):lower()
-		end)
+-- Executor detection runs once at startup. Two goals:
+--   1. Some executors (old Yub builds, Arceus) have broken file APIs we must skip.
+--   2. HTTP request and connection-inspection globals vary by executor.
+-- We probe namespaces and known globals rather than relying solely on the name
+-- string, since many executors lie, truncate, or don't expose identifyexecutor.
+local Executor = (function()
+	local env: AnyMap = {}
+	pcall(function()
+		local g = getgenv or getfenv
+		if g then env = g() or {} end
+	end)
+
+	local function fn(k: string): any?
+		local v = env[k]
+		return type(v) == "function" and v or nil
 	end
-	if executorName:find("yub") then
+	local function tbl(k: string): any?
+		local v = env[k]
+		return type(v) == "table" and v or nil
+	end
+
+	-- Try every common name-identification API in priority order
+	local rawName = ""
+	for _, id in ipairs({ "identifyexecutor", "getexecutorname", "whatexecutor" }) do
+		local f = fn(id)
+		if f then
+			local ok, r = pcall(f)
+			if ok and type(r) == "string" and #r > 0 then
+				rawName = r
+				break
+			end
+		end
+	end
+
+	-- Normalise: lowercase, drop whitespace, keep only the base token
+	local name = rawName:lower():gsub("%s+", ""):match("^[%a][%w%-_%.]*") or ""
+
+	-- Namespace/global fingerprinting — fallback when the name is missing/useless
+	if name == "" then
+		if tbl("syn") and type(env.syn.request) == "function" then
+			name = "synapse"
+		elseif env.KRNL_LOADED == true then
+			name = "krnl"
+		elseif tbl("fluxus") and type(env.fluxus.request) == "function" then
+			name = "fluxus"
+		elseif tbl("sw") then
+			name = "scriptware"
+		elseif tbl("celery") then
+			name = "celery"
+		elseif tbl("delta") then
+			name = "delta"
+		elseif env.OXYGEN_U == true then
+			name = "oxygenu"
+		elseif tbl("Electron") then
+			name = "electron"
+		elseif fn("queue_on_teleport") and fn("getgc") then
+			-- old Synapse X didn't expose identifyexecutor but had these
+			name = "synapse"
+		else
+			name = "unknown"
+		end
+	end
+
+	-- Executors whose file-system implementations are known broken/unsafe.
+	-- We simply skip those APIs rather than letting them silently corrupt data.
+	local FS_BROKEN: { [string]: boolean } = {
+		yub = true,
+		yubx = true,
+		arceus = true,
+	}
+	local fsOk = not FS_BROKEN[name]
+
+	return {
+		name       = name,
+		rawName    = rawName,
+		isKnown    = name ~= "unknown",
+		fsOk       = fsOk,
+		hasFilesystem = fsOk and type(env.writefile) == "function" and type(env.readfile) == "function",
+		hasHttp    = type(env.request) == "function"
+			or type(env.http_request) == "function"
+			or (tbl("syn") and type(env.syn.request) == "function")
+			or (tbl("fluxus") and type(env.fluxus.request) == "function")
+			or (tbl("http") and type(env.http.request) == "function"),
+		hasGetConn = type(env.getconnections) == "function" or type(env.get_signal_cons) == "function",
+		hasClipboard = type(env.setclipboard) == "function" or type(env.toclipboard) == "function",
+		hasFireTouch = type(env.firetouchinterest) == "function",
+		env        = env,
+	}
+end)()
+
+-- Retrieve a callable from the executor env. Pass noFs=true to block it on
+-- executors whose file APIs are broken (avoids silent corruption).
+local function execFunc(name: string, noFs: boolean?): any?
+	if noFs and not Executor.fsOk then
 		return nil
 	end
-	local envGetter = getgenv or getfenv
-	if not envGetter then
-		return nil
-	end
-	local ok, env = pcall(envGetter)
-	if not ok or type(env) ~= "table" then
-		return nil
-	end
-	return env[name]
+	local v = Executor.env[name]
+	return type(v) == "function" and v or nil
 end
 
-local writeFile = safeFileApi("writefile")
-local readFile = safeFileApi("readfile")
-local isFile = safeFileApi("isfile")
-local makeFolder = safeFileApi("makefolder")
-local isFolder = safeFileApi("isfolder")
-local deleteFile = safeFileApi("delfile")
-local listFiles = safeFileApi("listfiles")
-local appendFile = safeFileApi("appendfile")
-local setClipboard = safeFileApi("setclipboard") or safeFileApi("toclipboard")
+local writeFile   = execFunc("writefile",  true)
+local readFile    = execFunc("readfile",   true)
+local isFile      = execFunc("isfile",     true)
+local makeFolder  = execFunc("makefolder", true)
+local isFolder    = execFunc("isfolder",   true)
+local deleteFile  = execFunc("delfile",    true)
+local listFiles   = execFunc("listfiles",  true)
+local appendFile  = execFunc("appendfile", true)
+local setClipboard = execFunc("setclipboard") or execFunc("toclipboard")
 local settingsFolder = "LuxyHub_Configs"
 local settingsFile = string.format("%s/KickBlox_v4_%s.json", settingsFolder, tostring(LocalPlayer.UserId))
 local logFile = string.format("%s/KickBlox_v4_%s.log", settingsFolder, tostring(LocalPlayer.UserId))
@@ -434,16 +521,21 @@ end
 
 clampSettings()
 
+-- Uses Executor.env so we don't need to reference bare globals that might not
+-- exist at parse time on strict executor environments.
 local function requestFunction(): any?
+	local e = Executor.env
 	local candidates = {
-		(syn and syn.request) or nil,
-		(http and http.request) or nil,
-		(http_service and http_service.request) or nil,
-		http_request,
-		request,
-		(fluxus and fluxus.request) or nil,
-		(getgenv and getgenv().request) or nil,
-		(getgenv and getgenv().http_request) or nil,
+		-- executor-specific namespaces first (most reliable)
+		type(e.syn)         == "table" and type(e.syn.request)          == "function" and e.syn.request          or nil,
+		type(e.fluxus)      == "table" and type(e.fluxus.request)       == "function" and e.fluxus.request       or nil,
+		type(e.http)        == "table" and type(e.http.request)         == "function" and e.http.request         or nil,
+		type(e.http_service) == "table" and type(e.http_service.request) == "function" and e.http_service.request or nil,
+		-- UNC globals
+		e.http_request,
+		e.request,
+		-- Wave executor capitalises the global
+		e.Request,
 	}
 	for _, candidate in ipairs(candidates) do
 		if type(candidate) == "function" then
@@ -454,11 +546,13 @@ local function requestFunction(): any?
 end
 
 local function getConnectionFetcher(): any?
+	local e = Executor.env
 	local candidates = {
-		getconnections,
-		get_signal_cons,
-		(getgenv and getgenv().getconnections) or nil,
-		(getgenv and getgenv().get_signal_cons) or nil,
+		e.getconnections,
+		e.get_signal_cons,
+		-- some executor forks add a numeric suffix
+		e.getconnections2,
+		e.get_signal_connections,
 	}
 	for _, candidate in ipairs(candidates) do
 		if type(candidate) == "function" then
@@ -1042,22 +1136,40 @@ local function refreshRemotes()
 	local network = ReplicatedStorage:FindFirstChild("Shared")
 	network = network and network:FindFirstChild("Packages")
 	network = network and network:FindFirstChild("Network")
-	remotes.kick = safeFindRemote(network, { "rev_KickEvent", "KickEvent", "rev_kickevent" })
-	remotes.collect = safeFindRemote(network, { "rev_B_Collect", "B_Collect", "Collect" })
-	remotes.upgradeBrainrot = safeFindRemote(network, { "rev_B_Upgrade", "B_Upgrade", "UpgradeBrainrot" })
-	remotes.speedUpgrade = safeFindRemote(network, { "rev_SPEED_UPGRADE", "SPEED_UPGRADE", "SpeedUpgrade" })
-	remotes.shopBuy = safeFindRemote(network, { "rev_Shop_Buy", "Shop_Buy", "ShopBuy" })
-	remotes.weightEquip = safeFindRemote(network, { "rev_WeightEquip", "WeightEquip" })
-	remotes.sellAll = safeFindRemote(network, { "ref_B_SellAll", "B_SellAll", "SellAll" })
-	remotes.toggleFavorite = safeFindRemote(network, { "rev_ToggleFav", "ToggleFav" })
-	remotes.rebirth = safeFindRemote(network, { "rev_RebirthRequest", "RebirthRequest", "Rebirth" })
-	remotes.plotUpgrade = safeFindRemote(network, { "rev_bs_upgrade", "bs_upgrade", "PlotUpgrade" })
-	remotes.weather = safeFindRemote(network, { "rev_sbe", "sbe", "SummonWeather" })
-	remotes.place = safeFindRemote(network, { "rev_S_Interact", "S_Interact", "PlaceBrainrot" })
-	remotes.battleCreate = safeFindRemote(network, { "ref_battle_create", "battle_create" })
-	remotes.battleInvite = safeFindRemote(network, { "ref_battle_invite", "battle_invite" })
-	remotes.battleStart = safeFindRemote(network, { "rev_battle_start", "battle_start" })
-	remotes.kickStyle = safeFindRemote(network, { "rev_KickStyleEquip", "KickStyleEquip" })
+
+	-- Primary alias lookup (covers original names + common renamed variants)
+	remotes.kick           = safeFindRemote(network, { "rev_KickEvent", "KickEvent", "rev_kickevent", "KickRemote", "rev_Kick" })
+	remotes.collect        = safeFindRemote(network, { "rev_B_Collect", "B_Collect", "Collect", "CollectCash", "rev_Collect" })
+	remotes.upgradeBrainrot= safeFindRemote(network, { "rev_B_Upgrade", "B_Upgrade", "UpgradeBrainrot", "BrainrotUpgrade", "rev_Upgrade" })
+	remotes.speedUpgrade   = safeFindRemote(network, { "rev_SPEED_UPGRADE", "SPEED_UPGRADE", "SpeedUpgrade", "rev_SpeedUp" })
+	remotes.shopBuy        = safeFindRemote(network, { "rev_Shop_Buy", "Shop_Buy", "ShopBuy", "BuyItem", "rev_Buy" })
+	remotes.weightEquip    = safeFindRemote(network, { "rev_WeightEquip", "WeightEquip", "EquipWeight", "rev_Equip" })
+	remotes.sellAll        = safeFindRemote(network, { "rev_B_SellAll", "ref_B_SellAll", "B_SellAll", "SellAll", "SellAllBrainrots" })
+	remotes.toggleFavorite = safeFindRemote(network, { "rev_ToggleFav", "ToggleFav", "FavoriteTool", "rev_Fav" })
+	remotes.rebirth        = safeFindRemote(network, { "rev_RebirthRequest", "RebirthRequest", "Rebirth", "DoRebirth", "rev_Rebirth" })
+	remotes.plotUpgrade    = safeFindRemote(network, { "rev_bs_upgrade", "bs_upgrade", "PlotUpgrade", "UpgradePlot", "rev_PlotUpgrade" })
+	remotes.weather        = safeFindRemote(network, { "rev_sbe", "sbe", "SummonWeather", "WeatherSummon", "rev_Weather" })
+	remotes.place          = safeFindRemote(network, { "rev_S_Interact", "S_Interact", "PlaceBrainrot", "PlacePet", "rev_Place" })
+	remotes.battleCreate   = safeFindRemote(network, { "ref_battle_create", "rev_battle_create", "battle_create", "BattleCreate" })
+	remotes.battleInvite   = safeFindRemote(network, { "ref_battle_invite", "rev_battle_invite", "battle_invite", "BattleInvite" })
+	remotes.battleStart    = safeFindRemote(network, { "rev_battle_start", "battle_start", "BattleStart", "StartBattle" })
+	remotes.kickStyle      = safeFindRemote(network, { "rev_KickStyleEquip", "KickStyleEquip", "EquipKickStyle", "rev_KickStyle" })
+
+	-- Dynamic fallback: scan the network folder for remotes not caught above.
+	-- Matches by pattern against the lowercase name; won't overwrite existing hits.
+	if network then
+		for _, child in ipairs(network:GetChildren()) do
+			if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
+				local n = child.Name:lower()
+				if not remotes.kick           and n:find("kick") and not n:find("style") then remotes.kick = child
+				elseif not remotes.collect    and n:find("collect")                        then remotes.collect = child
+				elseif not remotes.sellAll    and n:find("sell")  and n:find("all")        then remotes.sellAll = child
+				elseif not remotes.rebirth    and n:find("rebirth")                        then remotes.rebirth = child
+				elseif not remotes.place      and n:find("place") and not n:find("upgrade") then remotes.place = child
+				end
+			end
+		end
+	end
 end
 
 refreshRemotes()
@@ -1139,15 +1251,38 @@ local function brainrotCps(name, mutation, level)
 	if not brainrots or not brainrots[name] then
 		return nil
 	end
-	local base = parseNumber(brainrots[name].CPS or brainrots[name].CashPerSecond or 0)
+	local entry = brainrots[name]
+	local base = parseNumber(entry.CPS or entry.CashPerSecond or entry.BaseCPS or 0)
+	local lvl = math.max(1, tonumber(level) or 1)
+
+	-- Level scaling: check for explicit per-level data before falling back to
+	-- simple linear scaling. Many games add a fixed amount per upgrade rather
+	-- than multiplying the whole value.
+	local leveledBase: number
+	if entry.CPSPerLevel or entry.CashPerSecondPerLevel then
+		local perLvl = parseNumber(entry.CPSPerLevel or entry.CashPerSecondPerLevel or 0)
+		leveledBase = base + (lvl - 1) * perLvl
+	elseif entry.LevelMultiplier then
+		local m = parseNumber(entry.LevelMultiplier or 1)
+		leveledBase = base * (1 + (lvl - 1) * (m - 1))
+	else
+		-- Default: linear (base × level). Works for most KickBlox games.
+		leveledBase = base * lvl
+	end
+
+	-- Mutation multiplier
 	local multiplier = 1
 	local mutationData = modules.entitiesData and modules.entitiesData.Mutations
 	if mutationData and mutationData[mutation] then
 		multiplier = parseNumber(mutationData[mutation].Multiplier or mutationData[mutation].Boost or 1)
 	elseif mutation and mutation:lower():match("^x%d+$") then
 		multiplier = tonumber(mutation:sub(2)) or 1
+	elseif mutation and mutation:lower():match("^%d+x$") then
+		-- "2x" style (normaliser converts it, but guard here just in case)
+		multiplier = tonumber(mutation:match("^(%d+)")) or 1
 	end
-	return base * multiplier * math.max(1, tonumber(level) or 1)
+
+	return leveledBase * multiplier
 end
 
 local function kickPower()
@@ -2446,16 +2581,17 @@ local protectedDropdown: any?
 local upgradeDropdown: any?
 
 local diagnosticsStatus = diagnosticsGroup:CreateStatus("Status", {
-	FPS = "--",
-	Mode = "--",
-	Loops = "0",
-	Remotes = "--",
+	Executor       = "detecting...",
+	FPS            = "--",
+	Mode           = "--",
+	Loops          = "0",
+	Remotes        = "--",
 	["Game Build"] = "--",
-	["Last Update"] = "--",
-	["Error Count"] = "0",
+	["Last Update"]= "--",
+	["Error Count"]= "0",
 	["Last Error"] = "--",
-	["Recent Error"] = "--",
-	["Log File"] = appendFile and logFile or "Unavailable",
+	["Recent Error"]= "--",
+	["Log File"]   = appendFile and logFile or "Unavailable",
 })
 
 local profileFolder = "LuxyHub_Configs/Profiles"
@@ -2981,11 +3117,36 @@ kickGroup:CreateToggle(
 	end
 )
 predictionStatus = kickGroup:CreateStatus("Prediction", {
-	Brainrot = "--",
-	Rarity = "--",
-	Mutation = "--",
-	["CPS Value"] = "--",
+	Brainrot     = "--",
+	Rarity       = "--",
+	Mutation     = "--",
+	["CPS (Lv.1)"] = "--",
+	["Net Gain"]   = "--",
+	Filter         = "--",
 })
+local sessionStatus: any = kickGroup:CreateStatus("Session", {
+	Time         = "0:00",
+	Kicks        = "0",
+	["Kicks/min"]= "0",
+	Matches      = "0",
+	Resets       = "0",
+	["Best CPS"] = "--",
+})
+kickGroup:CreateButton(
+	"Reset Session Stats",
+	function()
+		runtime.sessionStart    = tick()
+		runtime.sessionKicks    = 0
+		runtime.sessionMatches  = 0
+		runtime.sessionResets   = 0
+		runtime.sessionBestCps  = 0
+		runtime.sessionBestName = "--"
+		runtime.kickRateWindow  = {}
+		runtime.kicksPerMin     = 0
+		notify("Session", "Stats reset.", 2)
+	end,
+	"Zero out kick/match/reset counters and restart the session timer."
+)
 kickGroup:CreateDivider()
 -- Roll filters (what brainrots to keep vs. reset)
 kickGroup:AddDropdown("FilterBrainrot", {
@@ -3662,6 +3823,7 @@ task.spawn(function()
 			for _ in pairs(loops) do
 				loopCount = loopCount + 1
 			end
+			diagnosticsStatus:Update("Executor", Executor.isKnown and Executor.name or ("? " .. (Executor.rawName ~= "" and ("(" .. Executor.rawName .. ")") or "unknown")))
 			diagnosticsStatus:Update("FPS", tostring(runtime.currentFps or "--"))
 			diagnosticsStatus:Update("Mode", tostring(runtime.performanceMode or "Balanced"))
 			diagnosticsStatus:Update("Loops", tostring(loopCount))
@@ -3675,6 +3837,18 @@ task.spawn(function()
 			diagnosticsStatus:Update("Error Count", tostring(totalLoggedErrors()))
 			diagnosticsStatus:Update("Last Error", runtime.lastError or runtime.lastLoopError or "--")
 			diagnosticsStatus:Update("Recent Error", runtime.errorLog[1] or "--")
+
+			-- Session stats (update them here since this loop already runs every 2s)
+			if sessionStatus and sessionStatus.Update then
+				local elapsed = math.floor(tick() - (runtime.sessionStart or tick()))
+				sessionStatus:Update("Time",    string.format("%d:%02d", math.floor(elapsed / 60), elapsed % 60))
+				sessionStatus:Update("Kicks",   tostring(runtime.sessionKicks  or 0))
+				sessionStatus:Update("Kicks/min", tostring(runtime.kicksPerMin or 0))
+				sessionStatus:Update("Matches", tostring(runtime.sessionMatches or 0))
+				sessionStatus:Update("Resets",  tostring(runtime.sessionResets  or 0))
+				local bestCps = runtime.sessionBestCps or 0
+				sessionStatus:Update("Best CPS", bestCps > 0 and (formatNumber(bestCps) .. "/s") or "--")
+			end
 		end
 		task.wait(2)
 	end
@@ -3767,21 +3941,72 @@ makeSupervisor("Prediction", 1, function()
 	end
 	local inGame = LocalPlayer:GetAttribute("InGame") or ""
 	if inGame == "" then
-		predictionStatus:Update("Brainrot", "--")
-		predictionStatus:Update("Rarity", "--")
-		predictionStatus:Update("Mutation", "--")
-		predictionStatus:Update("CPS Value", "--")
+		predictionStatus:Update("Brainrot",    "--")
+		predictionStatus:Update("Rarity",      "--")
+		predictionStatus:Update("Mutation",    "--")
+		predictionStatus:Update("CPS (Lv.1)",  "--")
+		predictionStatus:Update("Net Gain",    "--")
+		predictionStatus:Update("Filter",      "--")
 		return
 	end
+
 	local parts = string.split(inGame, ",")
-	local name = trim(parts[1] or "Unknown")
+	local name     = trim(parts[1] or "Unknown")
 	local mutation = normalizeMutation(parts[2] or "None")
-	local rarity = rarityFor(name, "Unknown")
-	local cps = brainrotCps(name, mutation, 1)
-	predictionStatus:Update("Brainrot", name)
-	predictionStatus:Update("Rarity", rarity)
-	predictionStatus:Update("Mutation", mutation)
-	predictionStatus:Update("CPS Value", cps and (formatNumber(cps) .. "/s") or "N/A")
+	-- Some game versions embed rarity at index 4 (index 3 = level sent by server)
+	local serverLevel  = tonumber(parts[3])
+	local serverRarity = parts[4] and trim(parts[4]) ~= "" and trim(parts[4]) or nil
+	local rarity   = rarityFor(name, serverRarity or "Unknown")
+
+	-- CPS at level 1 (a fresh drop always arrives at level 1)
+	local cps1 = brainrotCps(name, mutation, 1)
+
+	-- Net-gain: difference between this brainrot's level-1 CPS and whatever
+	-- is currently the weakest slot in the plot. Tells you at a glance whether
+	-- placing it would actually help.
+	local netGainStr = "?"
+	local plot = findPlot()
+	if cps1 and plot and plot:FindFirstChild("Slots") then
+		local weakestCps = math.huge
+		local hasEmpty   = false
+		for _, slot in ipairs(plot.Slots:GetChildren()) do
+			local placed = slot:FindFirstChild("PlacedPart")
+			if not placed then
+				hasEmpty   = true
+				weakestCps = 0
+				break
+			end
+			local pName, pMutation, pLevel = placedBrainrotInfo(placed)
+			if pName then
+				local pCps = brainrotCps(pName, pMutation, pLevel) or 0
+				if pCps < weakestCps then
+					weakestCps = pCps
+				end
+			end
+		end
+		if weakestCps < math.huge then
+			local diff = cps1 - weakestCps
+			if hasEmpty then
+				netGainStr = "+" .. formatNumber(cps1) .. " (slot free)"
+			else
+				netGainStr = (diff >= 0 and "+" or "") .. formatNumber(diff) .. "/s"
+			end
+		end
+	end
+
+	-- Track best match seen this session
+	if cps1 and cps1 > (runtime.sessionBestCps or 0) then
+		runtime.sessionBestCps = cps1
+		runtime.sessionBestName = name
+	end
+
+	local matchesFilter = mainFilterMatches(name, mutation)
+	predictionStatus:Update("Brainrot",   name)
+	predictionStatus:Update("Rarity",     rarity)
+	predictionStatus:Update("Mutation",   mutation)
+	predictionStatus:Update("CPS (Lv.1)", cps1 and (formatNumber(cps1) .. "/s") or "N/A")
+	predictionStatus:Update("Net Gain",   netGainStr)
+	predictionStatus:Update("Filter",     matchesFilter and "Keep" or "Skip")
 end)
 
 makeSupervisor("AutoKick", 0.3, function()
@@ -3824,13 +4049,15 @@ makeSupervisor("AutoKick", 0.3, function()
 			local brainrot = trim(parts[index] or "")
 			local mutation = normalizeMutation(parts[index + 1] or "None")
 			if brainrot == "" or brainrot == "Unknown" or mainFilterMatches(brainrot, mutation) then
-				shouldReset = false
-				runtime.lastAutoKickMatch = tick()
-				break
+					shouldReset = false
+					runtime.lastAutoKickMatch = tick()
+					runtime.sessionMatches = (runtime.sessionMatches or 0) + 1
+					break
 			end
 		end
 		if shouldReset and tick() >= runtime.nextAutoKickReset and tick() - runtime.lastAutoKickMatch > 5 then
 			runtime.nextAutoKickReset = tick() + 10
+			runtime.sessionResets = (runtime.sessionResets or 0) + 1
 			restoreCamera(humanoid)
 			humanoid.Health = 0
 			return
@@ -3875,6 +4102,14 @@ makeSupervisor("AutoKick", 0.3, function()
 		safeCall("AutoKickRemote", function()
 			remotes.kick:FireServer(accuracy, power)
 		end)
+		runtime.sessionKicks = (runtime.sessionKicks or 0) + 1
+		-- sliding-window kicks-per-minute
+		local _now = tick()
+		table.insert(runtime.kickRateWindow, _now)
+		while runtime.kickRateWindow[1] and _now - runtime.kickRateWindow[1] > 60 do
+			table.remove(runtime.kickRateWindow, 1)
+		end
+		runtime.kicksPerMin = #runtime.kickRateWindow
 	end
 end)
 
