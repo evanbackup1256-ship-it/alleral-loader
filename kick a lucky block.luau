@@ -3122,7 +3122,7 @@ webhookGroup:AddDropdown("WebhookBrainrot", {
 	Values = gameData.BrainrotOptions,
 	Default = state.WBBrainrot,
 	Multi = true,
-	
+	l
 	Searchable = true,
 	Callback = function(selection)
 		state.WBBrainrot = selectedDropdownKeys(selection)
