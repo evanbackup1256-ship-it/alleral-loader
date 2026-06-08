@@ -2306,29 +2306,32 @@ local function wrapStarlightGroup(groupbox: any): AnyMap
 		}, nextId(label))
 	end
 
-	function group:CreateSlider(label: string, minimum: number, maximum: number, default: number?, callback: Callback?)
+	function group:CreateSlider(label: string, minimum: number, maximum: number, default: number?, callback: Callback?, tooltip: string?)
 		return groupbox:CreateSlider({
 			Name = label,
 			Range = { minimum, maximum },
 			CurrentValue = tonumber(default) or minimum,
 			Increment = maximum <= 5 and 0.05 or 1,
+			Tooltip = tooltip,
 			Callback = loggedCallback(label, callback),
 		}, nextId(label))
 	end
 
-	function group:CreateButton(label: string, callback: Callback?)
+	function group:CreateButton(label: string, callback: Callback?, tooltip: string?)
 		return groupbox:CreateButton({
 			Name = label,
+			Tooltip = tooltip,
 			Callback = loggedCallback(label, callback),
 		}, nextId(label))
 	end
 
-	function group:CreateInput(label: string, placeholder: string?, icon: any?, callback: Callback?)
+	function group:CreateInput(label: string, placeholder: string?, icon: any?, callback: Callback?, tooltip: string?)
 		return groupbox:CreateInput({
 			Name = label,
 			Icon = starlightIcon(icon),
 			PlaceholderText = placeholder or "",
 			RemoveTextOnFocus = false,
+			Tooltip = tooltip,
 			Callback = loggedCallback(label, callback),
 		}, nextId(label))
 	end
@@ -2370,6 +2373,13 @@ local function wrapStarlightGroup(groupbox: any): AnyMap
 
 	function group:CreateDivider()
 		return groupbox:CreateDivider()
+	end
+
+	function group:CreateParagraph(name: string, content: string)
+		return groupbox:CreateParagraph({
+			Name = name,
+			Content = content,
+		}, nextId(name))
 	end
 
 	return group
@@ -2648,165 +2658,283 @@ local function supportSummary(): string
 	return table.concat(lines, "\n")
 end
 
-profileGroup:CreateInput("Profile", "default", nil, function(value)
-	profileNameInput = sanitizeProfileName(value)
-end)
-profileGroup:CreateButton("Save", function()
-	local ok, result = saveProfile(profileNameInput)
-	if ok then
-		refreshProfilesDropdown(result)
+profileGroup:CreateInput(
+	"Profile Name",
+	"default",
+	nil,
+	function(value)
+		profileNameInput = sanitizeProfileName(value)
+	end,
+	"Name for the profile to save, load, or delete."
+)
+profileGroup:CreateButton(
+	"Save Profile",
+	function()
+		local ok, result = saveProfile(profileNameInput)
+		if ok then
+			refreshProfilesDropdown(result)
+		end
+		notify(ok and "Profiles" or "Profiles Error", ok and ("Saved: " .. tostring(result)) or tostring(result), 3)
+	end,
+	"Save current settings to a named profile file on disk."
+)
+profileGroup:CreateButton(
+	"Load Profile",
+	function()
+		local ok, err = loadProfile(profileNameInput)
+		notify(ok and "Profiles" or "Profiles Error", ok and ("Loaded: " .. tostring(profileNameInput)) or tostring(err), 3)
+	end,
+	"Load settings from the named profile file and apply them immediately."
+)
+profileGroup:CreateButton(
+	"Delete Profile",
+	function()
+		local deletedName = profileNameInput
+		local ok, err = deleteProfile(profileNameInput)
+		if ok then
+			profileNameInput = "default"
+			refreshProfilesDropdown("default")
+		end
+		notify(ok and "Profiles" or "Profiles Error", ok and ("Deleted: " .. tostring(deletedName)) or tostring(err), 3)
+	end,
+	"Permanently delete the named profile file from disk."
+)
+profileGroup:CreateDivider()
+availableProfilesDropdown = profileGroup:CreateDropdown(
+	"Saved Profiles",
+	listProfiles(),
+	"default",
+	function(value)
+		profileNameInput = sanitizeProfileName(selectedDropdownValue(value, profileNameInput))
 	end
-	notify(ok and "Profiles" or "Profiles Error", ok and ("Saved: " .. tostring(result)) or tostring(result), 3)
-end)
-profileGroup:CreateButton("Load", function()
-	local ok, err = loadProfile(profileNameInput)
-	notify(ok and "Profiles" or "Profiles Error", ok and ("Loaded: " .. tostring(profileNameInput)) or tostring(err), 3)
-end)
-profileGroup:CreateButton("Delete", function()
-	local deletedName = profileNameInput
-	local ok, err = deleteProfile(profileNameInput)
-	if ok then
-		profileNameInput = "default"
-		refreshProfilesDropdown("default")
-	end
-	notify(ok and "Profiles" or "Profiles Error", ok and ("Deleted: " .. tostring(deletedName)) or tostring(err), 3)
-end)
-availableProfilesDropdown = profileGroup:CreateDropdown("Saved Profiles", listProfiles(), "default", function(value)
-	profileNameInput = sanitizeProfileName(selectedDropdownValue(value, profileNameInput))
-end)
-profileGroup:CreateInput("Import JSON", "Paste JSON", nil, function(value)
-	importBuffer = tostring(value or "")
-end)
-profileGroup:CreateButton("Import", function()
-	local ok, decoded = safeCall("ImportProfileJson", function()
-		return HttpService:JSONDecode(importBuffer)
-	end)
-	if not ok then
-		notify("Profiles Error", "Invalid JSON: " .. shortError(decoded), 3)
-		return
-	end
-	local applied, err = applyConfigSnapshot(decoded)
-	notify(applied and "Profiles" or "Profiles Error", applied and "Imported into current config." or tostring(err), 3)
-end)
-profileGroup:CreateButton("Export", function()
-	local encoded = HttpService:JSONEncode(collectConfigSnapshot())
-	importBuffer = encoded
-	if setClipboard then
-		safeCall("CopyProfileExport", function()
-			setClipboard(encoded)
+)
+profileGroup:CreateButton(
+	"Refresh List",
+	function()
+		refreshProfilesDropdown(profileNameInput)
+		notify("Profiles", "Profile list refreshed.", 3)
+	end,
+	"Reload the saved profiles list from disk."
+)
+profileGroup:CreateDivider()
+profileGroup:CreateInput(
+	"Import / Export JSON",
+	"Paste exported JSON here",
+	nil,
+	function(value)
+		importBuffer = tostring(value or "")
+	end,
+	"Paste an exported profile JSON to import it, or use Export to fill this box."
+)
+profileGroup:CreateButton(
+	"Import JSON",
+	function()
+		local ok, decoded = safeCall("ImportProfileJson", function()
+			return HttpService:JSONDecode(importBuffer)
 		end)
-		notify("Profiles", "Current config copied to clipboard.", 3)
-	else
-		notify("Profiles", "Export JSON is ready in the import box.", 3)
+		if not ok then
+			notify("Profiles Error", "Invalid JSON: " .. shortError(decoded), 3)
+			return
+		end
+		local applied, err = applyConfigSnapshot(decoded)
+		notify(applied and "Profiles" or "Profiles Error", applied and "Imported into current config." or tostring(err), 3)
+	end,
+	"Apply the JSON pasted above to the current session."
+)
+profileGroup:CreateButton(
+	"Export to Clipboard",
+	function()
+		local encoded = HttpService:JSONEncode(collectConfigSnapshot())
+		importBuffer = encoded
+		if setClipboard then
+			safeCall("CopyProfileExport", function()
+				setClipboard(encoded)
+			end)
+			notify("Profiles", "Config copied to clipboard.", 3)
+		else
+			notify("Profiles", "Export JSON is in the Import/Export box.", 3)
+		end
+	end,
+	"Copy the current config as JSON to clipboard (and the Import/Export box)."
+)
+
+configGroup:CreateToggle(
+	"Quiet UI Errors",
+	state.UIQuietMode,
+	"Suppress repeated error notifications. Errors are still logged in the Diagnostics tab.",
+	function(value)
+		state.UIQuietMode = value
+		saveSettings()
 	end
-end)
-profileGroup:CreateButton("Refresh List", function()
-	refreshProfilesDropdown(profileNameInput)
-	notify("Profiles", "Profile list refreshed.", 3)
-end)
-
-configGroup:CreateToggle("Quiet UI Errors", state.UIQuietMode, "Limit repeated notifications", function(value)
-	state.UIQuietMode = value
-	saveSettings()
-end)
-configGroup:CreateToggle("Notify Loop Errors", state.NotifyOnError, "Show recovered loop errors", function(value)
-	state.NotifyOnError = value
-	saveSettings()
-end)
-
-recoveryGroup:CreateButton("Reset Stuck States", resetRuntimeLocks)
-recoveryGroup:CreateButton("Pause All Automation", pauseAutomation)
-recoveryGroup:CreateButton("Refresh Remotes & Plot", function()
-	runtime.cachedRemotesAt = 0
-	runtime.cachedPlotAt = 0
-	runtime.nextPlotLookup = 0
-	runtime.cachedPlot = nil
-	runtime.remoteLookupCache = {}
-	refreshRemotes()
-	updatePlotLists(protectedDropdown, upgradeDropdown)
-	notify("Runtime", "Remotes and plot cache refreshed.", 3)
-end)
-recoveryGroup:CreateButton("Clear Webhook Cache", function()
-	runtime.seenWebhookGuids = {}
-	runtime.seenWebhookOrder = {}
-	notify("Webhook", "Seen-item cache cleared.", 3)
-end)
-diagnosticsGroup:CreateButton("Clear Error Log", clearErrorLog)
-diagnosticsGroup:CreateButton("Check Game Update", function()
-	checkGameBuild(true)
-end)
-diagnosticsGroup:CreateButton("Mark Build Reviewed", acceptCurrentGameBuild)
-diagnosticsGroup:CreateButton("Copy Support Info", function()
-	local summary = supportSummary()
-	if setClipboard then
-		safeCall("CopySupportInfo", function()
-			setClipboard(summary)
-		end, true)
-		notify("Support", "Support info copied.", 3)
-	else
-		logError("Support", "Clipboard is not available.", summary)
-		notify("Support", "Clipboard is not available. Check Diagnostics.", 4)
+)
+configGroup:CreateToggle(
+	"Notify Loop Errors",
+	state.NotifyOnError,
+	"Show a notification whenever a background loop recovers from an error.",
+	function(value)
+		state.NotifyOnError = value
+		saveSettings()
 	end
-end)
-diagnosticsGroup:CreateButton("Refresh Status", function()
-	checkGameBuild(true)
-	notify("Support", "Status refreshed.", 3)
-end)
+)
 
-tuningGroup:CreateSlider("Auto Kick Interval", 0.3, 2, state.AutoKickInterval, function(value)
-	state.AutoKickInterval = math.max(0.3, value)
-	saveSettings()
-end)
-tuningGroup:CreateSlider("Auto Place Interval", 1.5, 5, state.AutoPlaceInterval, function(value)
-	state.AutoPlaceInterval = math.max(1.5, value)
-	saveSettings()
-end)
-tuningGroup:CreateSlider("Mastery Interval", 1, 5, state.MasteryInterval, function(value)
-	state.MasteryInterval = math.max(1, value)
-	saveSettings()
-end)
-tuningGroup:CreateSlider("Plot Refresh Interval", 8, 30, state.PlotRefreshInterval, function(value)
-	state.PlotRefreshInterval = math.max(8, value)
-	saveSettings()
-end)
-tuningGroup:CreateSlider("Favorite Scan Interval", 4, 30, state.FavoriteScanInterval, function(value)
-	state.FavoriteScanInterval = math.max(4, value)
-	saveSettings()
-end)
+recoveryGroup:CreateButton(
+	"Reset Stuck States",
+	resetRuntimeLocks,
+	"Clear all internal locks (IsPlacingPet, masteryBusy, etc.) and cooldowns. Use when Auto Place or Mastery stops responding."
+)
+recoveryGroup:CreateButton(
+	"Pause All Automation",
+	pauseAutomation,
+	"Disable every active automation toggle at once and reset all stuck states."
+)
+recoveryGroup:CreateButton(
+	"Refresh Remotes & Plot",
+	function()
+		runtime.cachedRemotesAt = 0
+		runtime.cachedPlotAt = 0
+		runtime.nextPlotLookup = 0
+		runtime.cachedPlot = nil
+		runtime.remoteLookupCache = {}
+		refreshRemotes()
+		updatePlotLists(protectedDropdown, upgradeDropdown)
+		notify("Runtime", "Remotes and plot cache refreshed.", 3)
+	end,
+	"Re-discover all game remotes and reload the plot. Use after a game update if remotes stop firing."
+)
+recoveryGroup:CreateButton(
+	"Clear Webhook Cache",
+	function()
+		runtime.seenWebhookGuids = {}
+		runtime.seenWebhookOrder = {}
+		notify("Webhook", "Seen-item cache cleared.", 3)
+	end,
+	"Reset the seen-GUID list so previously sent webhook items can be sent again."
+)
+diagnosticsGroup:CreateButton(
+	"Clear Error Log",
+	clearErrorLog,
+	"Wipe the in-memory error log and delete the on-disk log file."
+)
+diagnosticsGroup:CreateButton(
+	"Check Game Update",
+	function()
+		checkGameBuild(true)
+	end,
+	"Fetch current game metadata and compare against your saved baseline version."
+)
+diagnosticsGroup:CreateButton(
+	"Mark Build Reviewed",
+	acceptCurrentGameBuild,
+	"Save the current game version as the new baseline, clearing any update warnings."
+)
+diagnosticsGroup:CreateButton(
+	"Copy Support Info",
+	function()
+		local summary = supportSummary()
+		if setClipboard then
+			safeCall("CopySupportInfo", function()
+				setClipboard(summary)
+			end, true)
+			notify("Support", "Support info copied.", 3)
+		else
+			logError("Support", "Clipboard is not available.", summary)
+			notify("Support", "Clipboard is not available. Check Diagnostics.", 4)
+		end
+	end,
+	"Copy a debug summary (version, FPS, errors) to clipboard for bug reports."
+)
+diagnosticsGroup:CreateButton(
+	"Refresh Status",
+	function()
+		checkGameBuild(true)
+		notify("Support", "Status refreshed.", 3)
+	end,
+	"Re-check game build and refresh the Diagnostics status panel."
+)
 
-kickGroup:AddDropdown("FilterBrainrot", {
-	Text = "Filter Brainrot",
-	Values = gameData.BrainrotOptions,
-	Default = state.TBrainrot,
-	Multi = true,
-	Searchable = true,
-	Callback = function(selection)
-		state.TBrainrot = selectedDropdownKeys(selection)
+tuningGroup:CreateSlider(
+	"Auto Kick Interval (sec)",
+	0.3,
+	2,
+	state.AutoKickInterval,
+	function(value)
+		state.AutoKickInterval = math.max(0.3, value)
 		saveSettings()
 	end,
-})
-kickGroup:AddDropdown("FilterRarity", {
-	Text = "Filter Rarity",
-	Values = gameData.RarityOptions,
-	Default = state.TRarity,
-	Multi = true,
-	Searchable = true,
-	Callback = function(selection)
-		state.TRarity = selectedDropdownKeys(selection)
+	"Seconds between Auto Kick loop ticks. Lower = faster, higher = more stable on low FPS."
+)
+tuningGroup:CreateSlider(
+	"Auto Place Interval (sec)",
+	1.5,
+	5,
+	state.AutoPlaceInterval,
+	function(value)
+		state.AutoPlaceInterval = math.max(1.5, value)
 		saveSettings()
 	end,
-})
-kickGroup:AddDropdown("FilterMutation", {
-	Text = "Filter Mutation",
-	Values = gameData.MutationOptions,
-	Default = state.TMutation,
-	Multi = true,
-	Searchable = true,
-	Callback = function(selection)
-		state.TMutation = selectedDropdownKeys(selection)
+	"Seconds between Auto Place Brainrot attempts."
+)
+tuningGroup:CreateSlider(
+	"Mastery Interval (sec)",
+	1,
+	5,
+	state.MasteryInterval,
+	function(value)
+		state.MasteryInterval = math.max(1, value)
 		saveSettings()
 	end,
-})
+	"Seconds between mastery loop ticks."
+)
+tuningGroup:CreateSlider(
+	"Plot Refresh Interval (sec)",
+	8,
+	30,
+	state.PlotRefreshInterval,
+	function(value)
+		state.PlotRefreshInterval = math.max(8, value)
+		saveSettings()
+	end,
+	"How often the live plot is re-read to refresh the Upgrade/Protected dropdowns."
+)
+tuningGroup:CreateSlider(
+	"Favorite Scan Interval (sec)",
+	4,
+	30,
+	state.FavoriteScanInterval,
+	function(value)
+		state.FavoriteScanInterval = math.max(4, value)
+		saveSettings()
+	end,
+	"How often the backpack is scanned to queue new tools for auto-favoriting."
+)
+
+-- AUTO KICK (primary toggle — goes first so it's immediately visible)
+kickGroup:CreateToggle(
+	"Auto Kick",
+	state.AFarm,
+	"Kick lucky blocks automatically. Moves to KickReady, fires the kick remote, and resets when a non-matching brainrot is detected.",
+	function(value)
+		state.AFarm = value
+		runtime.autoKickSession = runtime.autoKickSession + 1
+		runtime.nextAutoKickReset = 0
+		runtime.lastAutoKickActivity = tick()
+		restoreCamera(select(2, characterParts()))
+		saveSettings()
+	end
+)
+kickGroup:CreateSlider(
+	"Move Speed",
+	40,
+	220,
+	state.VolcanoTweenSpeed,
+	function(value)
+		state.VolcanoTweenSpeed = value
+		saveSettings()
+	end,
+	"How fast the script teleports your character to the KickReady position each kick cycle. Higher = snappier movement."
+)
+kickGroup:CreateDivider()
+-- Kick power settings
 kickGroup:CreateDropdown(
 	"Minigame Accuracy",
 	{ "Bad", "Mid", "Good", "Great", "Excellent", "Perfect", "Cosmic" },
@@ -2816,173 +2944,336 @@ kickGroup:CreateDropdown(
 		saveSettings()
 	end
 )
-kickGroup:CreateDropdown("Power Scale Mode", { "Normal", "Micro", "Nano" }, state.KickPowerMode, function(value)
-	state.KickPowerMode = selectedDropdownValue(value, state.KickPowerMode)
-	saveSettings()
-end)
-kickGroup:CreateSlider("Set Kick Power", 0, 100, state.CustomKickPowerPercent, function(value)
-	state.CustomKickPowerPercent = value
-	saveSettings()
-end)
-local predictionStatus = kickGroup:CreateStatus("Prediction", {
+kickGroup:CreateDropdown(
+	"Power Scale Mode",
+	{ "Normal", "Micro", "Nano" },
+	state.KickPowerMode,
+	function(value)
+		state.KickPowerMode = selectedDropdownValue(value, state.KickPowerMode)
+		saveSettings()
+	end
+)
+kickGroup:CreateSlider(
+	"Kick Power %",
+	0,
+	100,
+	state.CustomKickPowerPercent,
+	function(value)
+		state.CustomKickPowerPercent = value
+		saveSettings()
+	end,
+	"Custom power as a percentage (0–100). Only applied when Power Scale Mode is Micro or Nano."
+)
+kickGroup:CreateDivider()
+-- Forward-declare so the toggle callback below can reference it before assignment
+local predictionStatus: any
+-- Live prediction display
+kickGroup:CreateToggle(
+	"Show Prediction",
+	state.APredict,
+	"Display the brainrot currently rolling in real-time — name, rarity, mutation, and CPS.",
+	function(value)
+		state.APredict = value
+		saveSettings()
+		if predictionStatus and predictionStatus.SetVisible then
+			predictionStatus:SetVisible(value)
+		end
+	end
+)
+predictionStatus = kickGroup:CreateStatus("Prediction", {
 	Brainrot = "--",
 	Rarity = "--",
 	Mutation = "--",
 	["CPS Value"] = "--",
 })
-kickGroup:CreateToggle("Prediction", state.APredict, "Show current in-game target", function(value)
-	state.APredict = value
-	saveSettings()
-	if predictionStatus and predictionStatus.SetVisible then
-		predictionStatus:SetVisible(value)
-	end
-end)
-kickGroup:CreateToggle("Auto Kick", state.AFarm, "Kick and manage lucky block rolls", function(value)
-	state.AFarm = value
-	runtime.autoKickSession = runtime.autoKickSession + 1
-	runtime.nextAutoKickReset = 0
-	runtime.lastAutoKickActivity = tick()
-	restoreCamera(select(2, characterParts()))
-	saveSettings()
-end)
-kickGroup:CreateSlider("Tween Speed", 40, 220, state.VolcanoTweenSpeed, function(value)
-	state.VolcanoTweenSpeed = value
-	saveSettings()
-end)
+kickGroup:CreateDivider()
+-- Roll filters (what brainrots to keep vs. reset)
+kickGroup:AddDropdown("FilterBrainrot", {
+	Text = "Filter: Brainrot",
+	Values = gameData.BrainrotOptions,
+	Default = state.TBrainrot,
+	Multi = true,
+	Searchable = true,
+	Tooltip = "Only keep rolls that match one of these brainrots. Leave as Any to accept all.",
+	Callback = function(selection)
+		state.TBrainrot = selectedDropdownKeys(selection)
+		saveSettings()
+	end,
+})
+kickGroup:AddDropdown("FilterRarity", {
+	Text = "Filter: Rarity",
+	Values = gameData.RarityOptions,
+	Default = state.TRarity,
+	Multi = true,
+	Searchable = true,
+	Tooltip = "Only keep rolls of these rarities. Leave as Any to accept all rarities.",
+	Callback = function(selection)
+		state.TRarity = selectedDropdownKeys(selection)
+		saveSettings()
+	end,
+})
+kickGroup:AddDropdown("FilterMutation", {
+	Text = "Filter: Mutation",
+	Values = gameData.MutationOptions,
+	Default = state.TMutation,
+	Multi = true,
+	Searchable = true,
+	Tooltip = "Filter by mutation. Select None to match only non-mutated brainrots; Any accepts everything.",
+	Callback = function(selection)
+		state.TMutation = selectedDropdownKeys(selection)
+		saveSettings()
+	end,
+})
 
-trainGroup:CreateToggle("Auto Train", state.ATrain, "Train equipped weight", function(value)
-	state.ATrain = value
-	saveSettings()
-end)
-trainGroup:CreateToggle("Auto Train + Collect Cash", state.ATrainCollect, "Train and collect plot cash", function(value)
-	state.ATrainCollect = value
-	if value then
-		local _, _, root = characterParts()
-		state.TrainAnchorCFrame = root and root.CFrame or nil
-		state.NextFlashCollect = 0
-	else
-		state.TrainAnchorCFrame = nil
+trainGroup:CreateToggle(
+	"Auto Train",
+	state.ATrain,
+	"Activate the equipped weight tool each tick to gain training XP. Pair with Auto Buy Best/Selected Weight.",
+	function(value)
+		state.ATrain = value
+		saveSettings()
 	end
-	saveSettings()
-end)
-trainGroup:CreateSlider("Cash Collect (Delay)", 1, 60, state.TrainCollectDelay, function(value)
-	state.TrainCollectDelay = value
-	state.NextFlashCollect = tick() + (value * 60)
-	saveSettings()
-end)
-trainGroup:CreateToggle("Auto Collect Cash", state.ACollect, "Collect plot cash", function(value)
-	state.ACollect = value
-	saveSettings()
-end)
-trainGroup:CreateSlider("Collect Delay", 1, 600, state.CollectDelay, function(value)
-	state.CollectDelay = value
-	saveSettings()
-end)
+)
+trainGroup:CreateDivider()
+trainGroup:CreateToggle(
+	"Auto Train + Collect Cash",
+	state.ATrainCollect,
+	"Anchors your position, keeps training, then flash-collects all plot slots at the chosen interval.",
+	function(value)
+		state.ATrainCollect = value
+		if value then
+			local _, _, root = characterParts()
+			state.TrainAnchorCFrame = root and root.CFrame or nil
+			state.NextFlashCollect = 0
+		else
+			state.TrainAnchorCFrame = nil
+		end
+		saveSettings()
+	end
+)
+trainGroup:CreateSlider(
+	"Flash Collect Every (min)",
+	1,
+	60,
+	state.TrainCollectDelay,
+	function(value)
+		state.TrainCollectDelay = value
+		state.NextFlashCollect = tick() + (value * 60)
+		saveSettings()
+	end,
+	"Minutes between flash-collect runs during Auto Train + Collect Cash."
+)
+trainGroup:CreateDivider()
+trainGroup:CreateToggle(
+	"Auto Collect Cash",
+	state.ACollect,
+	"Independently collect plot cash on a timer. Does not require a weight to be equipped.",
+	function(value)
+		state.ACollect = value
+		saveSettings()
+	end
+)
+trainGroup:CreateSlider(
+	"Collect Every (sec)",
+	1,
+	600,
+	state.CollectDelay,
+	function(value)
+		state.CollectDelay = value
+		saveSettings()
+	end,
+	"Seconds between standalone Auto Collect Cash runs."
+)
 
+placeGroup:CreateToggle(
+	"Auto Place Brainrot",
+	state.APlaceBest,
+	"Equip and place the highest-CPS brainrot from backpack into empty or weaker plot slots.",
+	function(value)
+		state.APlaceBest = value
+		saveSettings()
+	end
+)
+placeGroup:CreateDivider()
+placeGroup:CreateToggle(
+	"Enable Protection",
+	state.AProtectFilter,
+	"Prevent Auto Place from replacing the brainrots listed in Protected Brainrots below.",
+	function(value)
+		state.AProtectFilter = value
+		saveSettings()
+	end
+)
 protectedDropdown = placeGroup:AddDropdown("ProtectedBrainrots", {
 	Text = "Protected Brainrots",
 	Values = state.PlotProtectedList,
 	Default = state.TProtectedBrainrots,
 	Multi = true,
 	Searchable = true,
+	Tooltip = "Brainrots selected here will not be replaced by Auto Place. The list is refreshed from your live plot.",
 	Callback = function(selection)
 		state.TProtectedBrainrots = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
 })
-placeGroup:CreateToggle("Enable Protection", state.AProtectFilter, "Protect selected plot brainrots", function(value)
-	state.AProtectFilter = value
-	saveSettings()
-end)
-placeGroup:CreateToggle("Auto Place Brainrot", state.APlaceBest, "Place stronger brainrots in plot", function(value)
-	state.APlaceBest = value
-	saveSettings()
-end)
 
+upgradeGroup:CreateToggle(
+	"Auto Upgrade Brainrot",
+	state.AAutoUpgrade,
+	"Automatically upgrade selected plot brainrots up to Max Level.",
+	function(value)
+		state.AAutoUpgrade = value
+		saveSettings()
+	end
+)
+upgradeGroup:CreateToggle(
+	"Auto Upgrade Plot",
+	state.APlotUpgrade,
+	"Continuously fire the plot upgrade remote to level up the plot structure itself.",
+	function(value)
+		state.APlotUpgrade = value
+		saveSettings()
+	end
+)
+upgradeGroup:CreateDivider()
 upgradeDropdown = upgradeGroup:AddDropdown("UpgradeBrainrots", {
-	Text = "Upgrade Brainrots",
+	Text = "Upgrade Targets",
 	Values = state.PlotBrainrotList,
 	Default = state.TUpgrade,
 	Multi = true,
 	Searchable = true,
+	Tooltip = "Which plot brainrots to upgrade. Leave as Any to upgrade all. List uses [Lv.X] labels from the live plot.",
 	Callback = function(selection)
 		state.TUpgrade = selectedDropdownKeys(selection)
 		rebuildUpgradeBase()
 		saveSettings()
 	end,
 })
-upgradeGroup:CreateSlider("Max Level", 1, 75, state.MaxUpLevel, function(value)
-	state.MaxUpLevel = value
-	saveSettings()
-end)
-upgradeGroup:CreateSlider("Upgrade Delay", 1, 30, state.AutoUpgradeDelay, function(value)
-	state.AutoUpgradeDelay = value
-	saveSettings()
-end)
-upgradeGroup:CreateToggle(
-	"Auto Upgrade Brainrot",
-	state.AAutoUpgrade,
-	"Upgrade matching plot brainrots",
+upgradeGroup:CreateSlider(
+	"Max Level",
+	1,
+	75,
+	state.MaxUpLevel,
 	function(value)
-		state.AAutoUpgrade = value
+		state.MaxUpLevel = value
+		saveSettings()
+	end,
+	"Stop upgrading a brainrot once it reaches this level."
+)
+upgradeGroup:CreateSlider(
+	"Upgrade Delay (sec)",
+	1,
+	30,
+	state.AutoUpgradeDelay,
+	function(value)
+		state.AutoUpgradeDelay = value
+		saveSettings()
+	end,
+	"Seconds to wait between consecutive upgrade remote calls per slot."
+)
+
+-- Weight buying (most impactful — first)
+economyGroup:CreateToggle(
+	"Auto Buy Best Weight",
+	state.ABuyBest,
+	"Automatically purchase and equip the best weight your coins can currently afford.",
+	function(value)
+		state.ABuyBest = value
 		saveSettings()
 	end
 )
-upgradeGroup:CreateToggle("Auto Upgrade Plot", state.APlotUpgrade, "Upgrade plot buttons", function(value)
-	state.APlotUpgrade = value
-	saveSettings()
-end)
-
-economyGroup:CreateToggle("Auto Claim 2x", state.A2xTrain, "Claim 2x train rewards", function(value)
-	state.A2xTrain = value
-	saveSettings()
-end)
-economyGroup:CreateToggle("Auto Rebirth", state.ARebirth, "Rebirth when available", function(value)
-	state.ARebirth = value
-	saveSettings()
-end)
-economyGroup:CreateToggle("Auto Buy Speed", state.ABuySpeed, "Upgrade speed", function(value)
-	state.ABuySpeed = value
-	saveSettings()
-end)
-economyGroup:CreateToggle("Auto Buy Best Weight", state.ABuyBest, "Buy best affordable weight", function(value)
-	state.ABuyBest = value
-	saveSettings()
-end)
-economyGroup:CreateToggle("Auto Buy Selected Weight", state.ABuyWeights, "Buy selected weight", function(value)
-	state.ABuyWeights = value
-	saveSettings()
-end)
-
+economyGroup:CreateToggle(
+	"Auto Buy Selected Weight",
+	state.ABuyWeights,
+	"Buy and equip the specific weight chosen in Target Weight below.",
+	function(value)
+		state.ABuyWeights = value
+		saveSettings()
+	end
+)
 state.WeightList = { "None" }
 for _, weight in ipairs(getSortedWeights()) do
 	table.insert(state.WeightList, weight)
 end
+economyGroup:CreateDropdown(
+	"Target Weight",
+	state.WeightList,
+	state.TTargetWeight,
+	function(value)
+		state.TTargetWeight = selectedDropdownValue(value, state.TTargetWeight)
+		saveSettings()
+	end
+)
+economyGroup:CreateDivider()
+economyGroup:CreateToggle(
+	"Auto Buy Speed",
+	state.ABuySpeed,
+	"Continuously attempt to purchase speed upgrades from the shop when affordable.",
+	function(value)
+		state.ABuySpeed = value
+		saveSettings()
+	end
+)
+economyGroup:CreateDivider()
+economyGroup:CreateToggle(
+	"Auto Rebirth",
+	state.ARebirth,
+	"Fire the rebirth remote whenever it becomes available.",
+	function(value)
+		state.ARebirth = value
+		saveSettings()
+	end
+)
+economyGroup:CreateToggle(
+	"Auto Claim 2x",
+	state.A2xTrain,
+	"Click the 2x training bonus button automatically whenever it appears.",
+	function(value)
+		state.A2xTrain = value
+		saveSettings()
+	end
+)
+
 local kickStyleOptions = getKickStyleOptions()
-styleGroup:CreateDropdown("Target Weight", state.WeightList, state.TTargetWeight, function(value)
-	state.TTargetWeight = selectedDropdownValue(value, state.TTargetWeight)
-	saveSettings()
-end)
-styleGroup:CreateDropdown("Target Kick Style", kickStyleOptions, state.TargetKickStyle, function(value)
-	state.TargetKickStyle = selectedDropdownValue(value, state.TargetKickStyle)
-	saveSettings()
-end)
+styleGroup:CreateDropdown(
+	"Target Kick Style",
+	kickStyleOptions,
+	state.TargetKickStyle,
+	function(value)
+		state.TargetKickStyle = selectedDropdownValue(value, state.TargetKickStyle)
+		saveSettings()
+	end
+)
 styleGroup:CreateToggle(
 	"Auto Buy & Equip Style",
 	state.AAutoKickStyle,
-	"Purchase and equip kick style automatically",
+	"Automatically purchase and equip the Target Kick Style.",
 	function(value)
 		state.AAutoKickStyle = value
 		saveSettings()
 	end
 )
 
+favoriteGroup:CreateToggle(
+	"Auto Favorite",
+	state.AAutoFav,
+	"Automatically favorite tools that match the Brainrot / Rarity / Mutation filters below.",
+	function(value)
+		state.AAutoFav = value
+		if value then
+			scanTools()
+		end
+		saveSettings()
+	end
+)
+favoriteGroup:CreateDivider()
 favoriteGroup:AddDropdown("FavoriteBrainrot", {
-	Text = "Favorite Brainrot",
+	Text = "Fav Filter: Brainrot",
 	Values = gameData.BrainrotOptions,
 	Default = state.TSSellBrainrot,
 	Multi = true,
 	Searchable = true,
+	Tooltip = "Favorite tools with these brainrot names.",
 	Callback = function(selection)
 		state.TSSellBrainrot = selectedDropdownKeys(selection)
 		if state.AAutoFav then
@@ -2992,11 +3283,12 @@ favoriteGroup:AddDropdown("FavoriteBrainrot", {
 	end,
 })
 favoriteGroup:AddDropdown("FavoriteRarity", {
-	Text = "Favorite Rarity",
+	Text = "Fav Filter: Rarity",
 	Values = gameData.RarityOptions,
 	Default = state.TSSellRarity,
 	Multi = true,
 	Searchable = true,
+	Tooltip = "Favorite tools with these rarities.",
 	Callback = function(selection)
 		state.TSSellRarity = selectedDropdownKeys(selection)
 		if state.AAutoFav then
@@ -3006,11 +3298,12 @@ favoriteGroup:AddDropdown("FavoriteRarity", {
 	end,
 })
 favoriteGroup:AddDropdown("FavoriteMutation", {
-	Text = "Favorite Mutation",
+	Text = "Fav Filter: Mutation",
 	Values = gameData.MutationOptions,
 	Default = state.TSSellMutation,
 	Multi = true,
 	Searchable = true,
+	Tooltip = "Favorite tools with these mutations.",
 	Callback = function(selection)
 		state.TSSellMutation = selectedDropdownKeys(selection)
 		if state.AAutoFav then
@@ -3019,60 +3312,115 @@ favoriteGroup:AddDropdown("FavoriteMutation", {
 		saveSettings()
 	end,
 })
-favoriteGroup:CreateToggle("Auto Favorite Filter", state.AAutoFav, "Favorite matching tools", function(value)
-	state.AAutoFav = value
-	if value then
-		scanTools()
-	end
-	saveSettings()
-end)
-favoriteGroup:CreateButton("Sell All Brainrots", function()
-	refreshRemotes()
-	if remotes.sellAll then
-		safeCall("SellAllBrainrots", function()
-			remotes.sellAll:InvokeServer()
-		end, true)
-		notify("Luxy Hub", "Sell All fired.", 3)
-	else
-		notify("Luxy Hub", "Sell All remote not found.", 3)
-	end
-end)
+favoriteGroup:CreateDivider()
+favoriteGroup:CreateButton(
+	"Sell All Brainrots",
+	function()
+		refreshRemotes()
+		if remotes.sellAll then
+			safeCall("SellAllBrainrots", function()
+				remotes.sellAll:InvokeServer()
+			end, true)
+			notify("Luxy Hub", "Sell All fired.", 3)
+		else
+			notify("Luxy Hub", "Sell All remote not found.", 3)
+		end
+	end,
+	"Fire the Sell All remote to sell every non-favorited brainrot in your backpack."
+)
 
-battleGroup:CreateDropdown("Battle Rounds", { "3", "5", "7" }, state.BattleRounds, function(value)
-	state.BattleRounds = selectedDropdownValue(value, state.BattleRounds)
-	saveSettings()
-end)
-battleGroup:CreateToggle("Enable Gamepass", state.BattleGamepass, "Use battle gamepass option", function(value)
-	state.BattleGamepass = value
-	saveSettings()
-end)
-battleGroup:CreateSlider("Min Players to Start", 2, 5, state.BattleMinPlayers, function(value)
-	state.BattleMinPlayers = value
-	saveSettings()
-end)
-battleGroup:CreateToggle("Auto Battle Lobby", state.AAutoBattle, "Create and start battle lobbies", function(value)
-	state.AAutoBattle = value
-	saveSettings()
-end)
-battleGroup:CreateToggle("Auto Accept Battle Invites", state.AAutoAcceptBattle, "Accept battle invites", function(value)
-	state.AAutoAcceptBattle = value
-	saveSettings()
-end)
+battleGroup:CreateToggle(
+	"Auto Battle Lobby",
+	state.AAutoBattle,
+	"Create a battle lobby, invite all players in the server, and start when enough join.",
+	function(value)
+		state.AAutoBattle = value
+		saveSettings()
+	end
+)
+battleGroup:CreateToggle(
+	"Auto Accept Invites",
+	state.AAutoAcceptBattle,
+	"Automatically click Accept on incoming battle invite popups.",
+	function(value)
+		state.AAutoAcceptBattle = value
+		saveSettings()
+	end
+)
+battleGroup:CreateDivider()
+battleGroup:CreateDropdown(
+	"Battle Rounds",
+	{ "3", "5", "7" },
+	state.BattleRounds,
+	function(value)
+		state.BattleRounds = selectedDropdownValue(value, state.BattleRounds)
+		saveSettings()
+	end
+)
+battleGroup:CreateToggle(
+	"Use Gamepass",
+	state.BattleGamepass,
+	"Include the battle gamepass option when creating a lobby.",
+	function(value)
+		state.BattleGamepass = value
+		saveSettings()
+	end
+)
+battleGroup:CreateSlider(
+	"Min Players to Start",
+	2,
+	5,
+	state.BattleMinPlayers,
+	function(value)
+		state.BattleMinPlayers = value
+		saveSettings()
+	end,
+	"Minimum number of other players needed in the lobby before it will be started."
+)
 
-masteryGroup:CreateSlider("Kick Power", 0, 100, state.MasteryKickPower, function(value)
-	state.MasteryKickPower = value
-	saveSettings()
-end)
-masteryGroup:CreateDropdown("Reset Method", { "Died", "TP" }, state.MasteryResetMethod, function(value)
-	state.MasteryResetMethod = selectedDropdownValue(value, state.MasteryResetMethod)
-	saveSettings()
-end)
-local masteryStatus = masteryGroup:CreateStatus("Mastery Status", {
+-- Forward-declare so the toggle callback can reference them before they're assigned
+local masteryStatus: any
+local updateMasteryStatus: (string, AnyMap?) -> ()
+
+masteryGroup:CreateToggle(
+	"Auto Farm Mastery",
+	state.AAutoMastery,
+	"Kick blocks at Mastery Kick Power, then reset via the chosen method to repeat the mastery grind.",
+	function(value)
+		state.AAutoMastery = value
+		if not value and updateMasteryStatus then
+			updateMasteryStatus("Idle")
+		end
+		saveSettings()
+	end
+)
+masteryGroup:CreateDivider()
+masteryGroup:CreateSlider(
+	"Mastery Kick Power",
+	0,
+	100,
+	state.MasteryKickPower,
+	function(value)
+		state.MasteryKickPower = value
+		saveSettings()
+	end,
+	"Power percentage used for mastery kicks. Lower values may be needed for certain mastery tiers."
+)
+masteryGroup:CreateDropdown(
+	"Reset Method",
+	{ "Died", "TP" },
+	state.MasteryResetMethod,
+	function(value)
+		state.MasteryResetMethod = selectedDropdownValue(value, state.MasteryResetMethod)
+		saveSettings()
+	end
+)
+masteryStatus = masteryGroup:CreateStatus("Mastery Status", {
 	State = "Idle",
 	["Reset Method"] = state.MasteryResetMethod,
 	["Last Reset"] = "--",
 })
-local function updateMasteryStatus(status, extra)
+updateMasteryStatus = function(status: string, extra: AnyMap?)
 	if not masteryStatus or not masteryStatus.Update then
 		return
 	end
@@ -3084,13 +3432,6 @@ local function updateMasteryStatus(status, extra)
 		end
 	end
 end
-masteryGroup:CreateToggle("Auto Farm Mastery", state.AAutoMastery, "Farm kick mastery", function(value)
-	state.AAutoMastery = value
-	if not value then
-		updateMasteryStatus("Idle")
-	end
-	saveSettings()
-end)
 
 local weatherOptions = { "None" }
 if modules.sacrificeData and modules.sacrificeData.Recipes then
@@ -3099,127 +3440,192 @@ if modules.sacrificeData and modules.sacrificeData.Recipes then
 	end
 	table.sort(weatherOptions)
 end
-weatherGroup:CreateDropdown("Target Weather", weatherOptions, state.TTargetWeatherEvent, function(value)
-	state.TTargetWeatherEvent = selectedDropdownValue(value, state.TTargetWeatherEvent)
-	saveSettings()
-end)
-weatherGroup:CreateToggle("Auto Summon Weather", state.AAutoSummonWeather, "Summon selected weather", function(value)
-	state.AAutoSummonWeather = value
-	saveSettings()
-end)
-
-serverGroup:CreateInput("Join Server Link / JobId", "Paste JobId here", nil, function(value)
-	state.JoinJobId = trim(value)
-end)
-serverGroup:CreateButton("Join Server Instance", function()
-	local jobId = trim(state.JoinJobId)
-	jobId = jobId:match("gameInstanceId=([%w%-]+)") or jobId:match("([%w%-]+)")
-	if jobId and jobId ~= "" then
-		TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LocalPlayer)
-	else
-		notify("Luxy Hub", "Failed to extract JobId.", 3)
+weatherGroup:CreateToggle(
+	"Auto Summon Weather",
+	state.AAutoSummonWeather,
+	"Automatically sacrifice the required items to summon the chosen weather event.",
+	function(value)
+		state.AAutoSummonWeather = value
+		saveSettings()
 	end
-end)
+)
+weatherGroup:CreateDropdown(
+	"Target Weather",
+	weatherOptions,
+	state.TTargetWeatherEvent,
+	function(value)
+		state.TTargetWeatherEvent = selectedDropdownValue(value, state.TTargetWeatherEvent)
+		saveSettings()
+	end
+)
 
+serverGroup:CreateToggle(
+	"Anti AFK",
+	state.AntiAFK,
+	"Prevent the Roblox idle-kick by disabling the AFK connection or simulating user input.",
+	function(value)
+		state.AntiAFK = value
+		saveSettings()
+	end
+)
+serverGroup:CreateDivider()
+serverGroup:CreateInput(
+	"Server JobId / Link",
+	"Paste JobId or share URL",
+	nil,
+	function(value)
+		state.JoinJobId = trim(value)
+	end,
+	"Paste a Roblox share URL (contains gameInstanceId=...) or a raw JobId string."
+)
+serverGroup:CreateButton(
+	"Join Server",
+	function()
+		local jobId = trim(state.JoinJobId)
+		jobId = jobId:match("gameInstanceId=([%w%-]+)") or jobId:match("([%w%-]+)")
+		if jobId and jobId ~= "" then
+			TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LocalPlayer)
+		else
+			notify("Luxy Hub", "Failed to extract JobId.", 3)
+		end
+	end,
+	"Teleport to the server whose JobId is entered above."
+)
+
+webhookGroup:CreateToggle(
+	"Enable Webhook",
+	state.AWebhook,
+	"Send a Discord webhook notification when a matching brainrot lands in your inventory.",
+	function(value)
+		state.AWebhook = value
+		saveSettings()
+	end
+)
+webhookGroup:CreateInput(
+	"Webhook URL",
+	"Paste Discord webhook URL",
+	nil,
+	function(value)
+		local normalized, err = normalizeWebhookUrl(value)
+		if not normalized then
+			notify("Webhook Error", err, 4)
+			return
+		end
+		state.WebhookURL = normalized
+		saveSettings()
+		local ok, sendError = sendWebhook(state.WebhookURL, {
+			username = "Luxy Hub",
+			embeds = {
+				{
+					title = "Webhook Connected",
+					description = "Webhook checks are active.",
+					color = 16733440,
+					footer = { text = "Luxy Hub" },
+					timestamp = DateTime.now():ToIsoDate(),
+				},
+			},
+		})
+		notify(ok and "Webhook Check" or "Webhook Error", ok and "Webhook connected." or sendError, 4)
+	end,
+	"Must be a valid Discord webhook URL (https://discord.com/api/webhooks/...)."
+)
+webhookGroup:CreateDivider()
+-- Inventory alert filters
 webhookGroup:AddDropdown("WebhookBrainrot", {
-	Text = "Webhook Brainrot",
+	Text = "Notify: Brainrot",
 	Values = gameData.BrainrotOptions,
 	Default = state.WBBrainrot,
 	Multi = true,
 	Searchable = true,
+	Tooltip = "Only send inventory webhooks for brainrots in this list.",
 	Callback = function(selection)
 		state.WBBrainrot = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
 })
 webhookGroup:AddDropdown("WebhookRarity", {
-	Text = "Webhook Rarity",
+	Text = "Notify: Rarity",
 	Values = gameData.RarityOptions,
 	Default = state.WBRarity,
 	Multi = true,
 	Searchable = true,
+	Tooltip = "Only send inventory webhooks for brainrots with these rarities.",
 	Callback = function(selection)
 		state.WBRarity = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
 })
 webhookGroup:AddDropdown("WebhookMutation", {
-	Text = "Webhook Mutation",
+	Text = "Notify: Mutation",
 	Values = gameData.MutationOptions,
 	Default = state.WBMutation,
 	Multi = true,
 	Searchable = true,
+	Tooltip = "Only send inventory webhooks for brainrots with these mutations.",
 	Callback = function(selection)
 		state.WBMutation = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
 })
-webhookGroup:CreateInput("Webhook URL", "Paste Discord webhook", nil, function(value)
-	local normalized, err = normalizeWebhookUrl(value)
-	if not normalized then
-		notify("Webhook Error", err, 4)
-		return
+webhookGroup:CreateDivider()
+-- Inventory status tracker
+webhookGroup:CreateToggle(
+	"Auto Send Progress",
+	state.AutoStatusWebhook,
+	"Periodically send an inventory summary webhook listing counts by rarity.",
+	function(value)
+		state.AutoStatusWebhook = value
+		runtime.nextStatusWebhook = tick() + (state.AutoStatusInterval * 60)
+		saveSettings()
 	end
-	state.WebhookURL = normalized
-	saveSettings()
-	local ok, sendError = sendWebhook(state.WebhookURL, {
-		username = "Luxy Hub",
-		embeds = {
-			{
-				title = "Webhook Connected",
-				description = "Webhook checks are active.",
-				color = 16733440,
-				footer = { text = "Luxy Hub" },
-				timestamp = DateTime.now():ToIsoDate(),
-			},
-		},
-	})
-	notify(ok and "Webhook Check" or "Webhook Error", ok and "Webhook connected." or sendError, 4)
-end)
-webhookGroup:CreateToggle("Enable Webhook", state.AWebhook, "Send filtered inventory webhooks", function(value)
-	state.AWebhook = value
-	saveSettings()
-end)
+)
+webhookGroup:CreateSlider(
+	"Status Interval (min)",
+	1,
+	120,
+	state.AutoStatusInterval,
+	function(value)
+		state.AutoStatusInterval = value
+		runtime.nextStatusWebhook = tick() + (value * 60)
+		saveSettings()
+	end,
+	"How many minutes between automatic inventory status sends."
+)
+webhookGroup:CreateButton(
+	"Send Status Now",
+	function()
+		runtime.nextStatusWebhook = 0
+	end,
+	"Force an immediate inventory summary webhook, bypassing the timer."
+)
+webhookGroup:CreateDivider()
+-- Status summary filters
 webhookGroup:AddDropdown("Status Brainrot", {
-	Text = "Tracker Filter: Brainrot",
+	Text = "Status Filter: Brainrot",
 	Values = gameData.BrainrotOptions,
 	Default = state.StatusFilterBrainrot,
 	Multi = true,
 	Searchable = true,
+	Tooltip = "Include only these brainrots in the inventory summary.",
 	Callback = function(selection)
 		state.StatusFilterBrainrot = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
 })
 webhookGroup:AddDropdown("Status Rarity", {
-	Text = "Tracker Filter: Rarity",
+	Text = "Status Filter: Rarity",
 	Values = gameData.RarityOptions,
 	Default = state.StatusFilterRarity,
 	Multi = true,
 	Searchable = true,
+	Tooltip = "Include only these rarities in the inventory summary.",
 	Callback = function(selection)
 		state.StatusFilterRarity = selectedDropdownKeys(selection)
 		saveSettings()
 	end,
 })
-webhookGroup:CreateSlider("Auto Send Interval (Mins)", 1, 120, state.AutoStatusInterval, function(value)
-	state.AutoStatusInterval = value
-	runtime.nextStatusWebhook = tick() + (value * 60)
-	saveSettings()
-end)
-webhookGroup:CreateToggle("Auto Send Progress", state.AutoStatusWebhook, "Send inventory status", function(value)
-	state.AutoStatusWebhook = value
-	runtime.nextStatusWebhook = tick() + (state.AutoStatusInterval * 60)
-	saveSettings()
-end)
-webhookGroup:CreateButton("Send Tracker Check Now", function()
-	runtime.nextStatusWebhook = 0
-end)
 
-serverGroup:CreateToggle("Anti AFK", state.AntiAFK, "Prevent idle kick", function(value)
-	state.AntiAFK = value
-	saveSettings()
-end)
+
 
 if predictionStatus and predictionStatus.SetVisible then
 	predictionStatus:SetVisible(state.APredict)
