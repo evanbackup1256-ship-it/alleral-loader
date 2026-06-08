@@ -2007,7 +2007,7 @@ local function watchFavoriteTool(tool)
 		local matches = selectionMatches(state.TSSellBrainrot, tool.Name, normalizeText)
 			and selectionMatches(state.TSSellRarity, rarity, normalizeText)
 			and selectionMatches(state.TSSellMutation, mutation, normalizeMutation)
-		if matches and tool:GetAttribute("Favorite") ~= true and not table.find(runtime.favoriteQueue, guid) then
+		if matches and tool:GetAttribute("Favorite") ~= true and not tableFind(runtime.favoriteQueue, guid) then
 			table.insert(runtime.favoriteQueue, guid)
 		end
 	end
