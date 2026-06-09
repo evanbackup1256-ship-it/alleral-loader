@@ -470,14 +470,14 @@ local function logError(scope, err, details)
 	end
 	local signature = label .. "\0" .. message
 	local now = tick()
-	rt.errorCounts[signature] = (rt.errorCounts[signature] or 0) + 1
+	rt.errCounts[signature] = (rt.errCounts[signature] or 0) + 1
 	rt.lastError = line
-	if now - (rt.errorLastSeen[signature] or 0) >= 5 then
-		rt.errorLastSeen[signature] = now
-			rt.sessionErrors = rt.sessionErrors + 1
-		table.insert(rt.errorLog, 1, line)
-		while #rt.errorLog > 12 do
-			table.remove(rt.errorLog)
+	if now - (rt.errSeen[signature] or 0) >= 5 then
+		rt.errSeen[signature] = now
+			rt.seshErrs = rt.seshErrs + 1
+		table.insert(rt.errLog, 1, line)
+		while #rt.errLog > 12 do
+			table.remove(rt.errLog)
 		end
 		warn("[Alleral] " .. line)
 	end
@@ -3171,8 +3171,8 @@ local function pauseAutomation()
 end
 
 local function clearErrorLog()
-	rt.errorLog = {}
-	rt.errorCounts = {}
+	rt.errLog = {}
+	rt.errCounts = {}
 	rt.lastError = nil
 	rt.lastLoopError = nil
 	if deleteFile and isFile and isFile(logFile) then
@@ -3185,7 +3185,7 @@ end
 
 local function totalLoggedErrors()
 	local total = 0
-	for _, count in pairs(rt.errorCounts) do
+	for _, count in pairs(rt.errCounts) do
 		total = total + (tonumber(count) or 0)
 	end
 	return total
@@ -3435,7 +3435,7 @@ local function runFullDiagnostics()
 	local envTest = getgenv()
 	check("Global State", not not envTest.Alleral_State, "Persistent")
 	check("Total Errors", totalLoggedErrors() == 0, tostring(totalLoggedErrors()) .. " total")
-	check("Session Errors", rt.sessionErrors == 0, tostring(rt.sessionErrors) .. " session")
+	check("Session Errors", rt.seshErrs == 0, tostring(rt.seshErrs) .. " session")
 
 	local pass = 0
 	local fail = 0
@@ -4339,7 +4339,7 @@ task.spawn(function()
 			diagnosticsStatus:Update("Last Update", build and formatRobloxTimestamp(build.Updated) or "--")
 			diagnosticsStatus:Update("Error Count", tostring(totalLoggedErrors()))
 			diagnosticsStatus:Update("Last Error", rt.lastError or rt.lastLoopError or "--")
-			diagnosticsStatus:Update("Recent Error", rt.errorLog[1] or "--")
+			diagnosticsStatus:Update("Recent Error", rt.errLog[1] or "--")
 
 			if sessionStatus and sessionStatus.Update then
 				local elapsed = math.floor(tick() - (rt.sessionStart or tick()))
@@ -5318,14 +5318,14 @@ coroutine.wrap(function()
 			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Session", string.format("%02d:%02d", mins, secs))
 			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Version", VERSION)
 			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Total Kicks", tostring(rt.sessionKicks))
-			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Total Errors", tostring(#rt.errorLog))
+			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Total Errors", tostring(#rt.errLog))
 			if state.AFarm or state.AAutoMastery or state.AAutoBattle or state.AAutoWeather or state.AAutoStyle then
 				local count = (state.AFarm and 1 or 0) + (state.AAutoMastery and 1 or 0) + (state.AAutoBattle and 1 or 0) + (state.AAutoWeather and 1 or 0) + (state.AAutoStyle and 1 or 0)
 				pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Active Features", tostring(count))
 			else
 				pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Active Features", "0")
 			end
-			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Session Errors", tostring(rt.sessionErrors))
+			pcall(Hub._DashboardStatus.Update, Hub._DashboardStatus, "Session Errors", tostring(rt.seshErrs))
 		end
 		if Hub._QuickStatus and Hub._QuickStatus.Update then
 			pcall(Hub._QuickStatus.Update, Hub._QuickStatus, "Farming", state.AFarm and "On" or "Off")
