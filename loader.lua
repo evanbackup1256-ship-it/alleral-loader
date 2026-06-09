@@ -24,25 +24,56 @@ if not url then
 	return
 end
 
+local HttpService = game:GetService("HttpService")
+
 local function fetch(url)
-	local funcs = {
-		function() return game:HttpGet(url) end,
-		function() return game:HttpGetAsync(url) end,
-		function()
-			local r = syn and syn.request or http_request or request
-			if r then
-				local resp = r({ Url = url, Method = "GET" })
-				return resp and resp.Body or ""
-			end
-			return ""
-		end,
+	local ok, src
+	local env = getgenv and getgenv() or getfenv and getfenv() or {}
+
+	ok, src = pcall(game.HttpGet, game, url)
+	if ok and src and src ~= "" and not src:find("404") and not src:find("Not Found") then
+		return src
+	end
+
+	ok, src = pcall(game.HttpGetAsync, game, url)
+	if ok and src and src ~= "" and not src:find("404") and not src:find("Not Found") then
+		return src
+	end
+
+	local requestCandidates = {
+		env.syn and env.syn.request,
+		env.fluxus and env.fluxus.request,
+		env.http and env.http.request,
+		env.http_service and env.http_service.request,
+		env.http_request,
+		env.request,
+		env.Request,
 	}
-	for _, f in ipairs(funcs) do
-		local ok, src = pcall(f)
-		if ok and src and src ~= "" and not src:find("404") and not src:find("Not Found") then
-			return src
+
+	for _, reqFunc in ipairs(requestCandidates) do
+		if type(reqFunc) == "function" then
+			ok, src = pcall(reqFunc, { Url = url, Method = "GET" })
+			if ok and src and type(src) == "table" and src.Body and src.Body ~= "" then
+				local body = src.Body
+				if not body:find("404") and not body:find("Not Found") then
+					return body
+				end
+			end
 		end
 	end
+
+	if type(HttpService.RequestAsync) == "function" then
+		ok, src = pcall(HttpService.RequestAsync, HttpService, {
+			Url = url,
+			Method = "GET",
+		})
+		if ok and src and type(src) == "table" and type(src.Body) == "string" and src.Body ~= "" then
+			if not src.Body:find("404") and not src.Body:find("Not Found") then
+				return src.Body
+			end
+		end
+	end
+
 	return nil
 end
 
