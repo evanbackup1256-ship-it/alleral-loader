@@ -840,7 +840,6 @@ local function loadLocalLua(path, label)
 		end
 	end
 	return nil
-	return loadLuaSource(source, label)
 end
 
 local function loadRemoteLua(url, label)
