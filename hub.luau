@@ -9,7 +9,6 @@ do
 end
 
 local HUB_VERSION = "1.0"
-local function addCache(url) return url .. "?t=" .. tostring(tick()) end
 local RAW_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/"
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
@@ -39,40 +38,6 @@ local function notify(title, text, duration)
 	pcall(function() StarterGui:SetCore("SendNotification", {Title = tostring(title), Text = tostring(text), Duration = duration or 3}) end)
 end
 
-local function fetchUrl(url)
-	return fetchText(url .. "?t=" .. tostring(tick()))
-end
-
-local function safeCall(scope, cb)
-	local ok, r = pcall(cb)
-	if not ok then warn("[Hub] " .. tostring(scope) .. ": " .. tostring(r)) end
-	return ok, r
-end
-
-local starlight
-local starlightWindow
-local starlightSection
-local hubTab
-
-local function patchStarlightSource(source)
-	source = source:gsub("function Tab:Show%(%)[\r\n]+%s*if Library%.ActiveTab then",
-		"function Tab:Show()\n\t\t\tif Library.ActiveTab == Tab then\n\t\t\t\treturn\n\t\t\tend\n\t\t\tif Library.ActiveTab then")
-	local inputStart = source:find("function Groupbox:CreateInput", 1, true)
-	local labelStart = inputStart and source:find("function Groupbox:CreateLabel", inputStart, true)
-	if not inputStart or not labelStart then return source end
-	local before = source:sub(1, inputStart - 1)
-	local block = source:sub(inputStart, labelStart - 1)
-	local after = source:sub(labelStart)
-	block = block:gsub("(Element%.Instance = GroupboxTemplateInstance%.Input_TEMPLATE:Clone%(%)[\r\n]+%s*Element%.Instance%.Visible = true)",
-		"%1\n\t\t\t\t\t\tElement.Instance.Parent = Groupbox.ParentingItem", 1)
-	block = block:gsub("\n%s*Element%.Instance%.Parent = Groupbox%.ParentingItem\n\n%s*(Starlight%.Window%.TabSections%[Name%]%.Tabs%[TabIndex%]%.Groupboxes%[GroupIndex%]%.Elements%[Index%] = Element)",
-		"\n\n\t\t\t\t\t%1", 1)
-	return before .. block .. after
-end
-
-local STARLIGHT_SRC = "https://raw.githubusercontent.com/Nebula-Softworks/Starlight-Interface-Suite/master/Source.lua"
-local STARLIGHT_LOCAL = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/starlight_repo/Source.lua"
-
 local function fetchText(url)
 	local cb = "?t=" .. tostring(tick())
 	url = url:find("?") and url or (url .. cb)
@@ -92,6 +57,42 @@ local function fetchText(url)
 	end
 	return nil
 end
+
+local function fetchUrl(url)
+	return fetchText(url)
+end
+
+local function safeCall(scope, cb)
+	local ok, r = pcall(cb)
+	if not ok then warn("[Hub] " .. tostring(scope) .. ": " .. tostring(r)) end
+	return ok, r
+end
+
+local starlight
+local starlightWindow
+local starlightSection
+local hubTab
+
+local function patchStarlightSource(source)
+	source = source:gsub("function Tab:Show%(%)[\r\n]+%s*if Library%.ActiveTab then",
+		"function Tab:Show()\n\t\t\tif Library.ActiveTab == Tab then\n\t\t\t\treturn\n\t\t\tend\n\t\t\tif Library.ActiveTab then")
+	source = source:gsub("\"UIPageLayout\"", "\"UIPaginatedLayout\"")
+	source = source:gsub("%.UIPageLayout", ".UIPaginatedLayout")
+	local inputStart = source:find("function Groupbox:CreateInput", 1, true)
+	local labelStart = inputStart and source:find("function Groupbox:CreateLabel", inputStart, true)
+	if not inputStart or not labelStart then return source end
+	local before = source:sub(1, inputStart - 1)
+	local block = source:sub(inputStart, labelStart - 1)
+	local after = source:sub(labelStart)
+	block = block:gsub("(Element%.Instance = GroupboxTemplateInstance%.Input_TEMPLATE:Clone%(%)[\r\n]+%s*Element%.Instance%.Visible = true)",
+		"%1\n\t\t\t\t\t\tElement.Instance.Parent = Groupbox.ParentingItem", 1)
+	block = block:gsub("\n%s*Element%.Instance%.Parent = Groupbox%.ParentingItem\n\n%s*(Starlight%.Window%.TabSections%[Name%]%.Tabs%[TabIndex%]%.Groupboxes%[GroupIndex%]%.Elements%[Index%] = Element)",
+		"\n\n\t\t\t\t\t%1", 1)
+	return before .. block .. after
+end
+
+local STARLIGHT_SRC = "https://raw.githubusercontent.com/Nebula-Softworks/Starlight-Interface-Suite/master/Source.lua"
+local STARLIGHT_LOCAL = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/starlight_repo/Source.lua"
 
 local function loadStarlight()
 	local src = fetchText(STARLIGHT_SRC)
