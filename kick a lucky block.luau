@@ -946,43 +946,6 @@ if not starlight or type(starlight.CreateWindow) ~= "function" then
 end
 runtime.ui = starlight
 
-local gameData = (function()
-	local data = { BrainrotOptions = { "Any" }, RarityOptions = { "Any" }, MutationOptions = { "Any" } }
-
-	local brainrots = modules.entitiesData and modules.entitiesData.Brainrots
-	if brainrots then
-		local seenRarity = { Any = true }
-		for name in pairs(brainrots) do
-			if name ~= "Any" then
-				table.insert(data.BrainrotOptions, name)
-			end
-			local r = brainrots[name] and brainrots[name].Rarity
-			if r and not seenRarity[r] then
-				seenRarity[r] = true
-				table.insert(data.RarityOptions, r)
-			end
-		end
-		table.sort(data.BrainrotOptions)
-		table.sort(data.RarityOptions)
-	else
-		data.RarityOptions = { "Any", "Common", "Rare", "Epic", "Legendary", "Mythic", "Godly", "Secret", "Divine", "Hacked", "OG", "Celestial", "Exclusive", "Eternal" }
-	end
-
-	local mutations = modules.mutationData and modules.mutationData.Mutations
-	if mutations then
-		for name in pairs(mutations) do
-			if name ~= "None" then
-				table.insert(data.MutationOptions, name)
-			end
-		end
-		table.sort(data.MutationOptions)
-	else
-		data.MutationOptions = { "Any", "None", "Golden", "Diamond", "Plasma", "Molten", "Radioactive", "Void", "Shadow", "Electrified", "Rainbow", "Virus", "Wet", "Alien", "Bacon", "Enchanted", "Phantom", "Astral", "Volcanic" }
-	end
-
-	return data
-end)()
-
 local function listFromSelection(selection)
 	if type(selection) == "string" then
 		return { selection }
@@ -1181,6 +1144,43 @@ end)
 loadModule("weatherService", "WeatherServiceClient", function()
 	return ReplicatedStorage.Modules.ServicesLoader.WeatherService_Client
 end)
+
+local gameData = (function()
+	local data = { BrainrotOptions = { "Any" }, RarityOptions = { "Any" }, MutationOptions = { "Any" } }
+
+	local brainrots = modules.entitiesData and modules.entitiesData.Brainrots
+	if brainrots then
+		local seenRarity = { Any = true }
+		for name in pairs(brainrots) do
+			if name ~= "Any" then
+				table.insert(data.BrainrotOptions, name)
+			end
+			local r = brainrots[name] and brainrots[name].Rarity
+			if r and not seenRarity[r] then
+				seenRarity[r] = true
+				table.insert(data.RarityOptions, r)
+			end
+		end
+		table.sort(data.BrainrotOptions)
+		table.sort(data.RarityOptions)
+	else
+		data.RarityOptions = { "Any", "Common", "Rare", "Epic", "Legendary", "Mythic", "Godly", "Secret", "Divine", "Hacked", "OG", "Celestial", "Exclusive", "Eternal" }
+	end
+
+	local mutations = modules.mutationData and modules.mutationData.Mutations
+	if mutations then
+		for name in pairs(mutations) do
+			if name ~= "None" then
+				table.insert(data.MutationOptions, name)
+			end
+		end
+		table.sort(data.MutationOptions)
+	else
+		data.MutationOptions = { "Any", "None", "Golden", "Diamond", "Plasma", "Molten", "Radioactive", "Void", "Shadow", "Electrified", "Rainbow", "Virus", "Wet", "Alien", "Bacon", "Enchanted", "Phantom", "Astral", "Volcanic" }
+	end
+
+	return data
+end)()
 
 local values = {
 	coins = modules.balanceService and parseNumber(modules.balanceService.Balance) or 0,
