@@ -1,6 +1,6 @@
 do
-	if not getgenv().Luxy_Tracked then
-		getgenv().Luxy_Tracked = true
+	if not getgenv().Alleral_Tracked then
+		getgenv().Alleral_Tracked = true
 		pcall(function()
 			local req = http_request or request or syn and syn.request
 			if req then
@@ -938,9 +938,9 @@ local function loadStarlight()
 	end
 
 	-- Local bundle fallbacks
-	local luxyBackup = loadLocalLua("new_ui_library_luxy_backup.lua", "Starlight local backup")
-	if luxyBackup and type(luxyBackup.CreateWindow) == "function" then
-		return luxyBackup
+	local alleralBackup = loadLocalLua("new_ui_library_luxy_backup.lua", "Starlight local backup")
+	if alleralBackup and type(alleralBackup.CreateWindow) == "function" then
+		return alleralBackup
 	end
 	return loadLocalLua("new_ui_library.lua", "Starlight local fallback")
 end
