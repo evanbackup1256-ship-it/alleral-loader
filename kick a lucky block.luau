@@ -308,7 +308,7 @@ local Executor = (function()
 	-- Normalise: lowercase, drop whitespace, keep only the base token
 	local name = rawName:lower():gsub("%s+", ""):match("^[%a][%w%-_%.]*") or ""
 
-	-- Namespace/global fingerprinting — fallback when the name is missing/useless
+	-- Namespace/global fingerprinting - fallback when the name is missing/useless
 	if name == "" then
 		if tbl("syn") and type(env.syn.request) == "function" then
 			name = "synapse"
@@ -825,7 +825,7 @@ end
 local STARLIGHT_SOURCE_URL =
 	"https://raw.githubusercontent.com/Nebula-Softworks/Starlight-Interface-Suite/master/Source.lua"
 
--- ── Auto-update mechanism ─────────────────────────────────────────────────────
+-- --- Auto-update mechanism --------------------------------------------------
 -- Fetches the latest script version from a remote source and runs it if newer.
 -- The script acts as its own launcher: always run the bleeding-edge version.
 local SCRIPT_SOURCE_URL =
@@ -859,7 +859,7 @@ end
 if autoUpdate() then
 	return
 end
--- ── End auto-update ───────────────────────────────────────────────────────────
+-- --- End auto-update --------------------------------------------------------
 
 local function patchStarlightSource(source)
 	source = source:gsub(
@@ -1085,12 +1085,12 @@ local function parseNumber(value)
 		return value
 	end
 	local text = tostring(value or ""):gsub("[,%s%$]", "")
-	-- Standard scientific notation: e.g. "1.5e3" → 1500
+	-- Standard scientific notation: e.g. "1.5e3" -> 1500
 	local mantissa, exponent = text:match("^(%-?[%d%.]+)[eE](%-?%d+)$")
 	if mantissa and exponent then
 		return (tonumber(mantissa) or 0) * (10 ^ (tonumber(exponent) or 0))
 	end
-	-- Number with optional K/M/B/T/… suffix; allow leading minus
+	-- Number with optional K/M/B/T/... suffix; allow leading minus
 	local number, suffix = text:match("^(%-?[%d%.]+)(%a*)$")
 	local valueNumber = tonumber(number or text) or 0
 	local powers = { K = 3, M = 6, B = 9, T = 12, Q = 15, Qi = 18, S = 21, Sp = 24, O = 27, N = 30, D = 33 }
@@ -1357,7 +1357,7 @@ local function brainrotCps(name, mutation, level)
 		local m = parseNumber(entry.LevelMultiplier or 1)
 		leveledBase = base * (1 + (lvl - 1) * (m - 1))
 	else
-		-- Default: linear (base × level). Works for most KickBlox games.
+		-- Default: linear (base x level). Works for most KickBlox games.
 		leveledBase = base * lvl
 	end
 
@@ -3185,7 +3185,7 @@ tuningGroup:CreateSlider(
 	"How often the backpack is scanned to queue new tools for auto-favoriting."
 )
 
--- AUTO KICK (primary toggle — goes first so it's immediately visible)
+-- AUTO KICK (primary toggle - goes first so it's immediately visible)
 kickGroup:CreateToggle(
 	"Auto Kick",
 	state.AFarm,
@@ -3239,7 +3239,7 @@ kickGroup:CreateSlider(
 		state.CustomKickPowerPercent = value
 		saveSettings()
 	end,
-	"Custom power as a percentage (0–100). Only applied when Power Scale Mode is Micro or Nano."
+	"Custom power as a percentage (0-100). Only applied when Power Scale Mode is Micro or Nano."
 )
 kickGroup:CreateDivider()
 -- Forward-declare so the toggle callback below can reference it before assignment
@@ -3248,7 +3248,7 @@ local predictionStatus
 kickGroup:CreateToggle(
 	"Show Prediction",
 	state.APredict,
-	"Display the brainrot currently rolling in real-time — name, rarity, mutation, and CPS.",
+	"Display the brainrot currently rolling in real-time - name, rarity, mutation, and CPS.",
 	function(value)
 		state.APredict = value
 		saveSettings()
@@ -3473,7 +3473,7 @@ upgradeGroup:CreateSlider(
 	"Seconds to wait between consecutive upgrade remote calls per slot."
 )
 
--- Weight buying (most impactful — first)
+-- Weight buying (most impactful - first)
 economyGroup:CreateToggle(
 	"Auto Buy Best Weight",
 	state.ABuyBest,
