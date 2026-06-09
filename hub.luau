@@ -31,7 +31,6 @@ do
 	local env = getgenv()
 	local rawName = tostring(identifyexecutor and identifyexecutor() or "")
 	Executor.name = rawName:lower()
-	Executor.hasHttp = type(HttpService.HttpGet) == "function" or type(HttpService.RequestAsync) == "function"
 	Executor.env = env
 end
 
