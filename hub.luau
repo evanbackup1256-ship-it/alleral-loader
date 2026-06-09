@@ -9,6 +9,7 @@ do
 end
 
 local HUB_VERSION = "1.0"
+local function addCache(url) return url .. "?t=" .. tostring(tick()) end
 local RAW_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/"
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
@@ -39,7 +40,7 @@ local function notify(title, text, duration)
 end
 
 local function fetchUrl(url)
-	return fetchText(url)
+	return fetchText(url .. "?t=" .. tostring(tick()))
 end
 
 local function safeCall(scope, cb)
@@ -73,6 +74,8 @@ local STARLIGHT_SRC = "https://raw.githubusercontent.com/Nebula-Softworks/Starli
 local STARLIGHT_LOCAL = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/starlight_repo/Source.lua"
 
 local function fetchText(url)
+	local cb = "?t=" .. tostring(tick())
+	url = url:find("?") and url or (url .. cb)
 	local httpReq = syn and syn.request or http_request or request or (http and http.request)
 	if httpReq then
 		local ok, resp = pcall(httpReq, {Url = url, Method = "GET"})
@@ -80,7 +83,10 @@ local function fetchText(url)
 			return resp.Body
 		end
 	end
-	local ok, data = pcall(function() return game:HttpGet(url) end)
+	local ok, data = pcall(function()
+		if type(game.HttpGet) == "function" then return game:HttpGet(url) end
+		return nil
+	end)
 	if ok and data and data ~= "" and not data:find("404: Not Found") then
 		return data
 	end

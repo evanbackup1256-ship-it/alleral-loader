@@ -1,8 +1,6 @@
---[[
-	Alleral Hub Loader v2.0
-	loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.lua"))()
-]]
-local HUB_URL = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub.luau"
+
+local function addCache(url) return url .. "?t=" .. tostring(tick()) end
+local HUB_URL = addCache("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub.luau")
 
 local function SafeGet(url)
 	if type(url) ~= "string" or url == "" then
@@ -17,12 +15,14 @@ local function SafeGet(url)
 		end
 	end
 	local success, result = pcall(function()
-		return game:HttpGet(url)
+		if type(game.HttpGet) == "function" then return game:HttpGet(url) end
+		return nil
 	end)
 	if not success then
 		warn("[Loader] HttpGet failed:", result)
 		return nil
 	end
+	if not result then return nil end
 	return result
 end
 
