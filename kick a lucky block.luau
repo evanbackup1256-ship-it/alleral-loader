@@ -83,43 +83,67 @@ local connections = {}
 local loops = {}
 local loopControllers = {}
 local rt = {
-	seenHooks = {},
-	hookOrder = {},
-	favQueue = {},
-	favTools = {},
-	lastKickAct = 0,
-	lastKickMatch = 0,
-	nextKickReset = 0,
-	kickSesh = 0,
-	flashSesh = 0,
-	cachedW = nil,
-	cachedPlot = nil,
-	plotAt = 0,
-	nextPlot = 0,
-	remoteAt = 0,
-	battleStat = nil,
-	battleAt = 0,
-	nextWBuy = {},
-	nextKStyle = 0,
-	remoteCache = {},
 	errLog = {},
 	errCounts = {},
 	errSeen = {},
-	perfMode = "Balanced",
-	seshStart = tick(),
-	seshKicks = 0,
-	seshResets = 0,
-	seshSkips = 0,
-	seshMatches = 0,
-	bestCps = 0,
-	bestName = "--",
-	rateWindow = {},
-	kpm = 0,
-	mastKicks = 0,
 	seshErrs = 0,
-	lastACTick = 0,
-	acHits = 0,
-	lastHide = 0,
+	remoteLookupCache = {},
+	cachedRemotesAt = 0,
+	cachedPlot = nil,
+	cachedPlotAt = 0,
+	nextPlotLookup = 0,
+	cachedBattleStatus = nil,
+	cachedBattleStatusAt = 0,
+	cachedWeights = nil,
+	currentFps = 60,
+	performanceMode = "Balanced",
+	favoriteTools = {},
+	favoriteQueue = {},
+	seenWebhookGuids = {},
+	seenWebhookOrder = {},
+	nextWeightBuyAttempt = {},
+	gameBuild = nil,
+	lastError = nil,
+	lastLoopError = nil,
+	kickRateWindow = {},
+	kicksPerMin = 0,
+	sessionStart = tick(),
+	sessionKicks = 0,
+	sessionResets = 0,
+	sessionSkips = 0,
+	sessionMatches = 0,
+	sessionBestCps = 0,
+	sessionBestName = "--",
+	sessionIndexSkips = 0,
+	autoKickSession = 0,
+	nextAutoKickReset = 0,
+	lastAutoKickActivity = 0,
+	lastAutoKickMatch = 0,
+	flashCollectSession = 0,
+	acTriggerCount = 0,
+	lastAntiCheatTrigger = 0,
+	lastEmergencyHide = 0,
+	masteryBusy = false,
+	masteryKickCount = 0,
+	nextMasteryAction = 0,
+	nextSpeedBuyAttempt = 0,
+	nextBattleCreate = 0,
+	nextBattleInvite = 0,
+	nextBattleStart = 0,
+	lastProtectedSignature = nil,
+	lastUpgradeSignature = nil,
+	nextKickStyleAttempt = 0,
+	nextCollect = 0,
+	nextFavoriteScan = 0,
+	nextStatusWebhook = 0,
+	battleCooldownUntil = 0,
+	lastBattleStatus = nil,
+	lastIndexSkip = nil,
+	staffDetected = nil,
+	staffDetectedName = nil,
+	staffDetectionTime = nil,
+	staffNotifyCooldown = 0,
+	ui = nil,
 }
 
 local Plrs = game:GetService("Players")
@@ -760,7 +784,7 @@ local function safeFindRemote(network, aliases)
 		end
 		local remote = network and network:FindFirstChild(alias)
 		if not remote then
-			remote = RS:FindFirstChild(alias, true)
+			remote = RS and RS:FindFirstChild(alias, true)
 		end
 		if remote then
 			rt.remoteLookupCache[alias] = remote
@@ -1268,34 +1292,34 @@ local function loadModule(key, label, resolver)
 end
 
 loadModule("entitiesData", "EntitiesData", function()
-	return RS.Shared.Data.EntitiesData
+	return RS and RS.Shared and RS.Shared.Data and RS.Shared.Data.EntitiesData
 end)
 loadModule("mutationData", "MutationData", function()
-	return RS.Shared.Data.MutationData
+	return RS and RS.Shared and RS.Shared.Data and RS.Shared.Data.MutationData
 end)
 loadModule("weightsData", "WeightsData", function()
-	return RS:FindFirstChild("WeightsData", true)
+	return RS and RS:FindFirstChild("WeightsData", true)
 end)
 loadModule("speedData", "SpeedData", function()
-	return RS.Shared.Data.SpeedData
+	return RS and RS.Shared and RS.Shared.Data and RS.Shared.Data.SpeedData
 end)
 loadModule("rebirthData", "RebirthData", function()
-	return RS.Shared.Data.RebirthData
+	return RS and RS.Shared and RS.Shared.Data and RS.Shared.Data.RebirthData
 end)
 loadModule("sacrificeData", "SacrificeData", function()
-	return RS.Shared.Data.SacrificeData
+	return RS and RS.Shared and RS.Shared.Data and RS.Shared.Data.SacrificeData
 end)
 loadModule("kickService", "KickServiceClient", function()
-	return RS.Modules.ServicesLoader.KickServiceClient
+	return RS and RS.Modules and RS.Modules.ServicesLoader and RS.Modules.ServicesLoader.KickServiceClient
 end)
 loadModule("balanceService", "ClientBalanceService", function()
-	return RS.Modules.ServicesLoader.ClientBalanceService
+	return RS and RS.Modules and RS.Modules.ServicesLoader and RS.Modules.ServicesLoader.ClientBalanceService
 end)
 loadModule("rebirthService", "RebirthServiceClient", function()
-	return RS.Modules.ServicesLoader.RebirthServiceClient
+	return RS and RS.Modules and RS.Modules.ServicesLoader and RS.Modules.ServicesLoader.RebirthServiceClient
 end)
 loadModule("weatherService", "WeatherServiceClient", function()
-	return RS.Modules.ServicesLoader.WeatherService_Client
+	return RS and RS.Modules and RS.Modules.ServicesLoader and RS.Modules.ServicesLoader.WeatherService_Client
 end)
 
 local gameData = (function()
@@ -1369,11 +1393,11 @@ end
 local remotes = {}
 
 local function refreshRemotes()
-	if tick() - rt.cachedRemotesAt < 5 then
+	if tick() - (rt.cachedRemotesAt or 0) < 5 then
 		return
 	end
 	rt.cachedRemotesAt = tick()
-	local network = RS:FindFirstChild("Shared")
+	local network = RS and RS:FindFirstChild("Shared")
 	network = network and network:FindFirstChild("Packages")
 	network = network and network:FindFirstChild("Network")
 
@@ -2094,7 +2118,7 @@ local function getSortedWeights()
 		return rt.cachedWeights
 	end
 	local weights = {}
-	local weightModels = RS:FindFirstChild("Objects")
+	local weightModels = RS and RS:FindFirstChild("Objects")
 		and RS.Objects:FindFirstChild("WeightModels")
 	if weightModels then
 		for _, item in ipairs(weightModels:GetChildren()) do
@@ -2294,7 +2318,7 @@ end
 local function getKickStyleOptions()
 	local options = { "Default" }
 	safeCall("KickStyleOptions", function()
-		local folder = RS.Shared.Data:FindFirstChild("KickStylesData")
+		local folder = RS and RS.Shared and RS.Shared.Data and RS.Shared.Data:FindFirstChild("KickStylesData")
 		if folder then
 			for _, item in ipairs(folder:GetChildren()) do
 				if item:IsA("ModuleScript") and item.Name ~= "Default" then
@@ -4819,7 +4843,7 @@ makeSupervisor("AutoFavorite", 4, function()
 		if remotes.toggleFavorite then
 			remotes.toggleFavorite:FireServer(guid)
 		else
-			local network = require(RS.Shared.Packages.Network)
+			local network = RS and RS.Shared and RS.Shared.Packages and RS.Shared.Packages.Network and require(RS.Shared.Packages.Network)
 			network.FireServer("ToggleFav", guid)
 		end
 	end)
