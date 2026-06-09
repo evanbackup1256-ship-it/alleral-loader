@@ -146,15 +146,15 @@ local rt = {
 	ui = nil,
 }
 
-local Plrs = game:GetService("Players")
-local RS = game:GetService("ReplicatedStorage")
-local Ws = game:GetService("Workspace")
-local RunSvc = game:GetService("RunService")
-local HttpSvc = game:GetService("HttpService")
-local MktSvc = game:GetService("MarketplaceService")
-local TeleSvc = game:GetService("TeleportService")
-local VUser = game:GetService("VirtualUser")
-local SGui = game:GetService("StarterGui")
+local Plrs = Players or game:GetService("Players")
+local RS = ReplicatedStorage or game:GetService("ReplicatedStorage")
+local Ws = Workspace or game:GetService("Workspace")
+local RunSvc = RunService or game:GetService("RunService")
+local HttpSvc = HttpService or game:GetService("HttpService")
+local MktSvc = MarketplaceService or game:GetService("MarketplaceService")
+local TeleSvc = TeleportService or game:GetService("TeleportService")
+local VUser = VirtualUser or game:GetService("VirtualUser")
+local SGui = StarterGui or game:GetService("StarterGui")
 local LP = Plrs.LocalPlayer
 if not LP then
 	Plrs:GetPropertyChangedSignal("LocalPlayer"):Wait()
