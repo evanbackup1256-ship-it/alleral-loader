@@ -1050,7 +1050,7 @@ local function normalizeMutation(value)
 	return text
 end
 
-local function selectionMatches(selection, value, normalizer: (any) -> string)
+local function selectionMatches(selection, value, normalizer)
 	selection = listFromSelection(selection)
 	if hasWildcard(selection) then
 		return true
@@ -2331,7 +2331,7 @@ local function starlightIcon(icon)
 	return tostring(icon or ""):match("%d+$") or ""
 end
 
-local function starlightWait(predicate: () -> any, timeout)
+local function starlightWait(predicate, timeout)
 	local started = tick()
 	repeat
 		if predicate() then

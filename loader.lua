@@ -14,4 +14,14 @@ if not url then
 	return
 end
 
-loadstring(game:HttpGet(url))()
+local src = game:HttpGet(url)
+if not src or src == "" then
+	warn("[Alleral] empty response for", url)
+	return
+end
+local fn, err = loadstring(src)
+if not fn then
+	warn("[Alleral] compile error:", err)
+	return
+end
+fn()
