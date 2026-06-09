@@ -5,7 +5,7 @@
 local RepoRoot = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/"
 
 local Games = {
-	[89469502395769] = RepoRoot .. "kick a lucky block.luau",
+	[89469502395769] = RepoRoot .. "kick%20a%20lucky%20block.luau",
 }
 
 local url = Games[game.PlaceId]
