@@ -637,6 +637,13 @@ end
 clampSettings()
 
 local function requestFunction()
+	local core = getgenv and getgenv().Alleral_Core
+	if core and type(core.requestFunction) == "function" then
+		local shared = core.requestFunction()
+		if shared then
+			return shared
+		end
+	end
 	local e = Executor.env
 	local candidates = {
 		type(e.syn)         == "table" and type(e.syn.request)          == "function" and e.syn.request          or nil,
@@ -674,6 +681,28 @@ local function requestFunction()
 	for _, candidate in ipairs(candidates) do
 		if type(candidate) == "function" then
 			return candidate
+		end
+	end
+	return nil
+end
+
+local function fetchUrl(url)
+	local httpGet = requestFunction()
+	if httpGet then
+		local ok, response = safeCall("FetchUrl", function()
+			return httpGet({ Url = url, Method = "GET" })
+		end)
+		if ok and response then
+			local body = response.Body or response.body
+			if body and body ~= "" and not body:find("404: Not Found") then
+				return body
+			end
+		end
+	end
+	if type(game.HttpGet) == "function" then
+		local ok, body = pcall(game.HttpGet, game, url, true)
+		if ok and body and body ~= "" and not body:find("404: Not Found") then
+			return body
 		end
 	end
 	return nil
@@ -898,27 +927,18 @@ return nil
 end
 
 local function loadRemoteLua(url, label)
-	local httpGet = requestFunction()
-	if not httpGet then
-		logError("Loader", "No HTTP function available for " .. label .. ".")
-		return nil
-	end
-	local ok, source = safeCall("FetchLua:" .. tostring(label), function()
-		local response = httpGet({
-			Url = url,
-			Method = "GET",
-		})
-		return response and (response.Body or tostring(response))
-	end)
-	if not ok or not source or source == "" or source:find("404: Not Found") then
-		logError("Loader", ok and ("Failed to fetch " .. label .. ".") or source)
+	local source = fetchUrl(url)
+	if not source then
+		logError("Loader", "Failed to fetch " .. label .. ".")
 		return nil
 	end
 	return loadLuaSource(source, label)
 end
 
-local STARLIGHT_SOURCE_URL =
-	"https://raw.githubusercontent.com/Nebula-Softworks/Starlight-Interface-Suite/master/Source.lua"
+local STARLIGHT_REMOTE_URLS = {
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/vendor/starlight/Source.lua",
+	"https://raw.githubusercontent.com/Nebula-Softworks/Starlight-Interface-Suite/master/Source.lua",
+}
 
 do
 	local execName = Executor and Executor.name or "unknown"
@@ -984,30 +1004,90 @@ local function patchStarlightSource(source)
 	return before .. block .. after
 end
 
-local function loadStarlight()
-	local httpGet = requestFunction()
-	if not httpGet then
-		logError("Starlight", "HTTP is unavailable; cannot load Starlight.")
+local STARLIGHT_LOCAL_FILES = {
+	"vendor/starlight/Source.lua",
+	"starlight/Source.lua",
+	"kick/vendor/starlight/Source.lua",
+	"kick/kick/vendor/starlight/Source.lua",
+}
+
+local function compileStarlightSource(source, label)
+	if not source or source == "" or not loadStringFn then
 		return nil
 	end
-	local ok, result = safeCall("LoadStarlight", function()
-		local response = httpGet({ Url = STARLIGHT_SOURCE_URL, Method = "GET" })
-		local source = response and (response.Body or tostring(response))
-		if not source or source == "" or source:find("404: Not Found") then
-			error("Empty or missing source.")
-		end
-		return loadStringFn(patchStarlightSource(source), "@Starlight")()
+	local ok, result = safeCall("CompileStarlight:" .. label, function()
+		return loadStringFn(patchStarlightSource(source), "@" .. label)()
 	end)
 	if ok and type(result) == "table" and type(result.CreateWindow) == "function" then
 		return result
 	end
-	logError("Starlight", ok and "Invalid library returned." or tostring(result))
 	return nil
+end
+
+local function loadStarlightFromLocal()
+	if not readFile or not isFile then
+		return nil
+	end
+	for _, path in ipairs(STARLIGHT_LOCAL_FILES) do
+		if isFile(path) then
+			local source = readFile(path)
+			local starlight = compileStarlightSource(source, "Starlight/local")
+			if starlight then
+				return starlight
+			end
+		end
+	end
+	return nil
+end
+
+local function loadStarlight()
+	local env = getgenv and getgenv() or {}
+	if type(env.Alleral_Starlight) == "table" and type(env.Alleral_Starlight.CreateWindow) == "function" then
+		return env.Alleral_Starlight
+	end
+
+	local core = env.Alleral_Core
+	if core and type(core.loadStarlight) == "function" then
+		local cached, err = core.loadStarlight()
+		if cached then
+			env.Alleral_Starlight = cached
+			return cached
+		end
+		if err then
+			logError("Starlight", "Core.loadStarlight: " .. tostring(err))
+		end
+	end
+
+	local localStarlight = loadStarlightFromLocal()
+	if localStarlight then
+		env.Alleral_Starlight = localStarlight
+		return localStarlight
+	end
+
+	local source
+	for _, url in ipairs(STARLIGHT_REMOTE_URLS) do
+		source = fetchUrl(url)
+		if source then
+			break
+		end
+	end
+	if not source then
+		logError("Starlight", "Could not load Starlight (no local copy and HTTP fetch failed).")
+		return nil
+	end
+	local remoteStarlight = compileStarlightSource(source, "Starlight/remote")
+	if remoteStarlight then
+		env.Alleral_Starlight = remoteStarlight
+	end
+	return remoteStarlight
 end
 
 local starlight = loadStarlight()
 if not starlight or type(starlight.CreateWindow) ~= "function" then
 	logError("Starlight", "Starlight Interface Suite was not available; startup aborted.")
+	if getgenv then
+		getgenv().Alleral_StartupFailed = "Starlight unavailable"
+	end
 	return
 end
 

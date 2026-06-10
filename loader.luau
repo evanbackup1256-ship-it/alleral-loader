@@ -12,7 +12,7 @@
 		getgenv().Alleral_Reload()
 ]]
 
-local LOADER_VERSION = "2.2"
+local LOADER_VERSION = "2.3"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local FETCH_RETRIES = 3
 local FETCH_BACKOFF = 0.75
@@ -467,6 +467,11 @@ local function runGameScript(profile)
 	if not ok then
 		return false, runErr
 	end
+	if ENV.Alleral_StartupFailed then
+		local failMsg = tostring(ENV.Alleral_StartupFailed)
+		ENV.Alleral_StartupFailed = nil
+		return false, failMsg
+	end
 	return true
 end
 
@@ -499,6 +504,8 @@ local function main()
 		return
 	end
 
+	ENV.Alleral_StartupFailed = nil
+	ENV.Alleral_Starlight = nil
 	unloadPrevious()
 
 	local profile, detectErr = detectGame()
@@ -537,6 +544,16 @@ local function main()
 	end
 
 	preloadAnalytics()
+
+	if ENV.Alleral_Core and type(ENV.Alleral_Core.loadStarlight) == "function" then
+		local starlight, starlightErr = ENV.Alleral_Core.loadStarlight()
+		if starlight then
+			ENV.Alleral_Starlight = starlight
+			log("info", "Starlight preloaded")
+		else
+			log("warn", "Starlight preload skipped: " .. tostring(starlightErr))
+		end
+	end
 
 	local ok, runErr = runGameScript(profile)
 	ENV.Alleral_LoaderRunning = false

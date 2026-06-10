@@ -5,11 +5,15 @@ Core.VERSION = "1.0"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
-local STARLIGHT_URL =
-	"https://raw.githubusercontent.com/Nebula-Softworks/Starlight-Interface-Suite/master/Source.lua"
+local STARLIGHT_REMOTE_URLS = {
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/vendor/starlight/Source.lua",
+	"https://raw.githubusercontent.com/Nebula-Softworks/Starlight-Interface-Suite/master/Source.lua",
+}
 local STARLIGHT_LOCAL_FILES = {
 	"vendor/starlight/Source.lua",
 	"starlight/Source.lua",
+	"kick/vendor/starlight/Source.lua",
+	"kick/kick/vendor/starlight/Source.lua",
 }
 
 local function genv()
@@ -129,6 +133,10 @@ local function compileStarlightSource(source, label)
 end
 
 function Core.loadStarlight()
+	if ENV.Alleral_Starlight and type(ENV.Alleral_Starlight.CreateWindow) == "function" then
+		return ENV.Alleral_Starlight
+	end
+
 	local loadStringFn = Core.loadStringFn()
 	if not loadStringFn then
 		return nil, "loadstring unavailable"
@@ -139,32 +147,48 @@ function Core.loadStarlight()
 		if source then
 			local starlight, err = compileStarlightSource(source, "@Starlight/local")
 			if starlight then
+				ENV.Alleral_Starlight = starlight
 				return starlight
 			end
 			warn("[Alleral] Local Starlight failed (" .. path .. "): " .. tostring(err))
 		end
 	end
 
-	local httpGet = Core.requestFunction()
-	if not httpGet then
-		return nil, "HTTP unavailable and no local Starlight found"
-	end
-	local ok, result = pcall(function()
-		local response = httpGet({ Url = STARLIGHT_URL, Method = "GET" })
-		local source = response and (response.Body or tostring(response))
-		if not source or source == "" or source:find("404: Not Found") then
-			error("Starlight download failed")
+	local function fetchRemoteSource(url)
+		local httpGet = Core.requestFunction()
+		if httpGet then
+			local ok, response = pcall(httpGet, { Url = url, Method = "GET" })
+			if ok and response then
+				local body = response.Body or response.body or (type(response) == "string" and response)
+				if body and body ~= "" and not body:find("404: Not Found") then
+					return body
+				end
+			end
 		end
-		local starlight, err = compileStarlightSource(source, "@Starlight/remote")
-		if not starlight then
-			error(err or "Invalid Starlight library")
+		if type(game.HttpGet) == "function" then
+			local ok, body = pcall(game.HttpGet, game, url, true)
+			if ok and body and body ~= "" and not body:find("404: Not Found") then
+				return body
+			end
 		end
-		return starlight
-	end)
-	if ok and type(result) == "table" then
-		return result
+		return nil
 	end
-	return nil, ok and "Invalid Starlight library" or tostring(result)
+
+	local lastErr = "HTTP unavailable and no local Starlight found"
+	for _, url in ipairs(STARLIGHT_REMOTE_URLS) do
+		local source = fetchRemoteSource(url)
+		if source then
+			local starlight, err = compileStarlightSource(source, "@Starlight/remote")
+			if starlight then
+				ENV.Alleral_Starlight = starlight
+				return starlight
+			end
+			lastErr = err or "Invalid Starlight library"
+		else
+			lastErr = "Starlight download failed: " .. url
+		end
+	end
+	return nil, lastErr
 end
 
 function Core.ensureCore()
