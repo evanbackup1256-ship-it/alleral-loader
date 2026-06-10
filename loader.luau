@@ -1,4 +1,4 @@
-local LOADER_VERSION = "3.1.2"
+local LOADER_VERSION = "3.1.3"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local FETCH_RETRIES = 3
 local FETCH_BACKOFF = 0.75
@@ -26,6 +26,8 @@ local OWNER_TELEMETRY_FILES = {
 	"kick/kick/../Alleral-Private/owner_telemetry.luau",
 	"Alleral-Private/owner_telemetry.luau",
 	"kick/Alleral-Private/owner_telemetry.luau",
+	"workspace/Alleral-Private/owner_telemetry.luau",
+	"workspace/../Alleral-Private/owner_telemetry.luau",
 	"owner_telemetry.luau",
 }
 local TELEMETRY_MODULE_VERSION = "2.2"
@@ -622,8 +624,9 @@ local function loadOwnerTelemetryConfig()
 	end
 
 	for _, path in ipairs(OWNER_TELEMETRY_FILES) do
-		if isFile and readFile and isFile(path) then
-			local cfg, label = loadOwnerTelemetryTable(readFile(path), path)
+		local raw = readLocalFile(path)
+		if raw then
+			local cfg, label = loadOwnerTelemetryTable(raw, path)
 			if cfg then
 				ENV.Alleral_OwnerTelemetry = cfg
 				log("info", "Telemetry config loaded from " .. label)
@@ -637,44 +640,13 @@ local function loadOwnerTelemetryConfig()
 			"owner_telemetry.luau",
 			"../Alleral-Private/owner_telemetry.luau",
 			"Alleral-Private/owner_telemetry.luau",
+			"kick/../Alleral-Private/owner_telemetry.luau",
 		})) do
 			local cfg, label = loadOwnerTelemetryTable(hit.source, hit.path)
 			if cfg then
 				ENV.Alleral_OwnerTelemetry = cfg
 				log("info", "Telemetry config loaded from " .. label)
 				return true
-			end
-		end
-		if listFiles then
-			local scanRoots = {
-				"",
-				"kick/",
-				"kick/kick/",
-				"workspace/",
-				"scripts/",
-				"../",
-				"../Alleral-Private/",
-				"Alleral-Private/",
-			}
-			for _, dir in ipairs(scanRoots) do
-				local listPath = dir == "" and "" or dir:gsub("/$", "")
-				local ok, entries = pcall(listFiles, listPath)
-				if ok and type(entries) == "table" then
-					for _, entry in ipairs(entries) do
-						local path = entry
-						if dir ~= "" and not path:find("/", 1, true) then
-							path = dir .. entry
-						end
-						if path:find("owner_telemetry%.luau$") then
-							local cfg, label = loadOwnerTelemetryTable(readLocalFile(path), path)
-							if cfg then
-								ENV.Alleral_OwnerTelemetry = cfg
-								log("info", "Telemetry config loaded from " .. label)
-								return true
-							end
-						end
-					end
-				end
 			end
 		end
 	end
