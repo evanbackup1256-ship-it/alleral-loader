@@ -1187,7 +1187,10 @@ local modules = {
 	weatherService = nil,
 }
 
+local moduleResolvers = {}
+
 local function loadModule(key, label, resolver)
+	moduleResolvers[key] = { label = label, resolver = resolver }
 	local ok, result = safeCall("LoadModule:" .. label, function()
 		local target = resolver()
 		if not target then
@@ -1199,6 +1202,14 @@ local function loadModule(key, label, resolver)
 		modules[key] = result
 	end
 	return modules[key]
+end
+
+local function retryMissingModules()
+	for key, entry in pairs(moduleResolvers) do
+		if not modules[key] then
+			loadModule(key, entry.label, entry.resolver)
+		end
+	end
 end
 
 loadModule("entitiesData", "EntitiesData", function()
@@ -1754,6 +1765,8 @@ local function makeSupervisor(name, interval, callback)
 				if not ok then
 					if name == "AutoPlaceBest" then
 						state.IsPlacingPet = false
+					elseif name == "TrainCollect" then
+						state.IsFlashCollecting = false
 					elseif name == "Mastery" then
 						runtime.masteryBusy = false
 						runtime.nextMasteryAction = tick() + 1
@@ -4227,6 +4240,8 @@ end
 track(
 	LocalPlayer.CharacterAdded:Connect(function(character)
 		runtime.cachedPlot = nil
+		runtime.cachedPlotAt = 0
+		runtime.nextPlotLookup = 0
 		restoreCamera(character:WaitForChild("Humanoid", 5))
 		track(
 			character.ChildAdded:Connect(function(child)
@@ -4260,6 +4275,7 @@ end
 
 makeSupervisor("RefreshData", 8, function()
 	refreshRemotes()
+	retryMissingModules()
 	updatePlotLists(protectedDropdown, upgradeDropdown)
 end)
 
@@ -4386,22 +4402,24 @@ makeSupervisor("AutoKick", 0.3, function()
 	end
 	if hasWave and inGame ~= "" then
 		local parts = string.split(inGame, ",")
-		local shouldReset = true
-		for index = 1, #parts, 2 do
-			local brainrot = trim(parts[index] or "")
-			local mutation = normalizeMutation(parts[index + 1] or "None")
-			if brainrot == "" or brainrot == "Unknown" or mainFilterMatches(brainrot, mutation) then
-					shouldReset = false
-					runtime.lastAutoKickMatch = tick()
-					runtime.sessionMatches = (runtime.sessionMatches or 0) + 1
-					break
-			end
+		local brainrot = trim(parts[1] or "")
+		local mutation = normalizeMutation(parts[2] or "None")
+		local shouldReset = not (
+			brainrot == ""
+			or brainrot == "Unknown"
+			or mainFilterMatches(brainrot, mutation)
+		)
+		if not shouldReset then
+			runtime.lastAutoKickMatch = tick()
+			runtime.sessionMatches = (runtime.sessionMatches or 0) + 1
 		end
 		if shouldReset and tick() >= runtime.nextAutoKickReset and tick() - runtime.lastAutoKickMatch > 5 then
 			runtime.nextAutoKickReset = tick() + 10
 			runtime.sessionResets = (runtime.sessionResets or 0) + 1
 			restoreCamera(humanoid)
-			humanoid.Health = 0
+			safeCall("AutoKickWaveReset", function()
+				humanoid.Health = 0
+			end)
 			return
 		end
 		if not shouldReset then
@@ -4774,9 +4792,6 @@ makeSupervisor("Battle", 4, function()
 					end
 				end
 			end
-			if playersInLobby == 0 then
-				playersInLobby = math.max(0, #Players:GetPlayers() - 1)
-			end
 			runtime.cachedBattleLobbyCount = playersInLobby
 		end
 
@@ -4940,6 +4955,10 @@ makeSupervisor("Mastery", 1, function()
 		end
 		finish(1.5)
 	end)
+	if not _bodyOk then
+		logError("Mastery", _bodyErr)
+		finish(1)
+	end
 end)
 
 local function resolveWeather(name)
