@@ -1,0 +1,5 @@
+.cora/
+.zed/
+
+# Local editor overrides (optional — keep shared .vscode/extensions.json tracked)
+.vscode/settings.json

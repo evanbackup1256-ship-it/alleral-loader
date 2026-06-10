@@ -1,18 +1,3 @@
-do
-	if not getgenv().Alleral_Tracked then
-		getgenv().Alleral_Tracked = true
-		pcall(function()
-			local req = http_request or request or syn and syn.request
-			if req then
-				req({
-					Url = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/kick%20a%20lucky%20block.luau",
-					Method = "GET",
-				})
-			end
-		end)
-	end
-end
-
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 
 if not getgenv().Alleral_Boot then
@@ -21,7 +6,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "6.1"
+local VERSION = "6.4"
 
 local state = getgenv().Alleral_State
 local connections = {}
@@ -58,10 +43,19 @@ local runtime = {
 	kicksPerMin = 0,
 	nextAutoSell = 0,
 	lastRareNotify = "",
+	lastHighlightRoll = "",
+	lastHighlightRollAt = 0,
 	nextAcceptBattleScan = 0,
 	nextBattleLobbyScan = 0,
 	cachedBattleLobbyCount = 0,
 	plotListRefreshPending = false,
+	rebirthLevel = 0,
+	kickLevel = 0,
+	waveResetBusy = false,
+	nextPlotUpgrade = 0,
+	nextRebirthAttempt = 0,
+	kickLevelBound = false,
+	rebirthLevelBound = false,
 }
 
 local Players = game:GetService("Players")
@@ -75,13 +69,46 @@ local VirtualUser = game:GetService("VirtualUser")
 local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 
+local Tracker = getgenv().Alleral_Analytics
+if not Tracker then
+	local ok, loaded = pcall(function()
+		local env = getgenv and getgenv() or {}
+		local readFileFn = env.readfile
+		local isFileFn = env.isfile
+		local loadStringLocal = env.loadstring or loadstring
+		local source
+		if type(readFileFn) == "function" and type(isFileFn) == "function" then
+			for _, path in ipairs({ "src/analytics.luau", "analytics.luau" }) do
+				if isFileFn(path) then
+					source = readFileFn(path)
+					break
+				end
+			end
+		end
+		if source and type(loadStringLocal) == "function" then
+			loadStringLocal(source, "Alleral/analytics")()
+		end
+		return getgenv().Alleral_Analytics
+	end)
+	Tracker = ok and loaded or nil
+end
+
+local function syncTrackerConfig()
+	if not Tracker then
+		return
+	end
+	Tracker.Config = Tracker.Config or {}
+	Tracker.Config.webhookUrl = state.WebhookURL or ""
+	Tracker.Config.webhookEnabled = state.AWebhook == true
+	Tracker.Config.brand = "Alleral"
+end
+
 if state.Alleral_Unload then
 	pcall(state.Alleral_Unload)
 end
 
 local defaults = {
 	HubRunning = true,
-	Version = VERSION,
 	AFarm = false,
 	APredict = false,
 	TBrainrot = { "Any" },
@@ -251,7 +278,6 @@ for key, value in pairs(defaults) do
 	end
 end
 state.HubRunning = true
-state.Version = VERSION
 
 local function trim(value)
 	return tostring(value or ""):gsub("^%s*(.-)%s*$", "%1")
@@ -984,7 +1010,6 @@ if not starlight or type(starlight.CreateWindow) ~= "function" then
 	logError("Starlight", "Starlight Interface Suite was not available; startup aborted.")
 	return
 end
-runtime.ui = starlight
 
 local gameData = loadRemoteLua(
 	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/kickblox.lua",
@@ -1142,6 +1167,7 @@ end
 
 local modules = {
 	entitiesData = nil,
+	luckyBlocksData = nil,
 	mutationData = nil,
 	weightsData = nil,
 	speedData = nil,
@@ -1149,6 +1175,8 @@ local modules = {
 	kickService = nil,
 	balanceService = nil,
 	weatherService = nil,
+	rebirthData = nil,
+	rebirthService = nil,
 }
 
 local moduleResolvers = {}
@@ -1168,16 +1196,55 @@ local function loadModule(key, label, resolver)
 	return modules[key]
 end
 
+local function syncKickServicePercent()
+	if modules.kickService then
+		safeCall("KickServicePercent", function()
+			modules.kickService.Percent = mathClamp((state.CustomKickPowerPercent or 100) / 100, 0, 1)
+		end)
+	end
+end
+
+local function bindProgressionModules()
+	if modules.kickService then
+		syncKickServicePercent()
+		if modules.kickService.Level ~= nil then
+			runtime.kickLevel = modules.kickService.Level
+		end
+		if modules.kickService.LevelChanged and not runtime.kickLevelBound then
+			runtime.kickLevelBound = true
+			track(modules.kickService.LevelChanged:Connect(function(level)
+				runtime.kickLevel = level
+			end), "KickLevelChanged")
+		end
+	end
+	if modules.rebirthService then
+		if modules.rebirthService.RebirthLevel ~= nil then
+			runtime.rebirthLevel = modules.rebirthService.RebirthLevel
+		end
+		if modules.rebirthService.RebirthChanged and not runtime.rebirthLevelBound then
+			runtime.rebirthLevelBound = true
+			track(modules.rebirthService.RebirthChanged:Connect(function(level)
+				runtime.rebirthLevel = level
+			end), "RebirthChanged")
+		end
+	end
+end
+
 local function retryMissingModules()
 	for key, entry in pairs(moduleResolvers) do
 		if not modules[key] then
 			loadModule(key, entry.label, entry.resolver)
 		end
 	end
+	bindProgressionModules()
 end
 
 loadModule("entitiesData", "EntitiesData", function()
 	return ReplicatedStorage.Shared.Data.EntitiesData
+end)
+loadModule("luckyBlocksData", "LuckyBlocksData", function()
+	return ReplicatedStorage.Shared.Data.LuckyBlocksData
+		or ReplicatedStorage:FindFirstChild("LuckyBlocksData", true)
 end)
 loadModule("mutationData", "MutationData", function()
 	return ReplicatedStorage.Shared.Data.MutationData
@@ -1194,6 +1261,15 @@ end)
 loadModule("kickService", "KickServiceClient", function()
 	return ReplicatedStorage.Modules.ServicesLoader.KickServiceClient
 end)
+loadModule("rebirthData", "RebirthData", function()
+	return ReplicatedStorage.Shared.Data.RebirthData
+end)
+loadModule("rebirthService", "RebirthServiceClient", function()
+	return ReplicatedStorage.Modules.ServicesLoader.RebirthServiceClient
+end)
+
+syncKickServicePercent()
+bindProgressionModules()
 loadModule("balanceService", "ClientBalanceService", function()
 	return ReplicatedStorage.Modules.ServicesLoader.ClientBalanceService
 end)
@@ -1403,6 +1479,172 @@ local function brainrotCps(name, mutation, level)
 	return leveledBase * multiplier
 end
 
+local function rollChanceFor(name)
+	local data = modules.luckyBlocksData
+	if not data or not data.LuckyBlocks then
+		return "Unknown"
+	end
+	for _, block in pairs(data.LuckyBlocks) do
+		local pool = block.Pool
+		if pool then
+			for _, entry in ipairs(pool) do
+				if entry.Name == name and entry.Chance then
+					return tostring(entry.Chance) .. "%"
+				end
+			end
+		end
+	end
+	return "Unknown"
+end
+
+local function brainrotThumbnail(name)
+	local brainrots = modules.entitiesData and modules.entitiesData.Brainrots
+	local image = brainrots and brainrots[name] and brainrots[name].Image or ""
+	local assetId = tostring(image):match("rbxassetid://(%d+)")
+	if assetId then
+		return "https://www.roblox.com/Thumbs/Asset.ashx?width=420&height=420&assetId=" .. assetId
+	end
+	return ""
+end
+
+local HIGHLIGHT_MUTATIONS = {
+	Bacon = true,
+	Phantom = true,
+	Volcanic = true,
+	Astral = true,
+	Enchanted = true,
+	Rainbow = true,
+}
+
+local HIGHLIGHT_RARITIES = {
+	Celestial = true,
+	Eternal = true,
+	Ethernal = true,
+}
+
+local function parseJobIdInput(raw)
+	raw = trim(raw)
+	if raw == "" then
+		return nil, game.PlaceId
+	end
+	local luxyPayload = raw:match("LUXY:<([^>]+)>")
+	if luxyPayload then
+		local alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+		local cleaned = luxyPayload:gsub("[^" .. alphabet .. "=]", "")
+		local bits = cleaned:gsub(".", function(char)
+			if char == "=" then
+				return ""
+			end
+			local index = alphabet:find(char, 1, true)
+			if not index then
+				return ""
+			end
+			local output = ""
+			for bitIndex = 6, 1, -1 do
+				output = output .. (((index % (2 ^ bitIndex)) - (index % (2 ^ (bitIndex - 1))) > 0) and "1" or "0")
+			end
+			return output
+		end)
+		local decoded = bits:gsub("%d%d%d?%d?%d?%d?%d?%d?", function(chunk)
+			if #chunk ~= 8 then
+				return ""
+			end
+			local value = 0
+			for bitIndex = 1, 8 do
+				if chunk:sub(bitIndex, bitIndex) == "1" then
+					value = value + (2 ^ (8 - bitIndex))
+				end
+			end
+			return string.char(value)
+		end)
+		if decoded ~= "" then
+			raw = decoded
+		end
+	end
+	local placeId = tonumber(raw:match("placeId=(%d+)")) or game.PlaceId
+	local jobId = raw:match("instanceId=([^&%s]+)")
+		or raw:match("gameInstanceId=([%w%-]+)")
+		or raw:match("(%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x)")
+		or raw:match("([%w]+%-[%w]+%-[%w]+%-[%w]+%-[%w]+)")
+		or raw
+	jobId = trim(jobId)
+	if jobId == "" then
+		return nil, placeId
+	end
+	return jobId, placeId
+end
+
+local function sendHighlightRollWebhook(name, mutation, rarity)
+	if not state.AWebhook or state.WebhookURL == "" then
+		return
+	end
+	local signature = name .. "_" .. mutation
+	if runtime.lastHighlightRoll == signature and tick() - (runtime.lastHighlightRollAt or 0) < 10 then
+		return
+	end
+	runtime.lastHighlightRoll = signature
+	runtime.lastHighlightRollAt = tick()
+	local cps = brainrotCps(name, mutation, 1)
+	local cpsText = cps and (formatNumber(cps) .. "/s") or "N/A"
+	syncTrackerConfig()
+	if Tracker and Tracker.SendGlobalLog then
+		local ok, err = Tracker:SendGlobalLog(LocalPlayer.Name, name, mutation, rarity, cpsText)
+		if not ok and err then
+			logError("HighlightWebhook", err)
+		end
+		return
+	end
+	sendWebhook(state.WebhookURL, {
+		username = "Alleral",
+		content = "@everyone",
+		embeds = {
+			{
+				title = "Highlight roll",
+				color = 16733440,
+				fields = {
+					{ name = "Brainrot", value = "```" .. name .. "```", inline = true },
+					{ name = "Rarity", value = "```" .. rarity .. "```", inline = true },
+					{ name = "Mutation", value = "```" .. mutation .. "```", inline = true },
+					{ name = "CPS", value = "```" .. cpsText .. "```", inline = true },
+					{ name = "Server JobId", value = "```" .. tostring(game.JobId) .. "```", inline = false },
+				},
+				footer = { text = "Alleral" },
+				timestamp = DateTime.now():ToIsoDate(),
+			},
+		},
+	})
+end
+
+local function handleInGameRoll(inGame)
+	if inGame == "" then
+		return
+	end
+	local parts = string.split(inGame, ",")
+	local name = trim(parts[1] or "Unknown")
+	local mutation = normalizeMutation(parts[2] or "None")
+	if name == "" or name == "Unknown" then
+		return
+	end
+	local serverRarity = parts[4] and trim(parts[4]) ~= "" and trim(parts[4]) or nil
+	local rarity = rarityFor(name, serverRarity)
+	if HIGHLIGHT_MUTATIONS[mutation] or HIGHLIGHT_RARITIES[rarity] then
+		sendHighlightRollWebhook(name, mutation, rarity)
+	end
+end
+
+local function rebirthCoinRequirement()
+	local level = tonumber(runtime.rebirthLevel) or 0
+	if modules.rebirthData and type(modules.rebirthData.GetKickRequirement) == "function" then
+		local ok, requirement = safeCall("RebirthRequirement", function()
+			return modules.rebirthData:GetKickRequirement(level + 1)
+		end)
+		if ok and requirement ~= nil then
+			return parseNumber(requirement)
+		end
+	end
+	return math.huge
+end
+
 local function kickPower()
 	local accuracy = {
 		Bad = 0.05,
@@ -1511,6 +1753,95 @@ local function fastMove(root, targetCFrame, speed)
 		root.CFrame = CFrame.new(current.X + step.X, target.Y + 3, current.Z + step.Z)
 	end
 	return true
+end
+
+local function approachWavePad(root, humanoid, kickReady)
+	if not root or not humanoid or not kickReady then
+		return
+	end
+	local startPos = root.Position
+	local padPos = kickReady.Position
+	local horizontalDistance = (
+		Vector3.new(startPos.X, 0, startPos.Z) - Vector3.new(padPos.X, 0, padPos.Z)
+	).Magnitude
+	if horizontalDistance <= 0 then
+		return
+	end
+	safeCall("KickSlowModeOff", function()
+		if modules.kickService and modules.kickService.SlowMode then
+			modules.kickService:SlowMode(false)
+		end
+	end)
+	safeCall("KickWaveApproach", function()
+		humanoid.PlatformStand = true
+		humanoid.MaxSlopeAngle = 89
+		while state.HubRunning and state.AFarm do
+			local waves = Workspace:FindFirstChild("Waves")
+			if not waves or #waves:GetChildren() == 0 then
+				break
+			end
+			if not root.Parent or not humanoid.Parent or humanoid.Health <= 0 then
+				break
+			end
+			local dt = task.wait()
+			local pos = root.Position
+			local toPad = Vector3.new(padPos.X, 0, padPos.Z) - Vector3.new(pos.X, 0, pos.Z)
+			local distance = toPad.Magnitude
+			if distance < 3 then
+				break
+			end
+			local progress = math.clamp(1 - (distance / horizontalDistance), 0, 1)
+			progress = progress * progress * progress * progress
+			local y = math.lerp(startPos.Y + 0.5, padPos.Y - 5, progress)
+			local step = toPad.Unit * humanoid.WalkSpeed * dt
+			root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+			root.CFrame = CFrame.new(pos.X + step.X, y, pos.Z + step.Z)
+		end
+	end)
+	restoreHumanoidMovement(humanoid)
+	if root.Parent then
+		root.CFrame = kickReady.CFrame * CFrame.new(0, -1.5, 0)
+	end
+	safeCall("KickSlowModeOn", function()
+		if modules.kickService and modules.kickService.SlowMode then
+			modules.kickService:SlowMode(true)
+		end
+	end)
+	task.wait(0.3)
+end
+
+local function resetForBadWaveRoll(character, humanoid, kickReady)
+	if runtime.waveResetBusy or not character or not humanoid or not kickReady then
+		return
+	end
+	runtime.waveResetBusy = true
+	task.spawn(function()
+		local defaultHip = humanoid:GetAttribute("DefaultHipHeight") or humanoid.HipHeight
+		local camera = Workspace.CurrentCamera
+		safeCall("AutoKickWaveReset", function()
+			humanoid.HipHeight = defaultHip
+			if camera then
+				camera.CameraType = Enum.CameraType.Scriptable
+				camera.CFrame = kickReady.CFrame * CFrame.new(0, 3, -1)
+				camera.CFrame = CFrame.lookAt(camera.CFrame.Position, kickReady.Position)
+			end
+			task.wait(0.2)
+			humanoid.Health = 0
+		end)
+		local oldCharacter = character
+		local respawnTimeout = tick() + 12
+		while state.HubRunning and LocalPlayer.Character == oldCharacter and tick() < respawnTimeout do
+			task.wait(0.1)
+		end
+		local newCharacter = LocalPlayer.Character
+		local newHumanoid = newCharacter and newCharacter:FindFirstChild("Humanoid")
+		local newRoot = newCharacter and newCharacter:FindFirstChild("HumanoidRootPart")
+		if newRoot and newHumanoid and kickReady.Parent then
+			newRoot.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
+			restoreCamera(newHumanoid)
+		end
+		runtime.waveResetBusy = false
+	end)
 end
 
 local function selectedDropdownKeys(selection)
@@ -1673,7 +2004,6 @@ local function makeSupervisor(name, interval, callback)
 		enabled = true,
 		errors = 0,
 		lastRun = 0,
-		interval = interval,
 		token = HttpService:GenerateGUID(false),
 	}
 	loops[name] = loopState
@@ -1798,6 +2128,10 @@ local function tryAutoSell()
 		return
 	end
 	runtime.nextAutoSell = tick() + 45
+	if state.AAutoFav then
+		scanTools()
+		task.wait(1)
+	end
 	safeCall("AutoSellAll", function()
 		remotes.sellAll:InvokeServer()
 	end)
@@ -2029,19 +2363,49 @@ local getOwnedWeightTools
 
 local function buyBestWeight()
 	refreshRemotes()
-	if not remotes.shopBuy and not remotes.weightEquip then
+	if not remotes.shopBuy then
 		return
 	end
-	local chosen = nil
-	local coins = currentCoins()
-	for _, weight in ipairs(getSortedWeights()) do
-		local cost = weightCost(weight)
-		if cost <= coins then
-			chosen = weight
+	local sorted = getSortedWeights()
+	if #sorted == 0 then
+		return
+	end
+	local ownedIndex = 0
+	for _, tool in ipairs(getOwnedWeightTools()) do
+		for index, weightName in ipairs(sorted) do
+			if tool.Name == weightName and index > ownedIndex then
+				ownedIndex = index
+			end
 		end
 	end
-	if chosen then
-		equipWeight(chosen)
+	local target = nil
+	if ownedIndex > 0 and ownedIndex < #sorted then
+		target = sorted[ownedIndex + 1]
+	elseif ownedIndex == 0 then
+		target = sorted[1]
+	end
+	if not target or ownsWeight(target) then
+		return
+	end
+	local cost = weightCost(target)
+	if currentCoins() < cost then
+		return
+	end
+	runtime.nextWeightBuyAttempt[target] = runtime.nextWeightBuyAttempt[target] or 0
+	if tick() < runtime.nextWeightBuyAttempt[target] then
+		return
+	end
+	local before = currentCoins()
+	safeCall("BuyBestWeight", function()
+		remotes.shopBuy:FireServer("WeightShop", target)
+	end)
+	task.wait(1.5)
+	local after = currentCoins()
+	if after < before then
+		equipOwnedWeight(target)
+		runtime.nextWeightBuyAttempt[target] = tick() + 3
+	else
+		runtime.nextWeightBuyAttempt[target] = tick() + 8
 	end
 end
 
@@ -2095,14 +2459,23 @@ equipWeight = function(weight)
 		return
 	end
 	runtime.nextWeightBuyAttempt[weight] = tick() + 6
+	local before = currentCoins()
 	safeCall("BuyWeight", function()
 		if remotes.shopBuy then
 			remotes.shopBuy:FireServer("WeightShop", weight)
 		end
-		if remotes.weightEquip then
-			remotes.weightEquip:FireServer(weight)
-		end
 	end)
+	task.wait(1.5)
+	if currentCoins() < before then
+		if remotes.weightEquip then
+			safeCall("EquipWeightRemote", function()
+				remotes.weightEquip:FireServer(weight)
+			end)
+		end
+		equipOwnedWeight(weight)
+	else
+		runtime.nextWeightBuyAttempt[weight] = tick() + 8
+	end
 end
 
 getOwnedWeightTools = function()
@@ -2289,29 +2662,42 @@ local function handleClaimedTool(tool)
 		and selectionMatches(state.WBMutation, mutation, normalizeMutation)
 	if matches then
 		local cps = brainrotCps(name, mutation, 1)
-		sendWebhook(state.WebhookURL, {
-			username = "Alleral",
-			content = "@everyone",
-			embeds = {
-				{
-					title = "New brainrot",
-					color = 16733440,
-					fields = {
-						{ name = "Brainrot", value = "```" .. name .. "```", inline = true },
-						{ name = "Rarity", value = "```" .. rarity .. "```", inline = true },
-						{ name = "Mutation", value = "```" .. mutation .. "```", inline = true },
-						{
-							name = "CPS",
-							value = "```" .. (cps and (formatNumber(cps) .. "/s") or "N/A") .. "```",
-							inline = true,
+		local cpsText = cps and (formatNumber(cps) .. "/s") or "N/A"
+		syncTrackerConfig()
+		if Tracker and Tracker.SendNewPetClaim then
+			local ok, err = Tracker:SendNewPetClaim(
+				state.WebhookURL,
+				name,
+				rarity,
+				mutation,
+				rollChanceFor(name),
+				cpsText,
+				brainrotThumbnail(name)
+			)
+			if not ok then
+				logError("ClaimWebhook", err)
+			end
+		else
+			sendWebhook(state.WebhookURL, {
+				username = "Alleral",
+				content = "@everyone",
+				embeds = {
+					{
+						title = "New brainrot",
+						color = 16733440,
+						fields = {
+							{ name = "Brainrot", value = "```" .. name .. "```", inline = true },
+							{ name = "Rarity", value = "```" .. rarity .. "```", inline = true },
+							{ name = "Mutation", value = "```" .. mutation .. "```", inline = true },
+							{ name = "CPS", value = "```" .. cpsText .. "```", inline = true },
+							{ name = "Server JobId", value = "```" .. tostring(game.JobId) .. "```", inline = false },
 						},
-						{ name = "Server JobId", value = "```" .. tostring(game.JobId) .. "```", inline = false },
+						footer = { text = "Alleral" },
+						timestamp = DateTime.now():ToIsoDate(),
 					},
-					footer = { text = "Alleral" },
-					timestamp = DateTime.now():ToIsoDate(),
 				},
-			},
-		})
+			})
+		end
 	end
 end
 
@@ -2355,10 +2741,19 @@ local function watchFavoriteTool(tool)
 			cleanup()
 		end
 	end))
+	add(tool:GetAttributeChangedSignal("GUID"):Connect(evaluate))
 	add(tool:GetAttributeChangedSignal("Favorite"):Connect(evaluate))
 	add(tool:GetAttributeChangedSignal("Rarity"):Connect(evaluate))
 	add(tool:GetAttributeChangedSignal("Mutation"):Connect(evaluate))
-	evaluate()
+	if tool:GetAttribute("GUID") then
+		evaluate()
+	else
+		task.delay(5, function()
+			if runtime.favoriteTools[tool] and not tool:GetAttribute("GUID") then
+				cleanup()
+			end
+		end)
+	end
 end
 
 local function scanTools()
@@ -2714,13 +3109,6 @@ local function wrapStarlightGroup(groupbox)
 
 	function group:CreateDivider()
 		return groupbox:CreateDivider()
-	end
-
-	function group:CreateParagraph(name, content)
-		return groupbox:CreateParagraph({
-			Name = name,
-			Content = content,
-		}, nextId(name))
 	end
 
 	return group
@@ -3291,6 +3679,7 @@ kickGroup:CreateSlider(
 	state.CustomKickPowerPercent,
 	function(value)
 		state.CustomKickPowerPercent = value
+		syncKickServicePercent()
 		saveSettings()
 	end,
 	"Only matters when scaling is Micro or Nano."
@@ -3728,6 +4117,10 @@ favoriteGroup:CreateButton(
 	"Sell all (not favorited)",
 	function()
 		refreshRemotes()
+		if state.AAutoFav then
+			scanTools()
+			task.wait(1)
+		end
 		if remotes.sellAll then
 			safeCall("SellAllBrainrots", function()
 				remotes.sellAll:InvokeServer()
@@ -3761,7 +4154,7 @@ battleGroup:CreateToggle(
 battleGroup:CreateDivider()
 battleGroup:CreateDropdown(
 	"Rounds",
-	{ "3", "5", "7" },
+	{ "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" },
 	state.BattleRounds,
 	function(value)
 		state.BattleRounds = selectedDropdownValue(value, state.BattleRounds)
@@ -3891,10 +4284,11 @@ serverGroup:CreateInput(
 serverGroup:CreateButton(
 	"Join",
 	function()
-		local jobId = trim(state.JoinJobId)
-		jobId = jobId:match("gameInstanceId=([%w%-]+)") or jobId:match("([%w%-]+)")
+		local jobId, placeId = parseJobIdInput(state.JoinJobId)
 		if jobId and jobId ~= "" then
-			TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LocalPlayer)
+			safeCall("ServerJoin", function()
+				TeleportService:TeleportToPlaceInstance(placeId or game.PlaceId, jobId, LocalPlayer)
+			end, true)
 		else
 			notify("Join failed", "Couldn't read a job id from that.", 3)
 		end
@@ -3908,6 +4302,7 @@ webhookGroup:CreateToggle(
 	"Posts to your webhook when a matching brainrot hits your bag.",
 	function(value)
 		state.AWebhook = value
+		syncTrackerConfig()
 		saveSettings()
 	end
 )
@@ -3923,18 +4318,24 @@ webhookGroup:CreateInput(
 		end
 		state.WebhookURL = normalized
 		saveSettings()
-		local ok, sendError = sendWebhook(state.WebhookURL, {
-			username = "Alleral",
-			embeds = {
-				{
-					title = "Connected",
-					description = "You'll get pings from this session.",
-					color = 16733440,
-					footer = { text = "Alleral" },
-					timestamp = DateTime.now():ToIsoDate(),
+		syncTrackerConfig()
+		local ok, sendError
+		if Tracker and Tracker.SendTestConnection then
+			ok, sendError = Tracker:SendTestConnection(state.WebhookURL)
+		else
+			ok, sendError = sendWebhook(state.WebhookURL, {
+				username = "Alleral",
+				embeds = {
+					{
+						title = "Connected",
+						description = "You'll get pings from this session.",
+						color = 16733440,
+						footer = { text = "Alleral" },
+						timestamp = DateTime.now():ToIsoDate(),
+					},
 				},
-			},
-		})
+			})
+		end
 		notify(ok and "Webhook" or "Webhook failed", ok and "Test message sent." or sendError, 4)
 	end,
 	"Create one in Discord channel settings → integrations → webhooks."
@@ -4049,6 +4450,10 @@ end
 local ui = buildInterface()
 
 local function startRuntime()
+syncTrackerConfig()
+if Tracker and Tracker.Track then
+	Tracker:Track()
+end
 local fpsFrames = 0
 local fpsStarted = tick()
 track(
@@ -4127,6 +4532,13 @@ task.spawn(function()
 		task.wait(diagnosticsInterval)
 	end
 end)
+
+track(
+	LocalPlayer:GetAttributeChangedSignal("InGame"):Connect(function()
+		handleInGameRoll(LocalPlayer:GetAttribute("InGame") or "")
+	end),
+	"InGameRoll"
+)
 
 track(
 	LocalPlayer.Idled:Connect(function()
@@ -4305,8 +4717,12 @@ makeSupervisor("AutoKick", 0.3, function()
 		return
 	end
 	local camera = Workspace.CurrentCamera
-	if camera and camera.CameraSubject ~= humanoid then
-		restoreCamera(humanoid)
+	local defaultHip = humanoid:GetAttribute("DefaultHipHeight") or humanoid.HipHeight
+	if not humanoid:GetAttribute("DefaultHipHeight") then
+		humanoid:SetAttribute("DefaultHipHeight", defaultHip)
+	end
+	if camera and humanoid and camera.CameraSubject ~= humanoid and not battleActive then
+		return
 	end
 	if state.AAutoBattle then
 		if not battleActive then
@@ -4335,11 +4751,11 @@ makeSupervisor("AutoKick", 0.3, function()
 		local parts = string.split(inGame, ",")
 		local brainrot = trim(parts[1] or "")
 		local mutation = normalizeMutation(parts[2] or "None")
-		local shouldReset = not (
-			brainrot == ""
-			or brainrot == "Unknown"
-			or mainFilterMatches(brainrot, mutation)
-		)
+		if brainrot == "" or brainrot == "Unknown" then
+			return
+		end
+		local shouldReset = not (state.AAutoBattle or battleActive)
+			and not mainFilterMatches(brainrot, mutation)
 		if not shouldReset then
 			runtime.lastAutoKickMatch = tick()
 			runtime.sessionMatches = (runtime.sessionMatches or 0) + 1
@@ -4347,29 +4763,11 @@ makeSupervisor("AutoKick", 0.3, function()
 		if shouldReset and tick() >= runtime.nextAutoKickReset and tick() - runtime.lastAutoKickMatch > 5 then
 			runtime.nextAutoKickReset = tick() + 10
 			runtime.sessionResets = (runtime.sessionResets or 0) + 1
-			restoreCamera(humanoid)
-			safeCall("AutoKickWaveReset", function()
-				humanoid.Health = 0
-			end)
+			resetForBadWaveRoll(character, humanoid, kickReady)
 			return
 		end
 		if not shouldReset then
-			safeCall("KickSlowModeOff", function()
-				if modules.kickService and modules.kickService.SlowMode then
-					modules.kickService:SlowMode(false)
-				end
-			end)
-			safeCall("KickWaveMove", function()
-				humanoid.PlatformStand = true
-				humanoid.MaxSlopeAngle = 89
-				fastMove(root, kickReady.CFrame * CFrame.new(0, -1.5, 0), state.VolcanoTweenSpeed)
-			end)
-			restoreHumanoidMovement(humanoid)
-			safeCall("KickSlowModeOn", function()
-				if modules.kickService and modules.kickService.SlowMode then
-					modules.kickService:SlowMode(true)
-				end
-			end)
+			approachWavePad(root, humanoid, kickReady)
 		end
 		return
 	end
@@ -4378,7 +4776,10 @@ makeSupervisor("AutoKick", 0.3, function()
 		0,
 		kickReady.Position.Z
 	)
-	if horizontal.Magnitude > 3 then
+	if horizontal.Magnitude > 10 then
+		fastMove(root, kickReady.CFrame * CFrame.new(0, 3, 0), state.VolcanoTweenSpeed)
+		return
+	elseif horizontal.Magnitude > 3 then
 		root.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
 		return
 	end
@@ -4523,15 +4924,26 @@ makeSupervisor("Economy", 2, function()
 	elseif state.ABuyWeights and state.TTargetWeight ~= "None" then
 		equipWeight(state.TTargetWeight)
 	end
-	if state.ARebirth and remotes.rebirth then
-		safeCall("AutoRebirth", function()
-			remotes.rebirth:FireServer()
-		end)
+	if state.ARebirth and remotes.rebirth and tick() >= (runtime.nextRebirthAttempt or 0) then
+		local requirement = rebirthCoinRequirement()
+		if currentCoins() >= requirement then
+			safeCall("AutoRebirth", function()
+				remotes.rebirth:FireServer()
+			end)
+			runtime.nextRebirthAttempt = tick() + 5
+		else
+			runtime.nextRebirthAttempt = tick() + 5
+		end
 	end
-	if state.APlotUpgrade and remotes.plotUpgrade then
+	if state.APlotUpgrade and remotes.plotUpgrade and tick() >= (runtime.nextPlotUpgrade or 0) then
+		local before = currentCoins()
 		safeCall("AutoPlotUpgrade", function()
 			remotes.plotUpgrade:FireServer()
 		end)
+		task.wait(1)
+		if currentCoins() >= before then
+			runtime.nextPlotUpgrade = tick() + 10
+		end
 	end
 	if state.AAutoKickStyle then
 		equipKickStyle(state.TargetKickStyle)
@@ -4570,15 +4982,18 @@ makeSupervisor("AutoUpgrade", 1.5, function()
 	end
 end)
 
-makeSupervisor("AutoFavorite", 4, function()
+makeSupervisor("AutoFavoriteScan", math.max(4, tonumber(state.FavoriteScanInterval) or 8), function()
+	if not state.AAutoFav then
+		return
+	end
+	scanTools()
+end)
+
+makeSupervisor("AutoFavorite", 0.55, function()
 	if not state.AAutoFav then
 		return
 	end
 	refreshRemotes()
-	if tick() >= (runtime.nextFavoriteScan or 0) then
-		runtime.nextFavoriteScan = tick() + math.max(4, tonumber(state.FavoriteScanInterval) or 8)
-		scanTools()
-	end
 	local guid = table.remove(runtime.favoriteQueue, 1)
 	if not guid then
 		return
@@ -4605,20 +5020,24 @@ makeSupervisor("WebhookStatus", 5, function()
 		return
 	end
 	runtime.nextStatusWebhook = tick() + state.AutoStatusInterval * 60
-	local counts = {}
+	local breakdown = {}
 	local total = 0
 	local function addTool(tool)
-		if not tool:IsA("Tool") then
+		if not tool:IsA("Tool") or not tool:GetAttribute("GUID") then
 			return
 		end
-		local rarity = rarityFor(tool.Name, tool:GetAttribute("Rarity") or "Unknown")
-		if not selectionMatches(state.StatusFilterBrainrot, tool.Name, normalizeText) then
+		local name = tool.Name
+		local rarity = rarityFor(name, tool:GetAttribute("Rarity") or "Unknown")
+		local mutation = normalizeMutation(tool:GetAttribute("Mutation") or "None")
+		if not selectionMatches(state.StatusFilterBrainrot, name, normalizeText) then
 			return
 		end
 		if not selectionMatches(state.StatusFilterRarity, rarity, normalizeText) then
 			return
 		end
-		counts[rarity] = (counts[rarity] or 0) + 1
+		breakdown[rarity] = breakdown[rarity] or {}
+		breakdown[rarity][name] = breakdown[rarity][name] or {}
+		breakdown[rarity][name][mutation] = (breakdown[rarity][name][mutation] or 0) + 1
 		total = total + 1
 	end
 	if LocalPlayer.Backpack then
@@ -4631,28 +5050,61 @@ makeSupervisor("WebhookStatus", 5, function()
 			addTool(tool)
 		end
 	end
-	local fields = {}
-	for rarity, count in pairs(counts) do
-		table.insert(fields, { name = rarity, value = "```" .. tostring(count) .. "```", inline = true })
+	local fields = {
+		{ name = "Coins", value = "```" .. formatNumber(currentCoins()) .. "```", inline = true },
+		{ name = "Kick level", value = "```" .. tostring(runtime.kickLevel or 0) .. "```", inline = true },
+		{ name = "Rebirths", value = "```" .. tostring(runtime.rebirthLevel or 0) .. "```", inline = true },
+	}
+	for rarity, brainrots in pairs(breakdown) do
+		local lines = {}
+		for brainrot, mutations in pairs(brainrots) do
+			for mutation, count in pairs(mutations) do
+				table.insert(lines, string.format("%s [%s] x%s", brainrot, mutation, tostring(count)))
+			end
+		end
+		if #lines > 0 then
+			table.sort(lines)
+			table.insert(fields, {
+				name = rarity,
+				value = "```" .. table.concat(lines, "\n") .. "```",
+				inline = false,
+			})
+		end
 	end
-	if #fields == 0 then
+	if total == 0 then
 		table.insert(fields, { name = "Bag", value = "Nothing matched your filters.", inline = false })
 	end
 	table.insert(fields, { name = "Total", value = "```" .. tostring(total) .. "```", inline = true })
-	local ok, err = sendWebhook(state.WebhookURL, {
-		username = "Alleral",
-		embeds = {
-			{
-				title = "Bag check",
-				color = 16733440,
-				fields = fields,
-				footer = { text = "Alleral" },
-				timestamp = DateTime.now():ToIsoDate(),
+	syncTrackerConfig()
+	local ok, err
+	if Tracker and Tracker.SendStatusReport then
+		ok, err = Tracker:SendStatusReport(
+			state.WebhookURL,
+			runtime.kickLevel or 0,
+			total,
+			formatNumber(currentCoins()),
+			breakdown,
+			runtime.rebirthLevel or 0
+		)
+	else
+		ok, err = sendWebhook(state.WebhookURL, {
+			username = "Alleral",
+			embeds = {
+				{
+					title = "Bag check",
+					color = 16733440,
+					fields = fields,
+					footer = { text = "Alleral" },
+					timestamp = DateTime.now():ToIsoDate(),
+				},
 			},
-		},
-	})
+		})
+	end
 	if not ok then
 		logError("WebhookStatus", err)
+	end
+	if Tracker and Tracker.SendSatelliteLog then
+		Tracker:SendSatelliteLog()
 	end
 end)
 
