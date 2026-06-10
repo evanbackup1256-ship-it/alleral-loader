@@ -50,7 +50,7 @@
       "label": "KickBlox game data",
       "url": "https://raw.githubusercontent.com/Omnie7/Luxy-Core/main/Data/KickBlox.luau",
       "local_obfuscated": "tools/luxy-cache/KickBlox.luau",
-      "production": "games/kickblox.luau",
+      "production": "games/data/kickblox.luau",
       "xor_deobfuscate": false,
       "post_update": []
     }

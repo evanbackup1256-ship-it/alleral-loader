@@ -1162,10 +1162,12 @@ if not starlight or type(starlight.CreateWindow) ~= "function" then
 end
 
 local KICKBLOX_URLS = {
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/games/data/kickblox.luau",
 	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/games/kickblox.luau",
 	"https://raw.githubusercontent.com/Omnie7/Luxy-Core/main/Data/KickBlox.luau",
 }
 local KICKBLOX_LOCAL_FILES = {
+	"games/data/kickblox.luau",
 	"games/kickblox.luau",
 	"src/kickblox.luau",
 	"kickblox.luau",

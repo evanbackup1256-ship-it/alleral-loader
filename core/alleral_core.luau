@@ -1,5 +1,5 @@
 local Core = {}
-Core.VERSION = "1.4"
+Core.VERSION = "1.5"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
@@ -446,6 +446,38 @@ function Core.wrapStarlightGroup(groupbox, loggedCallback)
 		config.Searchable = config.Searchable == true
 		config.Callback = loggedCallback(config.Callback or function() end)
 		return groupbox:CreateDropdown(config, nextId(name))
+	end
+	function group:CreateLabel(text)
+		return groupbox:CreateLabel({
+			Name = text,
+		}, nextId("label"))
+	end
+	function group:CreateStatus(label, fields)
+		local status = {
+			Labels = {},
+			LastValues = {},
+		}
+		for key, value in pairs(fields or {}) do
+			local rendered = tostring(value)
+			status.LastValues[key] = rendered
+			status.Labels[key] = groupbox:CreateLabel({
+				Name = tostring(key) .. ": " .. rendered,
+			}, nextId(label .. "_" .. tostring(key)))
+		end
+		function status:Update(key, value)
+			local rendered = tostring(value)
+			if self.LastValues[key] == rendered then
+				return
+			end
+			self.LastValues[key] = rendered
+			local row = self.Labels[key]
+			if row and row.Set then
+				row:Set({
+					Name = tostring(key) .. ": " .. rendered,
+				})
+			end
+		end
+		return status
 	end
 	function group:CreateDivider()
 		return groupbox:CreateDivider()

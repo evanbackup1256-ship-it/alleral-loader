@@ -1,4 +1,4 @@
-local LOADER_VERSION = "3.2.0"
+local LOADER_VERSION = "3.3.0"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local FETCH_RETRIES = 3
 local FETCH_BACKOFF = 0.75
@@ -19,6 +19,11 @@ local SHARED_TELEMETRY_FILES = {
 	"src/telemetry.luau",
 	"telemetry.luau",
 }
+local SHARED_HELPERS_FILES = {
+	"core/game_helpers.luau",
+	"src/game_helpers.luau",
+	"game_helpers.luau",
+}
 local OWNER_TELEMETRY_FILES = {
 	"../Alleral-Private/owner_telemetry.luau",
 	"../../Alleral-Private/owner_telemetry.luau",
@@ -34,6 +39,7 @@ local TELEMETRY_MODULE_VERSION = "2.2"
 local SHARED_CORE_URL = REPO_BASE .. "/core/alleral_core.luau"
 local SHARED_ANALYTICS_URL = REPO_BASE .. "/core/analytics.luau"
 local SHARED_TELEMETRY_URL = REPO_BASE .. "/core/telemetry.luau"
+local SHARED_HELPERS_URL = REPO_BASE .. "/core/game_helpers.luau"
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -257,7 +263,7 @@ local GAMES = {
 	{
 		id = "survive_a_zombie_arena",
 		name = "Survive a Zombie Arena",
-		version = "1.0",
+		version = "2.0",
 		needsCore = true,
 		placeIds = { 114204398207377 },
 		scriptFiles = {
@@ -575,13 +581,14 @@ local function invalidateStaleModules()
 	ENV.Alleral_Telemetry = nil
 	ENV.Alleral_ReportError = nil
 	ENV.Alleral_LogEvent = nil
+	ENV.Alleral_GameHelpers = nil
 	ENV.Alleral_LoaderVersion = LOADER_VERSION
 	log("info", "Cleared cached modules for loader " .. LOADER_VERSION)
 end
 
 local function preloadCore(required)
 	local core = ENV.Alleral_Core
-	if core and type(core.loadStarlight) == "function" and core.VERSION == "1.4" then
+	if core and type(core.loadStarlight) == "function" and (core.VERSION == "1.4" or core.VERSION == "1.5") then
 		return true
 	end
 	ENV.Alleral_Core = nil
@@ -677,6 +684,24 @@ local function loadOwnerTelemetryConfig()
 	end
 
 	ENV.Alleral_OwnerTelemetry = nil
+	return false
+end
+
+local function preloadHelpers()
+	if ENV.Alleral_GameHelpers and ENV.Alleral_GameHelpers.VERSION == "1.0" then
+		return true
+	end
+	local source, sourceLabel = resolveFromFiles(SHARED_HELPERS_FILES, "helpers", SHARED_HELPERS_URL, "Alleral_GameHelpers")
+	if not source then
+		log("warn", "Game helpers skipped: " .. tostring(sourceLabel))
+		return false
+	end
+	local ok, err = compileAndRun(source, "Alleral/helpers")
+	if ok and ENV.Alleral_GameHelpers then
+		log("info", "Game helpers loaded from " .. sourceLabel)
+		return true
+	end
+	log("warn", "Game helpers failed: " .. tostring(err))
 	return false
 end
 
@@ -909,6 +934,7 @@ local function main()
 	end
 
 	preloadAnalytics()
+	preloadHelpers()
 	preloadTelemetry()
 
 	if ENV.Alleral_Core and type(ENV.Alleral_Core.loadStarlight) == "function" then

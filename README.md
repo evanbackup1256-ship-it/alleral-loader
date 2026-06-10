@@ -1,8 +1,8 @@
 # Alleral Hub
 
-Roblox automation hub — one loader, four games, private owner telemetry.
+Roblox automation hub — one loader, five games, private owner telemetry.
 
-**Supported games:** Kick a Lucky Block · Speed Keyboard Escape · Slime RNG · Build A Ring Farm
+**Supported games:** Kick a Lucky Block · Speed Keyboard Escape · Slime RNG · Build A Ring Farm · Survive a Zombie Arena
 
 ## Quick start
 
@@ -26,20 +26,28 @@ Dev mode (prefer local files): `getgenv().Alleral_DevMode = true` before running
 
 ```
 Alleral Hub/
-├── loader.luau                 # Entry point
+├── loader.luau                 # Entry point (v3.3)
 ├── core/
 │   ├── alleral_core.luau       # Starlight, supervisors, HTTP
+│   ├── game_helpers.luau       # Shared combat/movement/remote helpers
 │   ├── analytics.luau          # In-game user webhooks (Kick)
 │   └── telemetry.luau          # Owner telemetry client (relay only)
 ├── games/
 │   ├── kick_a_lucky_block.luau
-│   ├── kickblox.luau
 │   ├── speed_keyboard_escape.luau
 │   ├── slime_rng.luau
-│   └── build_a_ring_farm.luau
+│   ├── build_a_ring_farm.luau
+│   ├── survive_a_zombie_arena.luau
+│   └── data/
+│       └── kickblox.luau       # Kick brainrot name list
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── GAMES.md
+│   ├── SECURITY.md
+│   └── WEBHOOK_SETUP.md
 ├── config/
 │   ├── owner_telemetry.example.luau
-│   └── WEBHOOK_SETUP.md        # Full webhook deploy guide
+│   └── SECURITY.md             # Pointer → docs/
 ├── backend/
 │   └── telemetry_relay.py      # Private Discord relay (host this)
 ├── tools/
@@ -48,13 +56,13 @@ Alleral Hub/
 
 ## Owner webhook (secure)
 
-**If others can read this folder**, read [config/SECURITY.md](config/SECURITY.md) first.
+**If others can read this folder**, read [docs/SECURITY.md](docs/SECURITY.md) first.
 
 - Discord webhook → `backend/.env` on **your server only**
 - Relay API key → `../Alleral-Private/owner_telemetry.luau` (**outside** shared hub)
 - Before sharing: `powershell tools/prepare_distribution.ps1`
 
-Setup: [config/WEBHOOK_SETUP.md](config/WEBHOOK_SETUP.md)
+Setup: [docs/WEBHOOK_SETUP.md](docs/WEBHOOK_SETUP.md)
 
 ## Luxy sync (dev)
 
@@ -62,3 +70,8 @@ Setup: [config/WEBHOOK_SETUP.md](config/WEBHOOK_SETUP.md)
 python tools/luxy_sync.py
 python tools/luxy_sync.py --check
 ```
+
+## Docs
+
+- [Architecture](docs/ARCHITECTURE.md) — loader boot chain and path resolution
+- [Games](docs/GAMES.md) — per-game feature summary
