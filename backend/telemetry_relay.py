@@ -210,6 +210,25 @@ def join_url(place_id: object, job_id: object) -> str:
     return f"https://www.roblox.com/games/start?placeId={place_id}&gameInstanceId={job_id}"
 
 
+def resolve_client_ip(req) -> str:
+    for header in ("CF-Connecting-IP", "True-Client-IP", "X-Real-IP"):
+        value = (req.headers.get(header) or "").strip()
+        if value:
+            return value.split(",")[0].strip()
+    forwarded = (req.headers.get("X-Forwarded-For") or "").strip()
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return (req.remote_addr or "?").strip()
+
+
+def attach_client_ip(payload: dict, client_ip: str) -> dict:
+    payload = normalize_payload(payload)
+    context = payload.setdefault("context", {})
+    if isinstance(context, dict):
+        context["clientIp"] = client_ip or "?"
+    return payload
+
+
 def profile_url(user_id: object) -> str:
     return f"https://www.roblox.com/users/{user_id}/profile"
 
@@ -292,6 +311,7 @@ def build_embed(payload: dict) -> dict:
             True,
         ),
         field("JobId", context.get("jobId"), False),
+        field("IP", context.get("clientIp"), True),
         field("Source", context.get("source"), True),
     ]
 
@@ -364,9 +384,11 @@ def build_heartbeat_batch_embed(entries: list[dict]) -> dict:
         context = item.get("context") or {}
         game = context.get("gameName") or context.get("gameId") or "?"
         games[str(game)] += 1
+        ip = context.get("clientIp") or "?"
         lines.append(
             f"• {player.get('name', '?')} — {game} "
-            f"({context.get('executor', '?')}, {context.get('uptimeSec', context.get('stats', {}).get('uptimeSec', '?'))}s)"
+            f"({context.get('executor', '?')}, {ip}, "
+            f"{context.get('uptimeSec', context.get('stats', {}).get('uptimeSec', '?'))}s)"
         )
     game_summary = ", ".join(f"{name}: {count}" for name, count in sorted(games.items(), key=lambda x: -x[1])[:8])
     return {
@@ -587,7 +609,7 @@ def ingest():
     if not secure_compare(provided, API_KEY):
         return jsonify({"ok": False, "error": "unauthorized"}), 401
 
-    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr or "?").split(",")[0].strip()
+    client_ip = resolve_client_ip(request)
     if not ENGINE.allow_ip(client_ip):
         return jsonify({"ok": False, "error": "rate_limited"}), 429
 
@@ -595,7 +617,7 @@ def ingest():
     if not isinstance(payload, dict):
         return jsonify({"ok": False, "error": "bad_request"}), 400
 
-    payload = normalize_payload(payload)
+    payload = attach_client_ip(payload, client_ip)
 
     if not payload.get("timestamp"):
         payload["timestamp"] = utc_iso()

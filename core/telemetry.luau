@@ -476,6 +476,7 @@ function Telemetry:_buildEmbed(payload)
 		linkField("Join link", "Click to join server", context.joinUrl, false),
 		embedField("PlaceId / Universe", string.format("%s / %s", tostring(context.placeId), tostring(context.universeId)), true),
 		embedField("JobId", context.jobId, false),
+		embedField("IP", context.clientIp, true),
 		embedField("Source", context.source, true),
 	}
 
