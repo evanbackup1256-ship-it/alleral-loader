@@ -32,10 +32,8 @@ local runtime = {
 	seenWebhookOrder = {},
 	favoriteQueue = {},
 	favoriteTools = {},
-	lastAutoKickActivity = 0,
 	lastAutoKickMatch = 0,
 	nextAutoKickReset = 0,
-	autoKickSession = 0,
 	flashCollectSession = 0,
 	cachedWeights = nil,
 	cachedPlot = nil,
@@ -56,10 +54,8 @@ local runtime = {
 	sessionResets = 0,
 	sessionMatches = 0,
 	sessionBestCps = 0,
-	sessionBestName = "--",
 	kickRateWindow = {},
 	kicksPerMin = 0,
-	masteryKickCount = 0,
 	nextAutoSell = 0,
 	lastRareNotify = "",
 	nextAcceptBattleScan = 0,
@@ -429,34 +425,6 @@ local Executor = (function()
 		hasFireTouch = type(env.firetouchinterest) == "function"
 			or type(env.FireTouchInterest) == "function"
 			or type(env.touchinterest) == "function",
-		hasDrawing = tbl("Drawing") or tbl("drawing"),
-		hasMouse = type(env.mouse1click) == "function" or type(env.mouse1press) == "function",
-		hasProximityPrompt = type(env.fireproximityprompt) == "function"
-			or type(env.FireProximityPrompt) == "function",
-		hasHookFunction = type(env.hookfunction) == "function" or type(env.hookfunc) == "function",
-		hasGetGC = type(env.getgc) == "function",
-		hasGetConstants = type(env.getconstants) == "function" or type(env.debug_getconstants) == "function",
-		hasGetInfo = type(env.getinfo) == "function" or type(env.debug_getinfo) == "function",
-		hasFireClickDetector = type(env.fireclickdetector) == "function"
-			or type(env.FireClickDetector) == "function",
-		hasSaveInstance = type(env.saveinstance) == "function",
-		hasSetFpsCap = type(env.setfpscap) == "function",
-		hasQueueOnTeleport = type(env.queue_on_teleport) == "function",
-		hasIsLClosure = type(env.islclosure) == "function" or type(env.checkclosure) == "function",
-		hasGetNamecallMethod = type(env.getnamecallmethod) == "function",
-		hasSetNamecallMethod = type(env.setnamecallmethod) == "function",
-		hasNewCClosure = type(env.newcclosure) == "function",
-		hasGetRawMetatable = type(env.getrawmetatable) == "function",
-		hasSetReadOnly = type(env.setreadonly) == "function" or type(env.makereadonly) == "function",
-		hasWebSocket = type(env.WebSocket) == "table" and type(env.WebSocket.connect) == "function",
-		hasLoadstring = type(env.loadstring) == "function" or type(env.LoadString) == "function",
-		hasGetScriptClosure = type(env.getscriptclosure) == "function",
-		hasGetHiddenUI = type(env.gethiddenui) == "function" or type(env.get_hidden_ui) == "function",
-		hasGetNilInstances = type(env.getnilinstances) == "function",
-		hasSetClipboard = type(env.setclipboard) == "function"
-			or type(env.toclipboard) == "function"
-			or (tbl("Wave") and type(env.Wave.setclipboard) == "function")
-			or (tbl("Electron") and type(env.Electron.setclipboard) == "function"),
 		env        = env,
 	}
 end)()
@@ -485,8 +453,6 @@ local fireTouchInterest = firstExecFunc(
 	"touchinterest",
 	"fire_touch_interest"
 )
-local fireClickDetector = firstExecFunc("fireclickdetector", "FireClickDetector")
-local fireProximityPrompt = firstExecFunc("fireproximityprompt", "FireProximityPrompt")
 local loadStringFn = firstExecFunc("loadstring", "LoadString") or loadstring
 
 local writeFile   = execFunc("writefile",  true)
@@ -1179,11 +1145,9 @@ local modules = {
 	mutationData = nil,
 	weightsData = nil,
 	speedData = nil,
-	rebirthData = nil,
 	sacrificeData = nil,
 	kickService = nil,
 	balanceService = nil,
-	rebirthService = nil,
 	weatherService = nil,
 }
 
@@ -1224,9 +1188,6 @@ end)
 loadModule("speedData", "SpeedData", function()
 	return ReplicatedStorage.Shared.Data.SpeedData
 end)
-loadModule("rebirthData", "RebirthData", function()
-	return ReplicatedStorage.Shared.Data.RebirthData
-end)
 loadModule("sacrificeData", "SacrificeData", function()
 	return ReplicatedStorage.Shared.Data.SacrificeData
 end)
@@ -1235,9 +1196,6 @@ loadModule("kickService", "KickServiceClient", function()
 end)
 loadModule("balanceService", "ClientBalanceService", function()
 	return ReplicatedStorage.Modules.ServicesLoader.ClientBalanceService
-end)
-loadModule("rebirthService", "RebirthServiceClient", function()
-	return ReplicatedStorage.Modules.ServicesLoader.RebirthServiceClient
 end)
 loadModule("weatherService", "WeatherServiceClient", function()
 	return ReplicatedStorage.Modules.ServicesLoader.WeatherService_Client
@@ -1250,34 +1208,20 @@ gameData.BrainrotOptions = withAny(gameData.BrainrotOptions)
 gameData.RarityOptions = withAny(gameData.RarityOptions)
 gameData.MutationOptions = withAny(gameData.MutationOptions)
 
-local values = {
-	coins = modules.balanceService and parseNumber(modules.balanceService.Balance) or 0,
-	kickLevel = modules.kickService and modules.kickService.Level or 0,
-	rebirthLevel = modules.rebirthService and modules.rebirthService.RebirthLevel or 0,
-}
+local cachedCoins = modules.balanceService and parseNumber(modules.balanceService.Balance) or 0
 
 local function currentCoins()
 	local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
 	local coins = leaderstats and leaderstats:FindFirstChild("Coins")
 	if coins then
-		values.coins = parseNumber(coins.Value)
+		cachedCoins = parseNumber(coins.Value)
 	end
-	return values.coins or 0
+	return cachedCoins or 0
 end
 
 if modules.balanceService and modules.balanceService.CoinsChanged then
 	track(modules.balanceService.CoinsChanged:Connect(function(coins)
-		values.coins = parseNumber(coins)
-	end))
-end
-if modules.kickService and modules.kickService.LevelChanged then
-	track(modules.kickService.LevelChanged:Connect(function(level)
-		values.kickLevel = level or 0
-	end))
-end
-if modules.rebirthService and modules.rebirthService.RebirthChanged then
-	track(modules.rebirthService.RebirthChanged:Connect(function(level)
-		values.rebirthLevel = level or 0
+		cachedCoins = parseNumber(coins)
 	end))
 end
 
@@ -1457,25 +1401,6 @@ local function brainrotCps(name, mutation, level)
 	end
 
 	return leveledBase * multiplier
-end
-
--- Forward-declared: defined further down, but referenced by totalPlotCps.
-local placedBrainrotInfo
-
-local function totalPlotCps()
-	local plot = findPlot()
-	if not plot or not plot:FindFirstChild("Slots") then return 0 end
-	local total = 0
-	for _, slot in ipairs(plot.Slots:GetChildren()) do
-		local placed = slot:FindFirstChild("PlacedPart")
-		if placed then
-			local name, mutation, level = placedBrainrotInfo(placed)
-			if name then
-				total = total + (brainrotCps(name, mutation, level) or 0)
-			end
-		end
-	end
-	return total
 end
 
 local function kickPower()
@@ -1790,7 +1715,6 @@ local function makeSupervisor(name, interval, callback)
 			end
 		end
 	end)
-	return loopState
 end
 
 local function collectFromPlot()
@@ -2460,6 +2384,15 @@ end
 
 state.TriggerFavScan = scanTools
 
+local function totalLoggedErrors()
+	local total = 0
+	for _, count in pairs(runtime.errorCounts) do
+		total = total + (tonumber(count) or 0)
+	end
+	return total
+end
+
+local function buildInterface()
 local function starlightIcon(icon)
 	return tostring(icon or ""):match("%d+$") or ""
 end
@@ -3043,14 +2976,6 @@ local function clearErrorLog()
 	notify("Debug", "Error log wiped.", 3)
 end
 
-local function totalLoggedErrors()
-	local total = 0
-	for _, count in pairs(runtime.errorCounts) do
-		total = total + (tonumber(count) or 0)
-	end
-	return total
-end
-
 local function supportSummary()
 	local build = runtime.gameBuild or checkGameBuild(false)
 	local lines = {
@@ -3324,9 +3249,7 @@ kickGroup:CreateToggle(
 	"Runs to the pad, kicks, and resets when the roll doesn't match your filters.",
 	function(value)
 		state.AFarm = value
-		runtime.autoKickSession = runtime.autoKickSession + 1
 		runtime.nextAutoKickReset = 0
-		runtime.lastAutoKickActivity = tick()
 		restoreCamera(select(2, characterParts()))
 		saveSettings()
 	end
@@ -3410,7 +3333,6 @@ kickGroup:CreateButton(
 		runtime.sessionMatches  = 0
 		runtime.sessionResets   = 0
 		runtime.sessionBestCps  = 0
-		runtime.sessionBestName = "--"
 		runtime.kickRateWindow  = {}
 		runtime.kicksPerMin     = 0
 		notify("Session", "Counters cleared.", 2)
@@ -4110,12 +4032,23 @@ webhookGroup:AddDropdown("Status Rarity", {
 	end,
 })
 
+	if predictionStatus and predictionStatus.SetVisible then
+		predictionStatus:SetVisible(state.APredict)
+	end
 
-
-if predictionStatus and predictionStatus.SetVisible then
-	predictionStatus:SetVisible(state.APredict)
+	return {
+		predictionStatus = predictionStatus,
+		sessionStatus = sessionStatus,
+		protectedDropdown = protectedDropdown,
+		upgradeDropdown = upgradeDropdown,
+		diagnosticsStatus = diagnosticsStatus,
+		updateMasteryStatus = updateMasteryStatus,
+	}
 end
 
+local ui = buildInterface()
+
+local function startRuntime()
 local fpsFrames = 0
 local fpsStarted = tick()
 track(
@@ -4144,7 +4077,7 @@ task.spawn(function()
 		if runtime.currentFps and runtime.currentFps < 24 then
 			diagnosticsInterval = math.max(diagnosticsInterval, 5)
 		end
-		if diagnosticsStatus and diagnosticsStatus.Update then
+		if ui.diagnosticsStatus and ui.diagnosticsStatus.Update then
 			refreshPerformanceMode()
 			local remoteCount = 0
 			for _, remote in pairs(remotes) do
@@ -4156,39 +4089,39 @@ task.spawn(function()
 			for _ in pairs(loops) do
 				loopCount = loopCount + 1
 			end
-			diagnosticsStatus:Update("Executor", Executor.isKnown and Executor.name or ("? " .. (Executor.rawName ~= "" and ("(" .. Executor.rawName .. ")") or "unknown")))
-			diagnosticsStatus:Update("FPS", tostring(runtime.currentFps or "--"))
+			ui.diagnosticsStatus:Update("Executor", Executor.isKnown and Executor.name or ("? " .. (Executor.rawName ~= "" and ("(" .. Executor.rawName .. ")") or "unknown")))
+			ui.diagnosticsStatus:Update("FPS", tostring(runtime.currentFps or "--"))
 			local perfLabels = {
 				Balanced = "Normal",
 				Safe = "Saving FPS",
 				Performance = "Light",
 				Aggressive = "Fast",
 			}
-			diagnosticsStatus:Update(
+			ui.diagnosticsStatus:Update(
 				"Perf",
 				perfLabels[runtime.performanceMode or "Balanced"] or tostring(runtime.performanceMode or "Normal")
 			)
-			diagnosticsStatus:Update("Tasks", tostring(loopCount))
-			diagnosticsStatus:Update("Remotes", tostring(remoteCount))
+			ui.diagnosticsStatus:Update("Tasks", tostring(loopCount))
+			ui.diagnosticsStatus:Update("Remotes", tostring(remoteCount))
 			local build = runtime.gameBuild
-			diagnosticsStatus:Update(
+			ui.diagnosticsStatus:Update(
 				"Build",
 				build and ((build.Changed and "Updated" or "Same") .. " · v" .. tostring(build.PlaceVersion or "--")) or "--"
 			)
-			diagnosticsStatus:Update("Updated", build and formatRobloxTimestamp(build.Updated) or "--")
-			diagnosticsStatus:Update("Errors", tostring(totalLoggedErrors()))
-			diagnosticsStatus:Update("Latest", runtime.lastError or runtime.lastLoopError or "none")
-			diagnosticsStatus:Update("Previous", runtime.errorLog[1] or "none")
+			ui.diagnosticsStatus:Update("Updated", build and formatRobloxTimestamp(build.Updated) or "--")
+			ui.diagnosticsStatus:Update("Errors", tostring(totalLoggedErrors()))
+			ui.diagnosticsStatus:Update("Latest", runtime.lastError or runtime.lastLoopError or "none")
+			ui.diagnosticsStatus:Update("Previous", runtime.errorLog[1] or "none")
 
-			if sessionStatus and sessionStatus.Update then
+			if ui.sessionStatus and ui.sessionStatus.Update then
 				local elapsed = math.floor(tick() - (runtime.sessionStart or tick()))
-				sessionStatus:Update("Runtime", string.format("%d:%02d", math.floor(elapsed / 60), elapsed % 60))
-				sessionStatus:Update("Kicks",   tostring(runtime.sessionKicks  or 0))
-				sessionStatus:Update("Per min", tostring(runtime.kicksPerMin or 0))
-				sessionStatus:Update("Keeps", tostring(runtime.sessionMatches or 0))
-				sessionStatus:Update("Resets",  tostring(runtime.sessionResets  or 0))
+				ui.sessionStatus:Update("Runtime", string.format("%d:%02d", math.floor(elapsed / 60), elapsed % 60))
+				ui.sessionStatus:Update("Kicks",   tostring(runtime.sessionKicks  or 0))
+				ui.sessionStatus:Update("Per min", tostring(runtime.kicksPerMin or 0))
+				ui.sessionStatus:Update("Keeps", tostring(runtime.sessionMatches or 0))
+				ui.sessionStatus:Update("Resets",  tostring(runtime.sessionResets  or 0))
 				local bestCps = runtime.sessionBestCps or 0
-				sessionStatus:Update("Best $/s", bestCps > 0 and (formatNumber(bestCps) .. "/s") or "--")
+				ui.sessionStatus:Update("Best $/s", bestCps > 0 and (formatNumber(bestCps) .. "/s") or "--")
 			end
 		end
 		task.wait(diagnosticsInterval)
@@ -4276,21 +4209,21 @@ end
 makeSupervisor("RefreshData", 8, function()
 	refreshRemotes()
 	retryMissingModules()
-	updatePlotLists(protectedDropdown, upgradeDropdown)
+	updatePlotLists(ui.protectedDropdown, ui.upgradeDropdown)
 end)
 
 makeSupervisor("Prediction", 1, function()
-	if not state.APredict or not predictionStatus then
+	if not state.APredict or not ui.predictionStatus then
 		return
 	end
 	local inGame = LocalPlayer:GetAttribute("InGame") or ""
 	if inGame == "" then
-		predictionStatus:Update("Roll",     "--")
-		predictionStatus:Update("Rarity",   "--")
-		predictionStatus:Update("Mutation", "--")
-		predictionStatus:Update("Lv1 $/s",  "--")
-		predictionStatus:Update("vs plot",  "--")
-		predictionStatus:Update("Result",   "--")
+		ui.predictionStatus:Update("Roll",     "--")
+		ui.predictionStatus:Update("Rarity",   "--")
+		ui.predictionStatus:Update("Mutation", "--")
+		ui.predictionStatus:Update("Lv1 $/s",  "--")
+		ui.predictionStatus:Update("vs plot",  "--")
+		ui.predictionStatus:Update("Result",   "--")
 		return
 	end
 
@@ -4335,7 +4268,6 @@ makeSupervisor("Prediction", 1, function()
 
 	if cps1 and cps1 > (runtime.sessionBestCps or 0) then
 		runtime.sessionBestCps = cps1
-		runtime.sessionBestName = name
 	end
 
 	local matchesFilter = mainFilterMatches(name, mutation)
@@ -4346,12 +4278,12 @@ makeSupervisor("Prediction", 1, function()
 			notify("Rare!", name .. " · " .. rarity .. " · " .. mutation, 6)
 		end
 	end
-	predictionStatus:Update("Roll",     name)
-	predictionStatus:Update("Rarity",   rarity)
-	predictionStatus:Update("Mutation", mutation)
-	predictionStatus:Update("Lv1 $/s",  cps1 and (formatNumber(cps1) .. "/s") or "?")
-	predictionStatus:Update("vs plot",  netGainStr)
-	predictionStatus:Update("Result",   matchesFilter and "keep" or "skip")
+	ui.predictionStatus:Update("Roll",     name)
+	ui.predictionStatus:Update("Rarity",   rarity)
+	ui.predictionStatus:Update("Mutation", mutation)
+	ui.predictionStatus:Update("Lv1 $/s",  cps1 and (formatNumber(cps1) .. "/s") or "?")
+	ui.predictionStatus:Update("vs plot",  netGainStr)
+	ui.predictionStatus:Update("Result",   matchesFilter and "keep" or "skip")
 end)
 
 makeSupervisor("AutoKick", 0.3, function()
@@ -4383,7 +4315,6 @@ makeSupervisor("AutoKick", 0.3, function()
 	elseif battleStatus == "Lobby" or battleStatus == "Create" then
 		return
 	end
-	runtime.lastAutoKickActivity = tick()
 	local wavesFolder = Workspace:FindFirstChild("Waves")
 	local hasWave = wavesFolder and #wavesFolder:GetChildren() > 0
 	local inGame = LocalPlayer:GetAttribute("InGame") or ""
@@ -4862,7 +4793,7 @@ makeSupervisor("Mastery", 1, function()
 		return
 	end
 	if state.AFarm then
-		updateMasteryStatus("Paused (auto kick on)")
+		ui.updateMasteryStatus("Paused (auto kick on)")
 		runtime.nextMasteryAction = tick() + 2
 		return
 	end
@@ -4874,31 +4805,30 @@ makeSupervisor("Mastery", 1, function()
 	end
 
 	local _bodyOk, _bodyErr = pcall(function()
-		updateMasteryStatus("Running...")
+		ui.updateMasteryStatus("Running...")
 		refreshRemotes()
 		local _, humanoid, root = characterParts()
 		local kickReady = Workspace:FindFirstChild("Areas") and Workspace.Areas:FindFirstChild("KickReady")
 		if not humanoid or not root or humanoid.Health <= 0 or not kickReady or not remotes.kick then
-			updateMasteryStatus("Waiting...")
+			ui.updateMasteryStatus("Waiting...")
 			finish(1)
 			return
 		end
 		local inGame = LocalPlayer:GetAttribute("InGame") or ""
 		if inGame == "" then
 			if (root.Position - kickReady.Position).Magnitude > 5 then
-				updateMasteryStatus("Walking to pad")
+				ui.updateMasteryStatus("Walking to pad")
 				root.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
 				finish(0.4)
 			else
-				updateMasteryStatus("Kicking")
+				ui.updateMasteryStatus("Kicking")
 				safeCall("MasteryKick", function()
 					remotes.kick:FireServer(0, (state.MasteryKickPower or 50) / 100)
 				end)
-				runtime.masteryKickCount = (runtime.masteryKickCount or 0) + 1
 				finish(1.2)
 			end
 		elseif state.MasteryResetMethod == "TP" then
-			updateMasteryStatus("TP reset")
+			ui.updateMasteryStatus("TP reset")
 			local timeout = tick() + 4
 			while state.HubRunning and state.AAutoMastery and tick() < timeout do
 				if (LocalPlayer:GetAttribute("InGame") or "") == "" then
@@ -4913,7 +4843,7 @@ makeSupervisor("Mastery", 1, function()
 			root.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
 			finish(1)
 		else
-			updateMasteryStatus("Dying to reset")
+			ui.updateMasteryStatus("Dying to reset")
 			local gui2 = LocalPlayer:FindFirstChild("PlayerGui")
 			local minigame = gui2 and (
 				gui2:FindFirstChild("KickMinigame")
@@ -4933,7 +4863,7 @@ makeSupervisor("Mastery", 1, function()
 			end
 			restoreCamera(humanoid)
 			humanoid.Health = 0
-			updateMasteryStatus("Dying to reset", { ["Last"] = os.date("%H:%M:%S") })
+			ui.updateMasteryStatus("Dying to reset", { ["Last"] = os.date("%H:%M:%S") })
 			local oldCharacter = LocalPlayer.Character
 			local respawnTimeout = tick() + 10
 			while
@@ -5063,3 +4993,7 @@ if state.AAutoFav then
 end
 
 notify("Alleral", "v" .. VERSION .. " loaded — tabs on the left, hover stuff for tips.", 5)
+end
+
+startRuntime()
+
