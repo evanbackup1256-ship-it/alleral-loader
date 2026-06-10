@@ -161,6 +161,37 @@ def clip(text: object, limit: int = 1000) -> str:
     return value[: limit - 3] + "..."
 
 
+def as_dict(value: object, string_key: str = "name") -> dict:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str) and value.strip():
+        return {string_key: value.strip()}
+    return {}
+
+
+def normalize_payload(payload: dict) -> dict:
+    normalized = dict(payload)
+    normalized["player"] = as_dict(payload.get("player"))
+    normalized["context"] = as_dict(payload.get("context"))
+    error = payload.get("error")
+    if isinstance(error, dict):
+        normalized["error"] = error
+    elif error is not None and str(error).strip():
+        normalized["error"] = {"message": str(error).strip()}
+    else:
+        normalized["error"] = {}
+    stats = normalized["context"].get("stats")
+    if stats is not None and not isinstance(stats, dict):
+        normalized["context"]["stats"] = {}
+    exec_profile = normalized["context"].get("executorProfile")
+    if exec_profile is not None and not isinstance(exec_profile, dict):
+        normalized["context"]["executorProfile"] = {}
+    caps = normalized["context"].get("capabilities")
+    if caps is not None and not isinstance(caps, dict):
+        normalized["context"]["capabilities"] = {}
+    return normalized
+
+
 def field(name: str, value: object, inline: bool = True) -> dict:
     text = clip(value, 1024)
     if not text:
@@ -218,6 +249,7 @@ def build_description(event: str, player: dict, context: dict) -> str | None:
 
 
 def build_embed(payload: dict) -> dict:
+    payload = normalize_payload(payload)
     event = str(payload.get("event") or "unknown")
     player = payload.get("player") or {}
     context = payload.get("context") or {}
@@ -327,6 +359,7 @@ def build_heartbeat_batch_embed(entries: list[dict]) -> dict:
     lines = []
     games: dict[str, int] = defaultdict(int)
     for item in entries[:40]:
+        item = normalize_payload(item)
         player = item.get("player") or {}
         context = item.get("context") or {}
         game = context.get("gameName") or context.get("gameId") or "?"
@@ -433,7 +466,7 @@ class RelayEngine:
         event = str(payload.get("event") or "")
         if event not in {"log", "heartbeat"}:
             return True
-        session = str((payload.get("context") or {}).get("sessionId") or payload.get("sessionId") or "")
+        session = str(as_dict(payload.get("context")).get("sessionId") or payload.get("sessionId") or "")
         if not session:
             return True
         now = time.time()
@@ -509,6 +542,7 @@ class RelayEngine:
                 continue
 
             _, _, payload = item
+            payload = normalize_payload(payload)
             player = payload.get("player") or {}
             context = payload.get("context") or {}
             embed = build_embed(payload)
@@ -560,6 +594,8 @@ def ingest():
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return jsonify({"ok": False, "error": "bad_request"}), 400
+
+    payload = normalize_payload(payload)
 
     if not payload.get("timestamp"):
         payload["timestamp"] = utc_iso()
