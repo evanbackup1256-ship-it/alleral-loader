@@ -1320,6 +1320,18 @@ local function coerceNumber(value)
 	return parseNumber(value)
 end
 
+local function rsChild(...)
+	local node = ReplicatedStorage
+	for i = 1, select("#", ...) do
+		local name = select(i, ...)
+		if not node then
+			return nil
+		end
+		node = node:FindFirstChild(name)
+	end
+	return node
+end
+
 local modules = {
 	entitiesData = nil,
 	luckyBlocksData = nil,
@@ -1336,17 +1348,33 @@ local modules = {
 
 local moduleResolvers = {}
 
-local function loadModule(key, label, resolver)
-	moduleResolvers[key] = { label = label, resolver = resolver }
-	local ok, result = safeCall("LoadModule:" .. label, function()
-		local target = resolver()
-		if not target then
-			return nil
+local function loadModule(key, label, resolver, optional)
+	local entry = moduleResolvers[key] or { label = label, resolver = resolver, optional = optional ~= false }
+	entry.label = label
+	entry.resolver = resolver
+	entry.optional = optional ~= false
+	moduleResolvers[key] = entry
+
+	if entry.giveUp then
+		return modules[key]
+	end
+
+	local okResolve, target = pcall(resolver)
+	if not okResolve or not target then
+		if entry.optional then
+			entry.giveUp = true
 		end
+		return nil
+	end
+
+	local ok, result = safeCall("LoadModule:" .. label, function()
 		return require(target)
 	end)
-	if ok then
+	if ok and result then
 		modules[key] = result
+		entry.giveUp = true
+	elseif entry.optional then
+		entry.giveUp = true
 	end
 	return modules[key]
 end
@@ -1387,50 +1415,51 @@ end
 
 local function retryMissingModules()
 	for key, entry in pairs(moduleResolvers) do
-		if not modules[key] then
-			loadModule(key, entry.label, entry.resolver)
+		if not modules[key] and not entry.giveUp then
+			loadModule(key, entry.label, entry.resolver, entry.optional)
 		end
 	end
 	bindProgressionModules()
 end
 
 loadModule("entitiesData", "EntitiesData", function()
-	return ReplicatedStorage.Shared.Data.EntitiesData
-end)
+	return rsChild("Shared", "Data", "EntitiesData")
+end, false)
 loadModule("luckyBlocksData", "LuckyBlocksData", function()
-	return ReplicatedStorage.Shared.Data.LuckyBlocksData
+	return rsChild("Shared", "Data", "LuckyBlocksData")
 		or ReplicatedStorage:FindFirstChild("LuckyBlocksData", true)
-end)
+end, true)
 loadModule("mutationData", "MutationData", function()
-	return ReplicatedStorage.Shared.Data.MutationData
-end)
+	return rsChild("Shared", "Data", "MutationData")
+end, true)
 loadModule("weightsData", "WeightsData", function()
 	return ReplicatedStorage:FindFirstChild("WeightsData", true)
-end)
+		or rsChild("Shared", "Data", "WeightsData")
+end, true)
 loadModule("speedData", "SpeedData", function()
-	return ReplicatedStorage.Shared.Data.SpeedData
-end)
+	return rsChild("Shared", "Data", "SpeedData")
+end, true)
 loadModule("sacrificeData", "SacrificeData", function()
-	return ReplicatedStorage.Shared.Data.SacrificeData
-end)
+	return rsChild("Shared", "Data", "SacrificeData")
+end, true)
 loadModule("kickService", "KickServiceClient", function()
-	return ReplicatedStorage.Modules.ServicesLoader.KickServiceClient
-end)
+	return rsChild("Modules", "ServicesLoader", "KickServiceClient")
+end, false)
 loadModule("rebirthData", "RebirthData", function()
-	return ReplicatedStorage.Shared.Data.RebirthData
-end)
+	return rsChild("Shared", "Data", "RebirthData")
+end, true)
 loadModule("rebirthService", "RebirthServiceClient", function()
-	return ReplicatedStorage.Modules.ServicesLoader.RebirthServiceClient
-end)
+	return rsChild("Modules", "ServicesLoader", "RebirthServiceClient")
+end, true)
 
 syncKickServicePercent()
 bindProgressionModules()
 loadModule("balanceService", "ClientBalanceService", function()
-	return ReplicatedStorage.Modules.ServicesLoader.ClientBalanceService
-end)
+	return rsChild("Modules", "ServicesLoader", "ClientBalanceService")
+end, true)
 loadModule("weatherService", "WeatherServiceClient", function()
-	return ReplicatedStorage.Modules.ServicesLoader.WeatherService_Client
-end)
+	return rsChild("Modules", "ServicesLoader", "WeatherService_Client")
+end, true)
 
 if modules.mutationData and modules.mutationData.ValidMutations then
 	gameData.MutationOptions = modules.mutationData.ValidMutations
@@ -1634,8 +1663,18 @@ local function brainrotCps(name, mutation, level)
 	return leveledBase * multiplier
 end
 
+local function luckyBlocksSource()
+	if modules.luckyBlocksData and modules.luckyBlocksData.LuckyBlocks then
+		return modules.luckyBlocksData
+	end
+	if modules.entitiesData and modules.entitiesData.LuckyBlocks then
+		return modules.entitiesData
+	end
+	return nil
+end
+
 local function rollChanceFor(name)
-	local data = modules.luckyBlocksData
+	local data = luckyBlocksSource()
 	if not data or not data.LuckyBlocks then
 		return "Unknown"
 	end
