@@ -12,7 +12,7 @@
 		getgenv().Alleral_Reload()
 ]]
 
-local LOADER_VERSION = "2.5"
+local LOADER_VERSION = "2.6"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local FETCH_RETRIES = 3
 local FETCH_BACKOFF = 0.75
@@ -326,7 +326,14 @@ end
 
 local function withCacheBust(url, nonce)
 	local sep = url:find("?") and "&" or "?"
-	return url .. sep .. "v=" .. LOADER_VERSION .. "&t=" .. tostring(nonce or os.time())
+	return url
+		.. sep
+		.. "v="
+		.. LOADER_VERSION
+		.. "&t="
+		.. tostring(nonce or os.time())
+		.. "&nocache="
+		.. tostring(math.random(10000, 99999))
 end
 
 local function fetchRemote(url, label, marker)
@@ -335,6 +342,16 @@ local function fetchRemote(url, label, marker)
 
 	for attempt = 1, #nonces do
 		local fetchUrl = withCacheBust(url, nonces[attempt])
+
+		if type(game.HttpGet) == "function" then
+			local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
+			if ok and body and body ~= "" and not body:find("404: Not Found") then
+				if not marker or body:find(marker, 1, true) then
+					return body, nil
+				end
+				lastErr = label .. " HttpGet response looked cached/outdated"
+			end
+		end
 
 		if httpRequest then
 			local ok, response = pcall(httpRequest, {
@@ -354,16 +371,6 @@ local function fetchRemote(url, label, marker)
 				end
 			else
 				lastErr = tostring(response)
-			end
-		end
-
-		if type(game.HttpGet) == "function" then
-			local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
-			if ok and body and body ~= "" and not body:find("404: Not Found") then
-				if not marker or body:find(marker, 1, true) then
-					return body, nil
-				end
-				lastErr = label .. " HttpGet response looked cached/outdated"
 			end
 		end
 
@@ -514,7 +521,7 @@ end
 
 local function preloadCore(required)
 	local core = ENV.Alleral_Core
-	if core and type(core.loadStarlight) == "function" and core.VERSION == "1.1" then
+	if core and type(core.loadStarlight) == "function" and core.VERSION == "1.2" then
 		return true
 	end
 	ENV.Alleral_Core = nil

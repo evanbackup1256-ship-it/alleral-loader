@@ -40,6 +40,7 @@ Inspect loader state: `getgenv().Alleral_LoaderInfo()`
 │   ├── alleral_core.luau       # Shared Starlight/settings bootstrap
 │   ├── analytics.luau          # Discord analytics / Tracker
 │   ├── kick_a_lucky_block.luau # Kick a Lucky Block (v6.4)
+│   ├── kickblox.luau           # Brainrot/rarity data (from Omnie7/Luxy-Core)
 │   ├── speed_keyboard_escape.luau
 │   ├── slime_rng.luau
 │   └── build_a_ring_farm.luau

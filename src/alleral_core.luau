@@ -1,7 +1,7 @@
 --[[ Alleral shared bootstrap — loaded by loader into getgenv().Alleral_Core ]]
 
 local Core = {}
-Core.VERSION = "1.1"
+Core.VERSION = "1.2"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
@@ -155,20 +155,22 @@ function Core.loadStarlight()
 	end
 
 	local function fetchRemoteSource(url)
+		local sep = url:find("?") and "&" or "?"
+		local fetchUrl = url .. sep .. "nocache=" .. tostring(math.random(10000, 99999))
+		if type(game.HttpGet) == "function" then
+			local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
+			if ok and body and body ~= "" and not body:find("404: Not Found") then
+				return body
+			end
+		end
 		local httpGet = Core.requestFunction()
 		if httpGet then
-			local ok, response = pcall(httpGet, { Url = url, Method = "GET" })
+			local ok, response = pcall(httpGet, { Url = fetchUrl, Method = "GET" })
 			if ok and response then
 				local body = response.Body or response.body or (type(response) == "string" and response)
 				if body and body ~= "" and not body:find("404: Not Found") then
 					return body
 				end
-			end
-		end
-		if type(game.HttpGet) == "function" then
-			local ok, body = pcall(game.HttpGet, game, url, true)
-			if ok and body and body ~= "" and not body:find("404: Not Found") then
-				return body
 			end
 		end
 		return nil

@@ -716,7 +716,19 @@ local function requestFunction()
 	return nil
 end
 
+local function withNoCache(url)
+	local sep = url:find("?") and "&" or "?"
+	return url .. sep .. "nocache=" .. tostring(math.random(10000, 99999))
+end
+
 local function fetchUrl(url)
+	url = withNoCache(url)
+	if type(game.HttpGet) == "function" then
+		local ok, body = pcall(game.HttpGet, game, url, true)
+		if ok and body and body ~= "" and not body:find("404: Not Found") then
+			return body
+		end
+	end
 	local httpGet = requestFunction()
 	if httpGet then
 		local ok, response = safeCall("FetchUrl", function()
@@ -727,12 +739,6 @@ local function fetchUrl(url)
 			if body and body ~= "" and not body:find("404: Not Found") then
 				return body
 			end
-		end
-	end
-	if type(game.HttpGet) == "function" then
-		local ok, body = pcall(game.HttpGet, game, url, true)
-		if ok and body and body ~= "" and not body:find("404: Not Found") then
-			return body
 		end
 	end
 	return nil
@@ -1132,10 +1138,38 @@ if not starlight or type(starlight.CreateWindow) ~= "function" then
 	return
 end
 
-local gameData = loadRemoteLua(
-	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/kickblox.lua",
-	"game data"
-) or { BrainrotOptions = {}, RarityOptions = {}, MutationOptions = {} }
+local KICKBLOX_URLS = {
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/src/kickblox.luau",
+	"https://raw.githubusercontent.com/Omnie7/Luxy-Core/main/Data/KickBlox.luau",
+}
+local KICKBLOX_LOCAL_FILES = {
+	"src/kickblox.luau",
+	"kickblox.luau",
+}
+
+local function loadGameData()
+	if readFile and isFile then
+		for _, path in ipairs(KICKBLOX_LOCAL_FILES) do
+			if isFile(path) then
+				local ok, data = safeCall("KickBloxLocal", function()
+					return loadStringFn(readFile(path), "@KickBlox/local")()
+				end)
+				if ok and type(data) == "table" then
+					return data
+				end
+			end
+		end
+	end
+	for _, url in ipairs(KICKBLOX_URLS) do
+		local loaded = loadRemoteLua(url, "game data")
+		if type(loaded) == "table" then
+			return loaded
+		end
+	end
+	return { BrainrotOptions = {}, RarityOptions = {}, MutationOptions = {} }
+end
+
+local gameData = loadGameData()
 
 local function withAny(options)
 	local output = { "Any" }
