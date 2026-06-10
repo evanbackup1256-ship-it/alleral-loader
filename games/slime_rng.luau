@@ -1479,6 +1479,7 @@ local window = starlight:CreateWindow({
 	Subtitle = "Slime RNG · v" .. VERSION,
 	Icon = 10723407389,
 	LoadingEnabled = false,
+	NotifyOnCallbackError = true,
 })
 
 local section = window:CreateTabSection("Alleral", true)
@@ -1601,8 +1602,12 @@ local function addMultiDropdown(group, name, label, values, default, callback)
 		Callback = function(selection)
 			local picked = {}
 			for item, enabled in pairs(selection) do
-				if enabled then
-					table.insert(picked, item)
+				if type(item) == "number" then
+					if enabled ~= nil and enabled ~= false then
+						table.insert(picked, tostring(enabled))
+					end
+				elseif enabled then
+					table.insert(picked, tostring(item))
 				end
 			end
 			callback(picked)
@@ -1744,6 +1749,8 @@ performance:CreateToggle("Anti AFK", state.AntiAFK ~= false, "Stops Roblox from 
 		Core.setupAntiAfk(LocalPlayer)
 	end
 end)
+
+miscTab:BuildThemeGroupbox(2)
 
 state.Alleral_Unload = function()
 	Core.stopAutomation(state, connections, loopControllers, loops, function()

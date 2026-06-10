@@ -588,7 +588,7 @@ end
 
 local function preloadCore(required)
 	local core = ENV.Alleral_Core
-	if core and type(core.loadStarlight) == "function" and (core.VERSION == "1.4" or core.VERSION == "1.5") then
+	if core and type(core.loadStarlight) == "function" and (core.VERSION == "1.4" or core.VERSION == "1.5" or core.VERSION == "1.6") then
 		return true
 	end
 	ENV.Alleral_Core = nil

@@ -1,8 +1,6 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local GuiService = game:GetService("GuiService")
-local TweenService = game:GetService("TweenService")
 
 local Util = require(script.Parent.util)
 local Theme = require(script.Parent.theme)
@@ -43,8 +41,11 @@ function WindowBuilder.create(library, windowSettings)
 	windowSettings.NotifyOnCallbackError = windowSettings.NotifyOnCallbackError ~= false
 
 	local player = Players.LocalPlayer
-	local guiInset = GuiService:GetGuiInset()
 	local theme = Theme.current()
+
+	if windowSettings.FileSettings then
+		library.FileSystem:BuildFolderTree(windowSettings.FileSettings)
+	end
 
 	local screenGui = Util.new("ScreenGui", {
 		Name = (getgenv and getgenv().InterfaceName) or windowSettings.Name or "Starlight Interface Suite",
@@ -62,10 +63,27 @@ function WindowBuilder.create(library, windowSettings)
 		Size = UDim2.fromScale(1, 1),
 	}, { screenGui })
 
-	local blur = Instance.new("BlurEffect")
-	blur.Name = "StarlightBlur"
-	blur.Size = Theme.Visual.BlurEnabled and Theme.Visual.BlurSize or 0
-	blur.Parent = game:GetService("Lighting")
+	local lighting = game:GetService("Lighting")
+	local blur = lighting:FindFirstChild("StarlightBlur")
+	if not blur then
+		blur = Instance.new("BlurEffect")
+		blur.Name = "StarlightBlur"
+		blur.Parent = lighting
+	end
+	blur.Size = 0
+
+	local function setBlur(active)
+		blur.Size = (active and Theme.Visual.BlurEnabled) and Theme.Visual.BlurSize or 0
+	end
+
+	local popupLayer = Util.new("Frame", {
+		Name = "Popups",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 200,
+	}, { overlay })
+	library._popupRoot = popupLayer
+	library._screenGui = screenGui
 
 	local main = Util.new("Frame", {
 		Name = "MainWindow",
@@ -126,6 +144,7 @@ function WindowBuilder.create(library, windowSettings)
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 1, -120),
 		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 0,
 	}, { sidebar })
 	Util.list(8, false, navHolder)
@@ -198,7 +217,6 @@ function WindowBuilder.create(library, windowSettings)
 	}
 
 	local dragging = false
-	local dragInput
 	local dragStart
 	local startPos
 
@@ -215,16 +233,25 @@ function WindowBuilder.create(library, windowSettings)
 		end
 	end)
 	UserInputService.InputChanged:Connect(function(input)
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			local delta = input.Position - dragStart
-			main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		if not dragging then
+			return
 		end
+		if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+		local delta = input.Position - dragStart
+		main.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
 	end)
 
 	local function setVisible(state)
 		window.Visible = state
 		main.Visible = state
-		blur.Enabled = state and Theme.Visual.BlurEnabled
+		setBlur(state)
 		if state then
 			main.BackgroundTransparency = 1
 			Tween.play(main, { BackgroundTransparency = Theme.Visual.WindowTransparency }, nil, Theme.tweenInfo(0.22))
@@ -246,8 +273,8 @@ function WindowBuilder.create(library, windowSettings)
 	end
 
 	function window:Destroy()
+		blur.Size = 0
 		screenGui:Destroy()
-		blur:Destroy()
 	end
 
 	function window:CreateTabSection(name, expanded)
@@ -329,6 +356,7 @@ function WindowBuilder.create(library, windowSettings)
 				BackgroundTransparency = 1,
 				Size = UDim2.fromScale(1, 1),
 				CanvasSize = UDim2.new(),
+				AutomaticCanvasSize = Enum.AutomaticSize.Y,
 				ScrollBarThickness = 4,
 				Visible = false,
 			}, { pages })
@@ -380,10 +408,16 @@ function WindowBuilder.create(library, windowSettings)
 			tab.NavLabel = navLabel
 			navButton.MouseButton1Click:Connect(activate)
 			self.Tabs[tabIndex] = tab
-			table.insert(self.Tabs, tab)
 
 			if not window.CurrentTab then
 				task.defer(activate)
+			end
+
+			function tab:Show()
+				if tab.Active then
+					return
+				end
+				activate()
 			end
 
 			function tab:CreateGroupbox(groupSettings, groupIndex)
@@ -449,19 +483,19 @@ function WindowBuilder.create(library, windowSettings)
 				self.Groupboxes[groupIndex] = groupbox
 
 				function groupbox:CreateToggle(s, i)
-					return Elements.createToggle(self, s, i, windowSettings)
+					return Elements.createToggle(self, s, i, windowSettings, library)
 				end
 				function groupbox:CreateSlider(s, i)
-					return Elements.createSlider(self, s, i, windowSettings)
+					return Elements.createSlider(self, s, i, windowSettings, library)
 				end
 				function groupbox:CreateButton(s, i)
-					return Elements.createButton(self, s, i, windowSettings)
+					return Elements.createButton(self, s, i, windowSettings, library)
 				end
 				function groupbox:CreateInput(s, i)
-					return Elements.createInput(self, s, i, windowSettings)
+					return Elements.createInput(self, s, i, windowSettings, library)
 				end
 				function groupbox:CreateLabel(s, i)
-					return Elements.createLabel(self, s, i, windowSettings)
+					return Elements.createLabel(self, s, i, windowSettings, library)
 				end
 				function groupbox:CreateDivider()
 					return Elements.createDivider(self)
@@ -470,7 +504,7 @@ function WindowBuilder.create(library, windowSettings)
 					return Elements.createParagraph(self, s, i)
 				end
 				function groupbox:CreateDropdown(s, i)
-					return Elements.createDropdown(self, s, i, windowSettings)
+					return Elements.createDropdown(self, s, i, windowSettings, nil, nil, library)
 				end
 				function groupbox:Set(newSettings)
 					self.Values = Util.merge(self.Values, newSettings)
@@ -531,7 +565,7 @@ function WindowBuilder.create(library, windowSettings)
 					CurrentValue = Theme.Visual.BlurEnabled,
 					Callback = function(value)
 						Theme.Visual.BlurEnabled = value
-						blur.Enabled = value and window.Visible
+						setBlur(window.Visible)
 					end,
 				}, "Blur")
 
@@ -569,7 +603,7 @@ function WindowBuilder.create(library, windowSettings)
 				groupbox:CreateButton({
 					Name = "Save config",
 					Callback = function()
-						library.FileSystem:SaveConfig(configName)
+						library.FileSystem:SaveConfig(configName, nil, library)
 						library:Notification({ Title = "Saved", Content = "Config '" .. configName .. "' saved.", Duration = 3 })
 					end,
 				}, "SaveConfig")
@@ -577,7 +611,7 @@ function WindowBuilder.create(library, windowSettings)
 				groupbox:CreateButton({
 					Name = "Load config",
 					Callback = function()
-						local ok = library.FileSystem:LoadConfig(configName)
+						local ok = library.FileSystem:LoadConfig(configName, nil, library)
 						library:Notification({
 							Title = ok and "Loaded" or "Failed",
 							Content = ok and ("Config '" .. configName .. "' loaded.") or "Could not load config.",

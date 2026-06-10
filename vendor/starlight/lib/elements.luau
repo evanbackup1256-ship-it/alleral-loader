@@ -5,29 +5,6 @@ local Tween = require(script.Parent.tween)
 
 local Elements = {}
 
-function Elements.makeTooltip(text, parent, theme)
-	if Util.isEmpty(text) then
-		return { Text = "" }
-	end
-	local tip = Util.new("TextLabel", {
-		Name = "Tooltip",
-		BackgroundColor3 = theme.Backgrounds.Highlight,
-		BackgroundTransparency = 0.1,
-		TextColor3 = theme.Foregrounds.Light,
-		Font = Enum.Font.Gotham,
-		TextSize = 12,
-		Text = text,
-		TextWrapped = true,
-		Size = UDim2.fromOffset(180, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		Visible = false,
-		ZIndex = 100,
-	}, { parent })
-	Util.corner(6, tip)
-	Util.padding(6, 8, 6, 8, tip)
-	return tip
-end
-
 function Elements.runCallback(windowSettings, label, callback, library)
 	local ok, err = pcall(callback)
 	if not ok and windowSettings.NotifyOnCallbackError ~= false then
@@ -102,6 +79,7 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 		NestedElements = {},
 	}
 	settings.CurrentValue = settings.CurrentValue == true
+	settings.Callback = settings.Callback or function() end
 
 	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
@@ -141,8 +119,10 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 		settings.CurrentValue = not settings.CurrentValue
 		paint(settings.CurrentValue)
 		Elements.runCallback(windowSettings, settings.Name or "Toggle", function()
-			settings.Callback(settings.CurrentValue)
-		end)
+			if settings.Callback then
+				settings.Callback(settings.CurrentValue)
+			end
+		end, library)
 	end)
 
 	function element:Set(newSettings)
@@ -163,13 +143,18 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 	return element
 end
 
-function Elements.createSlider(groupbox, settings, index, windowSettings)
+function Elements.createSlider(groupbox, settings, index, windowSettings, library)
 	local theme = Theme.current()
 	local element = { Class = "Slider", Values = settings, NestedElements = {} }
 	local minValue = settings.Range and settings.Range[1] or 0
 	local maxValue = settings.Range and settings.Range[2] or 100
 	local increment = settings.Increment or 1
 	settings.CurrentValue = Util.clamp(settings.CurrentValue or minValue, minValue, maxValue)
+
+	local function snapValue(raw)
+		local steps = math.floor((raw - minValue) / increment + 0.5)
+		return Util.clamp(minValue + steps * increment, minValue, maxValue)
+	end
 
 	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
@@ -200,32 +185,50 @@ function Elements.createSlider(groupbox, settings, index, windowSettings)
 
 	local dragging = false
 	local function setValue(raw, fire)
-		local stepped = minValue + math.floor(((raw - minValue) / increment) + 0.5) * increment
-		settings.CurrentValue = Util.clamp(stepped, minValue, maxValue)
-		local alpha = (settings.CurrentValue - minValue) / math.max(maxValue - minValue, 1)
+		settings.CurrentValue = snapValue(raw)
+		local alpha = (settings.CurrentValue - minValue) / math.max(maxValue - minValue, increment)
 		fill.Size = UDim2.new(alpha, 0, 1, 0)
 		valueLabel.Text = tostring(settings.CurrentValue)
-		if fire then
+		if fire and settings.Callback then
 			Elements.runCallback(windowSettings, settings.Name or "Slider", function()
 				settings.Callback(settings.CurrentValue)
-			end)
+			end, library)
 		end
 	end
 	setValue(settings.CurrentValue, false)
 
+	local function updateFromInput(input)
+		local rel = Util.clamp((input.Position.X - bar.AbsolutePosition.X) / math.max(bar.AbsoluteSize.X, 1), 0, 1)
+		setValue(minValue + (maxValue - minValue) * rel, dragging)
+	end
+
 	local hit = Util.button({ Parent = bar, Size = UDim2.fromScale(1, 3), Position = UDim2.fromScale(0, -1), BackgroundTransparency = 1, Radius = 999 })
 	hit.MouseButton1Down:Connect(function()
 		dragging = true
+		local mouse = UserInputService:GetMouseLocation()
+		local rel = Util.clamp((mouse.X - bar.AbsolutePosition.X) / math.max(bar.AbsoluteSize.X, 1), 0, 1)
+		setValue(minValue + (maxValue - minValue) * rel, true)
 	end)
 	UserInputService.InputEnded:Connect(function(input)
 		if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+			if dragging then
+				setValue(settings.CurrentValue, true)
+			end
 			dragging = false
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if not dragging then
+			return
+		end
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			updateFromInput(input)
 		end
 	end)
 	bar.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			local rel = Util.clamp((input.Position.X - bar.AbsolutePosition.X) / math.max(bar.AbsoluteSize.X, 1), 0, 1)
-			setValue(minValue + (maxValue - minValue) * rel, true)
+			dragging = true
+			updateFromInput(input)
 		end
 	end)
 
@@ -235,6 +238,13 @@ function Elements.createSlider(groupbox, settings, index, windowSettings)
 		end
 		element.Values = newSettings
 		settings = newSettings
+		if newSettings.Range then
+			minValue = settings.Range[1] or minValue
+			maxValue = settings.Range[2] or maxValue
+		end
+		if newSettings.Increment then
+			increment = newSettings.Increment
+		end
 		label.Text = settings.Name or label.Text
 		setValue(settings.CurrentValue, false)
 	end
@@ -247,7 +257,7 @@ function Elements.createSlider(groupbox, settings, index, windowSettings)
 	return element
 end
 
-function Elements.createButton(groupbox, settings, index, windowSettings)
+function Elements.createButton(groupbox, settings, index, windowSettings, library)
 	local theme = Theme.current()
 	local element = { Class = "Button", Values = settings, NestedElements = {} }
 	local row = Util.button({
@@ -272,7 +282,7 @@ function Elements.createButton(groupbox, settings, index, windowSettings)
 		Tween.play(row, { BackgroundColor3 = theme.Backgrounds.Highlight }, nil, Theme.tweenInfo(0.12))
 	end)
 	row.MouseButton1Click:Connect(function()
-		Elements.runCallback(windowSettings, settings.Name or "Button", settings.Callback or function() end)
+		Elements.runCallback(windowSettings, settings.Name or "Button", settings.Callback or function() end, library)
 	end)
 
 	function element:Set(newSettings)
@@ -286,7 +296,7 @@ function Elements.createButton(groupbox, settings, index, windowSettings)
 	return element
 end
 
-function Elements.createInput(groupbox, settings, index, windowSettings)
+function Elements.createInput(groupbox, settings, index, windowSettings, library)
 	local theme = Theme.current()
 	local element = { Class = "Input", Values = settings, NestedElements = {} }
 	settings.CurrentValue = settings.CurrentValue or settings.Placeholder or ""
@@ -315,7 +325,7 @@ function Elements.createInput(groupbox, settings, index, windowSettings)
 			if settings.Callback then
 				settings.Callback(settings.CurrentValue)
 			end
-		end)
+		end, library)
 	end)
 
 	function element:Set(newSettings)
@@ -332,12 +342,13 @@ function Elements.createInput(groupbox, settings, index, windowSettings)
 	return element
 end
 
-function Elements.createLabel(groupbox, settings, index, windowSettings)
+function Elements.createLabel(groupbox, settings, index, windowSettings, library)
 	local theme = Theme.current()
 	local element = { Class = "Label", Values = settings, NestedElements = {} }
 	local row, label, slot, dropdownHolder = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
-	slot:Destroy()
+	slot.Visible = false
+	slot.Size = UDim2.fromOffset(0, 0)
 
 	function element:Set(newSettings)
 		element.Values = Util.merge(element.Values, newSettings)
@@ -346,14 +357,24 @@ function Elements.createLabel(groupbox, settings, index, windowSettings)
 	function element:Destroy()
 		row:Destroy()
 	end
+	function element:Lock(reason)
+		label.Text = reason or element.Values.Name or ""
+	end
+	function element:Unlock()
+		label.Text = element.Values.Name or ""
+	end
 	function element:AddDropdown(nestedSettings, nestedIndex)
-		return Elements.createDropdown(groupbox, nestedSettings, nestedIndex or #element.NestedElements + 1, windowSettings, element, dropdownHolder)
+		return Elements.createDropdown(groupbox, nestedSettings, nestedIndex or #element.NestedElements + 1, windowSettings, element, dropdownHolder, library)
 	end
 	function element:AddBind(nestedSettings, nestedIndex)
-		return Elements.createBind(groupbox, nestedSettings, nestedIndex or #element.NestedElements + 1, windowSettings, element, slot)
+		slot.Visible = true
+		slot.Size = UDim2.fromOffset(80, 24)
+		return Elements.createBind(groupbox, nestedSettings, nestedIndex or #element.NestedElements + 1, windowSettings, element, slot, library)
 	end
 	function element:AddColorPicker(nestedSettings, nestedIndex)
-		return Elements.createColorPicker(groupbox, nestedSettings, nestedIndex or #element.NestedElements + 1, windowSettings, element, slot)
+		slot.Visible = true
+		slot.Size = UDim2.fromOffset(24, 24)
+		return Elements.createColorPicker(groupbox, nestedSettings, nestedIndex or #element.NestedElements + 1, windowSettings, element, slot, library)
 	end
 
 	groupbox.Elements[index] = element
@@ -408,23 +429,32 @@ function Elements.createParagraph(groupbox, settings, index)
 	return element
 end
 
-function Elements.createDropdown(groupbox, settings, index, windowSettings, parentElement, holderOverride)
+function Elements.createDropdown(groupbox, settings, index, windowSettings, parentElement, holderOverride, library)
 	local theme = Theme.current()
 	local element = { Class = "Dropdown", Values = settings, NestedElements = {} }
 	settings.Options = settings.Options or settings.Values or {}
-	settings.Multi = settings.Multi == true or settings.MultiSelection == true
+	settings.Callback = settings.Callback or function() end
+	settings.Multi = settings.Multi == true or settings.MultiSelection == true or settings.MultipleOptions == true
+	settings.Placeholder = settings.Placeholder or "--"
 	if settings.Multi then
 		settings.CurrentOptions = settings.CurrentOptions or settings.CurrentOption or settings.Default or {}
 		if type(settings.CurrentOptions) ~= "table" then
 			settings.CurrentOptions = { settings.CurrentOptions }
+		end
+		if type(settings.CurrentOption) == "table" and settings.CurrentOptions == settings.CurrentOption then
+			-- already aligned
+		elseif type(settings.CurrentOption) == "table" then
+			settings.CurrentOptions = settings.CurrentOption
 		end
 	else
 		settings.CurrentOption = settings.CurrentOption or settings.Default or settings.Options[1] or ""
 	end
 
 	local parentFrame = holderOverride
+	local rowLabel
 	if not parentFrame then
 		local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
+		rowLabel = label
 		element.Instance = row
 		parentFrame = slot
 		parentFrame.Size = UDim2.fromOffset(150, 28)
@@ -452,25 +482,74 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 	})
 	Util.padding(0, 10, 0, 10, closed)
 
+	local popupRoot = library and library._popupRoot or parentFrame
 	local popup = Util.new("ScrollingFrame", {
+		Name = "DropdownPopup",
 		BackgroundColor3 = theme.Backgrounds.Elevated,
 		BorderSizePixel = 0,
-		Size = UDim2.fromOffset(parentFrame.AbsoluteSize.X > 0 and parentFrame.AbsoluteSize.X or 180, 160),
-		Position = UDim2.fromOffset(0, 34),
+		Size = UDim2.fromOffset(180, 160),
+		Position = UDim2.fromOffset(0, 0),
 		Visible = false,
 		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 4,
-		ZIndex = 50,
-	}, { parentFrame })
+		ZIndex = 250,
+		ClipsDescendants = true,
+	}, { popupRoot })
 	Util.corner(8, popup)
-	Util.list(2, false, popup)
+	local popupLayout = Util.list(2, false, popup)
 	Util.stroke(theme.Miscellaneous.Divider, 1, 0.4, popup)
+
+	local openDropdowns = library and library._openDropdowns
+	if not openDropdowns and library then
+		openDropdowns = {}
+		library._openDropdowns = openDropdowns
+	end
+
+	local function positionPopup()
+		local anchor = closed.AbsolutePosition
+		local size = closed.AbsoluteSize
+		popup.Size = UDim2.fromOffset(math.max(size.X, 180), 160)
+		popup.Position = UDim2.fromOffset(anchor.X, anchor.Y + size.Y + 4)
+	end
+
+	local function closePopup()
+		popup.Visible = false
+		if openDropdowns then
+			openDropdowns[popup] = nil
+		end
+	end
+
+	local function clearOpenDropdowns()
+		if not openDropdowns then
+			return
+		end
+		for key in pairs(openDropdowns) do
+			openDropdowns[key] = nil
+		end
+	end
+
+	local function openPopup()
+		if openDropdowns then
+			for other, _ in pairs(openDropdowns) do
+				if other ~= popup and other.Parent then
+					other.Visible = false
+				end
+			end
+			clearOpenDropdowns()
+			openDropdowns[popup] = true
+		end
+		positionPopup()
+		popup.Visible = true
+	end
 
 	local function displayValue()
 		if settings.Multi then
-			valueText.Text = #settings.CurrentOptions == 0 and "None" or table.concat(settings.CurrentOptions, ", ")
+			valueText.Text = #settings.CurrentOptions == 0 and settings.Placeholder
+				or table.concat(settings.CurrentOptions, ", ")
 		else
-			valueText.Text = tostring(settings.CurrentOption or "")
+			local text = tostring(settings.CurrentOption or "")
+			valueText.Text = (text == "" and settings.Placeholder) or text
 		end
 	end
 
@@ -489,7 +568,14 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 				Size = UDim2.new(1, -8, 0, 28),
 				Radius = 6,
 			})
+			opt.ZIndex = popup.ZIndex + 1
 			opt.LayoutOrder = i
+			local selected = settings.Multi
+				and table.find(settings.CurrentOptions, option) ~= nil
+				or settings.CurrentOption == option
+			if selected then
+				opt.BackgroundColor3 = theme.AccentSoft
+			end
 			Util.text({
 				Parent = opt,
 				Text = tostring(option),
@@ -507,29 +593,62 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 					end
 					Elements.runCallback(windowSettings, settings.Name or "Dropdown", function()
 						settings.Callback(settings.CurrentOptions)
-					end)
+					end, library)
+					displayValue()
+					rebuildOptions(filtered)
 				else
 					settings.CurrentOption = option
-					popup.Visible = false
+					closePopup()
 					Elements.runCallback(windowSettings, settings.Name or "Dropdown", function()
 						settings.Callback(option)
-					end)
+					end, library)
+					displayValue()
 				end
-				displayValue()
 			end)
 		end
-		popup.CanvasSize = UDim2.new(0, 0, 0, #options * 30)
+		popup.CanvasSize = UDim2.new(0, 0, 0, math.max(#options * 30, popupLayout.AbsoluteContentSize.Y))
 	end
 
 	displayValue()
 	rebuildOptions()
 
 	closed.MouseButton1Click:Connect(function()
-		popup.Visible = not popup.Visible
 		if popup.Visible then
-			popup.Size = UDim2.fromOffset(closed.AbsoluteSize.X, 160)
+			closePopup()
+		else
+			openPopup()
 		end
 	end)
+
+	if library and library._screenGui then
+		library._screenGui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+			if popup.Visible then
+				positionPopup()
+			end
+		end)
+	end
+
+	local dismissConnection
+	dismissConnection = UserInputService.InputBegan:Connect(function(input, processed)
+		if not popup.Visible or processed then
+			return
+		end
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+		local pos = input.Position
+		local function inside(gui)
+			if not gui or not gui.Visible then
+				return false
+			end
+			local ap, sz = gui.AbsolutePosition, gui.AbsoluteSize
+			return pos.X >= ap.X and pos.X <= ap.X + sz.X and pos.Y >= ap.Y and pos.Y <= ap.Y + sz.Y
+		end
+		if not inside(closed) and not inside(popup) then
+			closePopup()
+		end
+	end)
+	element._dismissConnection = dismissConnection
 
 	function element:Set(newSettings)
 		element.Values = Util.merge(element.Values, newSettings)
@@ -537,17 +656,61 @@ function Elements.createDropdown(groupbox, settings, index, windowSettings, pare
 		if newSettings.Options or newSettings.Values then
 			settings.Options = newSettings.Options or newSettings.Values
 		end
+		if newSettings.MultipleOptions ~= nil then
+			settings.Multi = newSettings.MultipleOptions == true
+		end
 		if newSettings.CurrentOption ~= nil then
-			settings.CurrentOption = newSettings.CurrentOption
+			if settings.Multi and type(newSettings.CurrentOption) == "table" then
+				settings.CurrentOptions = newSettings.CurrentOption
+			else
+				settings.CurrentOption = newSettings.CurrentOption
+			end
 		end
 		if newSettings.CurrentOptions ~= nil then
 			settings.CurrentOptions = newSettings.CurrentOptions
 		end
-		label = label
+		if newSettings.Callback then
+			settings.Callback = newSettings.Callback
+		end
+		if rowLabel then
+			rowLabel.Text = settings.Name or rowLabel.Text
+		end
 		displayValue()
-		rebuildOptions()
+		rebuildOptions(newSettings.Options or newSettings.Values)
+	end
+	function element:SetValues(newValues, newDefault)
+		settings.Options = newValues or settings.Options
+		if settings.Multi then
+			settings.CurrentOptions = type(newDefault) == "table" and newDefault or settings.CurrentOptions
+		else
+			settings.CurrentOption = newDefault or settings.CurrentOption
+		end
+		element:Set({ Options = settings.Options, CurrentOption = settings.CurrentOption, CurrentOptions = settings.CurrentOptions })
+	end
+	function element:Refresh(newValues, newDefault)
+		self:SetValues(newValues, newDefault)
+	end
+	function element:Search(query)
+		local needle = tostring(query or ""):lower()
+		if needle == "" then
+			rebuildOptions()
+			return
+		end
+		local filtered = {}
+		for _, option in ipairs(settings.Options) do
+			if tostring(option):lower():find(needle, 1, true) then
+				table.insert(filtered, option)
+			end
+		end
+		rebuildOptions(filtered)
 	end
 	function element:Destroy()
+		if element._dismissConnection then
+			element._dismissConnection:Disconnect()
+		end
+		if popup and popup.Parent then
+			popup:Destroy()
+		end
 		if element.Instance then
 			element.Instance:Destroy()
 		end

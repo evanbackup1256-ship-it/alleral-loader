@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""Bundle modular Starlight sources into a single Source.lua for executor loadstring."""
+"""Bundle modular Starlight sources into a single obfuscated Source.lua for executors."""
 
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 LIB = ROOT / "lib"
+PLAIN_OUTPUT = ROOT / "Source.plain.lua"
 OUTPUT = ROOT / "Source.lua"
+TOOLS = ROOT.parents[1] / "tools"
+sys.path.insert(0, str(TOOLS))
+
+from luau_obfuscator import obfuscate_source  # noqa: E402
 
 MODULE_ORDER = [
     "util.luau",
@@ -20,24 +26,18 @@ MODULE_ORDER = [
     "window.luau",
 ]
 
-HEADER = """--[[
-    Starlight Interface Suite — Alleral Rewrite
-    Bundled programmatic UI library. Edit files under vendor/starlight/lib/ then run:
-    python vendor/starlight/bundle.py
-]]
+HEADER = """--[[ Starlight bundle — edit vendor/starlight/lib/ then run bundle.py ]]
 
 """
 
 
-def strip_requires(source: str) -> str:
-    lines = []
-    for line in source.splitlines():
-        if re.match(r"^\s*local\s+\w+\s*=\s*require\(script\.Parent", line):
-            continue
-        if re.match(r"^\s*return\s+\w+\s*$", line):
-            continue
-        lines.append(line)
-    return "\n".join(lines)
+def transform_module(source: str) -> str:
+    source = re.sub(
+        r"local (\w+) = require\(script\.Parent\.(\w+)\)",
+        r"local \1 = requireModule('\2')",
+        source,
+    )
+    return source
 
 
 def module_name(filename: str) -> str:
@@ -45,13 +45,19 @@ def module_name(filename: str) -> str:
 
 
 def bundle() -> str:
-    chunks = [HEADER, "local modules = {}\nlocal function requireModule(name)\n\treturn modules[name]\nend\n"]
+    chunks = [
+        HEADER,
+        "local modules = {}\n"
+        "local function requireModule(name)\n"
+        "\treturn modules[name]\n"
+        "end\n",
+    ]
 
     for filename in MODULE_ORDER:
         path = LIB / filename
         name = module_name(filename)
-        body = strip_requires(path.read_text(encoding="utf-8"))
-        chunks.append(f"modules['{name}'] = (function()\n{body}\nend)()\n")
+        body = transform_module(path.read_text(encoding="utf-8"))
+        chunks.append(f"do\n\tmodules['{name}'] = (function()\n{body}\n\tend)()\nend\n")
 
     chunks.append(
         """
@@ -122,12 +128,12 @@ return Starlight
 
 def main() -> None:
     bundled = bundle()
-    # Fix cross-module references inside bundled modules
-    bundled = bundled.replace("require(script.Parent.util)", "requireModule('util')")
-    bundled = bundled.replace("require(script.Parent.theme)", "requireModule('theme')")
-    bundled = bundled.replace("require(script.Parent.tween)", "requireModule('tween')")
-    OUTPUT.write_text(bundled, encoding="utf-8")
-    print(f"Wrote {OUTPUT} ({len(bundled.splitlines())} lines)")
+    PLAIN_OUTPUT.write_text(bundled, encoding="utf-8")
+    protected = obfuscate_source(bundled, profile="full")
+    OUTPUT.write_text(protected, encoding="utf-8")
+    print(f"Wrote {PLAIN_OUTPUT} ({len(bundled.splitlines())} lines, plain)")
+    print(f"Wrote {OUTPUT} ({len(protected.splitlines())} lines, protected)")
+    print("Run: python tools/verify_obfuscation.py")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 local Core = {}
-Core.VERSION = "1.5"
+Core.VERSION = "1.6"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
@@ -9,6 +9,7 @@ local STARLIGHT_REMOTE_URLS = {
 }
 local STARLIGHT_LOCAL_FILES = {
 	"vendor/starlight/Source.lua",
+	"vendor/starlight/init.luau",
 	"starlight/Source.lua",
 	"kick/vendor/starlight/Source.lua",
 	"kick/kick/vendor/starlight/Source.lua",
@@ -172,6 +173,9 @@ end
 
 function Core.patchStarlightSource(source)
 	if not source or source == "" then
+		return source
+	end
+	if source:find("Alleral%-1") or source:find("Alleral Rewrite") then
 		return source
 	end
 	source = source:gsub(
@@ -390,72 +394,276 @@ function Core.loadSettings(state, keys, filename)
 	end
 end
 
-function Core.wrapStarlightGroup(groupbox, loggedCallback)
+function Core.wrapStarlightGroup(groupbox, callbackWrapper)
 	local group = {}
+	local serial = 0
+	local MAX_RENDERED_DROPDOWN_OPTIONS = 50
+
 	local function nextId(name)
-		return name .. "_" .. HttpService:GenerateGUID(false)
+		serial += 1
+		return tostring(name) .. "_" .. HttpService:GenerateGUID(false):sub(1, 8) .. "_" .. serial
 	end
+
+	local function wrap(label, callback)
+		callback = callback or function() end
+		if not callbackWrapper then
+			return callback
+		end
+		local ok, wrapped = pcall(callbackWrapper, label, callback)
+		if ok and type(wrapped) == "function" then
+			return wrapped
+		end
+		return callbackWrapper(callback)
+	end
+
+	local function normalizeOptions(values)
+		local output = {}
+		local seen = {}
+		for _, value in ipairs(values or {}) do
+			local text = tostring(value)
+			if text ~= "" and not seen[text] then
+				seen[text] = true
+				table.insert(output, text)
+			end
+		end
+		return output
+	end
+
+	local function currentSelection(default, multi)
+		if type(default) == "table" then
+			local copy = {}
+			for i, v in ipairs(default) do
+				copy[i] = v
+			end
+			for k, v in pairs(default) do
+				if type(k) ~= "number" then
+					copy[k] = v
+				end
+			end
+			return copy
+		end
+		if multi then
+			return default and { tostring(default) } or {}
+		end
+		return tostring(default or "")
+	end
+
+	local function compactOptions(values, selected, limit)
+		values = normalizeOptions(values)
+		limit = limit or MAX_RENDERED_DROPDOWN_OPTIONS
+		if #values <= limit then
+			return values
+		end
+		local output = {}
+		local seen = {}
+		local selectedList = type(selected) == "table" and selected or { selected }
+		for _, value in ipairs(selectedList) do
+			local text = tostring(value)
+			if text ~= "" and not seen[text] then
+				seen[text] = true
+				table.insert(output, text)
+			end
+		end
+		for _, value in ipairs(values) do
+			if #output >= limit then
+				break
+			end
+			if not seen[value] then
+				table.insert(output, value)
+			end
+		end
+		return output
+	end
+
+	local function waitForElement(element, timeout)
+		local started = tick()
+		repeat
+			if element and element.Instance then
+				return true
+			end
+			task.wait()
+		until tick() - started >= (timeout or 3)
+		return element and element.Instance ~= nil
+	end
+
+	local function setVisible(element, visible)
+		waitForElement(element, 1)
+		if element and element.Instance then
+			element.Instance.Visible = visible
+		end
+	end
+
 	function group:CreateToggle(name, default, tooltip, callback)
 		return groupbox:CreateToggle({
 			Name = name,
-			CurrentValue = default,
+			CurrentValue = default == true,
 			Tooltip = tooltip,
-			Callback = loggedCallback(callback),
+			Callback = wrap(name, callback),
 		}, nextId(name))
 	end
+
 	function group:CreateSlider(name, min, max, default, callback, tooltip)
 		return groupbox:CreateSlider({
 			Name = name,
 			Range = { min, max },
-			Increment = 1,
-			CurrentValue = default,
+			Increment = max <= 5 and 0.05 or 1,
+			CurrentValue = tonumber(default) or min,
 			Tooltip = tooltip,
-			Callback = loggedCallback(callback),
+			Callback = wrap(name, callback),
 		}, nextId(name))
 	end
+
 	function group:CreateButton(name, callback, tooltip)
 		return groupbox:CreateButton({
 			Name = name,
 			Tooltip = tooltip,
-			Callback = loggedCallback(callback),
+			Callback = wrap(name, callback),
 		}, nextId(name))
 	end
-	function group:CreateInput(name, placeholder, default, callback, tooltip)
+
+	function group:CreateInput(name, placeholder, arg3, arg4, arg5)
+		local icon, default, callback, tip
+		local function isIcon(value)
+			local text = tostring(value or "")
+			return text:find("rbxassetid") ~= nil or text:match("^%d+$") ~= nil
+		end
+		if type(arg3) == "function" then
+			callback = arg3
+			tip = arg4
+		elseif type(arg4) == "function" and isIcon(arg3) then
+			icon = Core.starlightIcon(arg3)
+			callback = arg4
+			tip = arg5
+		elseif type(arg4) == "function" then
+			default = tostring(arg3 or "")
+			callback = arg4
+			tip = arg5
+		else
+			icon = Core.starlightIcon(arg3)
+			callback = arg4
+			tip = arg5
+		end
 		return groupbox:CreateInput({
 			Name = name,
+			Icon = icon,
 			Placeholder = placeholder,
+			PlaceholderText = placeholder,
 			CurrentValue = default or "",
-			Tooltip = tooltip,
-			Callback = loggedCallback(callback),
+			RemoveTextOnFocus = false,
+			Tooltip = tip,
+			Callback = wrap(name, callback),
 		}, nextId(name))
 	end
+
 	function group:CreateDropdown(name, options, default, callback, tooltip)
 		return groupbox:CreateDropdown({
 			Name = name,
-			Options = options,
+			Options = normalizeOptions(options),
 			CurrentOption = default,
 			Tooltip = tooltip,
-			Callback = loggedCallback(callback),
+			Callback = wrap(name, callback),
 		}, nextId(name))
 	end
-	function group:AddDropdown(name, config)
-		config.Name = config.Text or name
-		config.Options = config.Values or config.Options or {}
-		config.CurrentOptions = config.Default or config.CurrentOptions or {}
-		config.Multi = config.Multi == true
-		config.Searchable = config.Searchable == true
-		config.Callback = loggedCallback(config.Callback or function() end)
-		return groupbox:CreateDropdown(config, nextId(name))
+
+	function group:AddDropdown(id, config)
+		config = config or {}
+		local multi = config.Multi == true or config.MultiSelection == true
+		local values = normalizeOptions(config.Values or config.Options)
+		local current = currentSelection(config.Default or config.CurrentValue or config.CurrentOption, multi)
+		local label = groupbox:CreateLabel({
+			Name = config.Text or config.Name or id,
+			Tooltip = config.Tooltip or config.Description,
+		}, nextId(id))
+		local handle = {
+			Values = values,
+			Selection = current,
+			Dropdown = nil,
+			Label = label,
+			LastSearch = "",
+		}
+		local function safeCallback(selection)
+			handle.Selection = currentSelection(selection, multi)
+			wrap(config.Text or config.Name or id, config.Callback or function() end)(selection)
+		end
+		local function rebuild(currentValues)
+			local nextValues = currentValues or handle.Values
+			if config.Searchable then
+				nextValues = compactOptions(nextValues, handle.Selection)
+			end
+			if handle.Dropdown and handle.Dropdown.Set then
+				handle.Dropdown:Set({
+					Options = nextValues,
+					Values = nextValues,
+					CurrentOption = handle.Selection,
+					CurrentOptions = type(handle.Selection) == "table" and handle.Selection or nil,
+					MultipleOptions = multi,
+					Placeholder = config.Placeholder or "--",
+					Callback = safeCallback,
+				})
+			end
+		end
+		if not waitForElement(label, 3) or not (label.Instance and label.Instance:FindFirstChild("DropdownHolder")) then
+			function handle:SetValues(newValues, newDefault)
+				self.Values = normalizeOptions(newValues)
+				self.Selection = currentSelection(newDefault or self.Selection, multi)
+			end
+			function handle:Refresh(newValues, newDefault)
+				self:SetValues(newValues, newDefault)
+			end
+			function handle:Search(query)
+				self.LastSearch = tostring(query or "")
+			end
+			return handle
+		end
+		local renderedValues = config.Searchable and compactOptions(values, current) or values
+		local dropdown = label:AddDropdown({
+			Options = renderedValues,
+			Values = renderedValues,
+			CurrentOption = current,
+			CurrentOptions = multi and current or nil,
+			MultipleOptions = multi,
+			Placeholder = config.Placeholder or "--",
+			Callback = safeCallback,
+		}, nextId(id .. "_dd"))
+		handle.Dropdown = dropdown
+		function handle:SetValues(newValues, newDefault)
+			self.Values = normalizeOptions(newValues)
+			self.Selection = currentSelection(newDefault or self.Selection, multi)
+			rebuild(self.Values)
+		end
+		function handle:Refresh(newValues, newDefault)
+			self:SetValues(newValues, newDefault)
+		end
+		function handle:Search(query)
+			self.LastSearch = tostring(query or "")
+			local filtered = self.LastSearch == "" and self.Values
+				or compactOptions(Core.filterDropdownOptions(self.Values, self.LastSearch), self.Selection)
+			rebuild(filtered)
+		end
+		if config.Searchable then
+			groupbox:CreateInput({
+				Name = (config.Text or config.Name or id) .. " filter",
+				PlaceholderText = "search...",
+				RemoveTextOnFocus = false,
+				Callback = wrap((config.Text or config.Name or id) .. " Search", function(text)
+					handle:Search(text)
+				end),
+			}, nextId(id .. "_search"))
+		end
+		return handle
 	end
+
 	function group:CreateLabel(text)
 		return groupbox:CreateLabel({
 			Name = text,
 		}, nextId("label"))
 	end
+
 	function group:CreateStatus(label, fields)
 		local status = {
 			Labels = {},
 			LastValues = {},
+			Visible = true,
 		}
 		for key, value in pairs(fields or {}) do
 			local rendered = tostring(value)
@@ -472,17 +680,52 @@ function Core.wrapStarlightGroup(groupbox, loggedCallback)
 			self.LastValues[key] = rendered
 			local row = self.Labels[key]
 			if row and row.Set then
-				row:Set({
-					Name = tostring(key) .. ": " .. rendered,
-				})
+				row:Set({ Name = tostring(key) .. ": " .. rendered })
+			end
+		end
+		function status:SetVisible(visible)
+			self.Visible = visible
+			for _, row in pairs(self.Labels) do
+				setVisible(row, visible)
 			end
 		end
 		return status
 	end
+
 	function group:CreateDivider()
 		return groupbox:CreateDivider()
 	end
+
 	return group
+end
+
+function Core.starlightIcon(icon)
+	return tostring(icon or ""):match("%d+$") or ""
+end
+
+function Core.filterDropdownOptions(values, query)
+	query = tostring(query or ""):lower()
+	if query == "" then
+		return values
+	end
+	local filtered = {}
+	for _, value in ipairs(values or {}) do
+		if tostring(value):lower():find(query, 1, true) then
+			table.insert(filtered, value)
+		end
+	end
+	return filtered
+end
+
+function Core.waitForStarlightGroupbox(groupbox, timeout)
+	local started = tick()
+	repeat
+		if groupbox and groupbox.Instance and groupbox.ParentingItem then
+			return true
+		end
+		task.wait()
+	until tick() - started >= (timeout or 1.5)
+	return groupbox and groupbox.Instance and groupbox.ParentingItem
 end
 
 function Core.makeSupervisor(state, loops, controllers, name, interval, callback)

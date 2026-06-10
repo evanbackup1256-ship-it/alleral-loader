@@ -30,8 +30,9 @@ Alleral Hub/
 ├── core/
 │   ├── alleral_core.luau       # Starlight, supervisors, HTTP
 │   ├── game_helpers.luau       # Shared combat/movement/remote helpers
-│   ├── analytics.luau          # In-game user webhooks (Kick)
-│   └── telemetry.luau          # Owner telemetry client (relay only)
+│   ├── internal/               # Readable telemetry/analytics sources
+│   ├── analytics.luau          # Protected (obfuscated) — do not edit
+│   └── telemetry.luau          # Protected (obfuscated) — do not edit
 ├── games/
 │   ├── kick_a_lucky_block.luau
 │   ├── speed_keyboard_escape.luau

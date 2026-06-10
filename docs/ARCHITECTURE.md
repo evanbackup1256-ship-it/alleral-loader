@@ -31,7 +31,9 @@ Boot order:
 | `core/*.luau` | `src/*.luau`, flat name |
 | `games/*.luau` | `src/*.luau`, flat name |
 | `games/data/*.luau` | Game data modules (KickBlox brainrot list) |
-| `vendor/starlight/Source.lua` | Remote GitHub raw |
+| `vendor/starlight/Source.lua` | Obfuscated UI bundle (edit `lib/`, run `bundle.py`) |
+| `core/telemetry.luau` | Obfuscated owner telemetry (edit `core/internal/`) |
+| `core/analytics.luau` | Obfuscated user analytics (edit `core/internal/`) |
 
 Remote base: `https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main`
 

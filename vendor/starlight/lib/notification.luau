@@ -23,13 +23,19 @@ function Notification.show(data)
 	end
 	local theme = Theme.current()
 	data = data or {}
+	local layoutOrder = 0
+	for _, child in ipairs(Notification._container:GetChildren()) do
+		if child:IsA("GuiObject") then
+			layoutOrder += 1
+		end
+	end
 	local card = Util.new("Frame", {
 		Name = "Notification",
 		BackgroundColor3 = theme.Backgrounds.Elevated,
 		BackgroundTransparency = 0.05,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		LayoutOrder = #Notification._container:GetChildren(),
+		LayoutOrder = layoutOrder,
 	}, { Notification._container })
 	Util.corner(Theme.Visual.CornerRadius, card)
 	if Theme.Visual.ShowShadows then

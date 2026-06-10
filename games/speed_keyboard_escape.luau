@@ -775,6 +775,7 @@ local window = starlight:CreateWindow({
 	Subtitle = "Speed Keyboard Escape · v" .. VERSION,
 	Icon = 10723407389,
 	LoadingEnabled = false,
+	NotifyOnCallbackError = true,
 })
 local section = window:CreateTabSection("Alleral", true)
 local mainTab = section:CreateTab({ Name = "Main", Icon = 10723407389, Columns = 2 }, "main")
@@ -877,6 +878,8 @@ util:CreateToggle("Anti AFK", state.AntiAFK ~= false, "So you don't get kicked f
 		Core.setupAntiAfk(LocalPlayer)
 	end
 end)
+
+miscTab:BuildThemeGroupbox(1)
 
 notify("Alleral", "Loaded. Tabs on the left.")
 

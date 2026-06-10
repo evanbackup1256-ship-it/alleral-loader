@@ -7,11 +7,11 @@ FileSystem.AutoloadConfigPath = nil
 FileSystem.AutoloadThemePath = nil
 
 local function hasFileApi()
-	return typewritefile == "function" or type(writefile) == "function"
+	return type(writefile) == "function"
 end
 
 local function writeFile(path, data)
-	local fn = writefile or typewritefile
+	local fn = writefile
 	if fn then
 		return pcall(fn, path, data)
 	end
@@ -29,8 +29,16 @@ end
 
 local function makeFolder(path)
 	local fn = makefolder
-	if fn then
-		pcall(fn, path)
+	if not fn or not path or path == "" then
+		return
+	end
+	local parts = string.split(path:gsub("\\", "/"), "/")
+	local built = ""
+	for _, part in ipairs(parts) do
+		if part ~= "" then
+			built = built == "" and part or (built .. "/" .. part)
+			pcall(fn, built)
+		end
 	end
 end
 
@@ -85,7 +93,10 @@ function FileSystem:SaveConfig(file, path, library)
 		end
 	end
 	local target = (path or self.AutoloadConfigPath or "") .. file .. self.FileExtension
-	makeFolder((path or self.AutoloadConfigPath or ""):gsub("/[^/]+$", ""))
+	local folder = (path or self.AutoloadConfigPath or ""):gsub("/+$", "")
+	if folder ~= "" then
+		makeFolder(folder)
+	end
 	return writeFile(target, HttpService:JSONEncode(payload))
 end
 

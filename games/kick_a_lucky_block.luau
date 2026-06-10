@@ -306,6 +306,20 @@ for key, value in pairs(defaults) do
 end
 state.HubRunning = true
 
+local Core = getgenv().Alleral_Core
+local starlight
+local bootErr
+if not Core or not Core.prepareGame then
+	warn("[Alleral] Core missing, run loader.luau first")
+	getgenv().Alleral_StartupFailed = "Alleral_Core missing"
+	return
+end
+Core, starlight, bootErr = Core.prepareGame(state)
+if not Core or not starlight then
+	warn("[Alleral] Boot failed: " .. tostring(bootErr))
+	return
+end
+
 local function trim(value)
 	return tostring(value or ""):gsub("^%s*(.-)%s*$", "%1")
 end
@@ -994,11 +1008,6 @@ local function loadRemoteLua(url, label)
 	return loadLuaSource(source, label)
 end
 
-local STARLIGHT_REMOTE_URLS = {
-	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/vendor/starlight/Source.lua",
-	"https://raw.githubusercontent.com/Nebula-Softworks/Starlight-Interface-Suite/master/Source.lua",
-}
-
 do
 	local execName = Executor and Executor.name or "unknown"
 	local execRaw = Executor and Executor.rawName or ""
@@ -1032,133 +1041,6 @@ do
 	else
 		notify("Alleral", display .. capText .. ". Good to go.", 4)
 	end
-end
-
-local function patchStarlightSource(source)
-	if not source or source == "" then
-		return source
-	end
-	source = source:gsub(
-		"function Tab:Show%(%)[\r\n]+%s*if Library%.ActiveTab then",
-		"function Tab:Show()\n\t\t\tif Library.ActiveTab == Tab then\n\t\t\t\treturn\n\t\t\tend\n\t\t\tif Library.ActiveTab then"
-	)
-	local inputStart = source:find("function Groupbox:CreateInput", 1, true)
-	local labelStart = inputStart and source:find("function Groupbox:CreateLabel", inputStart, true)
-	if not inputStart or not labelStart then
-		return source
-	end
-	local before = source:sub(1, inputStart - 1)
-	local block = source:sub(inputStart, labelStart - 1)
-	local after = source:sub(labelStart)
-	block = block:gsub(
-		"(Element%.Instance = GroupboxTemplateInstance%.Input_TEMPLATE:Clone%(%)[\r\n]+%s*Element%.Instance%.Visible = true)",
-		"%1\n\t\t\t\t\t\tElement.Instance.Parent = Groupbox.ParentingItem",
-		1
-	)
-	block = block:gsub(
-		"\n%s*Element%.Instance%.Parent = Groupbox%.ParentingItem\n\n%s*(Starlight%.Window%.TabSections%[Name%]%.Tabs%[TabIndex%]%.Groupboxes%[GroupIndex%]%.Elements%[Index%] = Element)",
-		"\n\n\t\t\t\t\t%1",
-		1
-	)
-	return before .. block .. after
-end
-
-local STARLIGHT_LOCAL_FILES = {
-	"vendor/starlight/Source.lua",
-	"starlight/Source.lua",
-	"kick/vendor/starlight/Source.lua",
-	"kick/kick/vendor/starlight/Source.lua",
-}
-
-local function compileStarlightSource(source, label)
-	if not source or source == "" or not loadStringFn then
-		return nil
-	end
-	local ok, result = safeCall("CompileStarlight:" .. label, function()
-		return loadStringFn(patchStarlightSource(source), "@" .. label)()
-	end)
-	if ok and type(result) == "table" and type(result.CreateWindow) == "function" then
-		return result
-	end
-	return nil
-end
-
-local function loadStarlightFromLocal()
-	if not readFile or not isFile then
-		return nil
-	end
-	for _, path in ipairs(STARLIGHT_LOCAL_FILES) do
-		if isFile(path) then
-			local source = readFile(path)
-			local starlight = compileStarlightSource(source, "Starlight/local")
-			if starlight then
-				return starlight
-			end
-		end
-	end
-	return nil
-end
-
-local function loadStarlight()
-	if type(shared) == "table" and type(shared.Alleral_Starlight) == "table" and type(shared.Alleral_Starlight.CreateWindow) == "function" then
-		return shared.Alleral_Starlight
-	end
-
-	local env = getgenv and getgenv() or {}
-	if type(env.Alleral_Starlight) == "table" and type(env.Alleral_Starlight.CreateWindow) == "function" then
-		return env.Alleral_Starlight
-	end
-
-	local core = env.Alleral_Core
-	if core and type(core.loadStarlight) == "function" then
-		local cached, err = core.loadStarlight()
-		if cached then
-			env.Alleral_Starlight = cached
-			return cached
-		end
-		if err then
-			logError("Starlight", "Core.loadStarlight: " .. tostring(err))
-		end
-	end
-
-	local localStarlight = loadStarlightFromLocal()
-	if localStarlight then
-		env.Alleral_Starlight = localStarlight
-		return localStarlight
-	end
-
-	local source
-	for _, url in ipairs(STARLIGHT_REMOTE_URLS) do
-		source = fetchUrl(url)
-		if source then
-			break
-		end
-	end
-	if not source then
-		logError("Starlight", "Could not load Starlight (no local copy and HTTP fetch failed).")
-		return nil
-	end
-	local remoteStarlight = compileStarlightSource(source, "Starlight/remote")
-	if remoteStarlight then
-		env.Alleral_Starlight = remoteStarlight
-	end
-	return remoteStarlight
-end
-
-local starlight = loadStarlight()
-if not starlight or type(starlight.CreateWindow) ~= "function" then
-	logError("Starlight", "Starlight Interface Suite was not available; startup aborted.")
-	local failMsg = "Starlight unavailable"
-	if getgenv then
-		getgenv().Alleral_StartupFailed = failMsg
-		if getgenv().Alleral_State then
-			getgenv().Alleral_State.StartupFailed = failMsg
-		end
-	end
-	pcall(function()
-		shared.Alleral_StartupFailed = failMsg
-	end)
-	return
 end
 
 local KICKBLOX_URLS = {
@@ -3193,330 +3075,24 @@ local function totalLoggedErrors()
 end
 
 local function buildInterface()
-local function starlightIcon(icon)
-	return tostring(icon or ""):match("%d+$") or ""
-end
-
-local function starlightWait(predicate: () -> any, timeout)
-	local started = tick()
-	repeat
-		if predicate() then
-			return true
-		end
-		task.wait()
-	until tick() - started >= (timeout or 2)
-	return false
-end
-
 local function starlightId(text)
 	return (tostring(text or "Element"):gsub("[^%w_]", "_"))
 end
 
-local function starlightOptions(values)
-	local output = {}
-	local seen = {}
-	for _, value in ipairs(values or {}) do
-		local normalized = tostring(value)
-		if not seen[normalized] then
-			seen[normalized] = true
-			table.insert(output, normalized)
+local function loggedCallback(label, callback)
+	return function(...)
+		if type(callback) ~= "function" then
+			return
 		end
-	end
-	return output
-end
-
-local function starlightSearch(values, query)
-	query = tostring(query or ""):lower()
-	if query == "" then
-		return starlightOptions(values)
-	end
-	local filtered = {}
-	for _, value in ipairs(values or {}) do
-		local text = tostring(value)
-		if text:lower():find(query, 1, true) then
-			table.insert(filtered, text)
+		local args = { ... }
+		local ok, result = safeCall("UI:" .. tostring(label), function()
+			return callback(table.unpack(args))
+		end, true)
+		if ok then
+			return result
 		end
+		return nil
 	end
-	return starlightOptions(filtered)
-end
-
-local MAX_RENDERED_DROPDOWN_OPTIONS = 50
-
-local function compactStarlightOptions(values, selected, limit)
-	values = starlightOptions(values)
-	limit = limit or MAX_RENDERED_DROPDOWN_OPTIONS
-	if #values <= limit then
-		return values
-	end
-	local output = {}
-	local seen = {}
-	local function add(value)
-		value = tostring(value)
-		if value ~= "" and not seen[value] then
-			seen[value] = true
-			table.insert(output, value)
-		end
-	end
-	if type(selected) == "table" then
-		for key, value in pairs(selected) do
-			if value == true then
-				add(key)
-			else
-				add(value)
-			end
-		end
-	elseif selected ~= nil then
-		add(selected)
-	end
-	for _, value in ipairs(values) do
-		if #output >= limit then
-			break
-		end
-		add(value)
-	end
-	return output
-end
-
-local function tableClone(source)
-	if type(source) ~= "table" then
-		return source
-	end
-	local output = {}
-	for key, value in pairs(source) do
-		output[key] = value
-	end
-	return output
-end
-
-local function starlightCurrent(default, multi)
-	if type(default) == "table" then
-		return tableClone(default)
-	end
-	if default == nil or default == "" then
-		return multi and {} or nil
-	end
-	if multi then
-		local single = tostring(default)
-		if single == "Any" or single == "All" then
-			return {}
-		end
-		return { single }
-	end
-	return tostring(default)
-end
-
-local function setStarlightVisible(element, visible)
-	starlightWait(function()
-		return element and element.Instance
-	end, 1)
-	if element and element.Instance then
-		element.Instance.Visible = visible
-	end
-end
-
-local function wrapStarlightGroup(groupbox)
-	local group = {}
-	local serial = 0
-
-	local function nextId(label)
-		serial = serial + 1
-		return starlightId(label) .. "_" .. serial
-	end
-
-	local function loggedCallback(label, callback)
-		return function(...)
-			if type(callback) ~= "function" then
-				return
-			end
-			local args = { ... }
-			local ok, result = safeCall("UI:" .. tostring(label), function()
-				return callback(table.unpack(args))
-			end, true)
-			if ok then
-				return result
-			end
-			return nil
-		end
-	end
-
-	function group:AddDropdown(id, options)
-		options = options or {}
-		local multi = options.Multi == true or options.MultiSelection == true
-		local values = starlightOptions(options.Values)
-		local current = starlightCurrent(options.Default or options.CurrentValue, multi)
-		local renderedValues = options.Searchable and compactStarlightOptions(values, current) or values
-		local label = groupbox:CreateLabel({
-			Name = options.Text or options.Name or id,
-			Tooltip = options.Tooltip or options.Description,
-		}, id)
-		local handle = {
-			Values = values,
-			Selection = current,
-			Dropdown = nil,
-			Label = label,
-			LastSearch = "",
-		}
-		local function safeCallback(selection)
-			handle.Selection = starlightCurrent(selection, multi)
-			loggedCallback(options.Text or options.Name or id, options.Callback)(selection)
-		end
-		local function rebuild(currentValues)
-			local nextValues = currentValues or handle.Values
-			if options.Searchable then
-				nextValues = compactStarlightOptions(nextValues, handle.Selection)
-			end
-			if handle.Dropdown and handle.Dropdown.Set then
-				handle.Dropdown:Set({
-					Options = nextValues,
-					CurrentOption = handle.Selection,
-					MultipleOptions = multi,
-					Placeholder = options.Placeholder or "--",
-					Callback = safeCallback,
-				}, id)
-			end
-		end
-		if not starlightWait(function()
-						return label.Instance and label.Instance.DropdownHolder
-					end, 3) then
-			function handle:SetValues(newValues, newDefault)
-				self.Values = starlightOptions(newValues)
-				self.Selection = starlightCurrent(newDefault or self.Selection, multi)
-			end
-			function handle:Refresh(newValues, newDefault)
-				self:SetValues(newValues, newDefault)
-			end
-			function handle:Search(query)
-				self.LastSearch = tostring(query or "")
-			end
-			notify("UI", "Dropdown took a sec to load: " .. tostring(options.Text or id), 3)
-			return handle
-		end
-		local dropdown = label:AddDropdown({
-			Options = renderedValues,
-			CurrentOption = current,
-			MultipleOptions = multi,
-			Placeholder = options.Placeholder or "--",
-			Callback = safeCallback,
-		}, id)
-		handle.Dropdown = dropdown
-		function handle:SetValues(newValues, newDefault)
-			self.Values = starlightOptions(newValues)
-			self.Selection = starlightCurrent(newDefault or self.Selection, multi)
-			rebuild(self.Values)
-		end
-		function handle:Refresh(newValues, newDefault)
-			self:SetValues(newValues, newDefault)
-		end
-		function handle:Search(query)
-			self.LastSearch = tostring(query or "")
-			local filtered = self.LastSearch == "" and self.Values
-				or compactStarlightOptions(starlightSearch(self.Values, self.LastSearch), self.Selection)
-			rebuild(filtered)
-		end
-		if options.Searchable then
-			local searchId = tostring(id) .. "_search"
-			local searchInput = groupbox:CreateInput({
-				Name = tostring(options.Text or options.Name or id) .. " filter",
-				PlaceholderText = "search...",
-				RemoveTextOnFocus = false,
-				Callback = loggedCallback(tostring(options.Text or options.Name or id) .. " Search", function(text)
-					handle:Search(text)
-				end),
-			}, searchId)
-			handle.SearchInput = searchInput
-		end
-		return handle
-	end
-
-	function group:CreateDropdown(label, values, default, callback)
-		return self:AddDropdown(nextId(label), {
-			Text = label,
-			Values = values,
-			Default = default,
-			Multi = false,
-			Callback = callback,
-		})
-	end
-
-	function group:CreateToggle(label, default, description, callback)
-		return groupbox:CreateToggle({
-			Name = label,
-			CurrentValue = default == true,
-			Tooltip = description,
-			Callback = loggedCallback(label, callback),
-		}, nextId(label))
-	end
-
-	function group:CreateSlider(label, minimum, maximum, default, callback, tooltip)
-		return groupbox:CreateSlider({
-			Name = label,
-			Range = { minimum, maximum },
-			CurrentValue = tonumber(default) or minimum,
-			Increment = maximum <= 5 and 0.05 or 1,
-			Tooltip = tooltip,
-			Callback = loggedCallback(label, callback),
-		}, nextId(label))
-	end
-
-	function group:CreateButton(label, callback, tooltip)
-		return groupbox:CreateButton({
-			Name = label,
-			Tooltip = tooltip,
-			Callback = loggedCallback(label, callback),
-		}, nextId(label))
-	end
-
-	function group:CreateInput(label, placeholder, icon, callback, tooltip)
-		return groupbox:CreateInput({
-			Name = label,
-			Icon = starlightIcon(icon),
-			PlaceholderText = placeholder or "",
-			RemoveTextOnFocus = false,
-			Tooltip = tooltip,
-			Callback = loggedCallback(label, callback),
-		}, nextId(label))
-	end
-
-	function group:CreateStatus(label, fields)
-		local status = {
-			Labels = {},
-			Visible = true,
-			LastValues = {},
-		}
-		for key, value in pairs(fields or {}) do
-			local rendered = tostring(value)
-			status.LastValues[key] = rendered
-			status.Labels[key] = groupbox:CreateLabel({
-				Name = tostring(key) .. ": " .. rendered,
-			}, nextId(label .. "_" .. tostring(key)))
-		end
-		function status:Update(key, value)
-			local rendered = tostring(value)
-			if self.LastValues[key] == rendered then
-				return
-			end
-			self.LastValues[key] = rendered
-			local row = self.Labels[key]
-			if row and row.Set then
-				row:Set({
-					Name = tostring(key) .. ": " .. rendered,
-				})
-			end
-		end
-		function status:SetVisible(visible)
-			self.Visible = visible
-			for _, row in pairs(self.Labels) do
-				setStarlightVisible(row, visible)
-			end
-		end
-		return status
-	end
-
-	function group:CreateDivider()
-		return groupbox:CreateDivider()
-	end
-
-	return group
 end
 
 local starlightWindow = starlight:CreateWindow({
@@ -3535,7 +3111,7 @@ local starlightSection = starlightWindow:CreateTabSection("Alleral", true)
 local function createStarlightTab(name, icon)
 	return starlightSection:CreateTab({
 		Name = name,
-		Icon = starlightIcon(icon),
+		Icon = Core.starlightIcon(icon),
 		Columns = 2,
 	}, starlightId(name))
 end
@@ -3543,13 +3119,13 @@ end
 local function createStarlightGroup(tab, name, icon, column)
 	local groupbox = tab:CreateGroupbox({
 		Name = name,
-		Icon = starlightIcon(icon),
+		Icon = Core.starlightIcon(icon),
 		Column = column or 1,
 	}, starlightId(name))
-	starlightWait(function()
-			return groupbox.Instance and groupbox.ParentingItem
-		end, 1.5)
-	return wrapStarlightGroup(groupbox)
+	Core.waitForStarlightGroupbox(groupbox, 1.5)
+	return Core.wrapStarlightGroup(groupbox, function(label, callback)
+		return loggedCallback(label, callback)
+	end)
 end
 
 local mainTab = createStarlightTab("Kick", "rbxassetid://10723407389")
@@ -3577,6 +3153,7 @@ local recoveryGroup = createStarlightGroup(configTab, "Stuck?", "rbxassetid://10
 local tuningGroup = createStarlightGroup(configTab, "Speed tweaks", "rbxassetid://10734950309", 1)
 local diagnosticsGroup = createStarlightGroup(configTab, "Debug info", "rbxassetid://10734950309", 2)
 local profileGroup = createStarlightGroup(configTab, "Save slots", "rbxassetid://10734950309", 1)
+configTab:BuildThemeGroupbox(2)
 local protectedDropdown
 local upgradeDropdown
 

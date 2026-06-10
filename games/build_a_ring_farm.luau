@@ -1872,6 +1872,7 @@ local window = starlight:CreateWindow({
 	Subtitle = "Build A Ring Farm · v" .. VERSION,
 	Icon = 10723407389,
 	LoadingEnabled = false,
+	NotifyOnCallbackError = true,
 })
 local section = window:CreateTabSection("Alleral", true)
 local farmTab = section:CreateTab({ Name = "Farm", Icon = 10723407389, Columns = 2 }, "farm")
@@ -1990,6 +1991,8 @@ util:CreateToggle("Anti AFK", state.AntiAFK, "So you don't get booted for sittin
 	saveSettings()
 end)
 util:CreateButton("Save now", saveSettings)
+
+miscTab:BuildThemeGroupbox(1)
 
 notify("Alleral", "Loaded. Hover toggles for tips.")
 

@@ -649,6 +649,7 @@ local window = starlight:CreateWindow({
 	Subtitle = "Survive a Zombie Arena · v" .. VERSION,
 	Icon = 10723407389,
 	LoadingEnabled = false,
+	NotifyOnCallbackError = true,
 })
 local section = window:CreateTabSection("Alleral", true)
 local farmTab = section:CreateTab({ Name = "Farm", Icon = 10734923214, Columns = 2 }, "farm")
@@ -800,6 +801,8 @@ Core.makeSupervisor(state, loops, loopControllers, "Stats", 1.5, function()
 	liveStatus:Update("Credits", G.leaderstatValue and G.leaderstatValue(LocalPlayer, "Credits") or "?")
 	liveStatus:Update("Zombies", tostring(#livingZombies()))
 end)
+
+miscTab:BuildThemeGroupbox(1)
 
 notify("Alleral", "Survive a Zombie Arena v" .. VERSION .. " loaded.", 4)
 
