@@ -1,7 +1,8 @@
 (() => {
   const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const EASE = (t) => 1 - (1 - t) ** 3;
 
-  function animateNumber(el, target, duration = 900) {
+  function animateNumber(el, target, duration = 1100) {
     if (prefersReduced || !el) {
       if (el) el.textContent = String(target);
       return;
@@ -12,24 +13,74 @@
     const t0 = performance.now();
     function frame(now) {
       const p = Math.min((now - t0) / duration, 1);
-      const eased = 1 - (1 - p) ** 3;
-      el.textContent = String(Math.round(start + diff * eased));
+      el.textContent = String(Math.round(start + diff * EASE(p)));
       if (p < 1) requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
   }
 
+  function revealEl(el, delay = 0) {
+    if (!el || el.classList.contains("visible")) return;
+    if (delay <= 0) {
+      el.classList.add("visible");
+      return;
+    }
+    setTimeout(() => el.classList.add("visible"), delay);
+  }
+
+  function initHeroSequence() {
+    const hero = document.querySelector(".hero");
+    if (!hero) return;
+    [...hero.querySelectorAll(".reveal")].forEach((el, i) => revealEl(el, 220 + i * 110));
+  }
+
   function bindTilt(card) {
     if (prefersReduced || card.dataset.tiltBound) return;
     card.dataset.tiltBound = "1";
+    let targetX = 0;
+    let targetY = 0;
+    let currentX = 0;
+    let currentY = 0;
+    let raf = 0;
+
+    function tick() {
+      currentX += (targetX - currentX) * 0.08;
+      currentY += (targetY - currentY) * 0.08;
+      if (Math.abs(targetX - currentX) < 0.01 && Math.abs(targetY - currentY) < 0.01 && targetX === 0 && targetY === 0) {
+        card.style.transform = "";
+        raf = 0;
+        return;
+      }
+      card.style.transform = `perspective(900px) rotateX(${currentY.toFixed(2)}deg) rotateY(${currentX.toFixed(2)}deg) translateY(-4px)`;
+      raf = requestAnimationFrame(tick);
+    }
+
     card.addEventListener("mousemove", (e) => {
       const r = card.getBoundingClientRect();
       const x = (e.clientX - r.left) / r.width - 0.5;
       const y = (e.clientY - r.top) / r.height - 0.5;
-      card.style.transform = `perspective(900px) rotateX(${(-y * 6).toFixed(2)}deg) rotateY(${(x * 6).toFixed(2)}deg) translateY(-6px) scale(1.02)`;
+      targetX = x * 5;
+      targetY = -y * 4;
+      if (!raf) raf = requestAnimationFrame(tick);
     });
     card.addEventListener("mouseleave", () => {
-      card.style.transform = "";
+      targetX = 0;
+      targetY = 0;
+      if (!raf) raf = requestAnimationFrame(tick);
+    });
+  }
+
+  function bindMagnetic(el, strength = 0.22) {
+    if (prefersReduced || el.dataset.magnetic) return;
+    el.dataset.magnetic = "1";
+    el.addEventListener("mousemove", (e) => {
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - r.left - r.width / 2) * strength;
+      const y = (e.clientY - r.top - r.height / 2) * strength;
+      el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+    });
+    el.addEventListener("mouseleave", () => {
+      el.style.transform = "";
     });
   }
 
@@ -37,19 +88,25 @@
     observeReveals(root = document) {
       const items = root.querySelectorAll(".reveal:not(.visible)");
       if (!items.length) return;
+
       const io = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              entry.target.classList.add("visible");
-              io.unobserve(entry.target);
-            }
+            if (!entry.isIntersecting) return;
+            const el = entry.target;
+            const delay = parseInt(el.dataset.revealDelay || "0", 10);
+            const siblings = el.parentElement?.querySelectorAll(":scope > .reveal:not(.visible)") || [];
+            const index = [...siblings].indexOf(el);
+            const stagger = index >= 0 ? Math.min(index * 70, 420) : 0;
+            setTimeout(() => el.classList.add("visible"), delay + stagger);
+            io.unobserve(el);
           });
         },
-        { threshold: 0.08, rootMargin: "0px 0px -40px 0px" }
+        { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
       );
-      items.forEach((el, i) => {
-        el.style.transitionDelay = `${Math.min(i * 0.05, 0.35)}s`;
+
+      items.forEach((el) => {
+        if (el.closest(".hero")) return;
         io.observe(el);
       });
     },
@@ -64,26 +121,42 @@
     bindMotion(root = document) {
       if (prefersReduced) return;
       root.querySelectorAll(".tilt-card:not([data-tilt-bound])").forEach(bindTilt);
+      root.querySelectorAll(".hero .btn-fill:not([data-magnetic])").forEach((btn) => bindMagnetic(btn, 0.18));
     },
 
     animateNumber,
   };
 
-  window.AlleralEffects.observeReveals();
-
   if (!prefersReduced) {
+    initHeroSequence();
+    window.AlleralEffects.observeReveals();
+
     const aurora = document.querySelector(".aurora");
+    let scrollY = window.scrollY;
+    let smoothY = scrollY;
+
     window.addEventListener("scroll", () => {
-      if (aurora) aurora.style.transform = `translateY(${window.scrollY * 0.12}px)`;
+      scrollY = window.scrollY;
     }, { passive: true });
 
+    function parallaxFrame() {
+      smoothY += (scrollY - smoothY) * 0.06;
+      if (aurora) {
+        aurora.style.transform = `translate3d(0, ${(smoothY * 0.08).toFixed(2)}px, 0)`;
+      }
+      requestAnimationFrame(parallaxFrame);
+    }
+    requestAnimationFrame(parallaxFrame);
+
     window.AlleralEffects.bindMotion();
+  } else {
+    document.querySelectorAll(".reveal").forEach((el) => el.classList.add("visible"));
   }
 
   const nav = document.getElementById("siteNav") || document.querySelector(".nav-shell");
   if (nav) {
     window.addEventListener("scroll", () => {
-      nav.classList.toggle("nav-scrolled", window.scrollY > 12);
+      nav.classList.toggle("nav-scrolled", window.scrollY > 16);
     }, { passive: true });
   }
 
