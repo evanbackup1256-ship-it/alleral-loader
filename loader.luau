@@ -20,7 +20,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 
 local RELEASE_FALLBACK = {
 	loader = "7.6.6",
-	core = "2.7.6",
+	core = "2.7.7",
 	ui = "Alleral",
 	analytics = "1.2",
 	telemetry = "3.2",
@@ -2183,6 +2183,7 @@ local function buildManagedFiles()
 			paths = {
 				UI .. "/windui/main.lua",
 				UI .. "/windui/arrrel.luau",
+				UI .. "/windui/autoscale.luau",
 				UI .. "/windui/aller.luau",
 				UI .. "/windui/bootstrap.lua",
 				UI .. "/windui/v2/boost.luau",

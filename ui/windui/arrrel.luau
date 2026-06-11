@@ -99,7 +99,7 @@ return function(WindUI)
 		return palette.accentHot
 	end
 
-	WindUI.ARRREL_UI_VERSION = "2.0.1-alleral-v2"
+	WindUI.ARRREL_UI_VERSION = "2.0.4-alleral-v2"
 	WindUI.ARRREL_BRAND = "Alleral"
 	WindUI.ALLERAL_UI_VERSION = WindUI.ARRREL_UI_VERSION
 	WindUI.ALLERAL_BRAND = "Alleral UI V2"
@@ -177,6 +177,8 @@ return function(WindUI)
 	local function motionEnabled()
 		return WindUI._AlleralReducedMotion ~= true
 	end
+
+	local MOTION_JITTER = { min = 0.004, max = 0.014 }
 
 	local Motion = (function()
 		local springStates = setmetatable({}, { __mode = "k" })
@@ -464,8 +466,8 @@ return function(WindUI)
 			end
 		end
 		if motionEnabled() and infoOrPreset ~= "instant" then
-			local jitterMin = RESOURCES.motion.jitterMin or 0.004
-			local jitterMax = RESOURCES.motion.jitterMax or 0.014
+			local jitterMin = MOTION_JITTER.min or 0.004
+			local jitterMax = MOTION_JITTER.max or 0.014
 			local jitter = tonumber(instance:GetAttribute("AlleralMotionJitter"))
 			if not jitter then
 				jitter = jitterMin + math.random() * (jitterMax - jitterMin)
@@ -507,6 +509,132 @@ return function(WindUI)
 	end
 
 	installTweenCreateHook()
+
+	local AutoScaleLib = (function()
+		local roots = {
+			"ui/windui/autoscale.luau",
+			"kick/ui/windui/autoscale.luau",
+			"kick/kick/ui/windui/autoscale.luau",
+			"windui/autoscale.luau",
+		}
+		local urls = {
+			"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/windui/autoscale.luau",
+			"https://github.com/evanbackup1256-ship-it/kick/raw/main/ui/windui/autoscale.luau",
+		}
+		local readFn = readfile or (syn and syn.readfile) or (fluxus and fluxus.readfile)
+		local isFileFn = isfile or (syn and syn.isfile)
+		local compile = loadstring or load
+
+		local function activate(body, label)
+			if type(body) ~= "string" or body:find("AutoScale", 1, true) == nil then
+				return nil
+			end
+			if type(compile) ~= "function" then
+				return nil
+			end
+			local chunk = compile(body, "@" .. tostring(label))
+			if not chunk then
+				return nil
+			end
+			local ok, factory = pcall(chunk)
+			if not ok or type(factory) ~= "function" then
+				return nil
+			end
+			local applied, api = pcall(factory, WindUI)
+			if applied and type(api) == "table" and type(api.apply) == "function" then
+				return api
+			end
+			return nil
+		end
+
+		if type(readFn) == "function" and type(isFileFn) == "function" then
+			for _, path in ipairs(roots) do
+				if isFileFn(path) then
+					local ok, body = pcall(readFn, path)
+					local api = ok and activate(body, path)
+					if api then
+						return api
+					end
+				end
+			end
+		end
+
+		for _, url in ipairs(urls) do
+			local bust = url .. (url:find("?", 1, true) and "&" or "?") .. "t=" .. tostring(tick())
+			local ok, body = pcall(function()
+				return game:HttpGet(bust)
+			end)
+			local api = ok and activate(body, url)
+			if api then
+				return api
+			end
+		end
+
+		local margin, minScale, maxScale, threshold = 40, 0.3, 1.0, 0.05
+		local function computeScale(window)
+			if type(window) ~= "table" or window.IsFullscreen or window.AutoScale == false then
+				return nil
+			end
+			local camera = Workspace.CurrentCamera
+			local main = window.UIElements and window.UIElements.Main
+			if not camera or not main or not main:IsA("GuiObject") then
+				return nil
+			end
+			local abs = main.AbsoluteSize
+			if abs.X <= 1 or abs.Y <= 1 then
+				return nil
+			end
+			local vp = camera.ViewportSize
+			local availX, availY = vp.X - margin * 2, vp.Y - margin * 2
+			if availX <= 0 or availY <= 0 then
+				return nil
+			end
+			return math.clamp(math.min(availX / abs.X, availY / abs.Y), minScale, maxScale)
+		end
+		local function applyScale(window)
+			if type(window) ~= "table" or type(window.SetUIScale) ~= "function" then
+				return nil
+			end
+			local base = computeScale(window)
+			if not base then
+				return nil
+			end
+			local scale = math.clamp(base * (tonumber(WindUI._AlleralUiScale) or 1), minScale, maxScale)
+			local current = (type(window.GetUIScale) == "function" and window:GetUIScale()) or 1
+			if math.abs(scale - current) > threshold then
+				pcall(function()
+					window:SetUIScale(scale)
+				end)
+			end
+			WindUI._AlleralAutoScale = scale
+			return scale
+		end
+		return {
+			apply = applyScale,
+			compute = computeScale,
+			bind = function(window, _, onRefresh)
+				local function refresh()
+					applyScale(window)
+					if type(onRefresh) == "function" then
+						pcall(onRefresh, window)
+					end
+				end
+				local function hook(camera)
+					if not camera then
+						return
+					end
+					pcall(function()
+						camera:GetPropertyChangedSignal("ViewportSize"):Connect(refresh)
+					end)
+					task.defer(refresh)
+				end
+				hook(Workspace.CurrentCamera)
+				Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+					hook(Workspace.CurrentCamera)
+				end)
+			end,
+		}
+	end)()
 
 	-- Spring motion presets (fraktality/spr-style: frequency Hz + damping ratio).
 	local ANIM = {
@@ -838,6 +966,7 @@ return function(WindUI)
 		ElementPadding = MAC.elementGap,
 		Resizable = true,
 		HideSearchBar = false,
+		AutoScale = true,
 	}
 
 	local PROFILE_PRESETS = {
@@ -907,6 +1036,148 @@ return function(WindUI)
 		end
 		local size = camera.ViewportSize
 		return math.min(size.X, size.Y)
+	end
+
+	local function resolveHStackParentWidth(hframe)
+		if not hframe or not hframe:IsA("GuiObject") then
+			return 0
+		end
+		local width = hframe.AbsoluteSize.X
+		if width >= 64 then
+			return width
+		end
+		local walk = hframe.Parent
+		for _ = 1, 12 do
+			if not walk or not walk:IsA("GuiObject") then
+				break
+			end
+			width = walk.AbsoluteSize.X
+			if width >= 64 then
+				return width
+			end
+			if walk:IsA("ScrollingFrame") or walk.Name == "ContainerFrame" or walk.Name == "ContainerFrameCanvas" then
+				width = math.max(width, walk.AbsoluteSize.X)
+				if width >= 64 then
+					return width
+				end
+			end
+			walk = walk.Parent
+		end
+		return width
+	end
+
+	local function distributeHStackColumns(hframe, columns)
+		local n = #columns
+		if n == 0 or not hframe then
+			return false
+		end
+		local parentWidth = resolveHStackParentWidth(hframe)
+		if parentWidth < 64 then
+			return false
+		end
+
+		hframe.Size = UDim2.new(1, 0, hframe.Size.Y.Scale, hframe.Size.Y.Offset)
+
+		local layout = hframe:FindFirstChildOfClass("UIListLayout")
+		local gap = layout and layout.Padding.Offset or 6
+		local scale = 1 / n
+		local totalGap = gap * (n - 1)
+		local remainder = -totalGap
+		local baseOffset = math.floor(remainder / n)
+		local extra = remainder - (baseOffset * n)
+
+		for index, col in ipairs(columns) do
+			if col and col:IsA("GuiObject") then
+				local offset = baseOffset
+				if index <= math.abs(extra) then
+					offset = offset - (extra < 0 and 1 or -1)
+				end
+				col.Size = UDim2.new(scale, offset, 0, 0)
+				col.AutomaticSize = Enum.AutomaticSize.Y
+			end
+		end
+		return true
+	end
+
+	local function collectHStackColumns(stack)
+		local columns = {}
+		if type(stack) == "table" and type(stack.Elements) == "table" then
+			for _, elem in pairs(stack.Elements) do
+				if type(elem) == "table" and elem.ElementFrame and elem.ElementFrame.Parent then
+					table.insert(columns, elem.ElementFrame)
+				end
+			end
+		end
+		table.sort(columns, function(a, b)
+			return (a.LayoutOrder or 0) < (b.LayoutOrder or 0)
+		end)
+		return columns
+	end
+
+	local function relayoutHorizontalStack(stack)
+		if type(stack) ~= "table" or stack.__type ~= "HStack" then
+			return false
+		end
+		local hframe = stack.ElementFrame
+		if not hframe then
+			return false
+		end
+		return distributeHStackColumns(hframe, collectHStackColumns(stack))
+	end
+
+	local function scheduleHStackRelayout(stack)
+		if type(stack) ~= "table" or stack._AlleralRelayoutHooked then
+			return
+		end
+		stack._AlleralRelayoutHooked = true
+		local function tryRelayout()
+			relayoutHorizontalStack(stack)
+		end
+		task.defer(tryRelayout)
+		task.delay(0.05, tryRelayout)
+		task.delay(0.2, tryRelayout)
+		local hframe = stack.ElementFrame
+		if hframe then
+			pcall(function()
+				hframe:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+					if hframe.AbsoluteSize.X >= 64 then
+						tryRelayout()
+					end
+				end)
+			end)
+		end
+	end
+
+	local function relayoutAllHStacks(window)
+		if type(window) ~= "table" then
+			return
+		end
+		local tabMod = window.TabModule
+		if not tabMod or not tabMod.Tabs then
+			return
+		end
+		for _, tab in pairs(tabMod.Tabs) do
+			local scroll = tab.UIElements and tab.UIElements.ContainerFrame
+			if not scroll then
+				continue
+			end
+			for _, desc in ipairs(scroll:GetDescendants()) do
+				if desc:IsA("Frame") then
+					local layout = desc:FindFirstChildOfClass("UIListLayout")
+					if layout and layout.FillDirection == Enum.FillDirection.Horizontal then
+						local columns = {}
+						for _, child in ipairs(desc:GetChildren()) do
+							if child:IsA("GuiObject") and not child:IsA("UIListLayout") then
+								table.insert(columns, child)
+							end
+						end
+						if #columns >= 2 then
+							distributeHStackColumns(desc, columns)
+						end
+					end
+				end
+			end
+		end
 	end
 
 	local function detectDeviceKind()
@@ -1126,10 +1397,7 @@ return function(WindUI)
 			emptyHint = "No matches",
 			footer = "↑↓   Enter   Esc",
 		},
-		motion = {
-			jitterMin = 0.004,
-			jitterMax = 0.014,
-		},
+		motion = MOTION_JITTER,
 	}
 
 	local function preloadAssets()
@@ -2477,6 +2745,27 @@ return function(WindUI)
 		end
 	end
 
+	local function polishRowLabels(root)
+		if not root then
+			return
+		end
+		for _, desc in ipairs(root:GetDescendants()) do
+			if desc:IsA("TextLabel") and desc.TextWrapped then
+				local layout = desc.Parent and desc.Parent:FindFirstChildOfClass("UIListLayout")
+				if layout and layout.FillDirection == Enum.FillDirection.Horizontal then
+					if desc.TextSize >= 15 and desc.TextSize <= 18 and desc.TextXAlignment == Enum.TextXAlignment.Left then
+						desc.TextWrapped = false
+						desc.TextTruncate = Enum.TextTruncate.AtEnd
+						if desc.AutomaticSize == Enum.AutomaticSize.XY then
+							desc.AutomaticSize = Enum.AutomaticSize.Y
+							desc.Size = UDim2.new(1, 0, 0, 0)
+						end
+					end
+				end
+			end
+		end
+	end
+
 	local function polishLabelTone(root)
 		if not root then
 			return
@@ -2777,6 +3066,9 @@ return function(WindUI)
 
 		tabMod:OnChange(function(index)
 			syncPill(index)
+			task.defer(function()
+				relayoutAllHStacks(window)
+			end)
 		end)
 
 		local active = tabMod.SelectedTab or window.CurrentTab
@@ -2788,15 +3080,50 @@ return function(WindUI)
 	end
 
 	local function applyWindowScale(window)
-		if not window or type(window.SetUIScale) ~= "function" then
+		if AutoScaleLib and type(AutoScaleLib.apply) == "function" then
+			return AutoScaleLib.apply(window)
+		end
+	end
+
+	local function bindWindowAutoScale(window)
+		if not window or WindUI._AlleralAutoScaleBound == window then
 			return
 		end
-		local scale = tonumber(WindUI._AlleralUiScale) or 1
-		if scale > 0 and scale ~= 1 then
-			pcall(function()
-				window:SetUIScale(scale)
+		WindUI._AlleralAutoScaleBound = window
+		if AutoScaleLib and type(AutoScaleLib.bind) == "function" then
+			AutoScaleLib.bind(window, nil, function()
+				if WindUI.Window then
+					task.defer(function()
+						relayoutAllHStacks(WindUI.Window)
+					end)
+				end
 			end)
 		end
+		task.defer(function()
+			applyWindowScale(window)
+			relayoutAllHStacks(window)
+		end)
+	end
+
+	function WindUI.RefreshViewportScale(_self, window)
+		window = window or WindUI.Window
+		if not window then
+			return nil
+		end
+		local scale = applyWindowScale(window)
+		task.defer(function()
+			relayoutAllHStacks(window)
+		end)
+		return scale
+	end
+
+	function WindUI.RelayoutColumns(_self, window)
+		window = window or WindUI.Window
+		if not window then
+			return false
+		end
+		relayoutAllHStacks(window)
+		return true
 	end
 
 	function WindUI.PolishWindow(_self, window)
@@ -2833,6 +3160,7 @@ return function(WindUI)
 				polishRowChrome(window.UIElements.MainBar)
 				polishSectionSpacing(window.UIElements.MainBar, resolveElementGap(window))
 				polishElementRowHeights(window.UIElements.MainBar)
+				polishRowLabels(window.UIElements.MainBar)
 				polishLabelTone(window.UIElements.MainBar)
 			end
 			polishContentChrome(window)
@@ -2844,7 +3172,9 @@ return function(WindUI)
 						polishRowChrome(main)
 						polishSectionSpacing(main, gap)
 						polishElementRowHeights(main)
+						polishRowLabels(main)
 						polishTabScrolling(window)
+						relayoutAllHStacks(window)
 						local tabMod = window.TabModule
 						if tabMod and tabMod.Tabs then
 							for _, tab in pairs(tabMod.Tabs) do
@@ -2909,6 +3239,7 @@ return function(WindUI)
 		settings.NewElements = settings.NewElements ~= false
 		settings.Resizable = settings.Resizable ~= false
 		settings.HideSearchBar = settings.HideSearchBar == true
+		settings.AutoScale = settings.AutoScale ~= false
 
 		settings.OpenButton = type(settings.OpenButton) == "table" and settings.OpenButton or {}
 		if settings.OpenButton.Color == nil then
@@ -3548,6 +3879,7 @@ return function(WindUI)
 				return stack
 			end
 			stack._AlleralLayoutWrapped = true
+			scheduleHStackRelayout(stack)
 			local origVStack = stack.VStack
 			function stack:VStack(vopts)
 				local col = origVStack(self, vopts)
@@ -3680,9 +4012,10 @@ return function(WindUI)
 
 		if window then
 			WindUI.Window = window
+			window.AutoScale = window.AutoScale ~= false
 			wrapWindowElements(window)
 			installWindowAnimations(window)
-			applyWindowScale(window)
+			bindWindowAutoScale(window)
 			task.spawn(preloadAssets)
 			task.defer(function()
 				installDropdownAnimations()
@@ -4176,6 +4509,9 @@ return function(WindUI)
 		if WindUI.Window then
 			applyWindowScale(WindUI.Window)
 			WindUI:RepairWindow(WindUI.Window)
+			task.defer(function()
+				relayoutAllHStacks(WindUI.Window)
+			end)
 		end
 		return resolved, preset
 	end
@@ -4258,6 +4594,7 @@ return function(WindUI)
 			installWindowAnimations(window)
 			applyWindowScale(window)
 			WindUI:PolishWindow(window)
+			relayoutAllHStacks(window)
 			if type(window.CanDropdown) ~= "boolean" then
 				window.CanDropdown = true
 			end

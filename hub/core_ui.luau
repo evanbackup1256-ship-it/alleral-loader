@@ -787,6 +787,11 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 			Callback = settings.Callback or function() end,
 		})
 		attachTooltip(handle, settings.Tooltip)
+		task.defer(function()
+			if handle and handle.ToggleFrame and handle.ToggleFrame.UIElements and handle.ToggleFrame.UIElements.Main then
+				fixWrappedLabels(handle.ToggleFrame.UIElements.Main)
+			end
+		end)
 		return wrapElement(function(nextSettings)
 			if nextSettings.CurrentValue ~= nil then
 				setElementValue(handle, nextSettings.CurrentValue == true)
@@ -978,6 +983,139 @@ function Core.createStubUiGroup(label)
 	return stub
 end
 
+local function measureTabContentWidth(rawTab, window)
+	if rawTab and rawTab.UIElements and rawTab.UIElements.ContainerFrame then
+		local scroll = rawTab.UIElements.ContainerFrame
+		local width = scroll.AbsoluteSize.X
+		if width >= 64 then
+			local pad = scroll:FindFirstChildOfClass("UIPadding")
+			if pad then
+				width = width - pad.PaddingLeft.Offset - pad.PaddingRight.Offset
+			end
+			return math.max(width, 64)
+		end
+	end
+	local rawWindow = window and window._rawWindow
+	if rawWindow and rawWindow.UIElements and rawWindow.UIElements.MainBar then
+		local width = rawWindow.UIElements.MainBar.AbsoluteSize.X
+		if width >= 64 then
+			return width - 48
+		end
+	end
+	return 0
+end
+
+local function fixWrappedLabels(root)
+	if not root then
+		return
+	end
+	for _, desc in ipairs(root:GetDescendants()) do
+		if desc:IsA("TextLabel") and desc.TextWrapped then
+			desc.TextWrapped = false
+			desc.TextTruncate = Enum.TextTruncate.AtEnd
+			if desc.AutomaticSize == Enum.AutomaticSize.XY then
+				desc.AutomaticSize = Enum.AutomaticSize.Y
+				desc.Size = UDim2.new(1, 0, 0, 0)
+			elseif desc.Size.X.Scale == 0 and desc.Size.X.Offset == 0 then
+				desc.Size = UDim2.new(1, 0, desc.Size.Y.Scale, desc.Size.Y.Offset)
+			end
+		end
+	end
+end
+
+local function relayoutTabColumns(tab)
+	local layout = tab._layout
+	if not layout or not layout.ready or not layout.hstack or not layout.cols then
+		return false
+	end
+	local hstack = layout.hstack
+	local hframe = hstack.ElementFrame
+	if not hframe then
+		return false
+	end
+
+	local width = hframe.AbsoluteSize.X
+	if width < 64 then
+		width = measureTabContentWidth(tab._rawTab, tab._window)
+	end
+	if width < 64 then
+		return false
+	end
+
+	hframe.Size = UDim2.new(1, 0, 0, 0)
+	hframe.AutomaticSize = Enum.AutomaticSize.Y
+
+	local n = #layout.cols
+	local gap = 6
+	local list = hframe:FindFirstChildOfClass("UIListLayout")
+	if list then
+		gap = list.Padding.Offset
+	end
+
+	local scale = 1 / n
+	local remainder = -(gap * (n - 1))
+	local baseOffset = math.floor(remainder / n)
+	local extra = remainder - (baseOffset * n)
+
+	for index, colStack in ipairs(layout.cols) do
+		local colFrame = colStack.ElementFrame
+		if colFrame and colFrame:IsA("GuiObject") then
+			local offset = baseOffset
+			if index <= math.abs(extra) then
+				offset = offset - (extra < 0 and 1 or -1)
+			end
+			colFrame.Size = UDim2.new(scale, offset, 0, 0)
+			colFrame.AutomaticSize = Enum.AutomaticSize.Y
+		end
+	end
+
+	for _, colStack in ipairs(layout.cols) do
+		if colStack.ElementFrame then
+			fixWrappedLabels(colStack.ElementFrame)
+		end
+	end
+	return true
+end
+
+local function scheduleTabColumnRelayout(tab)
+	if tab._columnRelayoutScheduled then
+		return
+	end
+	tab._columnRelayoutScheduled = true
+
+	local function tryRelayout()
+		relayoutTabColumns(tab)
+	end
+
+	task.defer(tryRelayout)
+	task.delay(0.05, tryRelayout)
+	task.delay(0.15, tryRelayout)
+	task.delay(0.35, tryRelayout)
+
+	local layout = tab._layout
+	local hframe = layout and layout.hstack and layout.hstack.ElementFrame
+	if hframe then
+		pcall(function()
+			hframe:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+				if hframe.AbsoluteSize.X >= 64 then
+					tryRelayout()
+				end
+			end)
+		end)
+	end
+
+	local rawTab = tab._rawTab
+	if rawTab and rawTab.UIElements and rawTab.UIElements.ContainerFrame then
+		pcall(function()
+			rawTab.UIElements.ContainerFrame:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+				if rawTab.UIElements.ContainerFrame.AbsoluteSize.X >= 64 then
+					tryRelayout()
+				end
+			end)
+		end)
+	end
+end
+
 function Core.wrapUiTab(rawTab, uiBundle, window)
 	local tab = {
 		_rawTab = rawTab,
@@ -1012,6 +1150,17 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 				if colOk and colBOk and colA and colB then
 					layout.cols = { colA, colB }
 					layout.ready = type(layout.cols[1].Section) == "function" and type(layout.cols[2].Section) == "function"
+					if layout.ready then
+						scheduleTabColumnRelayout(tab)
+						local windUi = uiBundle and (uiBundle.WindUI or uiBundle.Library)
+						if windUi and type(windUi.RelayoutColumns) == "function" then
+							task.defer(function()
+								pcall(function()
+									windUi:RelayoutColumns(window)
+								end)
+							end)
+						end
+					end
 				end
 			end
 		end
@@ -1048,6 +1197,12 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 			Core.logWarn("CreateGroupbox Section failed for " .. tostring(name) .. ": " .. tostring(rawGroup))
 			return Core.createWindUiGroupbox({}, uiBundle)
 		end
+		task.defer(function()
+			scheduleTabColumnRelayout(tab)
+			if rawGroup.UIElements and rawGroup.UIElements.Main then
+				fixWrappedLabels(rawGroup.UIElements.Main)
+			end
+		end)
 		return Core.createWindUiGroupbox(rawGroup, uiBundle)
 	end
 
@@ -2013,6 +2168,7 @@ function Core.buildUiWindow(ui, settings)
 		Theme = "Arrrel",
 		NewElements = true,
 		HideSearchBar = false,
+		AutoScale = true,
 		UICorner = 12,
 		UIPadding = 24,
 		SideBarWidth = 280,
@@ -2098,7 +2254,17 @@ function Core.buildUiTab(section, name, icon, columns, id)
 		Core.logWarn("buildUiTab AddTab failed for " .. tostring(name))
 	end
 	local wrapped = Core.wrapUiTab(rawTab, window._ui or section._ui, window)
-	wrapped._columnCount = math.max(1, tonumber(columns) or 1)
+	local requested = math.max(1, tonumber(columns) or 1)
+	if requested >= 2 then
+		local camera = workspace.CurrentCamera
+		if camera then
+			local shortSide = math.min(camera.ViewportSize.X, camera.ViewportSize.Y)
+			if shortSide <= 900 then
+				requested = 1
+			end
+		end
+	end
+	wrapped._columnCount = requested
 	return wrapped
 end
 

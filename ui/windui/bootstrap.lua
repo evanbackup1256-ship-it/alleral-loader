@@ -5,6 +5,7 @@
 
 local PATCH_FILE = "arrrel.luau"
 local PATCH_FALLBACK = "aller.luau"
+local AUTOSCALE_FILE = "autoscale.luau"
 local PATCH_ROOTS = {
 	"ui/windui/",
 	"windui/",
@@ -13,6 +14,8 @@ local PATCH_ROOTS = {
 }
 
 local PATCH_URLS = {
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/windui/autoscale.luau",
+	"https://github.com/evanbackup1256-ship-it/kick/raw/main/ui/windui/autoscale.luau",
 	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/windui/arrrel.luau",
 	"https://github.com/evanbackup1256-ship-it/kick/raw/main/ui/windui/arrrel.luau",
 	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/windui/aller.luau",
@@ -85,6 +88,45 @@ end
 return function(WindUI)
 	if type(WindUI) ~= "table" then
 		return WindUI
+	end
+
+	local function loadModule(fileName, marker)
+		local readFn = readfile or (syn and syn.readfile) or (fluxus and fluxus.readfile)
+		local isFileFn = isfile or (syn and syn.isfile)
+		if type(readFn) == "function" and type(isFileFn) == "function" then
+			for _, root in ipairs(PATCH_ROOTS) do
+				local path = root .. fileName
+				if isFileFn(path) then
+					local ok, body = pcall(readFn, path)
+					if ok and type(body) == "string" and body:find(marker, 1, true) then
+						return body, path
+					end
+				end
+			end
+		end
+		for _, url in ipairs(PATCH_URLS) do
+			if url:find(fileName, 1, true) then
+				local body = httpFetch(url)
+				if body then
+					return body, url
+				end
+			end
+		end
+		return nil
+	end
+
+	local autoscaleSource = loadModule(AUTOSCALE_FILE, "WindUI AutoScale")
+	if autoscaleSource then
+		local compile = loadstring or load
+		if type(compile) == "function" then
+			local chunk = compile(autoscaleSource, "@Arrrel/autoscale")
+			if chunk then
+				local ok, factory = pcall(chunk)
+				if ok and type(factory) == "function" then
+					pcall(factory, WindUI)
+				end
+			end
+		end
 	end
 
 	local source, label = readLocalPatch()
