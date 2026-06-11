@@ -1,15 +1,14 @@
 local Core = {}
-Core.VERSION = "1.6"
+Core.VERSION = "1.8"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
 local STARLIGHT_REMOTE_URLS = {
 	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/vendor/starlight/Source.lua",
-	"https://raw.githubusercontent.com/Nebula-Softworks/Starlight-Interface-Suite/master/Source.lua",
 }
 local STARLIGHT_LOCAL_FILES = {
 	"vendor/starlight/Source.lua",
-	"vendor/starlight/init.luau",
+	"vendor/starlight/Source.plain.lua",
 	"starlight/Source.lua",
 	"kick/vendor/starlight/Source.lua",
 	"kick/kick/vendor/starlight/Source.lua",
@@ -35,7 +34,14 @@ function Core.notify(title, text, duration)
 end
 
 function Core.requestFunction()
+	local sharedEnv = ENV.shared or (typeof(shared) == "table" and shared) or nil
+	local solaraLib = sharedEnv and type(sharedEnv.solara) == "table" and sharedEnv.solara or nil
+	local soloraLib = sharedEnv and type(sharedEnv.Solora) == "table" and sharedEnv.Solora or nil
 	local candidates = {
+		solaraLib and solaraLib.request,
+		soloraLib and soloraLib.request,
+		type(ENV.Solara) == "table" and ENV.Solara.request or nil,
+		type(ENV.Solora) == "table" and ENV.Solora.request or nil,
 		type(ENV.syn) == "table" and ENV.syn.request or nil,
 		type(ENV.fluxus) == "table" and ENV.fluxus.request or nil,
 		type(ENV.http) == "table" and ENV.http.request or nil,
@@ -61,7 +67,12 @@ function Core.requestFunction()
 		type(ENV.Evon) == "table" and ENV.Evon.request or nil,
 		type(ENV.delta) == "table" and ENV.delta.request or nil,
 		type(ENV.celery) == "table" and ENV.celery.request or nil,
-		ENV.http_request,
+		type(ENV.Codex) == "table" and ENV.Codex.request or nil,
+		type(ENV.Hydrogen) == "table" and ENV.Hydrogen.request or nil,
+		type(ENV.Ronix) == "table" and ENV.Ronix.request or nil,
+		type(ENV.Macsploit) == "table" and ENV.Macsploit.request or nil,
+		type(ENV.Oxygen) == "table" and ENV.Oxygen.request or nil,
+		type(ENV.http) == "table" and ENV.http.request or nil,
 		ENV.request,
 		ENV.Request,
 	}
@@ -87,6 +98,547 @@ function Core.requestFunction()
 		end
 	end
 	return nil
+end
+
+function Core.firstExecFunc(...)
+	for index = 1, select("#", ...) do
+		local name = select(index, ...)
+		local fn = ENV[name] or (getfenv and getfenv()[name])
+		if type(fn) == "function" then
+			return fn
+		end
+	end
+	return nil
+end
+
+function Core.execFunction(name, requireFilesystem)
+	if requireFilesystem then
+		local profile = Core.executorProfile()
+		if not profile.fsOk then
+			return nil
+		end
+	end
+	local fn = ENV[name]
+	return type(fn) == "function" and fn or nil
+end
+
+function Core.detectExecutor()
+	local rawName = ""
+	for _, id in ipairs({
+		"identifyexecutor",
+		"getexecutorname",
+		"whatexecutor",
+		"getexecutor",
+		"getexecutorinfo",
+	}) do
+		local fn = Core.firstExecFunc(id)
+		if fn then
+			local ok, result, version = pcall(fn)
+			if ok and type(result) == "string" and result ~= "" then
+				rawName = result
+				if type(version) == "string" and version ~= "" then
+					rawName = rawName .. " " .. version
+				end
+				break
+			end
+		end
+	end
+
+	local slug = rawName:lower():gsub("%s+", ""):match("^[%a][%w%-_%.]*") or ""
+	local function hasTable(key)
+		local value = ENV[key]
+		return type(value) == "table" and value or nil
+	end
+	local sharedEnv = ENV.shared or (typeof(shared) == "table" and shared) or nil
+
+	if slug == "" then
+		if hasTable("syn") and type(ENV.syn.request) == "function" then
+			slug = "synapse"
+		elseif ENV.KRNL_LOADED == true then
+			slug = "krnl"
+		elseif hasTable("fluxus") and type(ENV.fluxus.request) == "function" then
+			slug = "fluxus"
+		elseif hasTable("sw") then
+			slug = "scriptware"
+		elseif hasTable("celery") then
+			slug = "celery"
+		elseif hasTable("delta") then
+			slug = "delta"
+		elseif ENV.OXYGEN_U == true then
+			slug = "oxygenu"
+		elseif hasTable("Electron") then
+			slug = "electron"
+		elseif hasTable("Wave") and type(ENV.Wave.setclipboard) == "function" then
+			slug = "wave"
+		elseif sharedEnv and type(sharedEnv.solara) == "table" then
+			slug = "solara"
+		elseif sharedEnv and type(sharedEnv.Solora) == "table" then
+			slug = "solora"
+		elseif hasTable("Solara") or hasTable("solara") then
+			slug = "solara"
+		elseif hasTable("Solora") or hasTable("solora") then
+			slug = "solora"
+		elseif hasTable("Xeno") then
+			slug = "xeno"
+		elseif hasTable("Volt") and type(ENV.Volt.request) == "function" then
+			slug = "volt"
+		elseif hasTable("Potassium") then
+			slug = "potassium"
+		elseif hasTable("Madium") then
+			slug = "madium"
+		elseif hasTable("Velocity") then
+			slug = "velocity"
+		elseif hasTable("Codex") then
+			slug = "codex"
+		elseif hasTable("Ronix") then
+			slug = "ronix"
+		elseif hasTable("Nihon") then
+			slug = "nihon"
+		elseif hasTable("Vega") or hasTable("VegaX") then
+			slug = "vegax"
+		elseif hasTable("Comet") then
+			slug = "comet"
+		elseif hasTable("Trigon") then
+			slug = "trigon"
+		elseif hasTable("Cryptic") then
+			slug = "cryptic"
+		elseif hasTable("Hydrogen") then
+			slug = "hydrogen"
+		elseif hasTable("Sentinel") then
+			slug = "sentinel"
+		elseif hasTable("Serenity") then
+			slug = "serenity"
+		elseif hasTable("Atlantis") then
+			slug = "atlantis"
+		elseif hasTable("Zorara") then
+			slug = "zorara"
+		elseif hasTable("Aztup") then
+			slug = "aztup"
+		elseif hasTable("Nixware") then
+			slug = "nixware"
+		elseif ENV.IS_JJSLOIT == true or hasTable("jjsploit") then
+			slug = "jjsploit"
+		elseif hasTable("Bunni") or hasTable("bunni") then
+			slug = "bunni"
+		elseif hasTable("Valyse") or hasTable("valyse") then
+			slug = "valyse"
+		elseif hasTable("Krypton") or hasTable("krypton") then
+			slug = "krypton"
+		elseif hasTable("SirHurt") or hasTable("sirhurt") then
+			slug = "sirhurt"
+		elseif hasTable("Temple") or hasTable("temple") then
+			slug = "temple"
+		elseif hasTable("Evon") or hasTable("evon") then
+			slug = "evon"
+		elseif hasTable("AWP") or hasTable("awp") then
+			slug = "awp"
+		elseif hasTable("Pebble") or hasTable("pebble") then
+			slug = "pebble"
+		elseif hasTable("Nzxt") or hasTable("nzxt") then
+			slug = "nzxt"
+		elseif hasTable("Nezur") or hasTable("nezur") then
+			slug = "nezur"
+		elseif hasTable("Seliware") or hasTable("seliware") then
+			slug = "seliware"
+		elseif hasTable("Luna") or hasTable("luna") then
+			slug = "luna"
+		elseif hasTable("Macsploit") or hasTable("macsploit") then
+			slug = "macsploit"
+		elseif hasTable("Arceus") or ENV.ARCEUS_LOADED == true then
+			slug = "arceus"
+		elseif Core.firstExecFunc("queue_on_teleport") and Core.firstExecFunc("getgc") then
+			slug = "synapse"
+		else
+			slug = "unknown"
+		end
+	end
+
+	if slug == "solora" then
+		slug = "solara"
+	end
+
+	local display = slug:sub(1, 1):upper() .. slug:sub(2)
+	if slug == "synapse" then
+		display = "Synapse"
+	elseif slug == "jjsploit" then
+		display = "JJSploit"
+	elseif slug == "solara" then
+		display = "Solara"
+	end
+
+	return {
+		slug = slug,
+		name = display,
+		rawName = rawName,
+		isKnown = slug ~= "unknown",
+	}
+end
+
+Core.EXECUTOR_FS_BROKEN = {
+	yub = true,
+	yubx = true,
+	arceus = true,
+	vegax = true,
+	comet = true,
+}
+
+Core.EXECUTOR_COMPAT = {
+	synapse = true,
+	krnl = true,
+	fluxus = true,
+	scriptware = true,
+	celery = true,
+	delta = true,
+	oxygenu = true,
+	electron = true,
+	wave = true,
+	solara = true,
+	solora = true,
+	xeno = true,
+	volt = true,
+	potassium = true,
+	madium = true,
+	velocity = true,
+	codex = true,
+	ronix = true,
+	nihon = true,
+	trigon = true,
+	cryptic = true,
+	hydrogen = true,
+	sentinel = true,
+	serenity = true,
+	atlantis = true,
+	zorara = true,
+	aztup = true,
+	nixware = true,
+	jjsploit = true,
+	bunni = true,
+	valyse = true,
+	krypton = true,
+	sirhurt = true,
+	temple = true,
+	evon = true,
+	awp = true,
+	pebble = true,
+	nzxt = true,
+	nezur = true,
+	seliware = true,
+	luna = true,
+	macsploit = true,
+}
+
+function Core.executorProfile()
+	local detected = Core.detectExecutor()
+	local slug = detected.slug
+	local fsOk = not Core.EXECUTOR_FS_BROKEN[slug]
+	local sharedEnv = ENV.shared or (typeof(shared) == "table" and shared) or nil
+	local solaraLib = sharedEnv and type(sharedEnv.solara) == "table" and sharedEnv.solara or nil
+	local soloraLib = sharedEnv and type(sharedEnv.Solora) == "table" and sharedEnv.Solora or nil
+
+	local hasHttp = Core.requestFunction() ~= nil
+	local hasFilesystem = fsOk
+		and type(ENV.writefile) == "function"
+		and type(ENV.readfile) == "function"
+	local hasGetConn = type(ENV.getconnections) == "function" or type(ENV.get_signal_cons) == "function"
+	local hasClipboard = type(ENV.setclipboard) == "function"
+		or type(ENV.toclipboard) == "function"
+		or (type(ENV.Wave) == "table" and type(ENV.Wave.setclipboard) == "function")
+		or (type(ENV.Electron) == "table" and type(ENV.Electron.setclipboard) == "function")
+	local hasFireTouch = type(ENV.firetouchinterest) == "function"
+		or type(ENV.FireTouchInterest) == "function"
+		or type(ENV.touchinterest) == "function"
+
+	return {
+		name = slug,
+		displayName = detected.name,
+		rawName = detected.rawName,
+		isKnown = detected.isKnown,
+		fsOk = fsOk,
+		hasFilesystem = hasFilesystem,
+		hasHttp = hasHttp,
+		hasGetConn = hasGetConn,
+		hasClipboard = hasClipboard,
+		hasFireTouch = hasFireTouch,
+		env = ENV,
+		solara = solaraLib ~= nil or soloraLib ~= nil or slug == "solara",
+	}
+end
+
+function Core.executorTelemetryProfile()
+	local profile = Core.executorProfile()
+	local apis = {}
+	for _, pair in ipairs({
+		{ "http_request", "http_request" },
+		{ "request", "request" },
+		{ "readfile", "readfile" },
+		{ "writefile", "writefile" },
+		{ "loadstring", "loadstring" },
+		{ "getconnections", "getconnections" },
+		{ "firetouchinterest", "firetouchinterest" },
+		{ "identifyexecutor", "identifyexecutor" },
+		{ "gethui", "gethui" },
+	}) do
+		if type(ENV[pair[2]]) == "function" then
+			table.insert(apis, pair[1])
+		end
+	end
+	if profile.solara then
+		table.insert(apis, "solara")
+	end
+	table.sort(apis)
+	local loaderCaps = ENV.Alleral_LoaderCapabilities or {}
+	return {
+		name = profile.displayName,
+		version = profile.rawName,
+		http = profile.hasHttp or loaderCaps.http == true,
+		loadstring = loaderCaps.loadstring == true or type(ENV.loadstring) == "function",
+		readfile = profile.hasFilesystem or loaderCaps.readfile == true,
+		apis = apis,
+	}
+end
+
+function Core.refreshLoaderCapabilities()
+	local profile = Core.executorProfile()
+	local caps = {
+		executor = profile.displayName,
+		executorSlug = profile.name,
+		http = profile.hasHttp,
+		loadstring = type(ENV.loadstring or loadstring) == "function",
+		readfile = profile.hasFilesystem,
+		isfile = type(ENV.isfile) == "function",
+		listfiles = type(ENV.listfiles) == "function",
+		solara = profile.solara,
+		hasClipboard = profile.hasClipboard,
+		hasFireTouch = profile.hasFireTouch,
+		hasGetConn = profile.hasGetConn,
+	}
+	ENV.Alleral_LoaderCapabilities = caps
+	pcall(function()
+		if shared then
+			shared.Alleral_LoaderCapabilities = caps
+		end
+	end)
+	return caps
+end
+
+function Core.notifyExecutorCompat(profile)
+	profile = profile or Core.executorProfile()
+	local caps = {}
+	if profile.hasHttp then
+		table.insert(caps, "HTTP")
+	end
+	if profile.hasFilesystem then
+		table.insert(caps, "FS")
+	end
+	if profile.hasFireTouch then
+		table.insert(caps, "Touch")
+	end
+	if profile.hasGetConn then
+		table.insert(caps, "Signals")
+	end
+	if profile.hasClipboard then
+		table.insert(caps, "Clipboard")
+	end
+	local capText = #caps > 0 and (" | " .. table.concat(caps, ", ")) or ""
+	local display = profile.displayName
+	local compat = Core.EXECUTOR_COMPAT[profile.name] or profile.isKnown
+	if not profile.isKnown then
+		Core.notify("Executor", "Couldn't tell what you're on" .. capText .. ". Most stuff should still run.", 6)
+	elseif not compat then
+		Core.notify("Executor", display .. capText .. ". A few features might not run.", 6)
+	else
+		Core.notify("Executor", display .. capText .. " — good to go.", 4)
+	end
+end
+
+local SCRIPT_STATUS_META = {
+	working = { label = "Working", icon = "✅" },
+	detected = { label = "Detected / unstable", icon = "⚠️" },
+	broken = { label = "Broken", icon = "❌" },
+	maintenance = { label = "Maintenance", icon = "🛠️" },
+	testing = { label = "Testing", icon = "🧪" },
+}
+
+function Core.scriptStatusMeta(status)
+	return SCRIPT_STATUS_META[tostring(status or ""):lower()] or { label = tostring(status or "Unknown"), icon = "❔" }
+end
+
+function Core.defaultScriptManifestUrls()
+	local urls = {}
+	if ENV.Alleral_ScriptManifestUrl and ENV.Alleral_ScriptManifestUrl ~= "" then
+		table.insert(urls, ENV.Alleral_ScriptManifestUrl)
+	end
+	local ownerCfg = ENV.Alleral_OwnerTelemetry
+	if type(ownerCfg) == "table" and type(ownerCfg.relayUrl) == "string" and ownerCfg.relayUrl ~= "" then
+		local relay = ownerCfg.relayUrl:gsub("/+$", "")
+		table.insert(urls, relay:gsub("/ingest$", "") .. "/scripts")
+		if not relay:find("/scripts$") then
+			table.insert(urls, relay .. "/scripts")
+		end
+	end
+	table.insert(urls, "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/config/scripts_manifest.json")
+	return urls
+end
+
+function Core.fetchScriptManifest(forceRefresh)
+	local cache = ENV.Alleral_ScriptManifestCache
+	if not forceRefresh and type(cache) == "table" and cache.fetchedAt and (tick() - cache.fetchedAt) < 60 then
+		return cache.data, nil
+	end
+
+	local requestFn = Core.requestFunction()
+	local readFileFn = ENV.readfile
+	local isFileFn = ENV.isfile
+	local lastErr = "Script manifest unavailable"
+
+	for _, path in ipairs({
+		"config/scripts_manifest.json",
+		"kick/config/scripts_manifest.json",
+	}) do
+		if type(readFileFn) == "function" and type(isFileFn) == "function" and isFileFn(path) then
+			local ok, raw = pcall(readFileFn, path)
+			if ok and type(raw) == "string" and raw ~= "" then
+				local decodedOk, decoded = pcall(function()
+					return HttpService:JSONDecode(raw)
+				end)
+				if decodedOk and type(decoded) == "table" then
+					ENV.Alleral_ScriptManifestCache = { fetchedAt = tick(), data = decoded, source = "local:" .. path }
+					ENV.Alleral_ScriptManifest = decoded
+					return decoded, nil
+				end
+			end
+		end
+	end
+
+	if requestFn then
+		for _, url in ipairs(Core.defaultScriptManifestUrls()) do
+			local ok, response = pcall(function()
+				return requestFn({
+					Url = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(math.random(10000, 99999)),
+					Method = "GET",
+					Headers = { ["Cache-Control"] = "no-cache" },
+				})
+			end)
+			if ok then
+				local body = type(response) == "table" and (response.Body or response.body) or (type(response) == "string" and response)
+				if type(body) == "string" and body ~= "" and not body:find("404") then
+					local decodedOk, decoded = pcall(function()
+						return HttpService:JSONDecode(body)
+					end)
+					if decodedOk and type(decoded) == "table" and type(decoded.scripts) == "table" then
+						ENV.Alleral_ScriptManifestCache = { fetchedAt = tick(), data = decoded, source = url }
+						ENV.Alleral_ScriptManifest = decoded
+						return decoded, nil
+					end
+				end
+			end
+			lastErr = "Manifest fetch failed: " .. url
+		end
+	end
+
+	if type(cache) == "table" and cache.data then
+		return cache.data, lastErr
+	end
+	return nil, lastErr
+end
+
+function Core.getScriptStatus(scriptId, profileVersion)
+	scriptId = tostring(scriptId or ENV.Alleral_ActiveScriptId or "")
+	local manifest = ENV.Alleral_ScriptManifest
+	if not manifest then
+		manifest = Core.fetchScriptManifest()
+	end
+	local entry = manifest and manifest.scripts and manifest.scripts[scriptId]
+	if type(entry) ~= "table" then
+		return {
+			id = scriptId,
+			status = "working",
+			label = "Working",
+			icon = "✅",
+			message = "No remote status entry — running local build.",
+			version = profileVersion or "?",
+		}
+	end
+	local meta = Core.scriptStatusMeta(entry.status)
+	return {
+		id = scriptId,
+		status = tostring(entry.status or "working"):lower(),
+		label = meta.label,
+		icon = meta.icon,
+		message = tostring(entry.message or ""),
+		version = tostring(entry.version or profileVersion or "?"),
+		name = tostring(entry.name or scriptId),
+		updatedAt = entry.updatedAt,
+		updatedBy = entry.updatedBy,
+	}
+end
+
+function Core.evaluateScriptStatus(scriptId, profileVersion)
+	local status = Core.getScriptStatus(scriptId, profileVersion)
+	local blocked = status.status == "broken" or status.status == "maintenance"
+	local warn = status.status == "detected" or status.status == "testing"
+	local force = ENV.Alleral_ForceLoad == true
+	return {
+		status = status,
+		allowed = not blocked or force,
+		warn = warn and not blocked,
+		force = force,
+	}
+end
+
+function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
+	scriptId = scriptId or ENV.Alleral_ActiveScriptId
+	local evaluation = Core.evaluateScriptStatus(scriptId, profileVersion)
+	local status = evaluation.status
+	local groupbox = tab:CreateGroupbox({
+		Name = "Script status",
+		Column = column or 1,
+		Icon = 6031075938,
+	}, "ScriptStatus")
+
+	local labels = {}
+	local function addRow(key, value)
+		labels[key] = groupbox:CreateLabel({
+			Name = tostring(key) .. ": " .. tostring(value),
+		}, "Status_" .. tostring(key))
+	end
+
+	addRow("Status", status.icon .. " " .. status.label)
+	addRow("Script", status.name)
+	addRow("Version", status.version)
+	addRow("Executor", (Core.executorProfile().displayName))
+	if status.message ~= "" then
+		addRow("Notice", status.message)
+	end
+	if evaluation.force then
+		addRow("Force load", "Enabled")
+	end
+
+	groupbox:CreateButton({
+		Name = "Refresh status",
+		Callback = function()
+			Core.fetchScriptManifest(true)
+			local nextEval = Core.evaluateScriptStatus(scriptId, profileVersion)
+			local nextStatus = nextEval.status
+			if labels.Status and labels.Status.Set then
+				labels.Status:Set({ Name = "Status: " .. nextStatus.icon .. " " .. nextStatus.label })
+			end
+			if labels.Notice and nextStatus.message ~= "" then
+				labels.Notice:Set({ Name = "Notice: " .. nextStatus.message })
+			elseif labels.Notice and labels.Notice.Instance then
+				labels.Notice.Instance.Visible = nextStatus.message ~= ""
+			end
+			Core.notify("Alleral", "Status refreshed — " .. nextStatus.label, 3)
+		end,
+	}, "RefreshStatus")
+
+	Core._scriptStatusUI = {
+		groupbox = groupbox,
+		labels = labels,
+		scriptId = scriptId,
+		profileVersion = profileVersion,
+	}
+	return groupbox, evaluation
 end
 
 local function trimText(value)
@@ -208,12 +760,21 @@ local function compileStarlightSource(source, label)
 	if not loadStringFn or not source or source == "" then
 		return nil, "Empty Starlight source"
 	end
+	if source:find("Alleral Protected") or source:find("Nebula%-Softworks") then
+		return nil, "Refusing cached or third-party Starlight — need Alleral Source.lua"
+	end
+	if not source:find("Alleral%-1") and not source:find('InterfaceBuild%s*=%s*"Alleral%-1"') then
+		return nil, "Not an Alleral Starlight build"
+	end
 	local compiled, compileErr = loadStringFn(Core.patchStarlightSource(source), label)
 	if not compiled then
 		return nil, tostring(compileErr)
 	end
 	local ok, result = pcall(compiled)
 	if ok and type(result) == "table" and type(result.CreateWindow) == "function" then
+		if result.InterfaceBuild ~= "Alleral-1" then
+			return nil, "Refusing non-Alleral Starlight (" .. tostring(result.InterfaceBuild) .. ")"
+		end
 		return result
 	end
 	return nil, ok and "Invalid Starlight library" or tostring(result)
@@ -341,6 +902,17 @@ function Core.prepareGame(state)
 		signalBootFailure(msg)
 		return nil, nil, msg
 	end
+	pcall(function()
+		if core.refreshLoaderCapabilities then
+			core.refreshLoaderCapabilities()
+		end
+		if core.fetchScriptManifest then
+			core.fetchScriptManifest(false)
+		end
+		if core.notifyExecutorCompat then
+			core.notifyExecutorCompat()
+		end
+	end)
 	return core, starlight
 end
 

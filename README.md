@@ -33,6 +33,8 @@ Alleral Hub/
 │   ├── internal/               # Readable telemetry/analytics sources
 │   ├── analytics.luau          # Protected (obfuscated) — do not edit
 │   └── telemetry.luau          # Protected (obfuscated) — do not edit
+├── config/
+│   └── scripts_manifest.json   # Script status source (also served by relay /scripts)
 ├── games/
 │   ├── kick_a_lucky_block.luau
 │   ├── speed_keyboard_escape.luau

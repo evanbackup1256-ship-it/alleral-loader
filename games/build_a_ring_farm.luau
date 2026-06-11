@@ -1993,6 +1993,7 @@ end)
 util:CreateButton("Save now", saveSettings)
 
 miscTab:BuildThemeGroupbox(1)
+Core.buildScriptStatusGroupbox(miscTab, 1, "build_a_ring_farm", VERSION)
 
 notify("Alleral", "Loaded. Hover toggles for tips.")
 

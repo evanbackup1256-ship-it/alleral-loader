@@ -86,9 +86,11 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 
 	local track = Util.new("Frame", {
 		BackgroundColor3 = theme.Backgrounds.Highlight,
-		Size = UDim2.fromOffset(44, 24),
+		Size = UDim2.fromOffset(46, 24),
 	}, { slot })
 	Util.corner(999, track)
+	local trackGradient = Util.gradient(Theme.accentGradient(), 0, track)
+	trackGradient.Enabled = settings.CurrentValue == true
 
 	local knob = Util.new("Frame", {
 		BackgroundColor3 = theme.Foregrounds.Medium,
@@ -96,14 +98,17 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 		Position = UDim2.fromOffset(3, 3),
 	}, { track })
 	Util.corner(999, knob)
+	Util.stroke(theme.Backgrounds.Dark, 1, 0.4, knob)
 
 	local function paint(on)
+		trackGradient.Enabled = on
 		Tween.play(track, {
 			BackgroundColor3 = on and theme.Accent or theme.Backgrounds.Highlight,
+			BackgroundTransparency = on and 0.15 or 0,
 		}, nil, Theme.tweenInfo(0.15))
 		Tween.play(knob, {
 			BackgroundColor3 = on and theme.Foregrounds.Active or theme.Foregrounds.Medium,
-			Position = on and UDim2.fromOffset(23, 3) or UDim2.fromOffset(3, 3),
+			Position = on and UDim2.fromOffset(25, 3) or UDim2.fromOffset(3, 3),
 		}, nil, Theme.tweenInfo(0.15))
 	end
 	paint(settings.CurrentValue)
@@ -172,6 +177,7 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		Size = UDim2.new(0, 0, 1, 0),
 	}, { bar })
 	Util.corner(999, fill)
+	Util.gradient(Theme.accentGradient(), 0, fill)
 
 	local valueLabel = Util.text({
 		Parent = slot,
@@ -262,11 +268,12 @@ function Elements.createButton(groupbox, settings, index, windowSettings, librar
 	local element = { Class = "Button", Values = settings, NestedElements = {} }
 	local row = Util.button({
 		Parent = groupbox.ParentingItem,
-		BackgroundColor3 = theme.Backgrounds.Highlight,
+		BackgroundColor3 = theme.Backgrounds.Elevated,
 		Size = UDim2.new(1, 0, 0, Theme.Visual.CompactMode and 32 or 36),
-		Radius = Theme.Visual.CornerRadius - 2,
+		Radius = Theme.Visual.CornerRadius,
 	})
 	element.Instance = row
+	local btnStroke = Util.stroke(theme.Accent, 1, 0.82, row)
 	Util.text({
 		Parent = row,
 		Text = settings.Name or "Button",
@@ -276,10 +283,12 @@ function Elements.createButton(groupbox, settings, index, windowSettings, librar
 		Size = UDim2.fromScale(1, 1),
 	})
 	row.MouseEnter:Connect(function()
-		Tween.play(row, { BackgroundColor3 = theme.AccentSoft }, nil, Theme.tweenInfo(0.12))
+		Tween.play(row, { BackgroundColor3 = theme.Backgrounds.Highlight }, nil, Theme.tweenInfo(0.12))
+		Tween.play(btnStroke, { Transparency = 0.35 }, nil, Theme.tweenInfo(0.12))
 	end)
 	row.MouseLeave:Connect(function()
-		Tween.play(row, { BackgroundColor3 = theme.Backgrounds.Highlight }, nil, Theme.tweenInfo(0.12))
+		Tween.play(row, { BackgroundColor3 = theme.Backgrounds.Elevated }, nil, Theme.tweenInfo(0.12))
+		Tween.play(btnStroke, { Transparency = 0.82 }, nil, Theme.tweenInfo(0.12))
 	end)
 	row.MouseButton1Click:Connect(function()
 		Elements.runCallback(windowSettings, settings.Name or "Button", settings.Callback or function() end, library)

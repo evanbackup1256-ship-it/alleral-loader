@@ -29,6 +29,10 @@ local function postWebhook(url, payload)
 end
 
 local function executorName()
+	local core = coreApi()
+	if core and type(core.detectExecutor) == "function" then
+		return core.detectExecutor().displayName
+	end
 	local env = {}
 	pcall(function()
 		local g = getgenv or getfenv
@@ -52,6 +56,9 @@ local function executorName()
 	end
 	if type(env.syn) == "table" then
 		return "Synapse"
+	end
+	if env.shared and type(env.shared.solara) == "table" then
+		return "Solara"
 	end
 	return "Unknown"
 end

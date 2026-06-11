@@ -22,8 +22,21 @@ python telemetry_relay.py
 |--------|------|------|
 | GET | `/health` | None |
 | POST | `/ingest` | Header `X-Alleral-Key` |
+| GET | `/scripts` | None (public manifest for loader) |
+| GET | `/scripts/<id>` | None |
+| PATCH | `/scripts/<id>` | Header `X-Admin-Key` |
+| GET | `/admin` | None (browser UI; saves require admin key) |
 
-Returns `202 Accepted` — work is queued so bursts don't drop events.
+Returns `202 Accepted` on ingest — work is queued so bursts don't drop events.
+
+## Script status admin
+
+1. Open `https://YOUR-APP.up.railway.app/admin`
+2. Paste `ADMIN_API_KEY` from `.env` (defaults to `TELEMETRY_API_KEY` if unset)
+3. Set status: `working`, `detected`, `broken`, `maintenance`, or `testing`
+4. Loader + in-game UI read from `GET /scripts` (GitHub manifest is fallback)
+
+Manifest file: `config/scripts_manifest.json` (override path with `SCRIPTS_MANIFEST_PATH`).
 
 ## Scale defaults
 

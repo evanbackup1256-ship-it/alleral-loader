@@ -72,6 +72,10 @@ DISCORD_INTERVAL_SEC = float(os.environ.get("TELEMETRY_DISCORD_INTERVAL_SEC", "0
 MAX_BODY_BYTES = int(os.environ.get("TELEMETRY_MAX_BODY_BYTES", "32768"))
 REPLAY_CACHE_SEC = int(os.environ.get("TELEMETRY_REPLAY_CACHE_SEC", "300"))
 MAX_EVENT_AGE_SEC = int(os.environ.get("TELEMETRY_MAX_EVENT_AGE_SEC", "600"))
+ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", API_KEY).strip()
+SCRIPTS_MANIFEST_PATH = Path(
+    os.environ.get("SCRIPTS_MANIFEST_PATH", str(ROOT / "config" / "scripts_manifest.json"))
+)
 MIN_API_KEY_LEN = 24
 
 EVENT_COLORS = {
@@ -112,8 +116,14 @@ PRIORITY = {
     "heartbeat": 9,
 }
 
+try:
+    from script_registry import ScriptRegistry, VALID_STATUSES
+except ImportError:
+    from backend.script_registry import ScriptRegistry, VALID_STATUSES
+
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES
+SCRIPT_REGISTRY = ScriptRegistry(SCRIPTS_MANIFEST_PATH)
 
 
 def secure_compare(provided: str, expected: str) -> bool:
@@ -632,6 +642,55 @@ def ingest():
         return jsonify({"ok": False, "error": "unavailable"}), 503
 
     return jsonify({"ok": True, "status": status}), 202
+
+
+def admin_authorized() -> bool:
+    if not ADMIN_API_KEY or len(ADMIN_API_KEY) < MIN_API_KEY_LEN:
+        return False
+    provided = request.headers.get("X-Admin-Key", "")
+    return secure_compare(provided, ADMIN_API_KEY)
+
+
+@app.get("/scripts")
+def list_scripts():
+    data = SCRIPT_REGISTRY.list_scripts()
+    return jsonify({"ok": True, "scripts": data.get("scripts", {}), "updatedAt": data.get("updatedAt")})
+
+
+@app.get("/scripts/<script_id>")
+def get_script(script_id: str):
+    entry = SCRIPT_REGISTRY.get_script(script_id)
+    if not entry:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    return jsonify({"ok": True, "script": entry})
+
+
+@app.patch("/scripts/<script_id>")
+def patch_script(script_id: str):
+    if not admin_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    try:
+        updated = SCRIPT_REGISTRY.update_script(
+            script_id,
+            payload,
+            updated_by=str(payload.get("updatedBy") or "admin"),
+        )
+    except KeyError:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "script": updated, "validStatuses": sorted(VALID_STATUSES)})
+
+
+@app.get("/admin")
+def admin_panel():
+    admin_path = ROOT / "backend" / "admin.html"
+    if not admin_path.is_file():
+        return "Admin UI missing", 404
+    return admin_path.read_text(encoding="utf-8"), 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
 def main() -> None:

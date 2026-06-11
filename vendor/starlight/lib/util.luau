@@ -96,6 +96,14 @@ function Util.stroke(color, thickness, transparency, parent)
 	return stroke
 end
 
+function Util.gradient(colorSequence, rotation, parent)
+	local gradient = Instance.new("UIGradient")
+	gradient.Color = colorSequence
+	gradient.Rotation = rotation or 0
+	gradient.Parent = parent
+	return gradient
+end
+
 function Util.list(padding, horizontal, parent)
 	local layout = Instance.new("UIListLayout")
 	layout.Padding = UDim.new(0, padding or 6)

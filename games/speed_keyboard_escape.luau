@@ -880,6 +880,7 @@ util:CreateToggle("Anti AFK", state.AntiAFK ~= false, "So you don't get kicked f
 end)
 
 miscTab:BuildThemeGroupbox(1)
+Core.buildScriptStatusGroupbox(miscTab, 1, "speed_keyboard_escape", VERSION)
 
 notify("Alleral", "Loaded. Tabs on the left.")
 

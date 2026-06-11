@@ -147,6 +147,11 @@ local function newSessionId()
 end
 
 local function executorProfile()
+	local core = ENV.Alleral_Core
+	if core and type(core.executorTelemetryProfile) == "function" then
+		return core.executorTelemetryProfile()
+	end
+
 	local name, version = "Unknown", nil
 	for _, id in ipairs({
 		"identifyexecutor",
@@ -179,6 +184,10 @@ local function executorProfile()
 			name = "Volt"
 		elseif ENV.fluxus then
 			name = "Fluxus"
+		elseif ENV.shared and type(ENV.shared.solara) == "table" then
+			name = "Solara"
+		elseif ENV.shared and type(ENV.shared.Solora) == "table" then
+			name = "Solara"
 		end
 	end
 

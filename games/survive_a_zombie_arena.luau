@@ -803,6 +803,7 @@ Core.makeSupervisor(state, loops, loopControllers, "Stats", 1.5, function()
 end)
 
 miscTab:BuildThemeGroupbox(1)
+Core.buildScriptStatusGroupbox(miscTab, 1, "survive_a_zombie_arena", VERSION)
 
 notify("Alleral", "Survive a Zombie Arena v" .. VERSION .. " loaded.", 4)
 

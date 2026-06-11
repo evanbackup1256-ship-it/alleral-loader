@@ -1751,6 +1751,7 @@ performance:CreateToggle("Anti AFK", state.AntiAFK ~= false, "Stops Roblox from 
 end)
 
 miscTab:BuildThemeGroupbox(2)
+Core.buildScriptStatusGroupbox(miscTab, 1, "slime_rng", VERSION)
 
 state.Alleral_Unload = function()
 	Core.stopAutomation(state, connections, loopControllers, loops, function()

@@ -48,7 +48,7 @@ function WindowBuilder.create(library, windowSettings)
 	end
 
 	local screenGui = Util.new("ScreenGui", {
-		Name = (getgenv and getgenv().InterfaceName) or windowSettings.Name or "Starlight Interface Suite",
+		Name = (getgenv and getgenv().InterfaceName) or windowSettings.Name or "Alleral Interface",
 		ResetOnSpawn = false,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		IgnoreGuiInset = true,
@@ -64,10 +64,12 @@ function WindowBuilder.create(library, windowSettings)
 	}, { screenGui })
 
 	local lighting = game:GetService("Lighting")
-	local blur = lighting:FindFirstChild("StarlightBlur")
-	if not blur then
+	local blur = lighting:FindFirstChild("AlleralBlur") or lighting:FindFirstChild("StarlightBlur")
+	if blur then
+		blur.Name = "AlleralBlur"
+	else
 		blur = Instance.new("BlurEffect")
-		blur.Name = "StarlightBlur"
+		blur.Name = "AlleralBlur"
 		blur.Parent = lighting
 	end
 	blur.Size = 0
@@ -91,20 +93,31 @@ function WindowBuilder.create(library, windowSettings)
 		BackgroundTransparency = Theme.Visual.WindowTransparency,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = windowSettings.DefaultSize or UDim2.fromOffset(860, 520),
+		Size = windowSettings.DefaultSize or UDim2.fromOffset(900, 560),
 		Visible = false,
 		ClipsDescendants = true,
 	}, { overlay })
 	main:SetAttribute("TargetTransparency", Theme.Visual.WindowTransparency)
-	Util.corner(Theme.Visual.GroupboxRadius + 4, main)
-	if Theme.Visual.ShowShadows then
-		Util.stroke(theme.Miscellaneous.Divider, 1, 0.5, main)
-	end
+	Util.corner(Theme.Visual.GroupboxRadius + 6, main)
+	local mainStroke = Util.stroke(theme.Miscellaneous.Divider, 1, 0.35, main)
+	mainStroke.Color = theme.Accent
+	mainStroke.Transparency = 0.75
+
+	local accentRail = Util.new("Frame", {
+		Name = "AccentRail",
+		BackgroundColor3 = theme.Accent,
+		Size = UDim2.new(0, 3, 1, -24),
+		Position = UDim2.new(0, 0, 0, 12),
+		ZIndex = 2,
+	}, { main })
+	Util.corner(999, accentRail)
+	Util.gradient(Theme.accentGradient(), 90, accentRail)
 
 	local sidebar = Util.new("Frame", {
 		Name = "Sidebar",
 		BackgroundColor3 = theme.Backgrounds.Dark,
-		BackgroundTransparency = 0.05,
+		BackgroundTransparency = 0.08,
+		Position = UDim2.fromOffset(3, 0),
 		Size = UDim2.new(0, Theme.Visual.SidebarWidth, 1, 0),
 	}, { main })
 	Util.padding(16, 14, 16, 14, sidebar)
@@ -127,17 +140,25 @@ function WindowBuilder.create(library, windowSettings)
 
 	Util.text({
 		Parent = brand,
-		Text = windowSettings.Name or "Starlight",
+		Text = windowSettings.Name or "Alleral",
 		Font = Enum.Font.GothamBold,
-		TextSize = 18 * Theme.Visual.FontScale,
+		TextSize = 19 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Light,
 	})
 	Util.text({
 		Parent = brand,
-		Text = windowSettings.Subtitle or "Alleral Interface",
-		TextSize = 12 * Theme.Visual.FontScale,
+		Text = windowSettings.Subtitle or "Interface Suite",
+		TextSize = 11 * Theme.Visual.FontScale,
 		TextColor3 = theme.Foregrounds.Medium,
 	})
+
+	local brandStripe = Util.new("Frame", {
+		Name = "BrandStripe",
+		BackgroundColor3 = theme.Accent,
+		Size = UDim2.new(1, 0, 0, 2),
+		Position = UDim2.new(0, 0, 1, -2),
+	}, { brand })
+	Util.gradient(Theme.accentGradient(), 0, brandStripe)
 
 	local navHolder = Util.new("ScrollingFrame", {
 		Name = "Navigation",
@@ -147,21 +168,31 @@ function WindowBuilder.create(library, windowSettings)
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 0,
 	}, { sidebar })
-	Util.list(8, false, navHolder)
+	Util.list(6, false, navHolder)
 
 	local content = Util.new("Frame", {
 		Name = "Content",
 		BackgroundTransparency = 1,
-		Position = UDim2.new(0, Theme.Visual.SidebarWidth, 0, 0),
-		Size = UDim2.new(1, -Theme.Visual.SidebarWidth, 1, 0),
+		Position = UDim2.new(0, Theme.Visual.SidebarWidth + 3, 0, 0),
+		Size = UDim2.new(1, -(Theme.Visual.SidebarWidth + 3), 1, 0),
 	}, { main })
 
 	local topBar = Util.new("Frame", {
 		Name = "TopBar",
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 44),
+		Size = UDim2.new(1, 0, 0, 48),
 	}, { content })
 	Util.padding(0, 16, 0, 16, topBar)
+
+	local topAccent = Util.new("Frame", {
+		Name = "TopAccent",
+		BackgroundColor3 = theme.Accent,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 0, 1, 0),
+		Size = UDim2.new(1, 0, 0, 1),
+		BackgroundTransparency = 0.35,
+	}, { topBar })
+	Util.gradient(Theme.accentGradient(), 0, topAccent)
 
 	local titleLabel = Util.text({
 		Parent = topBar,
@@ -204,8 +235,8 @@ function WindowBuilder.create(library, windowSettings)
 	local pages = Util.new("Frame", {
 		Name = "Pages",
 		BackgroundTransparency = 1,
-		Position = UDim2.new(0, 0, 0, 44),
-		Size = UDim2.new(1, 0, 1, -44),
+		Position = UDim2.new(0, 0, 0, 48),
+		Size = UDim2.new(1, 0, 1, -48),
 	}, { content })
 
 	local window = {
@@ -323,16 +354,17 @@ function WindowBuilder.create(library, windowSettings)
 				Parent = tabsFrame,
 				BackgroundColor3 = theme.Backgrounds.Highlight,
 				BackgroundTransparency = 1,
-				Size = UDim2.new(1, 0, 0, 36),
-				Radius = 10,
+				Size = UDim2.new(1, 0, 0, 34),
+				Radius = 999,
 			})
+			local navStroke = Util.stroke(theme.Accent, 1, 1, navButton)
 
 			local navRow = Util.new("Frame", {
 				BackgroundTransparency = 1,
 				Size = UDim2.fromScale(1, 1),
 			}, { navButton })
 			Util.list(10, true, navRow)
-			Util.padding(0, 10, 0, 10, navRow)
+			Util.padding(0, 12, 0, 12, navRow)
 
 			if not Util.isEmpty(tabSettings.Icon) then
 				Util.new("ImageLabel", {
@@ -390,6 +422,9 @@ function WindowBuilder.create(library, windowSettings)
 					end
 					if other.NavButton then
 						Tween.play(other.NavButton, { BackgroundTransparency = 1 })
+						if other.NavStroke then
+							Tween.play(other.NavStroke, { Transparency = 1 })
+						end
 						if other.NavLabel then
 							Tween.play(other.NavLabel, { TextColor3 = theme.Foregrounds.Medium })
 						end
@@ -398,13 +433,15 @@ function WindowBuilder.create(library, windowSettings)
 				tab.Active = true
 				tab.Page.Visible = true
 				titleLabel.Text = tabSettings.Name or tabIndex
-				Tween.play(navButton, { BackgroundTransparency = 0.35 })
+				Tween.play(navButton, { BackgroundTransparency = 0.15, BackgroundColor3 = theme.Backgrounds.Highlight })
+				Tween.play(navStroke, { Transparency = 0.55, Color = theme.Accent })
 				Tween.play(navLabel, { TextColor3 = theme.Foregrounds.Light })
 				window.CurrentTab = tab
 			end
 
 			tab.Page = page
 			tab.NavButton = navButton
+			tab.NavStroke = navStroke
 			tab.NavLabel = navLabel
 			navButton.MouseButton1Click:Connect(activate)
 			self.Tabs[tabIndex] = tab
@@ -440,10 +477,17 @@ function WindowBuilder.create(library, windowSettings)
 					AutomaticSize = Enum.AutomaticSize.Y,
 				}, { holder })
 				Util.corner(Theme.Visual.GroupboxRadius, box)
-				if Theme.Visual.ShowShadows then
-					Util.stroke(theme.Miscellaneous.Divider, 1, 0.55, box)
-				end
-				Util.padding(12, 12, 12, 12, box)
+				Util.stroke(theme.Miscellaneous.Divider, 1, 0.65, box)
+
+				local groupAccent = Util.new("Frame", {
+					Name = "Accent",
+					BackgroundColor3 = theme.Accent,
+					Size = UDim2.new(1, -24, 0, 2),
+					Position = UDim2.fromOffset(12, 0),
+				}, { box })
+				Util.gradient(Theme.accentGradient(), 0, groupAccent)
+
+				Util.padding(14, 12, 12, 12, box)
 				Util.list(8, false, box)
 
 				local header = Util.new("Frame", {
@@ -530,7 +574,7 @@ function WindowBuilder.create(library, windowSettings)
 
 				groupbox:CreateDropdown({
 					Name = "Theme preset",
-					Options = { "Starlight", "Midnight", "Aurora", "Rose" },
+					Options = { "Alleral", "Midnight", "Aurora", "Rose", "Starlight" },
 					CurrentOption = Theme.Visual.ThemeName,
 					Callback = function(selected)
 						Theme.setTheme(selected)

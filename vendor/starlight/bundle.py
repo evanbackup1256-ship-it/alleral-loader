@@ -1,20 +1,15 @@
 #!/usr/bin/env python3
-"""Bundle modular Starlight sources into a single obfuscated Source.lua for executors."""
+"""Bundle modular Starlight sources into a single plain Source.lua for executors."""
 
 from __future__ import annotations
 
 import re
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 LIB = ROOT / "lib"
 PLAIN_OUTPUT = ROOT / "Source.plain.lua"
 OUTPUT = ROOT / "Source.lua"
-TOOLS = ROOT.parents[1] / "tools"
-sys.path.insert(0, str(TOOLS))
-
-from luau_obfuscator import obfuscate_source  # noqa: E402
 
 MODULE_ORDER = [
     "util.luau",
@@ -129,11 +124,9 @@ return Starlight
 def main() -> None:
     bundled = bundle()
     PLAIN_OUTPUT.write_text(bundled, encoding="utf-8")
-    protected = obfuscate_source(bundled, profile="full")
-    OUTPUT.write_text(protected, encoding="utf-8")
+    OUTPUT.write_text(bundled, encoding="utf-8")
     print(f"Wrote {PLAIN_OUTPUT} ({len(bundled.splitlines())} lines, plain)")
-    print(f"Wrote {OUTPUT} ({len(protected.splitlines())} lines, protected)")
-    print("Run: python tools/verify_obfuscation.py")
+    print(f"Wrote {OUTPUT} ({len(bundled.splitlines())} lines, plain)")
 
 
 if __name__ == "__main__":

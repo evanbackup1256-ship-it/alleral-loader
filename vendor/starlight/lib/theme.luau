@@ -3,6 +3,33 @@ local Util = require(script.Parent.util)
 local Theme = {}
 
 Theme.Palettes = {
+	Alleral = {
+		Accent = Color3.fromRGB(124, 92, 255),
+		AccentSoft = Color3.fromRGB(56, 189, 248),
+		Backgrounds = {
+			Dark = Color3.fromRGB(5, 6, 11),
+			Medium = Color3.fromRGB(9, 10, 17),
+			Light = Color3.fromRGB(14, 16, 26),
+			Groupbox = Color3.fromRGB(11, 12, 20),
+			Highlight = Color3.fromRGB(22, 24, 38),
+			Elevated = Color3.fromRGB(18, 20, 32),
+		},
+		Foregrounds = {
+			Active = Color3.fromRGB(255, 255, 255),
+			Light = Color3.fromRGB(232, 234, 244),
+			Medium = Color3.fromRGB(142, 146, 168),
+			Dark = Color3.fromRGB(82, 86, 108),
+			MediumHover = Color3.fromRGB(188, 192, 212),
+			DarkHover = Color3.fromRGB(108, 112, 134),
+		},
+		Miscellaneous = {
+			Divider = Color3.fromRGB(38, 40, 58),
+			Shadow = Color3.fromRGB(0, 0, 0),
+			Success = Color3.fromRGB(52, 211, 153),
+			Warning = Color3.fromRGB(251, 191, 36),
+			Danger = Color3.fromRGB(248, 113, 113),
+		},
+	},
 	Starlight = {
 		Accent = Color3.fromRGB(99, 132, 255),
 		AccentSoft = Color3.fromRGB(72, 98, 196),
@@ -114,23 +141,23 @@ Theme.Palettes = {
 }
 
 Theme.Visual = {
-	ThemeName = "Starlight",
-	Accent = Theme.Palettes.Starlight.Accent,
-	CornerRadius = 10,
-	GroupboxRadius = 12,
-	WindowTransparency = 0.04,
-	GroupboxTransparency = 0.08,
+	ThemeName = "Alleral",
+	Accent = Theme.Palettes.Alleral.Accent,
+	CornerRadius = 8,
+	GroupboxRadius = 10,
+	WindowTransparency = 0.02,
+	GroupboxTransparency = 0.06,
 	BlurEnabled = true,
-	BlurSize = 18,
+	BlurSize = 22,
 	AnimationSpeed = 1,
 	FontScale = 1,
 	CompactMode = false,
 	ShowShadows = true,
-	SidebarWidth = 220,
+	SidebarWidth = 196,
 }
 
 function Theme.current()
-	local palette = Util.deepCopy(Theme.Palettes[Theme.Visual.ThemeName] or Theme.Palettes.Starlight)
+	local palette = Util.deepCopy(Theme.Palettes[Theme.Visual.ThemeName] or Theme.Palettes.Alleral)
 	palette.Accent = Theme.Visual.Accent
 	return palette
 end
@@ -148,6 +175,14 @@ function Theme.setTheme(name)
 		Theme.Visual.ThemeName = name
 		Theme.Visual.Accent = Theme.Palettes[name].Accent
 	end
+end
+
+function Theme.accentGradient()
+	local palette = Theme.current()
+	return ColorSequence.new({
+		ColorSequenceKeypoint.new(0, palette.Accent),
+		ColorSequenceKeypoint.new(1, palette.AccentSoft or palette.Accent),
+	})
 end
 
 function Theme.tweenInfo(time, style, direction)

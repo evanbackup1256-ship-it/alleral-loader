@@ -1,5 +1,6 @@
-local LOADER_VERSION = "3.3.0"
+local LOADER_VERSION = "3.5.0"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
+local SCRIPT_MANIFEST_URL = REPO_BASE .. "/config/scripts_manifest.json"
 local FETCH_RETRIES = 3
 local FETCH_BACKOFF = 0.75
 local MIN_SCRIPT_BYTES = 1000
@@ -588,7 +589,7 @@ end
 
 local function preloadCore(required)
 	local core = ENV.Alleral_Core
-	if core and type(core.loadStarlight) == "function" and (core.VERSION == "1.4" or core.VERSION == "1.5" or core.VERSION == "1.6") then
+	if core and type(core.loadStarlight) == "function" and (core.VERSION == "1.4" or core.VERSION == "1.5" or core.VERSION == "1.6" or core.VERSION == "1.7" or core.VERSION == "1.8") then
 		return true
 	end
 	ENV.Alleral_Core = nil
@@ -872,6 +873,51 @@ local function preflight()
 	return true
 end
 
+local function applyCoreCapabilities()
+	local core = ENV.Alleral_Core
+	if core and type(core.refreshLoaderCapabilities) == "function" then
+		local caps = core.refreshLoaderCapabilities()
+		if type(caps) == "table" then
+			CAPABILITIES.executor = caps.executor or CAPABILITIES.executor
+			CAPABILITIES.http = caps.http == true
+			CAPABILITIES.readfile = caps.readfile == true
+			CAPABILITIES.isfile = type(firstExecFunc("isfile")) ~= nil
+			CAPABILITIES.listfiles = type(firstExecFunc("listfiles")) ~= nil
+			CAPABILITIES.solara = caps.solara == true
+		end
+	end
+end
+
+local function resolveScriptGate(profile)
+	local core = ENV.Alleral_Core
+	if not core or type(core.fetchScriptManifest) ~= "function" then
+		return { allowed = true, status = { label = "Working", icon = "✅", message = "" } }
+	end
+	ENV.Alleral_ActiveScriptId = profile.id
+	ENV.Alleral_ScriptManifestUrl = ENV.Alleral_ScriptManifestUrl or SCRIPT_MANIFEST_URL
+	core.fetchScriptManifest(false)
+	local evaluation = core.evaluateScriptStatus(profile.id, profile.version)
+	local status = evaluation.status
+	if not evaluation.allowed then
+		local message = string.format(
+			"%s is %s. %s Set getgenv().Alleral_ForceLoad = true to override.",
+			profile.name,
+			status.label,
+			status.message ~= "" and status.message or "Script is temporarily unavailable."
+		)
+		return evaluation, message
+	end
+	if evaluation.warn then
+		notify("Alleral", string.format(
+			"%s — %s%s",
+			profile.name,
+			status.label,
+			status.message ~= "" and (": " .. status.message) or ""
+		), 7)
+	end
+	return evaluation
+end
+
 local function main()
 	log("info", "Alleral loader " .. LOADER_VERSION)
 	if ENV.Alleral_LoaderRunning then
@@ -936,6 +982,22 @@ local function main()
 	preloadAnalytics()
 	preloadHelpers()
 	preloadTelemetry()
+	applyCoreCapabilities()
+
+	local gateEval, gateErr = resolveScriptGate(profile)
+	if gateEval and gateEval.allowed == false then
+		local message = gateErr or "Script blocked by status manifest."
+		notify("Alleral", message, 10)
+		log("warn", tostring(message))
+		telemetryReport("failed", {
+			scriptName = profile.id,
+			scriptVersion = profile.version,
+			gameName = profile.name,
+			error = message,
+		})
+		ENV.Alleral_LoaderRunning = false
+		return
+	end
 
 	if ENV.Alleral_Core and type(ENV.Alleral_Core.loadStarlight) == "function" then
 		local starlight, starlightErr = ENV.Alleral_Core.loadStarlight()

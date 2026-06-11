@@ -334,167 +334,7 @@ local function notify(title, text, duration)
 	end)
 end
 
-local Executor = (function()
-	local env = {}
-	pcall(function()
-		local g = getgenv or getfenv
-		if g then env = g() or {} end
-	end)
-
-	local function fn(k)
-		local v = env[k]
-		return type(v) == "function" and v or nil
-	end
-	local function tbl(k)
-		local v = env[k]
-		return type(v) == "table" and v or nil
-	end
-
-	local rawName = ""
-	for _, id in ipairs({
-		"identifyexecutor",
-		"getexecutorname",
-		"whatexecutor",
-		"getexecutor",
-		"getexecutorinfo",
-	}) do
-		local f = fn(id)
-		if f then
-			local ok, r = pcall(f)
-			if ok and type(r) == "string" and #r > 0 then
-				rawName = r
-				break
-			end
-		end
-	end
-
-	local name = rawName:lower():gsub("%s+", ""):match("^[%a][%w%-_%.]*") or ""
-
-	if name == "" then
-		if tbl("syn") and type(env.syn.request) == "function" then
-			name = "synapse"
-		elseif env.KRNL_LOADED == true then
-			name = "krnl"
-		elseif tbl("fluxus") and type(env.fluxus.request) == "function" then
-			name = "fluxus"
-		elseif tbl("sw") then
-			name = "scriptware"
-		elseif tbl("celery") then
-			name = "celery"
-		elseif tbl("delta") then
-			name = "delta"
-		elseif env.OXYGEN_U == true then
-			name = "oxygenu"
-		elseif tbl("Electron") then
-			name = "electron"
-		elseif tbl("Wave") and type(env.Wave.setclipboard) == "function" then
-			name = "wave"
-		elseif tbl("shared") and type(env.shared.solara) == "table" then
-			name = "solara"
-		elseif tbl("Xeno") then
-			name = "xeno"
-		elseif tbl("Volt") and type(env.Volt.request) == "function" then
-			name = "volt"
-		elseif tbl("Potassium") then
-			name = "potassium"
-		elseif tbl("Madium") then
-			name = "madium"
-		elseif tbl("Velocity") then
-			name = "velocity"
-		elseif tbl("Codex") then
-			name = "codex"
-		elseif tbl("Ronix") then
-			name = "ronix"
-		elseif tbl("Nihon") then
-			name = "nihon"
-		elseif tbl("Vega") or tbl("VegaX") then
-			name = "vegax"
-		elseif tbl("Comet") then
-			name = "comet"
-		elseif tbl("Trigon") then
-			name = "trigon"
-		elseif tbl("Cryptic") then
-			name = "cryptic"
-		elseif tbl("Hydrogen") then
-			name = "hydrogen"
-		elseif tbl("Sentinel") then
-			name = "sentinel"
-		elseif tbl("Serenity") then
-			name = "serenity"
-		elseif tbl("Atlantis") then
-			name = "atlantis"
-		elseif tbl("Zorara") then
-			name = "zorara"
-		elseif tbl("Aztup") then
-			name = "aztup"
-		elseif tbl("Nixware") then
-			name = "nixware"
-		elseif env.IS_JJSLOIT == true or tbl("jjsploit") then
-			name = "jjsploit"
-		elseif tbl("Bunni") or tbl("bunni") then
-			name = "bunni"
-		elseif tbl("Valyse") or tbl("valyse") then
-			name = "valyse"
-		elseif tbl("Krypton") or tbl("krypton") then
-			name = "krypton"
-		elseif tbl("SirHurt") or tbl("sirhurt") then
-			name = "sirhurt"
-		elseif tbl("Temple") or tbl("temple") then
-			name = "temple"
-		elseif tbl("Evon") or tbl("evon") then
-			name = "evon"
-		elseif tbl("AWP") or tbl("awp") then
-			name = "awp"
-		elseif tbl("Pebble") or tbl("pebble") then
-			name = "pebble"
-		elseif tbl("Nzxt") or tbl("nzxt") then
-			name = "nzxt"
-		elseif tbl("Nezur") or tbl("nezur") then
-			name = "nezur"
-		elseif tbl("Seliware") or tbl("seliware") then
-			name = "seliware"
-		elseif tbl("Luna") or tbl("luna") then
-			name = "luna"
-		elseif tbl("Macsploit") or tbl("macsploit") then
-			name = "macsploit"
-		elseif tbl("Arceus") or env.ARCEUS_LOADED == true then
-			name = "arceus"
-		elseif fn("queue_on_teleport") and fn("getgc") then
-			name = "synapse"
-		else
-			name = "unknown"
-		end
-	end
-
-	local FS_BROKEN = {
-		yub = true,
-		yubx = true,
-		arceus = true,
-		vegax = true,
-		comet = true,
-	}
-	local fsOk = not FS_BROKEN[name]
-
-	return {
-		name       = name,
-		rawName    = rawName,
-		isKnown    = name ~= "unknown",
-		fsOk       = fsOk,
-		hasFilesystem = fsOk and type(env.writefile) == "function" and type(env.readfile) == "function",
-		hasHttp    = type(env.request) == "function"
-			or type(env.http_request) == "function"
-			or (tbl("syn") and type(env.syn.request) == "function")
-			or (tbl("fluxus") and type(env.fluxus.request) == "function")
-			or (tbl("http") and type(env.http.request) == "function")
-			or (type(HttpService.RequestAsync) == "function"),
-		hasGetConn = type(env.getconnections) == "function" or type(env.get_signal_cons) == "function",
-		hasClipboard = type(env.setclipboard) == "function" or type(env.toclipboard) == "function",
-		hasFireTouch = type(env.firetouchinterest) == "function"
-			or type(env.FireTouchInterest) == "function"
-			or type(env.touchinterest) == "function",
-		env        = env,
-	}
-end)()
+local Executor = Core.executorProfile()
 
 local function execFunc(name, noFs)
 	if noFs and not Executor.fsOk then
@@ -510,6 +350,9 @@ local function firstExecFunc(...)
 		if candidate then
 			return candidate
 		end
+	end
+	if Core and Core.firstExecFunc then
+		return Core.firstExecFunc(...)
 	end
 	return nil
 end
@@ -1006,41 +849,6 @@ local function loadRemoteLua(url, label)
 		return nil
 	end
 	return loadLuaSource(source, label)
-end
-
-do
-	local execName = Executor and Executor.name or "unknown"
-	local execRaw = Executor and Executor.rawName or ""
-	local display = execName ~= "unknown" and execName or (execRaw ~= "" and execRaw or "unknown")
-	local compatMap = {
-		synapse = true, krnl = true, fluxus = true, scriptware = true,
-		celery = true, delta = true, electron = true, wave = true,
-		oxygenu = true, awp = true, evon = true,
-		solara = true, xeno = true, volt = true, potassium = true,
-		madium = true, velocity = true, codex = true, ronix = true,
-		nihon = true, vegax = true, comet = true, trigon = true,
-		cryptic = true, hydrogen = true, sentinel = true, serenity = true,
-		atlantis = true, zorara = true, aztup = true, nixware = true,
-		jjsploit = true, bunni = true, valyse = true, krypton = true,
-		sirhurt = true, temple = true, pebble = true, nzxt = true,
-		nezur = true, seliware = true, luna = true, macsploit = true,
-		arceus = true,
-	}
-	local caps = {}
-	if Executor.hasHttp then table.insert(caps, "HTTP") end
-	if Executor.hasFilesystem then table.insert(caps, "FS") end
-	if Executor.hasFireTouch then table.insert(caps, "Touch") end
-	if Executor.hasGetConn then table.insert(caps, "Signals") end
-	if Executor.hasClipboard then table.insert(caps, "Clipboard") end
-	local capText = #caps > 0 and (" [" .. table.concat(caps, ", ") .. "]") or ""
-	local compat = compatMap[display:lower()] or Executor.isKnown
-	if display == "unknown" then
-		notify("Executor", "Couldn't tell what you're on" .. capText .. ". Most stuff should still run.", 6)
-	elseif not compat and (#caps < 2) then
-		notify("Executor", display .. capText .. ". A few features might not run.", 6)
-	else
-		notify("Alleral", display .. capText .. ". Good to go.", 4)
-	end
 end
 
 local KICKBLOX_URLS = {
@@ -3154,6 +2962,7 @@ local tuningGroup = createStarlightGroup(configTab, "Speed tweaks", "rbxassetid:
 local diagnosticsGroup = createStarlightGroup(configTab, "Debug info", "rbxassetid://10734950309", 2)
 local profileGroup = createStarlightGroup(configTab, "Save slots", "rbxassetid://10734950309", 1)
 configTab:BuildThemeGroupbox(2)
+Core.buildScriptStatusGroupbox(configTab, 1, "kick_a_lucky_block", VERSION)
 local protectedDropdown
 local upgradeDropdown
 
@@ -4476,7 +4285,7 @@ task.spawn(function()
 			for _ in pairs(loops) do
 				loopCount = loopCount + 1
 			end
-			ui.diagnosticsStatus:Update("Executor", Executor.isKnown and Executor.name or ("? " .. (Executor.rawName ~= "" and ("(" .. Executor.rawName .. ")") or "unknown")))
+			ui.diagnosticsStatus:Update("Executor", Executor.isKnown and Executor.displayName or ("? " .. (Executor.rawName ~= "" and ("(" .. Executor.rawName .. ")") or "unknown")))
 			ui.diagnosticsStatus:Update("FPS", tostring(runtime.currentFps or "--"))
 			local perfLabels = {
 				Balanced = "Normal",
