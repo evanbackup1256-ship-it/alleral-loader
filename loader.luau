@@ -3,11 +3,12 @@
 	Detects game, fetches core + game script, runs.
 ]]
 
-local LOADER_VERSION = "5.0.1"
+local LOADER_VERSION = "5.0.2"
 local MIN_CORE = "1.18"
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
 local RAW = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH
+local GH_WEB = "https://github.com/" .. REPO .. "/raw/" .. BRANCH
 local CDN = "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. BRANCH
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -493,7 +494,7 @@ local function main()
 
 	local src, label = getSource(profile.scriptFiles, profile.scriptUrl, {
 		marker = profile.sourceMarker,
-		minBytes = 5000,
+		minBytes = 40000,
 	})
 	if not src then
 		notify("Alleral", "Game script failed: " .. tostring(label), 8)
