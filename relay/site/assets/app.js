@@ -10,7 +10,7 @@
     toastEl.textContent = text;
     toastEl.classList.toggle("error", isError);
     toastEl.classList.add("show");
-    setTimeout(() => toastEl.classList.remove("show"), 2600);
+    setTimeout(() => toastEl.classList.remove("show"), 2800);
   }
 
   async function api(path, options = {}) {
@@ -28,7 +28,12 @@
 
   function setActiveNav() {
     const id = location.hash.replace("#", "") || "home";
-    $$(".nav a").forEach((a) => a.classList.toggle("active", a.dataset.section === id));
+    $$(".nav a[data-section]").forEach((a) => a.classList.toggle("active", a.dataset.section === id));
+  }
+
+  function afterRender() {
+    window.AlleralEffects?.observeReveals?.();
+    window.AlleralEffects?.bindCardTilt?.($("#gamesGrid"));
   }
 
   function renderAnnouncement(site) {
@@ -54,10 +59,10 @@
   function renderFeatures(site) {
     const root = $("#features");
     root.innerHTML = "";
-    (site.features || []).forEach((item) => {
+    (site.features || []).forEach((item, i) => {
       const row = document.createElement("div");
-      row.className = "feature";
-      row.innerHTML = `<span class="feature-dot"></span><div>${item}</div>`;
+      row.className = "feature reveal";
+      row.innerHTML = `<span class="feature-num">${String(i + 1).padStart(2, "0")}</span><div class="feature-text">${item}</div>`;
       root.appendChild(row);
     });
   }
@@ -67,13 +72,17 @@
     root.innerHTML = "";
     const games = Object.values(site.games || {}).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     if (!games.length) {
-      root.innerHTML = '<div class="empty">No games listed yet.</div>';
+      root.innerHTML = '<div class="empty reveal">nothing listed yet — check back soon.</div>';
+      afterRender();
       return;
     }
-    games.forEach((game) => {
+    games.forEach((game, i) => {
       const status = (game.status || "working").toLowerCase();
       const card = document.createElement("article");
       card.className = "card";
+      card.dataset.tilt = "1";
+      card.style.animationDelay = `${i * 0.07}s`;
+      card.classList.add("card-enter");
       card.innerHTML = `
         <div class="card-head">
           <div>
@@ -83,8 +92,8 @@
           <span class="badge ${status}">${status}</span>
         </div>
         <div class="desc">${game.description || game.message || ""}</div>
-        <div class="actions" style="margin-top:12px;">
-          ${game.robloxUrl ? `<a class="btn secondary" href="${game.robloxUrl}" target="_blank" rel="noopener">Open on Roblox</a>` : ""}
+        <div class="actions" style="margin-top:14px;">
+          ${game.robloxUrl ? `<a class="btn ghost" href="${game.robloxUrl}" target="_blank" rel="noopener">open on roblox</a>` : ""}
         </div>
       `;
       root.appendChild(card);
@@ -93,7 +102,7 @@
     const bugGame = $("#bugGame");
     if (bugGame) {
       const current = bugGame.value;
-      bugGame.innerHTML = '<option value="">Select game</option>';
+      bugGame.innerHTML = '<option value="">pick a game</option>';
       games.forEach((g) => {
         const opt = document.createElement("option");
         opt.value = g.name || g.id;
@@ -102,6 +111,7 @@
       });
       if (current) bugGame.value = current;
     }
+    afterRender();
   }
 
   function renderFaq(site) {
@@ -109,9 +119,11 @@
     root.innerHTML = "";
     (site.faq || []).forEach((item) => {
       const node = document.createElement("details");
+      node.className = "reveal";
       node.innerHTML = `<summary>${item.q || "Question"}</summary><p>${item.a || ""}</p>`;
       root.appendChild(node);
     });
+    afterRender();
   }
 
   function renderChangelog(site) {
@@ -119,13 +131,14 @@
     root.innerHTML = "";
     (site.changelog || []).forEach((entry) => {
       const node = document.createElement("div");
-      node.className = "changelog-item";
+      node.className = "changelog-item reveal";
       node.innerHTML = `
-        <h3>${entry.date || ""} — ${entry.title || "Update"}</h3>
+        <h3>${entry.date || ""} — ${entry.title || "update"}</h3>
         <ul>${(entry.items || []).map((i) => `<li>${i}</li>`).join("")}</ul>
       `;
       root.appendChild(node);
     });
+    afterRender();
   }
 
   function renderBugCategories(site) {
@@ -143,7 +156,7 @@
   async function loadSite() {
     const data = await api("/api/site");
     state.site = data;
-    document.title = `${data.brand || "Alleral"} Hub`;
+    document.title = `${data.brand || "Alleral"} — hub`;
     $("#brandName").textContent = data.brand || "Alleral";
     renderAnnouncement(data);
     renderHero(data);
@@ -158,9 +171,9 @@
     const text = state.site?.loadstring || $("#loadstringCode")?.textContent || "";
     try {
       await navigator.clipboard.writeText(text);
-      flash("Loadstring copied");
+      flash("copied — paste it in your executor");
     } catch {
-      flash("Copy failed — select the text manually", true);
+      flash("copy failed — select the text manually", true);
     }
   }
 
@@ -181,7 +194,7 @@
     try {
       await api("/api/bug-report", { method: "POST", body: JSON.stringify(payload) });
       $("#bugForm").reset();
-      flash("Bug report sent — thank you");
+      flash("report sent — thanks");
     } catch (e) {
       err.textContent = e.message;
       flash(e.message, true);
@@ -200,7 +213,7 @@
     try {
       await api("/api/feature-request", { method: "POST", body: JSON.stringify(payload) });
       $("#featureForm").reset();
-      flash("Feature request sent");
+      flash("idea sent — noted");
     } catch (e) {
       err.textContent = e.message;
       flash(e.message, true);
@@ -218,7 +231,9 @@
   }
 
   $("#copyLoadstring")?.addEventListener("click", copyLoadstring);
-  $("#refreshSite")?.addEventListener("click", () => loadSite().then(() => flash("Refreshed")).catch((e) => flash(e.message, true)));
+  $("#refreshSite")?.addEventListener("click", () =>
+    loadSite().then(() => flash("refreshed")).catch((e) => flash(e.message, true))
+  );
   $("#bugForm")?.addEventListener("submit", submitBug);
   $("#featureForm")?.addEventListener("submit", submitFeature);
   window.addEventListener("hashchange", setActiveNav);

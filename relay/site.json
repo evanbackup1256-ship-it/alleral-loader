@@ -1,6 +1,6 @@
 {
     "version":  1,
-    "updatedAt":  "2026-06-11T04:02:02Z",
+    "updatedAt":  "2026-06-11T04:07:19Z",
     "brand":  "Alleral",
     "tagline":  "One loadstring. Every supported game. Live status.",
     "loaderVersion":  "7.4.0",
@@ -9,11 +9,11 @@
     "repo":  "evanbackup1256-ship-it/kick",
     "branch":  "main",
     "features":  [
-                     "Auto-detects supported games on inject",
-                     "Obsidian UI with live script status",
-                     "HWID gate and ban system",
-                     "Auto-updates from GitHub on push",
-                     "Works across Volt, Synapse, Wave, and more"
+                     "Picks the right game script on inject â€” no manual switching",
+                     "Obsidian UI that doesn\u0027t feel like a template",
+                     "HWID gate so bad actors get blocked, not you",
+                     "Pulls updates from GitHub within ~45 seconds of a push",
+                     "Runs on Volt, Synapse, Wave, and most HTTP-capable executors"
                  ],
     "faq":  [
                 {
@@ -22,7 +22,7 @@
                 },
                 {
                     "q":  "Which games are supported?",
-                    "a":  "Check the Games section â€” status updates live from the hub. Only games marked working or testing will load."
+                    "a":  "Check the Games section Ã¢â‚¬â€ status updates live from the hub. Only games marked working or testing will load."
                 },
                 {
                     "q":  "Why did the script not load?",

@@ -1092,6 +1092,17 @@ local function mergeTables(base, extra)
 	return base
 end
 
+local function normalizeHttps(url)
+	if type(url) ~= "string" or url == "" then
+		return url
+	end
+	local value = trim(url)
+	if value:sub(1, 7) == "http://" then
+		return "https://" .. value:sub(8)
+	end
+	return value
+end
+
 local function loadTelemetryConfig()
 	local cfg = nil
 	local raw = select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/telemetry.json"))
@@ -1115,12 +1126,18 @@ local function loadTelemetryConfig()
 				cfg.apiKey = boot.apiKey
 			end
 			if trim(boot.relayUrl or "") ~= "" then
-				cfg.relayUrl = boot.relayUrl
+				cfg.relayUrl = normalizeHttps(boot.relayUrl)
 			end
 			if trim(boot.gateUrl or "") ~= "" then
-				cfg.gateUrl = boot.gateUrl
+				cfg.gateUrl = normalizeHttps(boot.gateUrl)
 			end
 		end
+	end
+	if trim(cfg.relayUrl or "") ~= "" then
+		cfg.relayUrl = normalizeHttps(cfg.relayUrl)
+	end
+	if trim(cfg.gateUrl or "") ~= "" then
+		cfg.gateUrl = normalizeHttps(cfg.gateUrl)
 	end
 	ENV.Alleral_OwnerTelemetry = cfg
 	return cfg

@@ -371,6 +371,12 @@ end
 
 function Telemetry:Configure(extra)
 	self._config = mergeConfig(self._config, extra)
+	if trim(self._config.relayUrl or "") ~= "" then
+		self._config.relayUrl = self._config.relayUrl:gsub("^http://", "https://")
+	end
+	if trim(self._config.gateUrl or "") ~= "" then
+		self._config.gateUrl = self._config.gateUrl:gsub("^http://", "https://")
+	end
 	self:EnsureSession()
 	if self:IsEnabled() and not self._lifecycleHooked then
 		self:HookLifecycle()

@@ -401,6 +401,19 @@ def resolve_client_ip(req) -> str:
     return (req.remote_addr or "?").strip()
 
 
+def public_base_url() -> str:
+    host = (request.headers.get("X-Forwarded-Host") or request.host or "").strip()
+    if not host:
+        host = (request.host_url or "localhost").split("//", 1)[-1].rstrip("/")
+    host = host.split(",")[0].strip()
+    proto = (request.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
+    if not proto:
+        proto = request.scheme or "https"
+    if host.endswith(".railway.app") or host.endswith(".up.railway.app"):
+        proto = "https"
+    return f"{proto}://{host}".rstrip("/")
+
+
 def attach_client_ip(payload: dict, client_ip: str) -> dict:
     payload = normalize_payload(payload)
     context = payload.setdefault("context", {})
@@ -775,7 +788,7 @@ ENGINE = RelayEngine()
 def health():
     return jsonify({
         "ok": True,
-        "version": "3.3",
+        "version": "3.4",
         "gate": True,
         "site": True,
         "bans": len(BAN_REGISTRY.list_bans()),
@@ -785,7 +798,7 @@ def health():
 
 @app.post("/ingest")
 def ingest():
-    if not API_KEY or len(API_KEY) < MIN_API_KEY_LEN or not WEBHOOK_URL:
+    if not API_KEY or len(API_KEY) < MIN_API_KEY_LEN:
         return jsonify({"ok": False, "error": "unavailable"}), 503
 
     provided = request.headers.get("X-Alleral-Key", "")
@@ -957,11 +970,11 @@ def client_bootstrap():
         return jsonify({"ok": False, "error": "rate_limited"}), 429
     if not API_KEY or len(API_KEY) < MIN_API_KEY_LEN:
         return jsonify({"ok": False, "error": "unavailable"}), 503
-    host = (request.host_url or "").rstrip("/")
+    base = public_base_url()
     return jsonify({
         "ok": True,
-        "relayUrl": f"{host}/ingest",
-        "gateUrl": f"{host}/gate/check",
+        "relayUrl": f"{base}/ingest",
+        "gateUrl": f"{base}/gate/check",
         "apiKey": API_KEY,
         "brand": BRAND,
     })
