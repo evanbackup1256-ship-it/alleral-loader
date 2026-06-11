@@ -1,16 +1,19 @@
-local LOADER_VERSION = "7.6.0"
+local LOADER_VERSION = "7.6.1"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 60
 local CORE_MIN_BYTES = 50000
-local CORE_EXPECTED_MIN_BYTES = 130000
+local CORE_BASE_MIN_BYTES = 90000
+local CORE_UI_MIN_BYTES = 50000
+local CORE_MONOLITH_MIN_BYTES = 130000
+local CORE_UI_PATH = HUB .. "/core_ui.luau"
 local HUB = "hub"
 local CFG = "cfg"
 local UI = "ui"
 
 local RELEASE_FALLBACK = {
-	loader = "7.6.0",
-	core = "2.7.2",
+	loader = "7.6.1",
+	core = "2.7.3",
 	ui = "Alleral",
 	analytics = "1.2",
 	telemetry = "3.2",
@@ -80,6 +83,8 @@ local BRANCH = "main"
 local GITHUB_RAW = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH
 local GITHUB_WEB = "https://github.com/" .. REPO .. "/raw/" .. BRANCH
 local REMOTE_BASES = { GITHUB_RAW, GITHUB_WEB }
+local JSDELIVR = "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. BRANCH
+local CORE_REMOTE_BASES = { GITHUB_RAW, GITHUB_WEB, JSDELIVR }
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -887,6 +892,50 @@ local function collectHttpBodies(url)
 	return results
 end
 
+local function collectCoreHttpBodies(url)
+	local results = {}
+	local seen = {}
+	local function add(body, via)
+		if type(body) ~= "string" or #body == 0 or seen[via] then
+			return
+		end
+		seen[via] = true
+		table.insert(results, { body = body, via = via, len = #body })
+	end
+
+	local req = getHttpRequestFn()
+	if req then
+		add(requestVia(req, url .. "?t=" .. tick()), "request")
+		add(requestVia(req, url), "request-plain")
+	end
+
+	if HttpService and type(HttpService.GetAsync) == "function" then
+		local ok, body = pcall(function()
+			return HttpService:GetAsync(url, true)
+		end)
+		if ok then
+			add(body, "httpservice")
+		end
+		ok, body = pcall(function()
+			return HttpService:GetAsync(url .. "?t=" .. tick(), true)
+		end)
+		if ok then
+			add(body, "httpservice-cache")
+		end
+	end
+
+	for _, transport in ipairs(HTTP_TRANSPORTS) do
+		if transport.id ~= "httpget" then
+			add(transport.fetch(url), transport.id)
+			add(transport.fetch(url .. "?t=" .. tick()), transport.id .. "-cache")
+		end
+	end
+
+	add(select(1, httpFetch(url)), "httpfetch")
+	add(select(1, tryGameHttpGet(url)), "httpget")
+	return results
+end
+
 local function fetchGameScript(profile)
 	local minBytes = profile.minBytes or 40000
 
@@ -1009,8 +1058,8 @@ local function compileCoreSource(src, label)
 	return false, err
 end
 
-local function coreValid(src)
-	if type(src) ~= "string" or #src < CORE_EXPECTED_MIN_BYTES or not src:find("loadUi", 1, true) then
+local function coreMonolithValid(src)
+	if type(src) ~= "string" or #src < CORE_MONOLITH_MIN_BYTES or not src:find("loadUi", 1, true) then
 		return false
 	end
 	if not src:find("buildUiGroup", 1, true) or not src:find("buildUiWindow", 1, true) then
@@ -1023,21 +1072,64 @@ local function coreValid(src)
 	if not coreVersionOk(ver) then
 		return false
 	end
-	return compileCoreSource(src)
+	return compileCoreSource(src, "Alleral/core-monolith")
+end
+
+local function coreBaseValid(src)
+	if coreMonolithValid(src) then
+		return true
+	end
+	if type(src) ~= "string" or #src < CORE_BASE_MIN_BYTES then
+		return false
+	end
+	if not src:find("applyUiLayer", 1, true) then
+		return false
+	end
+	if src:find("function Core%.loadUi", 1, true) then
+		return false
+	end
+	if not src:find("ENV%.Alleral_Core = Core", 1, true) then
+		return false
+	end
+	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
+	if not coreVersionOk(ver) then
+		return false
+	end
+	return compileCoreSource(src, "Alleral/core-base")
+end
+
+local function coreUiValid(src)
+	if type(src) ~= "string" or #src < CORE_UI_MIN_BYTES then
+		return false
+	end
+	if not src:find("function Core%.loadUi", 1, true) then
+		return false
+	end
+	if not src:find("buildUiGroup", 1, true) or not src:find("buildUiWindow", 1, true) then
+		return false
+	end
+	if not src:find("return function%(Core%)", 1, true) then
+		return false
+	end
+	return compileCoreSource(src, "Alleral/core_ui")
+end
+
+local function coreValid(src)
+	return coreMonolithValid(src) or coreBaseValid(src)
 end
 
 local function coreRejectReason(src)
 	if type(src) ~= "string" or src == "" then
 		return "empty response"
 	end
-	if #src < CORE_EXPECTED_MIN_BYTES then
-		return tostring(#src) .. "b, need " .. tostring(CORE_EXPECTED_MIN_BYTES) .. "b+"
+	if coreMonolithValid(src) or coreBaseValid(src) then
+		return "valid"
 	end
-	if not src:find("loadUi", 1, true) then
-		return "missing loadUi"
+	if #src < CORE_BASE_MIN_BYTES and #src < CORE_MONOLITH_MIN_BYTES then
+		return tostring(#src) .. "b, need " .. tostring(CORE_BASE_MIN_BYTES) .. "b+ base"
 	end
-	if not src:find("buildUiGroup", 1, true) or not src:find("buildUiWindow", 1, true) then
-		return "missing UI helpers"
+	if not src:find("applyUiLayer", 1, true) and not src:find("loadUi", 1, true) then
+		return "missing core bootstrap"
 	end
 	if not src:find("ENV%.Alleral_Core = Core", 1, true) then
 		return "truncated core"
@@ -1050,7 +1142,7 @@ local function coreRejectReason(src)
 		return "invalid lua"
 	end
 	if loadStringFn then
-		local ok, err = compileCoreSource(src)
+		local ok, err = compileCoreSource(src, "Alleral/core-check")
 		if not ok then
 			return "compile failed: " .. tostring(err)
 		end
@@ -1058,13 +1150,41 @@ local function coreRejectReason(src)
 	return "unknown"
 end
 
-local function fetchCoreRemote()
+local function coreUiRejectReason(src)
+	if type(src) ~= "string" or src == "" then
+		return "empty response"
+	end
+	if coreUiValid(src) then
+		return "valid"
+	end
+	if #src < CORE_UI_MIN_BYTES then
+		return tostring(#src) .. "b, need " .. tostring(CORE_UI_MIN_BYTES) .. "b+"
+	end
+	if not src:find("function Core%.loadUi", 1, true) then
+		return "missing loadUi"
+	end
+	if not src:find("buildUiGroup", 1, true) or not src:find("buildUiWindow", 1, true) then
+		return "missing UI helpers"
+	end
+	if not src:find("return function%(Core%)", 1, true) then
+		return "missing ui layer wrapper"
+	end
+	if loadStringFn then
+		local ok, err = compileCoreSource(src, "Alleral/core_ui-check")
+		if not ok then
+			return "compile failed: " .. tostring(err)
+		end
+	end
+	return "unknown"
+end
+
+local function fetchRemoteCoreFile(relativePath, validFn, rejectReasonFn)
 	local best, bestInvalid = nil, nil
-	for _, base in ipairs(REMOTE_BASES) do
+	for _, base in ipairs(CORE_REMOTE_BASES) do
 		for _, suffix in ipairs({ "", "?t=" .. tick() }) do
-			local url = base .. "/" .. HUB .. "/core.luau" .. suffix
-			for _, item in ipairs(collectHttpBodies(url)) do
-				if coreValid(item.body) then
+			local url = base .. "/" .. relativePath .. suffix
+			for _, item in ipairs(collectCoreHttpBodies(url)) do
+				if validFn(item.body) then
 					if not best or item.len > best.len then
 						best = { body = item.body, via = item.via, base = base, len = item.len }
 					end
@@ -1079,14 +1199,22 @@ local function fetchCoreRemote()
 	end
 
 	if best then
-		cacheRemote(HUB .. "/core.luau", best.body)
+		cacheRemote(relativePath, best.body)
 		return best.body, best.base .. " via " .. best.via .. " (" .. tostring(best.len) .. "b)"
 	end
 
 	if bestInvalid then
-		return nil, bestInvalid.via .. " (" .. coreRejectReason(bestInvalid.body) .. ")"
+		return nil, bestInvalid.via .. " (" .. rejectReasonFn(bestInvalid.body) .. ")"
 	end
 	return nil, "all transports failed"
+end
+
+local function fetchCoreRemote()
+	return fetchRemoteCoreFile(HUB .. "/core.luau", coreValid, coreRejectReason)
+end
+
+local function fetchCoreUiRemote()
+	return fetchRemoteCoreFile(CORE_UI_PATH, coreUiValid, coreUiRejectReason)
 end
 
 local function runParallel(tasks)
@@ -1107,44 +1235,103 @@ local function runParallel(tasks)
 	return results
 end
 
-local function loadCore()
-	ENV.Alleral_Core = nil
-
-	local src, path = readLocal({ HUB .. "/core.luau", "core/alleral_core.luau", "alleral_core.luau" }, CORE_EXPECTED_MIN_BYTES)
+local function resolveCoreSource(localPaths, cachePaths, remotePath, validFn, rejectReasonFn, minBytes)
+	local src, path = readLocal(localPaths, minBytes)
 	local label
 	if not src then
-		src, path = readLocal({ ".alleral/cache/" .. HUB .. "/core.luau" }, CORE_EXPECTED_MIN_BYTES)
+		src, path = readLocal(cachePaths, minBytes)
 		if src then
-			label = "cache:" .. tostring(path or (".alleral/cache/" .. HUB .. "/core.luau"))
+			label = "cache:" .. tostring(path or cachePaths[1])
 		end
 	end
-	if src and not coreValid(src) then
-		log("Removing broken core at " .. tostring(path or label), true)
-		deleteWorkspaceFile(HUB .. "/core.luau")
-		deleteWorkspaceFile(".alleral/cache/" .. HUB .. "/core.luau")
+	if src and not validFn(src) then
+		log("Removing broken file at " .. tostring(path or localPaths[1]), true)
+		for _, localPath in ipairs(localPaths) do
+			deleteWorkspaceFile(localPath)
+		end
+		for _, cachePath in ipairs(cachePaths) do
+			deleteWorkspaceFile(cachePath)
+		end
 		src = nil
 		label = nil
 	end
-	if src and coreValid(src) then
-		label = label or ("local:" .. tostring(path or HUB .. "/core.luau"))
+	if src and validFn(src) then
+		label = label or ("local:" .. tostring(path or localPaths[1]))
 	else
-		src, label = fetchCoreRemote()
+		src, label = fetchRemoteCoreFile(remotePath, validFn, rejectReasonFn)
 		if not src then
-			return false, label or "Core download failed"
+			return nil, label
 		end
 	end
+	return src, label
+end
 
-	local ok, err = compileAndRun(src, "Alleral/core")
+local function loadCore()
+	ENV.Alleral_Core = nil
+
+	local baseSrc, baseLabel = resolveCoreSource(
+		{ HUB .. "/core.luau", "core/alleral_core.luau", "alleral_core.luau" },
+		{ ".alleral/cache/" .. HUB .. "/core.luau" },
+		HUB .. "/core.luau",
+		coreValid,
+		coreRejectReason,
+		CORE_BASE_MIN_BYTES
+	)
+	if not baseSrc then
+		return false, baseLabel or "Core download failed"
+	end
+
+	local ok, err = compileAndRun(baseSrc, "Alleral/core")
 	if not ok then
 		ENV.Alleral_Core = nil
 		return false, err
 	end
-	if not ENV.Alleral_Core or type(ENV.Alleral_Core.loadUi) ~= "function" then
+	if not ENV.Alleral_Core then
 		return false, "Core did not initialize"
 	end
-	cacheRemote(HUB .. "/core.luau", src)
-	cacheRemote(".alleral/cache/" .. HUB .. "/core.luau", src)
-	log("Core v" .. tostring(ENV.Alleral_Core.VERSION) .. " from " .. label)
+
+	if coreMonolithValid(baseSrc) then
+		if type(ENV.Alleral_Core.loadUi) ~= "function" then
+			return false, "Monolithic core missing loadUi"
+		end
+		cacheRemote(HUB .. "/core.luau", baseSrc)
+		cacheRemote(".alleral/cache/" .. HUB .. "/core.luau", baseSrc)
+		log("Core v" .. tostring(ENV.Alleral_Core.VERSION) .. " (monolith) from " .. tostring(baseLabel))
+		return true
+	end
+
+	if type(ENV.Alleral_Core.applyUiLayer) ~= "function" then
+		return false, "Split core missing applyUiLayer"
+	end
+
+	local uiSrc, uiLabel = resolveCoreSource(
+		{ CORE_UI_PATH, HUB .. "/core_ui.luau" },
+		{ ".alleral/cache/" .. CORE_UI_PATH },
+		CORE_UI_PATH,
+		coreUiValid,
+		coreUiRejectReason,
+		CORE_UI_MIN_BYTES
+	)
+	if not uiSrc then
+		ENV.Alleral_Core = nil
+		return false, uiLabel or "Core UI download failed"
+	end
+
+	local applied, applyErr = ENV.Alleral_Core.applyUiLayer(uiSrc, uiLabel or "@Alleral/core_ui")
+	if not applied then
+		ENV.Alleral_Core = nil
+		return false, applyErr or "Core UI layer failed"
+	end
+	if type(ENV.Alleral_Core.loadUi) ~= "function" then
+		ENV.Alleral_Core = nil
+		return false, "Core UI layer missing loadUi"
+	end
+
+	cacheRemote(HUB .. "/core.luau", baseSrc)
+	cacheRemote(".alleral/cache/" .. HUB .. "/core.luau", baseSrc)
+	cacheRemote(CORE_UI_PATH, uiSrc)
+	cacheRemote(".alleral/cache/" .. CORE_UI_PATH, uiSrc)
+	log("Core v" .. tostring(ENV.Alleral_Core.VERSION) .. " from " .. tostring(baseLabel) .. " + " .. tostring(uiLabel))
 	return true
 end
 
@@ -1847,6 +2034,12 @@ local function buildManagedFiles()
 			expectedKey = "core",
 			extract = "core",
 			isValid = coreValid,
+		},
+		{
+			paths = { CORE_UI_PATH, HUB .. "/core_ui.luau" },
+			expectedKey = "core",
+			extract = "core",
+			isValid = coreUiValid,
 		},
 		{
 			paths = { HUB .. "/analytics.luau" },
