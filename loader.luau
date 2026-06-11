@@ -3,8 +3,58 @@
 	Detects game, fetches core + game script, runs.
 ]]
 
-local LOADER_VERSION = "5.2.2"
+local LOADER_VERSION = "5.3.1"
 local MIN_CORE = "1.18"
+local RELEASE_FALLBACK = {
+	core = "1.19",
+	analytics = "1.0",
+	telemetry = "2.2",
+	helpers = "1.0",
+}
+local WORKSPACE_ROOTS = {
+	"",
+	"kick/",
+	"kick/kick/",
+	"workspace/",
+	"scripts/",
+	"autoexec/",
+	"Autoexec/",
+	"autoexecute/",
+	"AutoExecute/",
+}
+local INSTALL_MANIFEST = ".alleral/versions.json"
+local LEGACY_LOADER_MARKERS = {
+	"[Alleral Loader v",
+	"Alleral loader 3.",
+	"Alleral loader 4.",
+	"[Alleral Bootstrap]",
+	"Alleral Bootstrap]",
+	"__Alleral_LaunchHandled",
+	"EMBEDDED_LOADER =",
+	"launch.template.luau",
+}
+local LEGACY_ENTRY_NAMES = {
+	"loader.luau",
+	"load.luau",
+	"launch.luau",
+	"bootstrap.luau",
+	"run.luau",
+	"alleral.luau",
+	"alleralloader.luau",
+	"AlleralLoader.luau",
+	"alleral_loader.luau",
+}
+local SCAN_DIRS = {
+	"",
+	"autoexec",
+	"Autoexec",
+	"autoexecute",
+	"AutoExecute",
+	"workspace",
+	"scripts",
+	"kick",
+	"kick/kick",
+}
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
 local RAW = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH
@@ -27,6 +77,7 @@ local function genv()
 end
 
 local ENV = genv()
+local PREVIOUS_LOADER_VERSION = ENV._Alleral_LoaderVersion or ENV.Alleral_LoaderVersion
 ENV._Alleral_LoaderVersion = LOADER_VERSION
 ENV.Alleral_LoaderRunning = false
 
@@ -51,6 +102,7 @@ local readFile = firstExecFunc("readfile", "read_file", "ReadFile")
 local isFile = firstExecFunc("isfile", "is_file", "IsFile")
 local writeFileFn = firstExecFunc("writefile", "write_file", "WriteFile")
 local makeFolderFn = firstExecFunc("makefolder", "make_folder", "MakeFolder")
+local deleteFileFn = firstExecFunc("delfile", "deletefile", "delete_file", "DeleteFile", "removefile", "RemoveFile")
 
 local function getHttpRequestFn()
 	local fn = firstExecFunc("request", "http_request", "Request", "httprequest")
@@ -661,8 +713,7 @@ local function readLocal(paths, minBytes)
 		return nil
 	end
 	local bestSrc, bestPath, bestLen = nil, nil, 0
-	local roots = { "", "kick/", "kick/kick/", "workspace/" }
-	for _, root in ipairs(roots) do
+	for _, root in ipairs(WORKSPACE_ROOTS) do
 		for _, path in ipairs(paths) do
 			local full = root .. path
 			local okExists, exists = pcall(isFile, full)
@@ -691,6 +742,21 @@ local function fetchRemote(relativePath, minBytes)
 	return nil, lastErr or ("fetch failed for " .. relativePath)
 end
 
+local function deleteWorkspaceFile(relativePath)
+	if type(deleteFileFn) ~= "function" or type(isFile) ~= "function" then
+		return false
+	end
+	local okExists, exists = pcall(isFile, relativePath)
+	if not (okExists and exists) then
+		return false
+	end
+	local ok = pcall(deleteFileFn, relativePath)
+	if ok then
+		log("Removed outdated " .. relativePath)
+	end
+	return ok
+end
+
 local function cacheRemote(relativePath, src)
 	if type(writeFileFn) ~= "function" then
 		return
@@ -711,6 +777,7 @@ local function getSource(localPaths, remotePath, opts)
 	if src then
 		if marker and not src:find(marker, 1, true) then
 			log("Skipping outdated local " .. path, true)
+			deleteWorkspaceFile(path)
 		else
 			return src, "local:" .. path
 		end
@@ -778,6 +845,11 @@ local function loadCore()
 	ENV.Alleral_Core = nil
 
 	local src, label = readLocal({ "core/alleral_core.luau", "alleral_core.luau" }, 5000)
+	if src and not coreValid(src) then
+		log("Removing broken/outdated core at " .. tostring(label), true)
+		deleteWorkspaceFile(label)
+		src = nil
+	end
 	if src and coreValid(src) then
 		label = "local:" .. label
 	else
@@ -956,6 +1028,359 @@ local GAMES = {
 	},
 }
 
+local VERSION_PATTERNS = {
+	core = 'Core%.VERSION%s*=%s*"([%d%.]+)"',
+	analytics = 'Analytics%.Version%s*=%s*"([%d%.]+)"',
+	telemetry = 'Telemetry%.Version%s*=%s*"([%d%.]+)"',
+	helpers = 'Helpers%.VERSION%s*=%s*"([%d%.]+)"',
+	loader = 'LOADER_VERSION%s*=%s*"([%d%.]+)"',
+	game = 'local VERSION%s*=%s*"([%d%.]+)"',
+}
+
+local function extractFileVersion(src, kind)
+	if type(src) ~= "string" then
+		return nil
+	end
+	local pattern = VERSION_PATTERNS[kind]
+	if not pattern then
+		return nil
+	end
+	return src:match(pattern)
+end
+
+local function readInstalledManifest()
+	if not readFile or not isFile then
+		return nil
+	end
+	for _, root in ipairs(WORKSPACE_ROOTS) do
+		local path = root .. INSTALL_MANIFEST
+		local okExists, exists = pcall(isFile, path)
+		if okExists and exists then
+			local okRead, raw = pcall(readFile, path)
+			return decodeJson(okRead and raw or nil), path
+		end
+	end
+	return nil
+end
+
+local function writeInstalledManifest(data)
+	if type(writeFileFn) ~= "function" or not HttpService or type(data) ~= "table" then
+		return
+	end
+	if makeFolderFn then
+		pcall(makeFolderFn, ".alleral")
+	end
+	pcall(writeFileFn, INSTALL_MANIFEST, HttpService:JSONEncode(data))
+end
+
+local function fetchExpectedVersions()
+	local expected = {
+		loader = LOADER_VERSION,
+		core = RELEASE_FALLBACK.core,
+		analytics = RELEASE_FALLBACK.analytics,
+		telemetry = RELEASE_FALLBACK.telemetry,
+		helpers = RELEASE_FALLBACK.helpers,
+		games = {},
+	}
+	for _, gameProfile in ipairs(GAMES) do
+		expected.games[gameProfile.id] = gameProfile.version
+	end
+
+	local release = decodeJson(select(1, bootstrapHttpGet(CDN .. "/config/release.json")))
+	if release then
+		expected.loader = release.loader or expected.loader
+		expected.core = release.core or expected.core
+		expected.analytics = release.analytics or expected.analytics
+		expected.telemetry = release.telemetry or expected.telemetry
+		expected.helpers = release.helpers or expected.helpers
+	end
+
+	local manifest = decodeJson(select(1, bootstrapHttpGet(CDN .. "/config/scripts_manifest.json")))
+	if manifest and type(manifest.scripts) == "table" then
+		for id, entry in pairs(manifest.scripts) do
+			if type(entry) == "table" and type(entry.version) == "string" then
+				expected.games[id] = entry.version
+				for _, gameProfile in ipairs(GAMES) do
+					if gameProfile.id == id then
+						gameProfile.version = entry.version
+					end
+				end
+			end
+		end
+	end
+
+	return expected
+end
+
+local function buildManagedFiles()
+	local managed = {
+		{
+			paths = { "core/alleral_core.luau", "alleral_core.luau" },
+			expectedKey = "core",
+			extract = "core",
+			isValid = coreValid,
+		},
+		{
+			paths = { "core/analytics.luau" },
+			expectedKey = "analytics",
+			extract = "analytics",
+		},
+		{
+			paths = { "core/telemetry.luau" },
+			expectedKey = "telemetry",
+			extract = "telemetry",
+		},
+		{
+			paths = { "core/game_helpers.luau" },
+			expectedKey = "helpers",
+			extract = "helpers",
+		},
+		{
+			paths = { "config/owner_telemetry.luau" },
+			purgeOnLoaderChange = true,
+		},
+		{
+			paths = {
+				"loader.luau",
+				"kick/loader.luau",
+				"kick/kick/loader.luau",
+				"workspace/loader.luau",
+				"autoexec/loader.luau",
+				"Autoexec/loader.luau",
+				"autoexec/alleral.luau",
+				"Autoexec/alleral.luau",
+			},
+			expectedKey = "loader",
+			extract = "loader",
+		},
+		{
+			paths = {
+				"load.luau",
+				"kick/load.luau",
+				"kick/kick/load.luau",
+				"launch.luau",
+				"bootstrap.luau",
+				"run.luau",
+				"autoexec/load.luau",
+				"autoexec/launch.luau",
+				"autoexec/bootstrap.luau",
+				"autoexec/run.luau",
+				"Autoexec/load.luau",
+			},
+			alwaysDelete = true,
+		},
+	}
+	for _, gameProfile in ipairs(GAMES) do
+		table.insert(managed, {
+			paths = gameProfile.scriptFiles,
+			gameId = gameProfile.id,
+			extract = "game",
+		})
+	end
+	return managed
+end
+
+local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
+	if entry.alwaysDelete then
+		return true
+	end
+
+	local expectedVersion
+	if entry.gameId then
+		expectedVersion = expected.games and expected.games[entry.gameId]
+	elseif entry.purgeOnLoaderChange then
+		local installedLoader = installedManifest and installedManifest.loader
+		return type(installedLoader) == "string" and installedLoader ~= expected.loader
+	else
+		expectedVersion = expected[entry.expectedKey]
+	end
+
+	if type(expectedVersion) ~= "string" or expectedVersion == "" then
+		return false
+	end
+
+	if type(src) ~= "string" or src == "" then
+		return true
+	end
+
+	if entry.isValid and not entry.isValid(src) then
+		return true
+	end
+
+	local foundVersion = extractFileVersion(src, entry.extract)
+	if not foundVersion then
+		return true
+	end
+
+	return foundVersion ~= expectedVersion
+end
+
+local function isLegacyAlleralLoader(src)
+	if type(src) ~= "string" or #src < 80 then
+		return false
+	end
+	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
+		return false
+	end
+	if src:find('local LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
+		return false
+	end
+	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
+		return false
+	end
+	for _, marker in ipairs(LEGACY_LOADER_MARKERS) do
+		if src:find(marker, 1, true) then
+			return true
+		end
+	end
+	local ver = src:match('LOADER_VERSION%s*=%s*"([%d%.]+)"')
+	if ver and ver < "5.0" then
+		return true
+	end
+	if src:find("Alleral loader", 1, true) and src:find("Detected Kick", 1, true) then
+		return true
+	end
+	return false
+end
+
+local function readFileIfExists(relativePath)
+	if not isFile or not readFile then
+		return nil
+	end
+	local okExists, exists = pcall(isFile, relativePath)
+	if not (okExists and exists) then
+		return nil
+	end
+	local okRead, src = pcall(readFile, relativePath)
+	return okRead and src or nil
+end
+
+local function clearLegacySession()
+	if ENV.Alleral_State and type(ENV.Alleral_State.Alleral_Unload) == "function" then
+		pcall(ENV.Alleral_State.Alleral_Unload)
+	end
+	ENV.Alleral_LoaderRunning = false
+end
+
+local function installAutoexecRedirect()
+	if type(writeFileFn) ~= "function" then
+		return
+	end
+	local stub = 'loadstring(game:HttpGet("'
+		.. CDN
+		.. '/loader.luau?t=" .. tick()))()\n'
+	for _, dir in ipairs({ "autoexec", "Autoexec" }) do
+		if makeFolderFn then
+			pcall(makeFolderFn, dir)
+		end
+		pcall(writeFileFn, dir .. "/alleral.luau", stub)
+	end
+	log("Wrote autoexec/alleral.luau → current loader")
+end
+
+local function purgeLegacyLoaders()
+	if not isFile or not readFile then
+		return 0, false
+	end
+
+	local removed = 0
+	local autoexecHit = false
+
+	local function tryDelete(path, src)
+		if not isLegacyAlleralLoader(src) then
+			return
+		end
+		if deleteWorkspaceFile(path) then
+			removed += 1
+			if path:lower():find("autoexec", 1, true) then
+				autoexecHit = true
+			end
+		end
+	end
+
+	for _, dir in ipairs(SCAN_DIRS) do
+		for _, name in ipairs(LEGACY_ENTRY_NAMES) do
+			local path = dir == "" and name or (dir .. "/" .. name)
+			tryDelete(path, readFileIfExists(path))
+		end
+	end
+
+	local listFn = firstExecFunc("listfiles", "list_files", "ListFiles")
+	local isFolderFn = firstExecFunc("isfolder", "is_folder", "IsFolder")
+	if listFn then
+		local function walk(dir, depth)
+			if depth > 8 then
+				return
+			end
+			dir = dir:gsub("/$", "")
+			local ok, entries = pcall(listFn, dir)
+			if not ok or type(entries) ~= "table" then
+				return
+			end
+			for _, entry in ipairs(entries) do
+				if type(entry) == "string" then
+					local path = entry:gsub("^/", "")
+					local isDir = false
+					if isFolderFn then
+						local okFolder, folder = pcall(isFolderFn, path)
+						isDir = okFolder and folder == true
+					end
+					if isDir then
+						walk(path, depth + 1)
+					elseif path:match("%.luau$") or path:match("%.lua$") then
+						tryDelete(path, readFileIfExists(path))
+					end
+				end
+			end
+		end
+		for _, dir in ipairs(SCAN_DIRS) do
+			walk(dir, 0)
+		end
+	end
+
+	return removed, autoexecHit
+end
+
+local function purgeOutdatedWorkspace()
+	if not isFile or not readFile then
+		return
+	end
+
+	local expected = fetchExpectedVersions()
+	local installedManifest = readInstalledManifest()
+	local removed = 0
+
+	for _, entry in ipairs(buildManagedFiles()) do
+		for _, root in ipairs(WORKSPACE_ROOTS) do
+			for _, path in ipairs(entry.paths) do
+				local fullPath = root .. path
+				local okExists, exists = pcall(isFile, fullPath)
+				if okExists and exists then
+					local okRead, src = pcall(readFile, fullPath)
+					if shouldDeleteCachedFile(okRead and src or nil, entry, expected, installedManifest) then
+						if deleteWorkspaceFile(fullPath) then
+							removed += 1
+						end
+					end
+				end
+			end
+		end
+	end
+
+	if removed > 0 then
+		log("Workspace cleanup: removed " .. tostring(removed) .. " outdated file(s)")
+	end
+
+	ENV._Alleral_ExpectedVersions = expected
+end
+
+local function recordInstalledVersions()
+	local expected = ENV._Alleral_ExpectedVersions
+	if type(expected) == "table" then
+		writeInstalledManifest(expected)
+	end
+end
+
 local function detectGame()
 	local placeId = game.PlaceId
 	local universeId = nil
@@ -1018,6 +1443,28 @@ local function main()
 		ENV.Alleral_LoaderRunning = false
 		return
 	end
+
+	clearLegacySession()
+
+	local legacyRemoved, autoexecHit = purgeLegacyLoaders()
+	if legacyRemoved > 0 then
+		log("Removed " .. tostring(legacyRemoved) .. " legacy loader file(s)")
+		if autoexecHit then
+			installAutoexecRedirect()
+		end
+	end
+
+	if type(PREVIOUS_LOADER_VERSION) == "string" and PREVIOUS_LOADER_VERSION < "5.0" then
+		log(
+			"Old loader v"
+				.. PREVIOUS_LOADER_VERSION
+				.. " ran this session — delete it from Volt → Settings → Autoexec",
+			true
+		)
+		notify("Alleral", "Delete Alleral v3.x from Volt Autoexec tab, then re-run this script.", 15)
+	end
+
+	purgeOutdatedWorkspace()
 
 	ENV.Alleral_Core = nil
 	ENV.Alleral_Rayfield = nil
@@ -1103,6 +1550,7 @@ local function main()
 		return
 	end
 
+	recordInstalledVersions()
 	notify("Alleral", profile.name .. " loaded.", 4)
 	log("Ready")
 end
