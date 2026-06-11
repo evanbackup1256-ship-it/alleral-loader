@@ -9,7 +9,7 @@ Roblox automation hub — one loader, five games, private owner telemetry.
 Join a supported game, paste this into your executor, and click **Execute**:
 
 ```lua
-(getgenv().loadstring or loadstring or load)(game.HttpGet(game, "https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/run.luau?t=" .. tick(), true))()
+(getgenv().loadstring or loadstring or load)(game.HttpGet(game, "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/run.luau?t=" .. tick(), true))()
 ```
 
 Save that line to your executor **Scripts** tab for one-click loading. No autoexec needed.

@@ -61,7 +61,22 @@ local function firstExecFunc(...)
 	return nil
 end
 
-local httpRequest = firstExecFunc("http_request", "request") or (ENV.syn and ENV.syn.request)
+local httpRequest = firstExecFunc("http_request", "request")
+	or (ENV.Volt and ENV.Volt.request)
+	or (ENV.Wave and ENV.Wave.request)
+	or (ENV.Solara and ENV.Solara.request)
+	or (ENV.Xeno and ENV.Xeno.request)
+	or (ENV.Krnl and ENV.Krnl.request)
+	or (ENV.syn and ENV.syn.request)
+	or (ENV.http and ENV.http.request)
+	or (HttpService and type(HttpService.RequestAsync) == "function" and function(opts)
+		return HttpService:RequestAsync({
+			Url = opts.Url or opts.url,
+			Method = opts.Method or opts.method or "GET",
+			Headers = opts.Headers or opts.headers,
+			Body = opts.Body or opts.body,
+		})
+	end)
 local loadStringFn = firstExecFunc("loadstring", "LoadString") or loadstring
 
 local function trim(s)
@@ -236,21 +251,23 @@ end
 
 local function fetchRemote(url)
 	url = cacheBust(url)
+	local headers = {
+		["Cache-Control"] = "no-cache, no-store, must-revalidate",
+		["Pragma"] = "no-cache",
+		["Accept"] = "application/vnd.github.raw+json, application/json, text/plain, */*",
+	}
 	if httpRequest then
-		local ok, res = pcall(httpRequest, {
-			Url = url,
-			Method = "GET",
-			Headers = {
-				["Cache-Control"] = "no-cache, no-store, must-revalidate",
-				["Pragma"] = "no-cache",
-				["Accept"] = "application/vnd.github.raw+json, application/json, text/plain, */*",
-			},
-		})
-		if ok and res then
-			local status = res.StatusCode or res.status or 200
-			local body = res.Body or res.body
-			if status >= 200 and status < 300 and type(body) == "string" and body ~= "" then
-				return body
+		for _, spec in ipairs({
+			{ Url = url, Method = "GET", Headers = headers },
+			{ url = url, method = "GET", headers = headers },
+		}) do
+			local ok, res = pcall(httpRequest, spec)
+			if ok and res then
+				local status = res.StatusCode or res.status or 200
+				local body = res.Body or res.body or (type(res) == "string" and res)
+				if status >= 200 and status < 300 and type(body) == "string" and body ~= "" then
+					return body
+				end
 			end
 		end
 	end
@@ -260,6 +277,26 @@ local function fetchRemote(url)
 			return body
 		end
 		ok, body = pcall(game.HttpGet, game, url)
+		if ok and type(body) == "string" and body ~= "" then
+			return body
+		end
+	end
+	local ok, body = pcall(function()
+		return game:HttpGet(url, true)
+	end)
+	if ok and type(body) == "string" and body ~= "" then
+		return body
+	end
+	ok, body = pcall(function()
+		return game:HttpGet(url)
+	end)
+	if ok and type(body) == "string" and body ~= "" then
+		return body
+	end
+	if HttpService and type(HttpService.GetAsync) == "function" then
+		ok, body = pcall(function()
+			return HttpService:GetAsync(url, true)
+		end)
 		if ok and type(body) == "string" and body ~= "" then
 			return body
 		end
