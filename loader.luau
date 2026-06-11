@@ -1,4 +1,4 @@
-local LOADER_VERSION = "3.7.2"
+local LOADER_VERSION = "3.7.3"
 local REQUIRED_CORE_VERSION = "1.17"
 local REQUIRED_UI_LIBRARY = "Rayfield"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
@@ -507,12 +507,19 @@ local function resolveFromFiles(files, label, url, marker)
 		if source then
 			return source, url
 		end
-		if CAPABILITIES.readfile and err and tostring(err):find("cached/outdated", 1, true) then
-			for _, file in ipairs(files) do
-				local localSource = readLocalFile(file)
-				if localSource and markerMatches(localSource, marker) then
-					log("warn", label .. " remote cache stale; using local " .. file)
-					return localSource, "local-fallback:" .. file
+		if CAPABILITIES.readfile then
+			local staleRemote = err and tostring(err):find("cached/outdated", 1, true)
+			if staleRemote or marker then
+				for _, file in ipairs(files) do
+					local localSource = readLocalFile(file)
+					if localSource and markerMatches(localSource, marker) then
+						if staleRemote then
+							log("warn", label .. " remote cache stale; using local " .. file)
+						else
+							log("info", label .. " using local " .. file)
+						end
+						return localSource, "local:" .. file
+					end
 				end
 			end
 		end

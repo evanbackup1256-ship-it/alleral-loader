@@ -1,0 +1,7 @@
+{
+  "loader": "3.7.3",
+  "core": "1.17",
+  "ui": "Rayfield",
+  "commit": "HEAD",
+  "minLoader": "3.7.0"
+}
