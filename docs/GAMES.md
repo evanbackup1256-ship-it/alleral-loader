@@ -23,7 +23,7 @@
 
 ## Survive a Zombie Arena
 
-- **Script:** `games/survive_a_zombie_arena.luau` (v2.0)
+- **Script:** `games/survive_a_zombie_arena.luau` (v2.1)
 - **APIs ported from public scripts:**
   - `ZombieRemotes.ZombieDamage` — kill aura / instant kill
   - `WaveRemotes.SkipVote` — auto skip wave

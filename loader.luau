@@ -863,6 +863,7 @@ local function waitForPath(root, path, timeout)
 end
 
 local GAMES = {
+	-- Keep versions in sync with config/scripts_manifest.json
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",

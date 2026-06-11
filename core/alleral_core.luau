@@ -1,15 +1,15 @@
 local Core = {}
-Core.VERSION = "1.18"
+Core.VERSION = "1.19"
 Core.UI_LIBRARY = "Rayfield"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
 local RAYFIELD_SOURCE_URL = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua"
 local RAYFIELD_MIRROR_URLS = {
-	"https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua",
+	"https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/vendor/rayfield/source.lua",
 	"https://cdn.jsdelivr.net/gh/SiriusSoftwareLtd/Rayfield@main/source.lua",
 	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/vendor/rayfield/source.lua",
-	"https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/vendor/rayfield/source.lua",
+	"https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua",
 }
 local RAYFIELD_MIN_BYTES = 50000
 local RAYFIELD_LOCAL_FILES = {
@@ -52,6 +52,11 @@ function Core.notify(title, text, duration)
 end
 
 function Core.requestFunction()
+	local fn = Core.firstExecFunc("request", "http_request", "Request", "httprequest")
+	if fn then
+		return fn
+	end
+
 	local sharedEnv = ENV.shared or (typeof(shared) == "table" and shared) or nil
 	local solaraLib = sharedEnv and type(sharedEnv.solara) == "table" and sharedEnv.solara or nil
 	local soloraLib = sharedEnv and type(sharedEnv.Solora) == "table" and sharedEnv.Solora or nil
@@ -90,16 +95,7 @@ function Core.requestFunction()
 		type(ENV.Ronix) == "table" and ENV.Ronix.request or nil,
 		type(ENV.Macsploit) == "table" and ENV.Macsploit.request or nil,
 		type(ENV.Oxygen) == "table" and ENV.Oxygen.request or nil,
-		type(ENV.http) == "table" and ENV.http.request or nil,
-		ENV.request,
-		ENV.Request,
 	}
-	for _, name in ipairs({ "http_request", "request", "Request" }) do
-		local fn = ENV[name]
-		if type(fn) == "function" then
-			table.insert(candidates, 1, fn)
-		end
-	end
 	for _, candidate in ipairs(candidates) do
 		if type(candidate) == "function" then
 			return candidate
@@ -121,9 +117,14 @@ end
 function Core.firstExecFunc(...)
 	for index = 1, select("#", ...) do
 		local name = select(index, ...)
-		local fn = ENV[name] or (getfenv and getfenv()[name])
-		if type(fn) == "function" then
-			return fn
+		if type(name) == "function" then
+			return name
+		end
+		if type(name) == "string" then
+			local fn = ENV[name] or (_G and _G[name]) or (getfenv and getfenv()[name])
+			if type(fn) == "function" then
+				return fn
+			end
 		end
 	end
 	return nil
@@ -490,6 +491,12 @@ function Core.fetchWeaoExploits(forceRefresh)
 	end
 
 	local function fetchUrl(url)
+		local fetchUrl = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(math.random(10000, 99999))
+		local decoded = decodeBody(Core.httpGet(fetchUrl))
+		if decoded then
+			return decoded, url
+		end
+
 		local headers = {
 			["User-Agent"] = "WEAO-3PService",
 			["Accept"] = "application/json",
@@ -499,7 +506,7 @@ function Core.fetchWeaoExploits(forceRefresh)
 		if requestFn then
 			local ok, response = pcall(function()
 				return requestFn({
-					Url = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(math.random(10000, 99999)),
+					Url = fetchUrl,
 					Method = "GET",
 					Headers = headers,
 				})
@@ -838,9 +845,10 @@ function Core.fetchScriptManifest(forceRefresh)
 
 	if requestFn then
 		for _, url in ipairs(Core.defaultScriptManifestUrls()) do
+			local fetchUrl = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(math.random(10000, 99999))
 			local ok, response = pcall(function()
 				return requestFn({
-					Url = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(math.random(10000, 99999)),
+					Url = fetchUrl,
 					Method = "GET",
 					Headers = { ["Cache-Control"] = "no-cache" },
 				})
@@ -857,6 +865,12 @@ function Core.fetchScriptManifest(forceRefresh)
 						return decoded, nil
 					end
 				end
+			end
+			local decoded, jsonErr = Core.httpGetJson(fetchUrl)
+			if type(decoded) == "table" and type(decoded.scripts) == "table" then
+				ENV.Alleral_ScriptManifestCache = { fetchedAt = tick(), data = decoded, source = url }
+				ENV.Alleral_ScriptManifest = decoded
+				return decoded, nil
 			end
 			lastErr = "Manifest fetch failed: " .. url
 		end
@@ -1204,6 +1218,14 @@ function Core.httpGet(url)
 	if type(url) ~= "string" or url == "" then
 		return nil
 	end
+
+	local plain = url:gsub("%?.*$", "")
+	local urls = {
+		plain .. "?t=" .. tostring(tick()),
+		plain,
+		url,
+	}
+
 	local function accept(body)
 		if type(body) ~= "string" or body == "" then
 			return false
@@ -1212,10 +1234,11 @@ function Core.httpGet(url)
 			return false
 		end
 		if body:find("<!DOCTYPE html>", 1, true) or body:find("<html", 1, true) then
-			return body:find("function ", 1, true) ~= nil
+			return body:find("function", 1, true) ~= nil or body:find("local ", 1, true) ~= nil
 		end
 		return true
 	end
+
 	local function extractBody(response)
 		if type(response) == "string" then
 			return response
@@ -1226,72 +1249,82 @@ function Core.httpGet(url)
 		return nil
 	end
 
-	if type(game.HttpGet) == "function" then
-		local ok, body = pcall(game.HttpGet, game, url, true)
-		if ok and accept(body) then
-			return body
+	local function tryRequest(fn, fetchUrl)
+		if type(fn) ~= "function" then
+			return nil
 		end
-		ok, body = pcall(game.HttpGet, game, url)
-		if ok and accept(body) then
-			return body
+		local ok, direct = pcall(fn, fetchUrl)
+		if ok and accept(direct) then
+			return direct
 		end
-	end
-
-	local ok, body = pcall(function()
-		return game:HttpGet(url, true)
-	end)
-	if ok and accept(body) then
-		return body
-	end
-
-	ok, body = pcall(function()
-		return game:HttpGet(url)
-	end)
-	if ok and accept(body) then
-		return body
-	end
-
-	if type(HttpService.GetAsync) == "function" then
-		ok, body = pcall(function()
-			return HttpService:GetAsync(url, true)
-		end)
-		if ok and accept(body) then
-			return body
+		if ok and type(direct) == "table" then
+			local body = extractBody(direct)
+			if accept(body) then
+				return body
+			end
 		end
-	end
-
-	local httpGet = Core.requestFunction()
-	if httpGet then
 		for _, spec in ipairs({
 			{
-				Url = url,
+				Url = fetchUrl,
 				Method = "GET",
-				Headers = {
-					["Cache-Control"] = "no-cache, no-store, must-revalidate",
-					["Pragma"] = "no-cache",
-				},
+				Headers = { ["Cache-Control"] = "no-cache" },
 			},
 			{
-				url = url,
+				url = fetchUrl,
 				method = "GET",
-				headers = {
-					["Cache-Control"] = "no-cache, no-store, must-revalidate",
-					["Pragma"] = "no-cache",
-				},
+				headers = { ["Cache-Control"] = "no-cache" },
 			},
 		}) do
-			local reqOk, response = pcall(httpGet, spec)
-			if reqOk then
-				body = extractBody(response)
+			local rok, response = pcall(fn, spec)
+			if rok then
+				local body = extractBody(response)
 				local status = type(response) == "table" and (response.StatusCode or response.status or response.Status or 200) or 200
 				if accept(body) and (status == 0 or (status >= 200 and status < 300)) then
 					return body
 				end
 			end
 		end
+		return nil
 	end
 
-	return nil
+	local bestBody, bestLen = nil, 0
+	local function consider(body)
+		if type(body) == "string" and accept(body) and #body > bestLen then
+			bestBody, bestLen = body, #body
+		end
+	end
+
+	for _, fetchUrl in ipairs(urls) do
+		if type(game.HttpGet) == "function" then
+			local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
+			consider(body)
+			ok, body = pcall(game.HttpGet, game, fetchUrl)
+			consider(body)
+		end
+		local ok, body = pcall(function()
+			return game:HttpGet(fetchUrl, true)
+		end)
+		if ok then
+			consider(body)
+		end
+		ok, body = pcall(function()
+			return game:HttpGet(fetchUrl)
+		end)
+		if ok then
+			consider(body)
+		end
+		if type(HttpService.GetAsync) == "function" then
+			ok, body = pcall(function()
+				return HttpService:GetAsync(fetchUrl, true)
+			end)
+			if ok then
+				consider(body)
+			end
+		end
+		consider(tryRequest(Core.requestFunction(), fetchUrl))
+	end
+
+	return bestBody
 end
 
 function Core.httpGetJson(url)

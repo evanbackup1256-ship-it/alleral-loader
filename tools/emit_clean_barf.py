@@ -3,7 +3,7 @@
 
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parents[1] / "src" / "build_a_ring_farm.luau"
+OUT = Path(__file__).resolve().parents[1] / "games" / "build_a_ring_farm.luau"
 
 # The Luau source is stored in emit_clean_barf.luau.part files or inline below.
 # Run: python tools/emit_clean_barf.py
@@ -16,7 +16,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "1.1"
+local VERSION = "1.2"
 local state = getgenv().Alleral_State
 local Core = getgenv().Alleral_Core
 local connections = {}

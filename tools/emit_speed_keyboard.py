@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REF = ROOT / "reference" / "speed_keyboard_escape.deobfuscated.lua"
-OUT = ROOT / "src" / "speed_keyboard_escape.luau"
+OUT = ROOT / "games" / "speed_keyboard_escape.luau"
 
 
 def eval_num(expr: str) -> float:
@@ -124,7 +124,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "1.0"
+local VERSION = "1.2"
 local state = getgenv().Alleral_State
 local Core = getgenv().Alleral_Core
 local connections = {{}}

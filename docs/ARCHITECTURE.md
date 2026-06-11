@@ -3,39 +3,45 @@
 ## Boot chain
 
 ```
-load.luau (optional rescue, once)
-    └── loader.luau
-            ├── bootstrap prefetch (Volt.request → core v1.18+)
-            ├── detect game by PlaceId
-            ├── load core (local → Volt fetch → mirrors, compile-validated)
-            ├── load analytics, helpers, telemetry
-            ├── preload Rayfield
-            └── run games/*.luau
+loader.luau (remote or readfile)
+    ├── detect executor (identifyexecutor + WEAO when available)
+    ├── detect game by PlaceId
+    ├── download core/alleral_core.luau (HttpGet → request → mirrors)
+    ├── load analytics, helpers, telemetry
+    ├── preload Rayfield
+    └── run games/*.luau
 ```
 
-## Entry points
+## Entry point
 
 | File | Purpose |
 |------|---------|
-| `load.luau` | One-time rescue: downloads validated core + loader, saves to workspace |
-| `loader.luau` | Main entry — auto-upgrades, loads core and game script |
+| `loader.luau` | Single entry — v5.2.2+ |
 
-## Core loading (v4.0.0)
+There is no `load.luau` rescue script. Load from GitHub or `readfile("loader.luau")`.
 
-1. Bootstrap block at top prefetches core via `Volt.request` from pinned good commit `d9441a1`
-2. `coreBodyValid()` rejects broken cores (missing `AlleralGroupShell` marker, version < 1.18)
-3. `coreSourceCompileOk()` runs `loadstring` compile check before executing core
-4. Mirror URLs only pin commits with fixed core (`d9441a1`, `414cc8d`)
+## Core loading
 
-## Dependencies loaded at runtime
+1. Try local `core/alleral_core.luau` if valid (v1.18+, compile check)
+2. Download from jsDelivr → GitHub raw
+3. `coreValid()` rejects broken cores (missing `AlleralGroupShell`, version < 1.18)
+4. Cache successful download to workspace via `writefile`
 
-| Module | Source |
-|--------|--------|
-| Core | `core/alleral_core.luau` (local, CDN, or bootstrap) |
-| Rayfield | Sirius GitHub or `vendor/rayfield/source.lua` |
-| Game script | `games/<game_id>.luau` |
+## Version sources
+
+| Component | Version | File |
+|-----------|---------|------|
+| Loader | 5.2.2 | `loader.luau`, `config/release.json` |
+| Core | 1.18 | `core/alleral_core.luau` |
+| Analytics | 1.0 | `core/analytics.luau` |
+| Telemetry | 2.2 | `core/telemetry.luau` |
+| Helpers | 1.0 | `core/game_helpers.luau` |
+| Game scripts | per-game | `games/*.luau`, `config/scripts_manifest.json` |
+
+Run `powershell tools/verify_versions.ps1` to check all versions match.
 
 ## Never do
 
 - Embed core in loader with `[=[` long strings (breaks Volt parser)
-- Pin CDN commits before `d9441a1` (broken `fakeUiInstance` syntax)
+- Commit output from `tools/bundle_core.ps1` (embedded core)
+- Keep old loader versions in workspace autoexec (v3.x conflicts with v5.x)
