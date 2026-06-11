@@ -1,9 +1,19 @@
 (() => {
+  const GRADIENTS = [
+    "linear-gradient(135deg, #1a3a5c 0%, #0a1628 50%, #2997ff33 100%)",
+    "linear-gradient(135deg, #2d1f4e 0%, #0f0a1a 50%, #bf5af233 100%)",
+    "linear-gradient(135deg, #1a3d2e 0%, #0a1a12 50%, #30d15833 100%)",
+    "linear-gradient(135deg, #3d2a1a 0%, #1a1008 50%, #ffd60a33 100%)",
+    "linear-gradient(135deg, #1a2a3d 0%, #0a101a 50%, #64d2ff33 100%)",
+    "linear-gradient(135deg, #3d1a2a 0%, #1a0a10 50%, #ff453a33 100%)",
+  ];
+
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
   const toastEl = $("#toast");
-  const state = { site: null };
+  const modal = $("#gameModal");
+  const state = { site: null, changelogShown: 2 };
 
   function flash(text, isError = false) {
     if (!toastEl) return;
@@ -26,45 +36,57 @@
     return data;
   }
 
+  function gradientFor(id, index) {
+    let hash = index;
+    for (let i = 0; i < (id || "").length; i += 1) hash += id.charCodeAt(i);
+    return GRADIENTS[hash % GRADIENTS.length];
+  }
+
   function setActiveNav() {
     const id = location.hash.replace("#", "") || "home";
-    $$(".nav a[data-section]").forEach((a) => a.classList.toggle("active", a.dataset.section === id));
+    $$(".nav-links a[data-section]").forEach((a) => a.classList.toggle("active", a.dataset.section === id));
   }
 
   function afterRender() {
     window.AlleralEffects?.observeReveals?.();
-    window.AlleralEffects?.bindCardTilt?.($("#gamesGrid"));
   }
 
   function renderAnnouncement(site) {
     const el = $("#announcement");
     const text = (site.announcement || "").trim();
     if (!el) return;
-    if (!text) {
-      el.classList.add("hidden");
-      return;
-    }
-    el.textContent = text;
-    el.classList.remove("hidden");
+    el.classList.toggle("hidden", !text);
+    if (text) el.textContent = text;
   }
 
   function renderHero(site) {
-    $("#tagline").textContent = site.tagline || "";
+    const brand = site.brand || "Alleral";
+    $("#heroBrand").textContent = brand.toUpperCase();
+    $("#tagline").textContent = site.tagline || "The ultimate Roblox script library.";
     $("#loaderVersion").textContent = site.loaderVersion || "—";
     $("#scriptsUpdated").textContent = site.scriptsUpdatedAt || "—";
     $("#loadstringCode").textContent = site.loadstring || "";
     $("#gameCount").textContent = String(Object.keys(site.games || {}).length);
   }
 
-  function renderFeatures(site) {
-    const root = $("#features");
-    root.innerHTML = "";
-    (site.features || []).forEach((item, i) => {
-      const row = document.createElement("div");
-      row.className = "feature reveal";
-      row.innerHTML = `<span class="feature-num">${String(i + 1).padStart(2, "0")}</span><div class="feature-text">${item}</div>`;
-      root.appendChild(row);
-    });
+  function openGameModal(game, gradient) {
+    if (!modal) return;
+    $("#modalTitle").textContent = game.name || game.id;
+    $("#modalMeta").textContent = `Version ${game.version || "?"} · ${game.id || ""}`;
+    $("#modalDesc").textContent = game.description || game.message || "No description available.";
+    const status = (game.status || "working").toLowerCase();
+    const badge = $("#modalBadge");
+    badge.textContent = status;
+    badge.className = `status-chip ${status}`;
+    $("#modalArt").style.background = gradient;
+    const roblox = $("#modalRoblox");
+    if (game.robloxUrl) {
+      roblox.href = game.robloxUrl;
+      roblox.classList.remove("hidden");
+    } else {
+      roblox.classList.add("hidden");
+    }
+    modal.showModal();
   }
 
   function renderGames(site) {
@@ -72,37 +94,39 @@
     root.innerHTML = "";
     const games = Object.values(site.games || {}).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     if (!games.length) {
-      root.innerHTML = '<div class="empty reveal">nothing listed yet — check back soon.</div>';
+      root.innerHTML = '<p class="empty reveal">No games listed yet.</p>';
       afterRender();
       return;
     }
     games.forEach((game, i) => {
       const status = (game.status || "working").toLowerCase();
+      const grad = gradientFor(game.id, i);
       const card = document.createElement("article");
-      card.className = "card";
-      card.dataset.tilt = "1";
-      card.style.animationDelay = `${i * 0.07}s`;
-      card.classList.add("card-enter");
+      card.className = "game-card card-enter";
+      card.style.animationDelay = `${i * 0.06}s`;
       card.innerHTML = `
-        <div class="card-head">
-          <div>
-            <div class="title">${game.name || game.id}</div>
-            <div class="meta">v${game.version || "?"} · ${game.id || ""}</div>
+        <div class="game-art" style="background:${grad}"></div>
+        <div class="game-body">
+          <h3>${game.name || game.id}</h3>
+          <div class="game-meta">
+            <span class="status-chip ${status}">${status}</span>
+            <span class="game-version">v${game.version || "?"}</span>
           </div>
-          <span class="badge ${status}">${status}</span>
-        </div>
-        <div class="desc">${game.description || game.message || ""}</div>
-        <div class="actions" style="margin-top:14px;">
-          ${game.robloxUrl ? `<a class="btn ghost" href="${game.robloxUrl}" target="_blank" rel="noopener">open on roblox</a>` : ""}
+          <p class="game-desc">${game.description || game.message || ""}</p>
+          <button class="btn-link" type="button">View details →</button>
         </div>
       `;
+      card.addEventListener("click", (e) => {
+        if (e.target.closest("a")) return;
+        openGameModal(game, grad);
+      });
       root.appendChild(card);
     });
 
     const bugGame = $("#bugGame");
     if (bugGame) {
       const current = bugGame.value;
-      bugGame.innerHTML = '<option value="">pick a game</option>';
+      bugGame.innerHTML = '<option value="">Select a game</option>';
       games.forEach((g) => {
         const opt = document.createElement("option");
         opt.value = g.name || g.id;
@@ -114,6 +138,33 @@
     afterRender();
   }
 
+  function renderChangelog(site, reset = true) {
+    const root = $("#changelog");
+    const entries = site.changelog || [];
+    if (reset) {
+      root.innerHTML = "";
+      state.changelogShown = 2;
+    }
+    const slice = entries.slice(0, state.changelogShown);
+    slice.forEach((entry, i) => {
+      if (root.children[i]) return;
+      const node = document.createElement("article");
+      node.className = "changelog-card reveal";
+      node.innerHTML = `
+        <h3>${entry.title || "Update"}</h3>
+        <p class="cl-date">${entry.date || ""}</p>
+        <ul>${(entry.items || []).map((item) => `<li>${item}</li>`).join("")}</ul>
+      `;
+      root.appendChild(node);
+    });
+    const btn = $("#loadMoreChangelog");
+    if (btn) {
+      const hasMore = state.changelogShown < entries.length;
+      btn.classList.toggle("hidden", !hasMore);
+    }
+    afterRender();
+  }
+
   function renderFaq(site) {
     const root = $("#faq");
     root.innerHTML = "";
@@ -121,21 +172,6 @@
       const node = document.createElement("details");
       node.className = "reveal";
       node.innerHTML = `<summary>${item.q || "Question"}</summary><p>${item.a || ""}</p>`;
-      root.appendChild(node);
-    });
-    afterRender();
-  }
-
-  function renderChangelog(site) {
-    const root = $("#changelog");
-    root.innerHTML = "";
-    (site.changelog || []).forEach((entry) => {
-      const node = document.createElement("div");
-      node.className = "changelog-item reveal";
-      node.innerHTML = `
-        <h3>${entry.date || ""} — ${entry.title || "update"}</h3>
-        <ul>${(entry.items || []).map((i) => `<li>${i}</li>`).join("")}</ul>
-      `;
       root.appendChild(node);
     });
     afterRender();
@@ -153,21 +189,6 @@
     });
   }
 
-  async function loadSite() {
-    const data = await api("/api/site");
-    state.site = data;
-    document.title = `${data.brand || "Alleral"} — hub`;
-    $("#brandName").textContent = data.brand || "Alleral";
-    renderAccess(data);
-    renderAnnouncement(data);
-    renderHero(data);
-    renderFeatures(data);
-    renderGames(data);
-    renderFaq(data);
-    renderChangelog(data);
-    renderBugCategories(data);
-  }
-
   function renderAccess(site) {
     const cfg = window.ALLERAL_CONFIG || {};
     const links = site.links || {};
@@ -176,13 +197,28 @@
 
     const primaryEl = $("#primaryUrl");
     const mirrorEl = $("#mirrorUrl");
-    const openEl = $("#openPrimaryUrl");
+    const mirrorLink = $("#mirrorLink");
     const footerEl = $("#footerSiteLink");
 
     if (primaryEl) primaryEl.textContent = primary;
-    if (mirrorEl) mirrorEl.textContent = mirror || "not configured yet";
-    if (openEl) openEl.href = primary;
+    if (mirrorEl) mirrorEl.textContent = mirror || "not available";
+    if (mirrorLink && mirror) mirrorLink.href = mirror;
     if (footerEl) footerEl.href = primary;
+  }
+
+  async function loadSite() {
+    const data = await api("/api/site");
+    state.site = data;
+    const brand = data.brand || "Alleral";
+    document.title = `${brand} — Script Library`;
+    $("#brandName").textContent = brand;
+    renderAccess(data);
+    renderAnnouncement(data);
+    renderHero(data);
+    renderGames(data);
+    renderChangelog(data, true);
+    renderFaq(data);
+    renderBugCategories(data);
   }
 
   async function copyText(text, msg) {
@@ -190,7 +226,7 @@
       await navigator.clipboard.writeText(text);
       flash(msg);
     } catch {
-      flash("copy failed — select manually", true);
+      flash("Copy failed", true);
     }
   }
 
@@ -202,69 +238,41 @@
       const res = await fetch(base + "/health", { cache: "no-store" });
       const data = await res.json();
       if (data.ok) {
-        el.className = "live-status online";
-        el.innerHTML = '<span class="live-dot"></span> relay online';
-        el.title = `Relay v${data.version || "?"} · ${data.time || ""}`;
-      } else {
-        throw new Error("offline");
-      }
+        el.className = "status-pill online";
+        el.innerHTML = '<span class="status-dot"></span>Online';
+        el.title = `Relay v${data.version || "?"}`;
+      } else throw new Error();
     } catch {
-      el.className = "live-status offline";
-      el.innerHTML = '<span class="live-dot"></span> relay offline';
+      el.className = "status-pill offline";
+      el.innerHTML = '<span class="status-dot"></span>Offline';
     }
-  }
-
-  function bindAccess() {
-    const cfg = window.ALLERAL_CONFIG || {};
-    $("#copyPrimaryUrl")?.addEventListener("click", () => {
-      const url = $("#primaryUrl")?.textContent || cfg.publicUrl || "";
-      copyText(url, "link copied — send to friends");
-    });
-    $("#copyMirrorUrl")?.addEventListener("click", () => {
-      const url = $("#mirrorUrl")?.textContent || "";
-      if (!url || url.includes("not configured")) {
-        flash("mirror not set up yet", true);
-        return;
-      }
-      copyText(url, "mirror link copied");
-    });
-  }
-
-  function bindMobileNav() {
-    const toggle = $("#navToggle");
-    const nav = $("#mainNav");
-    toggle?.addEventListener("click", () => nav?.classList.toggle("open"));
-    $$(".nav a").forEach((a) => a.addEventListener("click", () => nav?.classList.remove("open")));
   }
 
   async function copyLoadstring() {
     const text = state.site?.loadstring || $("#loadstringCode")?.textContent || "";
-    try {
-      await navigator.clipboard.writeText(text);
-      flash("copied — paste it in your executor");
-    } catch {
-      flash("copy failed — select the text manually", true);
-    }
+    await copyText(text, "Script copied to clipboard");
   }
 
   async function submitBug(ev) {
     ev.preventDefault();
     const err = $("#bugError");
     err.textContent = "";
-    const payload = {
-      category: $("#bugCategory").value,
-      severity: $("#bugSeverity").value,
-      game: $("#bugGame").value,
-      robloxUser: $("#bugUser").value.trim(),
-      executor: $("#bugExecutor").value.trim(),
-      contact: $("#bugContact").value.trim(),
-      description: $("#bugDescription").value.trim(),
-      steps: $("#bugSteps").value.trim(),
-    };
     try {
-      await api("/api/bug-report", { method: "POST", body: JSON.stringify(payload) });
+      await api("/api/bug-report", {
+        method: "POST",
+        body: JSON.stringify({
+          category: $("#bugCategory").value,
+          severity: $("#bugSeverity").value,
+          game: $("#bugGame").value,
+          robloxUser: $("#bugUser").value.trim(),
+          executor: $("#bugExecutor").value.trim(),
+          contact: $("#bugContact").value.trim(),
+          description: $("#bugDescription").value.trim(),
+          steps: $("#bugSteps").value.trim(),
+        }),
+      });
       $("#bugForm").reset();
-      flash("report sent — thanks");
+      flash("Report submitted");
     } catch (e) {
       err.textContent = e.message;
       flash(e.message, true);
@@ -275,15 +283,17 @@
     ev.preventDefault();
     const err = $("#featureError");
     err.textContent = "";
-    const payload = {
-      robloxUser: $("#featureUser").value.trim(),
-      game: $("#featureGame").value.trim(),
-      idea: $("#featureIdea").value.trim(),
-    };
     try {
-      await api("/api/feature-request", { method: "POST", body: JSON.stringify(payload) });
+      await api("/api/feature-request", {
+        method: "POST",
+        body: JSON.stringify({
+          robloxUser: $("#featureUser").value.trim(),
+          game: $("#featureGame").value.trim(),
+          idea: $("#featureIdea").value.trim(),
+        }),
+      });
       $("#featureForm").reset();
-      flash("idea sent — noted");
+      flash("Idea submitted");
     } catch (e) {
       err.textContent = e.message;
       flash(e.message, true);
@@ -291,25 +301,47 @@
   }
 
   function bindTabs() {
-    $$(".panel-tabs button").forEach((btn) => {
+    $$(".support-tabs button").forEach((btn) => {
       btn.addEventListener("click", () => {
         const panel = btn.dataset.panel;
-        $$(".panel-tabs button").forEach((b) => b.classList.toggle("active", b === btn));
+        $$(".support-tabs button").forEach((b) => b.classList.toggle("active", b === btn));
         $$("[data-panel-body]").forEach((body) => body.classList.toggle("hidden", body.dataset.panelBody !== panel));
       });
     });
   }
 
+  function bindModal() {
+    $$(".modal-close, .modal-close-btn").forEach((btn) => {
+      btn.addEventListener("click", () => modal?.close());
+    });
+    modal?.addEventListener("click", (e) => {
+      if (e.target === modal) modal.close();
+    });
+  }
+
+  function bindMobileNav() {
+    const toggle = $("#navToggle");
+    const nav = $("#mainNav");
+    toggle?.addEventListener("click", () => nav?.classList.toggle("open"));
+    $$(".nav-links a").forEach((a) => a.addEventListener("click", () => nav?.classList.remove("open")));
+  }
+
   $("#copyLoadstring")?.addEventListener("click", copyLoadstring);
-  $("#refreshSite")?.addEventListener("click", () =>
-    loadSite().then(() => flash("refreshed")).catch((e) => flash(e.message, true))
-  );
+  $("#copyPrimaryUrl")?.addEventListener("click", () => {
+    copyText($("#primaryUrl")?.textContent || "", "Link copied");
+  });
+  $("#loadMoreChangelog")?.addEventListener("click", () => {
+    state.changelogShown += 3;
+    renderChangelog(state.site, false);
+  });
   $("#bugForm")?.addEventListener("submit", submitBug);
   $("#featureForm")?.addEventListener("submit", submitFeature);
   window.addEventListener("hashchange", setActiveNav);
 
+  $("#footerYear").textContent = String(new Date().getFullYear());
+
   bindTabs();
-  bindAccess();
+  bindModal();
   bindMobileNav();
   setActiveNav();
   checkLiveStatus();

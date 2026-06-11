@@ -4,238 +4,190 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Alleral</title>
-  <meta name="description" content="Alleral — one loadstring, every supported game, live status." />
+  <meta name="description" content="Alleral — the ultimate Roblox script library. One loadstring, live game status, instant updates." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./assets/style.css" />
   <script src="./assets/config.js"></script>
   <script src="./assets/gate.js"></script>
 </head>
 <body>
-  <canvas id="bgCanvas" aria-hidden="true"></canvas>
-  <div class="grain" aria-hidden="true"></div>
-  <div class="glow glow-a" aria-hidden="true"></div>
-  <div class="glow glow-b" aria-hidden="true"></div>
-  <div class="scanline" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"></div>
 
-  <header class="topbar">
-    <div class="wrap topbar-inner">
-      <a class="brand" href="#home">
-        <span class="brand-mark">
-          <span class="brand-ring"></span>
-          <span class="brand-core"></span>
-        </span>
-        <span id="brandName">Alleral</span>
-      </a>
-      <div class="topbar-right">
-        <span id="liveStatus" class="live-status" title="Relay status">
-          <span class="live-dot"></span> checking…
-        </span>
-        <button id="navToggle" class="nav-toggle" type="button" aria-label="Menu">☰</button>
-      </div>
-      <nav class="nav" id="mainNav">
+  <header class="nav-shell">
+    <nav class="nav-bar wrap">
+      <a class="nav-logo" href="#home" id="brandName">Alleral</a>
+      <div class="nav-links" id="mainNav">
         <a href="#home" data-section="home">Home</a>
-        <a href="#access" data-section="access">Visit</a>
         <a href="#games" data-section="games">Games</a>
-        <a href="#load" data-section="load">Load</a>
+        <a href="#changelog" data-section="changelog">Updates</a>
         <a href="#faq" data-section="faq">FAQ</a>
-        <a href="#report" data-section="report">Report</a>
-        <a class="nav-admin" href="https://alleral-telemetry-production.up.railway.app/admin" target="_blank" rel="noopener">Admin</a>
-      </nav>
-    </div>
+        <a href="#support" data-section="support">Support</a>
+      </div>
+      <div class="nav-actions">
+        <span id="liveStatus" class="status-pill"><span class="status-dot"></span>Checking</span>
+        <button id="navToggle" class="nav-menu-btn" type="button" aria-label="Menu">
+          <span></span><span></span>
+        </button>
+      </div>
+    </nav>
   </header>
 
-  <main class="wrap">
-    <section id="home" class="hero">
-      <div id="announcement" class="announce hidden reveal"></div>
-      <p class="eyebrow reveal">roblox script hub</p>
-      <h1 class="hero-title reveal">
-        <span class="line">one loadstring.</span>
-        <span class="line accent-text shimmer-text">every game we support.</span>
-      </h1>
-      <p id="tagline" class="hero-sub reveal">One loadstring. Every supported game. Live status.</p>
-      <div class="pill-row reveal">
-        <span class="pill"><span class="pill-label">loader</span> <strong id="loaderVersion">—</strong></span>
-        <span class="pill"><strong id="gameCount">0</strong> <span class="pill-label">games tracked</span></span>
-        <span class="pill"><span class="pill-label">manifest</span> <strong id="scriptsUpdated">—</strong></span>
+  <main>
+    <section id="home" class="hero wrap">
+      <div id="announcement" class="announce-banner hidden reveal"></div>
+      <p class="hero-kicker reveal">Welcome to</p>
+      <h1 class="hero-brand reveal"><span id="heroBrand">ALLERAL</span></h1>
+      <p id="tagline" class="hero-lead reveal">The ultimate Roblox script library.</p>
+
+      <div class="script-panel reveal">
+        <div class="script-panel-head">
+          <span class="script-file">loader.luau</span>
+          <span class="script-meta">v<span id="loaderVersion">—</span></span>
+        </div>
+        <pre id="loadstringCode" class="script-code">Loading…</pre>
+        <div class="script-actions">
+          <button id="copyLoadstring" class="btn btn-fill" type="button">Copy Script</button>
+          <a class="btn btn-outline" href="#games">View Games</a>
+        </div>
       </div>
-      <div class="hero-actions reveal">
-        <a class="btn primary glow-btn" href="#load">get loadstring</a>
-        <a class="btn ghost" href="#access">how to visit this site</a>
+
+      <div class="hero-stats reveal">
+        <div class="stat"><strong id="gameCount">0</strong><span>Games</span></div>
+        <div class="stat-divider"></div>
+        <div class="stat"><strong id="scriptsUpdated">—</strong><span>Last sync</span></div>
+        <div class="stat-divider"></div>
+        <div class="stat online"><strong>Live</strong><span>Status feed</span></div>
       </div>
     </section>
 
-    <section id="access" class="section">
-      <div class="section-head reveal">
-        <div>
-          <p class="eyebrow">for players</p>
-          <h2>how to open the hub</h2>
-          <p>you don't need this website to run the script — but it's the easiest place to copy the loadstring, check game status, and report bugs.</p>
+    <section id="games" class="section wrap">
+      <header class="section-intro reveal">
+        <p class="section-label">Games</p>
+        <h2>Featured titles.</h2>
+        <p class="section-desc">Live status from the hub — the same data your loader reads in-game.</p>
+      </header>
+      <div id="gamesGrid" class="games-grid"></div>
+    </section>
+
+    <section id="changelog" class="section section-alt">
+      <div class="wrap">
+        <header class="section-intro reveal">
+          <p class="section-label">Changelog</p>
+          <h2>Latest updates.</h2>
+          <p class="section-desc">Releases, fixes, and new game support — tracked in real time.</p>
+        </header>
+        <div id="changelog" class="changelog-list"></div>
+        <div class="section-cta reveal">
+          <button id="loadMoreChangelog" class="btn btn-outline hidden" type="button">Load more</button>
         </div>
       </div>
-      <div class="access-grid reveal">
-        <article class="card access-card access-primary">
-          <p class="access-label">main link · bookmark this</p>
-          <code id="primaryUrl" class="access-url">…</code>
-          <div class="actions">
-            <button id="copyPrimaryUrl" class="btn primary glow-btn" type="button">copy link</button>
-            <a id="openPrimaryUrl" class="btn ghost" href="#" target="_blank" rel="noopener">open</a>
+    </section>
+
+    <section id="faq" class="section wrap">
+      <header class="section-intro reveal">
+        <p class="section-label">Support</p>
+        <h2>Frequently asked questions.</h2>
+      </header>
+      <div id="faq" class="faq-list"></div>
+    </section>
+
+    <section id="support" class="section section-alt">
+      <div class="wrap">
+        <header class="section-intro reveal">
+          <p class="section-label">Contact</p>
+          <h2>Report a bug or request a feature.</h2>
+          <p class="section-desc">Send details straight to the maintainer — no account required.</p>
+        </header>
+
+        <div class="support-tabs reveal">
+          <button class="active" data-panel="bug" type="button">Bug report</button>
+          <button data-panel="feature" type="button">Feature request</button>
+        </div>
+
+        <div class="support-grid">
+          <div class="panel reveal" data-panel-body="bug">
+            <form id="bugForm" class="form">
+              <div class="form-row">
+                <label>Category<select id="bugCategory"></select></label>
+                <label>Severity
+                  <select id="bugSeverity">
+                    <option value="low">Low</option>
+                    <option value="normal" selected>Normal</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </label>
+              </div>
+              <label>Game<select id="bugGame"><option value="">Select a game</option></select></label>
+              <div class="form-row">
+                <label>Roblox username<input id="bugUser" placeholder="Your username" /></label>
+                <label>Executor<input id="bugExecutor" placeholder="Volt, Wave, Synapse…" /></label>
+              </div>
+              <label>Contact <span class="muted-inline">optional</span><input id="bugContact" placeholder="Discord or email" /></label>
+              <label>Description<textarea id="bugDescription" required placeholder="What happened?"></textarea></label>
+              <label>Steps to reproduce<textarea id="bugSteps" placeholder="1. Join game…"></textarea></label>
+              <div id="bugError" class="form-error"></div>
+              <button class="btn btn-fill" type="submit">Submit report</button>
+            </form>
           </div>
-        </article>
-        <article class="card access-card">
-          <p class="access-label">mirror (github pages)</p>
-          <code id="mirrorUrl" class="access-url">…</code>
-          <div class="actions">
-            <button id="copyMirrorUrl" class="btn secondary" type="button">copy mirror</button>
+
+          <div class="panel hidden reveal" data-panel-body="feature">
+            <form id="featureForm" class="form">
+              <label>Roblox username<input id="featureUser" placeholder="Your username" /></label>
+              <label>Game <span class="muted-inline">optional</span><input id="featureGame" placeholder="Which game?" /></label>
+              <label>Your idea<textarea id="featureIdea" required placeholder="Describe the feature…"></textarea></label>
+              <div id="featureError" class="form-error"></div>
+              <button class="btn btn-fill" type="submit">Submit idea</button>
+            </form>
           </div>
-          <p class="access-note">same site, different host — use if the main link is down.</p>
-        </article>
-      </div>
-      <ol class="access-steps reveal">
-        <li><strong>on pc or phone</strong> — open the link in Chrome, Safari, Firefox, whatever you have.</li>
-        <li><strong>copy loadstring</strong> — go to the Load section, copy, paste in your executor in Roblox.</li>
-        <li><strong>share with friends</strong> — send them the main link above. no download, no account needed.</li>
-      </ol>
-    </section>
-
-    <section id="games" class="section">
-      <div class="section-head reveal">
-        <div>
-          <p class="eyebrow">live manifest</p>
-          <h2>supported games</h2>
-          <p>same status data your loader pulls in-game — no guessing.</p>
-        </div>
-        <button id="refreshSite" class="btn secondary" type="button">refresh</button>
-      </div>
-      <div id="gamesGrid" class="grid games"></div>
-    </section>
-
-    <section id="load" class="section">
-      <div class="section-head reveal">
-        <div>
-          <p class="eyebrow">copy &amp; run</p>
-          <h2>loadstring</h2>
-          <p>paste in your executor while you're in a supported game. the script itself loads from GitHub — this page just gives you the one-liner.</p>
-        </div>
-      </div>
-      <div class="load-box reveal">
-        <div class="load-header">
-          <span class="term-dot"></span>
-          <span class="term-dot"></span>
-          <span class="term-dot"></span>
-          <span class="term-label">executor</span>
-        </div>
-        <pre id="loadstringCode" class="code">loading…</pre>
-        <div class="actions">
-          <button id="copyLoadstring" class="btn primary glow-btn" type="button">copy loadstring</button>
-          <a class="btn ghost" href="#games">check game status first</a>
         </div>
       </div>
     </section>
 
-    <section class="section">
-      <div class="section-head reveal">
-        <p class="eyebrow">why bother</p>
-        <h2>what you get</h2>
+    <section id="access" class="section wrap">
+      <header class="section-intro reveal">
+        <p class="section-label">Share</p>
+        <h2>Send this link to friends.</h2>
+      </header>
+      <div class="share-bar reveal">
+        <code id="primaryUrl" class="share-url">…</code>
+        <button id="copyPrimaryUrl" class="btn btn-fill" type="button">Copy link</button>
       </div>
-      <div id="features" class="features"></div>
-    </section>
-
-    <section id="faq" class="section">
-      <div class="section-head reveal">
-        <p class="eyebrow">questions</p>
-        <h2>faq</h2>
-      </div>
-      <div id="faq" class="faq"></div>
-    </section>
-
-    <section id="report" class="section">
-      <div class="section-head reveal">
-        <div>
-          <p class="eyebrow">talk to us</p>
-          <h2>bug reports &amp; ideas</h2>
-          <p>broken feature? weird crash? drop it here — goes straight to the maintainer.</p>
-        </div>
-      </div>
-      <div class="tabs panel-tabs reveal">
-        <button class="active" data-panel="bug" type="button">bug report</button>
-        <button data-panel="feature" type="button">feature request</button>
-      </div>
-
-      <div class="grid two">
-        <div class="card glass reveal" data-panel-body="bug">
-          <form id="bugForm">
-            <label>category
-              <select id="bugCategory"></select>
-            </label>
-            <label>severity
-              <select id="bugSeverity">
-                <option value="low">low</option>
-                <option value="normal" selected>normal</option>
-                <option value="high">high</option>
-                <option value="critical">critical</option>
-              </select>
-            </label>
-            <label>game
-              <select id="bugGame"><option value="">pick a game</option></select>
-            </label>
-            <label>roblox username
-              <input id="bugUser" placeholder="your roblox name" />
-            </label>
-            <label>executor
-              <input id="bugExecutor" placeholder="volt, wave, synapse…" />
-            </label>
-            <label>contact <span class="optional">optional</span>
-              <input id="bugContact" placeholder="discord, email…" />
-            </label>
-            <label>what happened?
-              <textarea id="bugDescription" required placeholder="be specific — what broke, when, what you expected"></textarea>
-            </label>
-            <label>steps to reproduce
-              <textarea id="bugSteps" placeholder="1. join game&#10;2. open ui…"></textarea>
-            </label>
-            <div id="bugError" class="error"></div>
-            <button class="btn primary glow-btn" type="submit">send report</button>
-          </form>
-        </div>
-
-        <div class="card glass hidden reveal" data-panel-body="feature">
-          <form id="featureForm">
-            <label>roblox username
-              <input id="featureUser" placeholder="your roblox name" />
-            </label>
-            <label>game <span class="optional">optional</span>
-              <input id="featureGame" placeholder="which game is this for?" />
-            </label>
-            <label>your idea
-              <textarea id="featureIdea" required placeholder="describe what you'd want added or changed"></textarea>
-            </label>
-            <div id="featureError" class="error"></div>
-            <button class="btn primary glow-btn" type="submit">send idea</button>
-          </form>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="section-head reveal">
-        <p class="eyebrow">history</p>
-        <h2>changelog</h2>
-      </div>
-      <div id="changelog" class="changelog"></div>
+      <p class="share-note reveal">Mirror: <a id="mirrorLink" href="#" target="_blank" rel="noopener"><span id="mirrorUrl">…</span></a></p>
     </section>
   </main>
 
-  <footer class="footer">
-    <div class="wrap footer-row">
-      <span>alleral · built for people who actually play these games</span>
-      <span>
-        <a id="footerSiteLink" href="#">hub</a> ·
-        <a href="https://alleral-telemetry-production.up.railway.app/admin" target="_blank" rel="noopener">admin</a>
-      </span>
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <p>© <span id="footerYear"></span> Alleral. Built for players who care about quality.</p>
+      <div class="footer-links">
+        <a id="footerSiteLink" href="#">Hub</a>
+        <a href="https://alleral-telemetry-production.up.railway.app/admin" target="_blank" rel="noopener">Admin</a>
+        <a href="https://github.com/evanbackup1256-ship-it/kick" target="_blank" rel="noopener">GitHub</a>
+      </div>
     </div>
   </footer>
+
+  <dialog id="gameModal" class="game-modal">
+    <div class="game-modal-inner">
+      <button class="modal-close" type="button" aria-label="Close">&times;</button>
+      <div id="modalArt" class="modal-art"></div>
+      <div class="modal-body">
+        <div class="modal-head">
+          <h3 id="modalTitle">Game</h3>
+          <span id="modalBadge" class="status-chip">working</span>
+        </div>
+        <p id="modalMeta" class="modal-meta"></p>
+        <p id="modalDesc" class="modal-desc"></p>
+        <div class="modal-actions">
+          <a id="modalRoblox" class="btn btn-fill hidden" href="#" target="_blank" rel="noopener">Open on Roblox</a>
+          <button class="btn btn-outline modal-close-btn" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
 
   <div id="toast" class="toast"></div>
   <script src="./assets/effects.js"></script>

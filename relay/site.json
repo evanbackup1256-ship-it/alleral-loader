@@ -1,6 +1,6 @@
 {
     "version":  1,
-    "updatedAt":  "2026-06-11T04:09:16Z",
+    "updatedAt":  "2026-06-11T04:11:03Z",
     "brand":  "Alleral",
     "tagline":  "One loadstring. Every supported game. Live status.",
     "loaderVersion":  "7.4.0",
@@ -9,7 +9,7 @@
     "repo":  "evanbackup1256-ship-it/kick",
     "branch":  "main",
     "features":  [
-                     "Picks the right game script on inject â€” no manual switching",
+                     "Picks the right game script on inject Ã¢â‚¬â€ no manual switching",
                      "Obsidian UI that doesn\u0027t feel like a template",
                      "HWID gate so bad actors get blocked, not you",
                      "Pulls updates from GitHub within ~45 seconds of a push",
@@ -18,7 +18,7 @@
     "faq":  [
                 {
                     "q":  "How do I visit the Alleral website?",
-                    "a":  "Open the hub in any normal browser (phone or PC). Bookmark the main link on the Visit section â€” no Roblox account needed to browse. You only need Roblox + an executor when you actually run the loadstring."
+                    "a":  "Open the hub in any normal browser (phone or PC). Bookmark the main link on the Visit section Ã¢â‚¬â€ no Roblox account needed to browse. You only need Roblox + an executor when you actually run the loadstring."
                 },
                 {
                     "q":  "How do I load Alleral?",
@@ -26,7 +26,7 @@
                 },
                 {
                     "q":  "Which games are supported?",
-                    "a":  "Check the Games section â€” status updates live from the hub. Only games marked working or testing will load."
+                    "a":  "Check the Games section Ã¢â‚¬â€ status updates live from the hub. Only games marked working or testing will load."
                 },
                 {
                     "q":  "Why did the script not load?",
