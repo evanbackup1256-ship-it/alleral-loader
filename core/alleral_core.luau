@@ -1,6 +1,6 @@
 local Core = {}
-Core.VERSION = "1.10"
-Core.STARLIGHT_BUILD = "Alleral-2"
+Core.VERSION = "1.11"
+Core.STARLIGHT_BUILD = "Alleral-3"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
@@ -728,7 +728,7 @@ function Core.patchStarlightSource(source)
 	if not source or source == "" then
 		return source
 	end
-	if source:find("Alleral%-[12]") or source:find("Alleral Rewrite") then
+	if source:find("Alleral%-[123]") or source:find("Alleral Rewrite") then
 		return source
 	end
 	source = source:gsub(
@@ -764,7 +764,7 @@ local function compileStarlightSource(source, label)
 	if source:find("Alleral Protected") or source:find("Nebula%-Softworks") then
 		return nil, "Refusing cached or third-party Starlight — need Alleral Source.lua"
 	end
-	if not source:find("Alleral%-2") and not source:find('InterfaceBuild%s*=%s*"Alleral%-2"') then
+	if not source:find("Alleral%-3") and not source:find('InterfaceBuild%s*=%s*"Alleral%-3"') then
 		return nil, "Not an Alleral Starlight build (need " .. Core.STARLIGHT_BUILD .. ")"
 	end
 	local compiled, compileErr = loadStringFn(Core.patchStarlightSource(source), label)
@@ -864,6 +864,7 @@ function Core.loadStarlight()
 
 	local remoteStarlight, remoteErr = loadRemoteStarlight()
 	if remoteStarlight then
+		warn("[Alleral] Starlight loaded (" .. tostring(remoteStarlight.InterfaceBuild) .. ") from remote")
 		return remoteStarlight
 	end
 

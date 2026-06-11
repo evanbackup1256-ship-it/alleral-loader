@@ -135,11 +135,12 @@ function WindowBuilder.create(library, windowSettings)
 	}
 
 	local function setVisible(state)
-		window.Visible = state
+		local visible = state == true
+		window.Visible = visible
 		if main then
-			main.Visible = state
+			main.Visible = visible
 		end
-		setBlur(state)
+		setBlur(visible)
 	end
 
 	local sidebar = Util.new("Frame", {
@@ -347,7 +348,7 @@ function WindowBuilder.create(library, windowSettings)
 	library.Window = window
 
 	function window:Toggle()
-		setVisible(not self.Visible)
+		setVisible(not window.Visible)
 	end
 
 	function window:Destroy()
@@ -715,9 +716,18 @@ function WindowBuilder.create(library, windowSettings)
 		return section
 	end
 
+	if windowSettings.LoadingEnabled ~= false then
+		task.defer(function()
+			task.wait(0.1)
+			setVisible(true)
+		end)
+	else
+		setVisible(true)
+	end
+
 	local toggleReady = false
 	task.defer(function()
-		task.wait(0.25)
+		task.wait(0.5)
 		toggleReady = true
 	end)
 
@@ -730,15 +740,6 @@ function WindowBuilder.create(library, windowSettings)
 			window:Toggle()
 		end
 	end)
-
-	if windowSettings.LoadingEnabled ~= false then
-		task.defer(function()
-			task.wait(0.1)
-			setVisible(true)
-		end)
-	else
-		setVisible(true)
-	end
 
 	library.OnDestroy = function()
 		window:Destroy()

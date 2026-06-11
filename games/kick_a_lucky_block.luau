@@ -3,7 +3,11 @@ do
 	if type(bridge) == "table" and getgenv then
 		local g = getgenv()
 		if type(g) == "table" then
-			if bridge.Alleral_Starlight then g.Alleral_Starlight = bridge.Alleral_Starlight end
+			if bridge.Alleral_Starlight
+				and bridge.Alleral_Starlight.InterfaceBuild == "Alleral-3"
+				and type(bridge.Alleral_Starlight.CreateWindow) == "function" then
+				g.Alleral_Starlight = bridge.Alleral_Starlight
+			end
 			if bridge.Alleral_Core then g.Alleral_Core = bridge.Alleral_Core end
 			if bridge.Alleral_Analytics then g.Alleral_Analytics = bridge.Alleral_Analytics end
 			if bridge.Alleral_Telemetry then g.Alleral_Telemetry = bridge.Alleral_Telemetry end

@@ -1,4 +1,6 @@
-local LOADER_VERSION = "3.5.3"
+local LOADER_VERSION = "3.5.4"
+local REQUIRED_CORE_VERSION = "1.11"
+local REQUIRED_STARLIGHT_BUILD = "Alleral-3"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local SCRIPT_MANIFEST_URL = REPO_BASE .. "/config/scripts_manifest.json"
 local FETCH_RETRIES = 3
@@ -470,7 +472,11 @@ do
 	if type(bridge) == "table" and getgenv then
 		local g = getgenv()
 		if type(g) == "table" then
-			if bridge.Alleral_Starlight then g.Alleral_Starlight = bridge.Alleral_Starlight end
+			if bridge.Alleral_Starlight
+				and bridge.Alleral_Starlight.InterfaceBuild == "Alleral-3"
+				and type(bridge.Alleral_Starlight.CreateWindow) == "function" then
+				g.Alleral_Starlight = bridge.Alleral_Starlight
+			end
 			if bridge.Alleral_Core then g.Alleral_Core = bridge.Alleral_Core end
 			if bridge.Alleral_Analytics then g.Alleral_Analytics = bridge.Alleral_Analytics end
 			if bridge.Alleral_Telemetry then g.Alleral_Telemetry = bridge.Alleral_Telemetry end
@@ -572,6 +578,18 @@ local function unloadPrevious()
 	ENV.Alleral_LoaderRunning = false
 end
 
+local function clearSharedBridge()
+	pcall(function()
+		if typeof(shared) == "table" then
+			shared.Alleral_Starlight = nil
+			shared.Alleral_Core = nil
+			shared.Alleral_Analytics = nil
+			shared.Alleral_Telemetry = nil
+			shared.Alleral_GameHelpers = nil
+		end
+	end)
+end
+
 local function invalidateStaleModules()
 	if ENV.Alleral_LoaderVersion == LOADER_VERSION then
 		return
@@ -587,9 +605,15 @@ local function invalidateStaleModules()
 	log("info", "Cleared cached modules for loader " .. LOADER_VERSION)
 end
 
+local function coreVersionOk(core)
+	return core
+		and type(core.loadStarlight) == "function"
+		and core.VERSION == REQUIRED_CORE_VERSION
+end
+
 local function preloadCore(required)
 	local core = ENV.Alleral_Core
-	if core and type(core.loadStarlight) == "function" and (core.VERSION == "1.4" or core.VERSION == "1.5" or core.VERSION == "1.6" or core.VERSION == "1.7" or core.VERSION == "1.8" or core.VERSION == "1.9" or core.VERSION == "1.10") then
+	if coreVersionOk(core) then
 		return true
 	end
 	ENV.Alleral_Core = nil
@@ -604,7 +628,7 @@ local function preloadCore(required)
 	end
 	local ok, err = compileAndRun(source, "Alleral/core")
 	if ok and ENV.Alleral_Core then
-		log("info", "Core loaded from " .. sourceLabel)
+		log("info", "Core loaded from " .. sourceLabel .. " (v" .. tostring(ENV.Alleral_Core.VERSION) .. ")")
 		return true
 	end
 	if required then
@@ -935,8 +959,10 @@ local function main()
 	end
 
 	invalidateStaleModules()
+	clearSharedBridge()
 	ENV.Alleral_StartupFailed = nil
 	ENV.Alleral_Starlight = nil
+	ENV.Alleral_Core = nil
 	unloadPrevious()
 
 	local profile, detectErr = detectGame()
@@ -1001,11 +1027,17 @@ local function main()
 
 	if ENV.Alleral_Core and type(ENV.Alleral_Core.loadStarlight) == "function" then
 		local starlight, starlightErr = ENV.Alleral_Core.loadStarlight()
-		if starlight then
+		if starlight and starlight.InterfaceBuild == REQUIRED_STARLIGHT_BUILD then
 			ENV.Alleral_Starlight = starlight
-			log("info", "Starlight preloaded")
+			log("info", "Starlight preloaded (" .. tostring(starlight.InterfaceBuild) .. ")")
 		else
-			log("warn", "Starlight preload skipped: " .. tostring(starlightErr))
+			ENV.Alleral_Starlight = nil
+			local detail = starlightErr
+				or ("Starlight build mismatch: " .. tostring(starlight and starlight.InterfaceBuild or "nil"))
+			log("warn", "Starlight preload failed: " .. detail)
+			notify("Alleral", "Starlight failed: " .. detail, 8)
+			ENV.Alleral_LoaderRunning = false
+			return
 		end
 	end
 
