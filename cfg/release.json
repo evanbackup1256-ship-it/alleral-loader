@@ -4,7 +4,7 @@
     "weao":  "1.1",
     "ui":  "Alleral",
     "windui":  "2.1.2-alleral-v2",
-    "commit":  "pending",
+    "commit":  "b3c21e4",
     "updatedAt":  "2026-06-11T00:00:00Z",
     "updatePollSeconds":  120,
     "autoUpdate":  true,
