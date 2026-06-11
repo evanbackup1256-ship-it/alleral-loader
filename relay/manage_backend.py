@@ -66,6 +66,62 @@ class ManageBackend:
     def supabase_configured(self) -> bool:
         return bool(self.supabase_url and self.supabase_service_key and requests is not None)
 
+    def _headers(self) -> dict[str, str]:
+        return {
+            "apikey": self.supabase_service_key,
+            "Authorization": f"Bearer {self.supabase_service_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+        }
+
+    def test_connection(self) -> dict[str, Any]:
+        if not self.supabase_configured():
+            return {"ok": False, "error": "not_configured", "hint": "Set SUPABASE_URL and SUPABASE_SERVICE_KEY on Railway"}
+        url = f"{self.supabase_url}/rest/v1/{self.supabase_table}?select=id&limit=1"
+        try:
+            resp = requests.get(url, headers=self._headers(), timeout=10)
+        except requests.RequestException as exc:
+            return {"ok": False, "error": str(exc)}
+        if resp.status_code == 404:
+            return {
+                "ok": False,
+                "error": "table_missing",
+                "hint": "Run supabase/migrations SQL or: .\\scripts\\setup_supabase.ps1",
+            }
+        if resp.status_code >= 400:
+            return {"ok": False, "error": f"HTTP {resp.status_code}", "body": resp.text[:200]}
+        return {"ok": True, "table": self.supabase_table, "url": self.supabase_url}
+
+    def push_hub_event(self, kind: str, payload: dict[str, Any] | None = None) -> bool:
+        if not self.supabase_configured():
+            return False
+        url = f"{self.supabase_url}/rest/v1/alleral_hub_events"
+        body = {
+            "kind": str(kind or "event")[:64],
+            "source": "hub",
+            "payload": payload if isinstance(payload, dict) else {},
+        }
+        try:
+            resp = requests.post(url, headers=self._headers(), data=json.dumps(body), timeout=8)
+            return 200 <= resp.status_code < 300
+        except requests.RequestException:
+            return False
+
+    def push_games_snapshot(self, commit: str, games: list[dict[str, Any]]) -> bool:
+        if not self.supabase_configured():
+            return False
+        url = f"{self.supabase_url}/rest/v1/alleral_games_snapshots"
+        body = {
+            "commit_sha": str(commit or "")[:64],
+            "total_games": len(games),
+            "games": games[:100],
+        }
+        try:
+            resp = requests.post(url, headers=self._headers(), data=json.dumps(body), timeout=12)
+            return 200 <= resp.status_code < 300
+        except requests.RequestException:
+            return False
+
     def status(self) -> dict[str, Any]:
         with self._lock:
             conn = sqlite3.connect(str(self._path), timeout=10)
@@ -168,12 +224,6 @@ class ManageBackend:
         if not self.supabase_configured():
             return False
         url = f"{self.supabase_url}/rest/v1/{self.supabase_table}"
-        headers = {
-            "apikey": self.supabase_service_key,
-            "Authorization": f"Bearer {self.supabase_service_key}",
-            "Content-Type": "application/json",
-            "Prefer": "return=minimal",
-        }
         body = {
             "event": row["event"],
             "actor": row["actor"],
@@ -181,7 +231,7 @@ class ManageBackend:
             "created_at": row["createdAt"],
         }
         try:
-            resp = requests.post(url, headers=headers, data=json.dumps(body), timeout=8)
+            resp = requests.post(url, headers=self._headers(), data=json.dumps(body), timeout=8)
             return 200 <= resp.status_code < 300
         except requests.RequestException:
             return False

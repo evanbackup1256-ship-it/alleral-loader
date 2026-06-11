@@ -12,5 +12,5 @@
     "analytics":  "1.0",
     "telemetry":  "3.0",
     "helpers":  "1.0",
-    "security":  "1.0"
+    "security":  "1.3"
 }

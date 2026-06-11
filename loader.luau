@@ -13,7 +13,7 @@ local RELEASE_FALLBACK = {
 	telemetry = "3.0",
 	helpers = "1.0",
 	weao = "1.0",
-	security = "1.0",
+	security = "1.3",
 	commit = "",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
 	autoUpdate = true,
@@ -709,6 +709,13 @@ local function cacheRemote(relativePath, src)
 	pcall(writeFileFn, relativePath, src)
 end
 
+local function usesLegacyHttpHash(src)
+	if type(src) ~= "string" then
+		return false
+	end
+	return src:find("HttpService:Hash", 1, true) ~= nil or src:find("HttpService%.Hash", 1, true) ~= nil
+end
+
 local function getSource(localPaths, remotePath, opts)
 	opts = type(opts) == "table" and opts or { marker = opts }
 	local minBytes = opts.minBytes or 0
@@ -716,7 +723,10 @@ local function getSource(localPaths, remotePath, opts)
 
 	local src, path = readLocal(localPaths, minBytes)
 	if src then
-		if marker and not src:find(marker, 1, true) then
+		if usesLegacyHttpHash(src) then
+			log("Removing Volt-incompatible cached " .. path, true)
+			deleteWorkspaceFile(path)
+		elseif marker and not src:find(marker, 1, true) then
 			log("Skipping outdated local " .. path, true)
 			deleteWorkspaceFile(path)
 		else
@@ -726,11 +736,16 @@ local function getSource(localPaths, remotePath, opts)
 
 	src, path = fetchRemote(remotePath, minBytes)
 	if src then
-		if marker and not src:find(marker, 1, true) then
+		if usesLegacyHttpHash(src) then
+			log("Remote " .. remotePath .. " still uses HttpService.Hash — skipping", true)
+			src = nil
+		elseif marker and not src:find(marker, 1, true) then
 			log("Script may be outdated (missing " .. marker .. ")", true)
 		end
-		cacheRemote(remotePath, src)
-		return src, "remote" .. (path and (" (" .. path .. ")") or "")
+		if src then
+			cacheRemote(remotePath, src)
+			return src, "remote" .. (path and (" (" .. path .. ")") or "")
+		end
 	end
 
 	return nil, path or ("Could not load " .. remotePath)
@@ -1389,6 +1404,7 @@ local VERSION_PATTERNS = {
 	telemetry = 'Telemetry%.Version%s*=%s*"([%d%.]+)"',
 	helpers = 'Helpers%.VERSION%s*=%s*"([%d%.]+)"',
 	weao = 'Weao%.VERSION%s*=%s*"([%d%.]+)"',
+	security = 'Security%.VERSION%s*=%s*"([%d%.]+)"',
 	loader = 'LOADER_VERSION%s*=%s*"([%d%.]+)"',
 	game = 'local VERSION%s*=%s*"([%d%.]+)"',
 }
@@ -1713,6 +1729,10 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 	end
 
 	if type(src) ~= "string" or src == "" then
+		return true
+	end
+
+	if usesLegacyHttpHash(src) then
 		return true
 	end
 

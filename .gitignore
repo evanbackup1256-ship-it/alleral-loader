@@ -6,6 +6,10 @@ backend/site/node_modules/
 supabase/.branches/
 supabase/.temp/
 
+# Local audit databases
+*.db
+manage_audit.db
+
 .zed/
 __pycache__/
 *.pyc

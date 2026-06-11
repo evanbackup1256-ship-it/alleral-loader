@@ -1791,7 +1791,7 @@ def admin_logout():
     return jsonify({"ok": True})
 
 
-@app.get("/dev")
+@app.post("/api/dev/login")
 def dev_login():
     purge_dev_sessions()
     if not dev_enabled():
