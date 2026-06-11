@@ -99,7 +99,7 @@ return function(WindUI)
 		return palette.accentHot
 	end
 
-	WindUI.ARRREL_UI_VERSION = "1.0.0-arrrel2"
+	WindUI.ARRREL_UI_VERSION = "1.0.0-arrrel3"
 	WindUI.ARRREL_BRAND = "Arrrel"
 	WindUI.ALLERAL_UI_VERSION = WindUI.ARRREL_UI_VERSION
 	WindUI.ALLERAL_BRAND = "Arrrel UI"
@@ -1091,11 +1091,18 @@ return function(WindUI)
 		end)
 	end
 
+	local function safeFontFace(family, weight)
+		local ok, font = pcall(function()
+			return Font.new(family, weight)
+		end)
+		return ok and font or nil
+	end
+
 	local RESOURCES = {
 		fonts = {
-			ui = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium),
-			uiSemibold = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
-			uiTitle = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+			ui = safeFontFace("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium),
+			uiSemibold = safeFontFace("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
+			uiTitle = safeFontFace("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.SemiBold),
 		},
 		preload = {
 			"rbxasset://fonts/families/GothamSSm.json",
@@ -1282,53 +1289,86 @@ return function(WindUI)
 		tween(card, ANIM.tooltip, { BackgroundTransparency = 0.06 })
 	end
 
-	local function findTooltipTarget(row)
+	local function findTooltipTargets(row)
+		local targets = {}
 		if not row or not row:IsA("GuiObject") then
-			return nil
+			return targets
+		end
+		local function addTarget(instance)
+			if instance and instance:IsA("GuiObject") and not instance:FindFirstChild("AlleralTipHook") then
+				table.insert(targets, instance)
+			end
 		end
 		if row:IsA("TextButton") or row:IsA("ImageButton") then
-			return row
+			addTarget(row)
+		end
+		local hitbox = row:FindFirstChild("Hitbox", true)
+		if hitbox and hitbox:IsA("GuiObject") then
+			addTarget(hitbox)
 		end
 		for _, desc in ipairs(row:GetDescendants()) do
 			if desc:IsA("TextButton") or desc:IsA("ImageButton") then
-				return desc
+				addTarget(desc)
 			end
 		end
-		pcall(function()
-			row.Active = true
-		end)
-		return row
+		if #targets == 0 then
+			pcall(function()
+				row.Active = true
+				row.Selectable = true
+			end)
+			addTarget(row)
+		end
+		return targets
 	end
 
 	local function attachRowTooltip(row, text)
-		local target = findTooltipTarget(row)
-		if not target or not target:IsA("GuiObject") or target:FindFirstChild("AlleralTipHook") then
-			return
-		end
 		text = tostring(text or "")
 		if text == "" then
 			return
 		end
-		local hook = Instance.new("BoolValue")
-		hook.Name = "AlleralTipHook"
-		hook.Parent = target
+		local targets = findTooltipTargets(row)
+		if #targets == 0 then
+			return
+		end
 		local hoverToken = 0
 		local showDelay = RESOURCES.tooltips.showDelay or 0.32
 		local showJitter = RESOURCES.tooltips.showJitter or 0.07
-		target.MouseEnter:Connect(function()
-			hoverToken += 1
-			local token = hoverToken
-			local waitFor = showDelay + (math.random() * showJitter)
-			task.delay(waitFor, function()
-				if token == hoverToken and target.Parent then
-					showTooltip(text, target)
+		for _, target in ipairs(targets) do
+			if target:FindFirstChild("AlleralTipHook") then
+				continue
+			end
+			local hook = Instance.new("BoolValue")
+			hook.Name = "AlleralTipHook"
+			hook.Parent = target
+			local function scheduleShow()
+				hoverToken += 1
+				local token = hoverToken
+				local waitFor = showDelay + (math.random() * showJitter)
+				task.delay(waitFor, function()
+					if token == hoverToken and target.Parent then
+						showTooltip(text, target)
+					end
+				end)
+			end
+			local function cancelShow()
+				hoverToken += 1
+				hideTooltip()
+			end
+			target.MouseEnter:Connect(scheduleShow)
+			target.MouseLeave:Connect(cancelShow)
+			if target:IsA("GuiButton") then
+				target.SelectionGained:Connect(scheduleShow)
+				target.SelectionLost:Connect(cancelShow)
+			end
+			target.InputBegan:Connect(function(input)
+				if
+					input.UserInputType == Enum.UserInputType.Touch
+					or input.UserInputType == Enum.UserInputType.MouseButton1
+				then
+					scheduleShow()
 				end
 			end)
-		end)
-		target.MouseLeave:Connect(function()
-			hoverToken += 1
-			hideTooltip()
-		end)
+		end
 	end
 
 	local function resolveElementRow(elem)
@@ -1336,17 +1376,21 @@ return function(WindUI)
 			return nil
 		end
 		local row = elem.UIElements and elem.UIElements.Main
-		if elem.ToggleFrame and elem.ToggleFrame.UIElements then
-			row = row or elem.ToggleFrame.UIElements.Main
-		end
-		if elem.SliderFrame and elem.SliderFrame.UIElements then
-			row = row or elem.SliderFrame.UIElements.Main
-		end
-		if elem.DropdownFrame and elem.DropdownFrame.UIElements then
-			row = row or elem.DropdownFrame.UIElements.Main
-		end
-		if elem.InputFrame and elem.InputFrame.UIElements then
-			row = row or elem.InputFrame.UIElements.Main
+		local frames = {
+			"ToggleFrame",
+			"SliderFrame",
+			"DropdownFrame",
+			"InputFrame",
+			"ButtonFrame",
+			"CheckboxFrame",
+			"KeybindFrame",
+			"ParagraphFrame",
+		}
+		for _, key in ipairs(frames) do
+			local frame = elem[key]
+			if frame and frame.UIElements and frame.UIElements.Main then
+				row = row or frame.UIElements.Main
+			end
 		end
 		return row
 	end
@@ -1364,7 +1408,7 @@ return function(WindUI)
 		end
 		elem._ArrrelTipHooked = true
 		task.spawn(function()
-			for _ = 1, 12 do
+			for _ = 1, 40 do
 				local row = resolveElementRow(elem)
 				if row and row.Parent then
 					attachRowTooltip(row, text)
@@ -2933,7 +2977,7 @@ return function(WindUI)
 	end
 
 	local function polishNotificationWrapper(wrapper, style)
-		if not wrapper or wrapper:FindFirstChild("AlleralNotifyRail") then
+		if not wrapper or wrapper:FindFirstChild("AlleralNotifyRail", true) then
 			return
 		end
 
@@ -2975,26 +3019,66 @@ return function(WindUI)
 		end
 	end
 
-	local function ensureNotificationHook()
-		if WindUI._AlleralNotifyHook then
-			return
+	local function resolveNotificationHolder()
+		if WindUI._AlleralNotifyHolder and WindUI._AlleralNotifyHolder.Parent then
+			return WindUI._AlleralNotifyHolder
 		end
-
 		local gui = WindUI.NotificationGui
 		if not gui then
-			return
+			return nil
 		end
-
 		for _, child in ipairs(gui:GetDescendants()) do
 			if child:IsA("UIListLayout") and child.Parent and child.Parent:IsA("Frame") then
 				WindUI._AlleralNotifyHolder = child.Parent
-				break
+				return child.Parent
 			end
 		end
+		local frame = gui:FindFirstChild("Frame", true)
+		if frame and frame:IsA("Frame") then
+			WindUI._AlleralNotifyHolder = frame
+			return frame
+		end
+		return nil
+	end
 
-		local holder = WindUI._AlleralNotifyHolder
-		if not holder then
+	local function installNotificationModuleHook()
+		local mod = WindUI.NotificationModule
+		if type(mod) ~= "table" or mod._AlleralNewHooked or type(mod.New) ~= "function" then
 			return
+		end
+		mod._AlleralNewHooked = true
+		local originalNew = mod.New
+		function mod.New(self, payload)
+			local style = WindUI._AlleralPendingNotifyStyle or NOTIFY_STYLES.info
+			if type(payload) == "table" and payload.Holder then
+				WindUI._AlleralNotifyHolder = payload.Holder
+			end
+			local result = originalNew(self, payload)
+			task.defer(function()
+				local holder = resolveNotificationHolder()
+				if not holder then
+					return
+				end
+				for _, child in ipairs(holder:GetChildren()) do
+					if child:IsA("GuiObject") then
+						polishNotificationWrapper(child, style)
+					end
+				end
+			end)
+			return result
+		end
+	end
+
+	local function ensureNotificationHook()
+		installNotificationModuleHook()
+
+		local holder = resolveNotificationHolder()
+		if not holder then
+			return false
+		end
+
+		if WindUI._AlleralNotifyHook then
+			return true
 		end
 
 		WindUI._AlleralNotifyHook = true
@@ -3015,6 +3099,14 @@ return function(WindUI)
 				polishNotificationWrapper(wrapper, style)
 			end)
 		end)
+		for _, child in ipairs(holder:GetChildren()) do
+			if child:IsA("GuiObject") then
+				task.defer(function()
+					polishNotificationWrapper(child, NOTIFY_STYLES.info)
+				end)
+			end
+		end
+		return true
 	end
 
 	local function wrapWindowElements(window)
@@ -3579,6 +3671,7 @@ return function(WindUI)
 			task.spawn(preloadAssets)
 			task.defer(function()
 				installDropdownAnimations()
+				ensureNotificationHook()
 				WindUI:PolishWindow(window)
 				startWatchdog(window)
 			end)
@@ -3587,8 +3680,20 @@ return function(WindUI)
 		return window
 	end
 
-	local _Notify = WindUI.Notify
+	local _Notify
+	do
+		local ok, original = pcall(function()
+			return WindUI.Notify
+		end)
+		if ok and type(original) == "function" then
+			_Notify = original
+		end
+	end
 	function WindUI.Notify(self, payload)
+		if type(_Notify) ~= "function" then
+			uiWarn("notify", "WindUI.Notify unavailable")
+			return nil
+		end
 		if type(payload) ~= "table" then
 			payload = { Content = tostring(payload or "") }
 		end
@@ -4192,6 +4297,8 @@ return function(WindUI)
 	if not passed then
 		uiWarn("selftest", "theme bootstrap incomplete")
 	end
+
+	WindUI._AlleralPatchComplete = true
 
 	return WindUI
 end

@@ -1,4 +1,4 @@
-1.0.0-arrrel2
+1.0.0-arrrel3
 Base: https://github.com/Footagesus/WindUI/releases/tag/1.6.64-fix
 Patch: ui/windui/arrrel.luau
 Legacy: ui/windui/aller.luau

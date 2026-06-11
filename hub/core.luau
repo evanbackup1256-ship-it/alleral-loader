@@ -1,7 +1,7 @@
 local Core = {}
 Core.VERSION = "2.7.0"
 Core.UI_LIBRARY = "Alleral"
-Core.ALLERAL_UI_VERSION = "1.0.0-arrrel2"
+Core.ALLERAL_UI_VERSION = "1.0.0-arrrel3"
 Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 
 local HttpService = game:GetService("HttpService")
@@ -239,6 +239,7 @@ function Core.installResilience()
 		"buildConfigProfileGroup",
 		"buildCloudConfigStudio",
 		"buildCloudConfigTab",
+		"repairUiWindow",
 		"buildScriptStatusGroupbox",
 		"postWebhook",
 		"writeFile",
@@ -1337,6 +1338,21 @@ function Core.registerUiWindow(window)
 	return window
 end
 
+function Core.repairUiWindow(window)
+	window = window or ENV.Alleral_UiWindow
+	if type(window) ~= "table" or not window._rawWindow then
+		return false
+	end
+	local lib = window._library or Core.getWindUi()
+	if not lib or type(lib.RepairWindow) ~= "function" then
+		return false
+	end
+	local ok = pcall(function()
+		lib:RepairWindow(window._rawWindow)
+	end)
+	return ok == true
+end
+
 Core._UiStateBindings = Core._UiStateBindings or {}
 
 function Core.clearUiStateBindings()
@@ -2402,6 +2418,9 @@ function Core.buildStandardSettingsExtras(tab, options)
 	if options.skipCloudConfig ~= true and type(options.savedKeys) == "table" and #options.savedKeys > 0 then
 		if type(options.window) == "table" then
 			Core.buildCloudConfigTab(options.window, options)
+			if options.cloudOnlyTab ~= true then
+				Core.buildCloudConfigStudio(tab, options)
+			end
 		else
 			Core.buildCloudConfigStudio(tab, options)
 		end
@@ -2417,6 +2436,11 @@ function Core.buildStandardSettingsExtras(tab, options)
 	Core.buildSettingsBackupGroup(tab, options)
 	if options.setupKeybinds ~= false then
 		Core.setupHubKeybinds(options)
+	end
+	if type(options.window) == "table" then
+		task.defer(function()
+			Core.repairUiWindow(options.window)
+		end)
 	end
 end
 
@@ -3247,8 +3271,7 @@ local function patchSourceValid(body)
 end
 
 local function patchApplied(windUi)
-	return type(windUi) == "table"
-		and (type(windUi.GetArrrelVersion) == "function" or type(windUi.GetAlleralVersion) == "function")
+	return type(windUi) == "table" and windUi._AlleralPatchComplete == true
 end
 
 local function bootstrapSourceValid(body)
@@ -3795,9 +3818,24 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 		if not handle.Desc and not handle.Description then
 			handle.Desc = tostring(tooltip)
 		end
-		if windUi and type(windUi.HookElementTooltip) == "function" then
-			pcall(windUi.HookElementTooltip, windUi, handle)
+		if not handle.Tooltip then
+			handle.Tooltip = tostring(tooltip)
 		end
+		local function tryHook()
+			if windUi and type(windUi.HookElementTooltip) == "function" then
+				pcall(windUi.HookElementTooltip, windUi, handle)
+			end
+		end
+		tryHook()
+		task.spawn(function()
+			for _ = 1, 20 do
+				if handle._ArrrelTipHooked then
+					return
+				end
+				tryHook()
+				task.wait(0.05)
+			end
+		end)
 	end
 
 	local function nextFlag(name, explicit)
@@ -4993,6 +5031,9 @@ function Core.buildUiWindow(ui, settings)
 	}
 	Core.registerUiWindow(window)
 	Core.flushPendingNotifications()
+	task.defer(function()
+		Core.repairUiWindow(window)
+	end)
 	function window:AddTab(name, icon)
 		if not self._rawWindow or type(self._rawWindow.Section) ~= "function" then
 			Core.logWarn("AddTab skipped — window missing")
