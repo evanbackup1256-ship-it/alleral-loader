@@ -5,6 +5,8 @@ __pycache__/
 
 # Secrets
 relay/.env
+backend/data/
+relay/data/
 cfg/owner_telemetry.luau
 cfg/telemetry.env
 src/owner_telemetry.luau
