@@ -17,7 +17,7 @@ if state.Alleral_Unload then
 	pcall(state.Alleral_Unload)
 end
 
-local rayfield
+local ui
 local bootErr
 local bootApi = getgenv().Alleral_Core
 if not bootApi or not bootApi.prepareGame then
@@ -26,8 +26,8 @@ if not bootApi or not bootApi.prepareGame then
 	warn("[Alleral] " .. msg)
 	return
 end
-Core, rayfield, bootErr = bootApi.prepareGame(state)
-if not Core or not rayfield then
+Core, ui, bootErr = bootApi.prepareGame(state)
+if not Core or not ui then
 	local msg = "Boot failed: " .. tostring(bootErr)
 	getgenv().Alleral_StartupFailed = msg
 	warn("[Alleral] " .. msg)
@@ -1867,41 +1867,41 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoOptimizePets", 10, funct
 	end
 end)
 
-local window = Core.buildRayfieldWindow(rayfield, {
+local window = Core.buildUiWindow(ui, {
 	Subtitle = "Build A Ring Farm · v" .. VERSION,
 })
-local section = Core.buildRayfieldSection(window)
-local farmTab = Core.buildRayfieldTab(section, "Farm", 10723407389, 2, "farm")
-local seedTab = Core.buildRayfieldTab(section, "Seeds", 10734923214, 2, "seeds")
-local upgradeTab = Core.buildRayfieldTab(section, "Upgrade", 10747376638, 2, "upgrade")
-local shopTab = Core.buildRayfieldTab(section, "Shop", 10734952479, 2, "shop")
-local eventTab = Core.buildRayfieldTab(section, "Events", 10709818534, 2, "events")
-local petTab = Core.buildRayfieldTab(section, "Pets", 10709769841, 2, "pets")
-local miscTab = Core.buildRayfieldTab(section, "Misc", 10734950020, 1, "misc")
-local settingsTab = Core.buildRayfieldTab(section, "Settings", 10734950309, 1, "settings")
+local section = Core.buildUiSection(window)
+local farmTab = Core.buildUiTab(section, "Farm", 10723407389, 2, "farm")
+local seedTab = Core.buildUiTab(section, "Seeds", 10734923214, 2, "seeds")
+local upgradeTab = Core.buildUiTab(section, "Upgrade", 10747376638, 2, "upgrade")
+local shopTab = Core.buildUiTab(section, "Shop", 10734952479, 2, "shop")
+local eventTab = Core.buildUiTab(section, "Events", 10709818534, 2, "events")
+local petTab = Core.buildUiTab(section, "Pets", 10709769841, 2, "pets")
+local miscTab = Core.buildUiTab(section, "Misc", 10734950020, 1, "misc")
+local settingsTab = Core.buildUiTab(section, "Settings", 10734950309, 1, "settings")
 
 local saveWrap = Core.onUiSave(saveSettings)
-local plant = Core.buildRayfieldGroup(farmTab, "Planting", 1, saveWrap, nil, "plant")
-local plot = Core.buildRayfieldGroup(farmTab, "Plot", 2, saveWrap, nil, "plot")
-local sell = Core.buildRayfieldGroup(farmTab, "Selling", 1, saveWrap, nil, "sell")
-local care = Core.buildRayfieldGroup(farmTab, "Spray & fert", 2, saveWrap, nil, "care")
-local roll = Core.buildRayfieldGroup(seedTab, "Roll & Buy", 1, saveWrap, nil, "roll")
-local discard = Core.buildRayfieldGroup(seedTab, "Discard", 2, saveWrap, nil, "discard")
-local plantUp = Core.buildRayfieldGroup(upgradeTab, "Plants", 1, saveWrap, nil, "plant_up")
-local farmUp = Core.buildRayfieldGroup(upgradeTab, "Farm & Plot", 2, saveWrap, nil, "farm_up")
-local gearUp = Core.buildRayfieldGroup(upgradeTab, "Gear Upgrades", 1, saveWrap, nil, "gear_up")
-local gearShop = Core.buildRayfieldGroup(shopTab, "Gear", 1, saveWrap, nil, "gear_shop")
-local eggShop = Core.buildRayfieldGroup(shopTab, "Eggs", 2, saveWrap, nil, "egg_shop")
-local contracts = Core.buildRayfieldGroup(shopTab, "Contracts", 1, saveWrap, nil, "contracts")
-local eventSeed = Core.buildRayfieldGroup(eventTab, "Event Seeds", 1, saveWrap, nil, "event_seed")
-local eventShop = Core.buildRayfieldGroup(eventTab, "Event Shop", 2, saveWrap, nil, "event_shop")
-local eventCombat = Core.buildRayfieldGroup(eventTab, "Events & drops", 1, saveWrap, nil, "event_combat")
-local honey = Core.buildRayfieldGroup(eventTab, "Honey", 2, saveWrap, nil, "honey")
-local pets = Core.buildRayfieldGroup(petTab, "Pets", 1, saveWrap, nil, "pet_auto")
-local petSell = Core.buildRayfieldGroup(petTab, "Sell Pets", 2, saveWrap, nil, "pet_sell")
-local comp = Core.buildRayfieldGroup(petTab, "Composter", 1, saveWrap, nil, "comp")
-local fly = Core.buildRayfieldGroup(miscTab, "Movement", 1, saveWrap, nil, "fly")
-local util = Core.buildRayfieldGroup(miscTab, "Utilities", 1, saveWrap, nil, "util")
+local plant = Core.buildUiGroup(farmTab, "Planting", 1, saveWrap, nil, "plant")
+local plot = Core.buildUiGroup(farmTab, "Plot", 2, saveWrap, nil, "plot")
+local sell = Core.buildUiGroup(farmTab, "Selling", 1, saveWrap, nil, "sell")
+local care = Core.buildUiGroup(farmTab, "Spray & fert", 2, saveWrap, nil, "care")
+local roll = Core.buildUiGroup(seedTab, "Roll & Buy", 1, saveWrap, nil, "roll")
+local discard = Core.buildUiGroup(seedTab, "Discard", 2, saveWrap, nil, "discard")
+local plantUp = Core.buildUiGroup(upgradeTab, "Plants", 1, saveWrap, nil, "plant_up")
+local farmUp = Core.buildUiGroup(upgradeTab, "Farm & Plot", 2, saveWrap, nil, "farm_up")
+local gearUp = Core.buildUiGroup(upgradeTab, "Gear Upgrades", 1, saveWrap, nil, "gear_up")
+local gearShop = Core.buildUiGroup(shopTab, "Gear", 1, saveWrap, nil, "gear_shop")
+local eggShop = Core.buildUiGroup(shopTab, "Eggs", 2, saveWrap, nil, "egg_shop")
+local contracts = Core.buildUiGroup(shopTab, "Contracts", 1, saveWrap, nil, "contracts")
+local eventSeed = Core.buildUiGroup(eventTab, "Event Seeds", 1, saveWrap, nil, "event_seed")
+local eventShop = Core.buildUiGroup(eventTab, "Event Shop", 2, saveWrap, nil, "event_shop")
+local eventCombat = Core.buildUiGroup(eventTab, "Events & drops", 1, saveWrap, nil, "event_combat")
+local honey = Core.buildUiGroup(eventTab, "Honey", 2, saveWrap, nil, "honey")
+local pets = Core.buildUiGroup(petTab, "Pets", 1, saveWrap, nil, "pet_auto")
+local petSell = Core.buildUiGroup(petTab, "Sell Pets", 2, saveWrap, nil, "pet_sell")
+local comp = Core.buildUiGroup(petTab, "Composter", 1, saveWrap, nil, "comp")
+local fly = Core.buildUiGroup(miscTab, "Movement", 1, saveWrap, nil, "fly")
+local util = Core.buildUiGroup(miscTab, "Utilities", 1, saveWrap, nil, "util")
 
 local function bindToggle(group, label, key, tooltip)
 	group:CreateToggle(label, state[key], tooltip, function(value)
@@ -1970,7 +1970,6 @@ util:CreateButton("Save now", saveSettings)
 
 settingsTab:BuildThemeGroupbox(1)
 Core.buildScriptStatusGroupbox(settingsTab, 1, "build_a_ring_farm", VERSION)
-Core.buildRoScriptsSearch(settingsTab, 2, rayfield)
 
 notify("Alleral", "Loaded. Hover toggles for tips.")
 

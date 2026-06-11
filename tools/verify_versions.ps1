@@ -138,7 +138,7 @@ foreach ($pattern in $legacyPatterns) {
 }
 
 Get-ChildItem -Path $root -Recurse -Include *.luau,*.lua,*.json,*.md,*.ps1 -File |
-    Where-Object { $_.FullName -notmatch '\\vendor\\rayfield\\' -and $_.Name -ne 'verify_versions.ps1' } |
+    Where-Object { $_.FullName -notmatch '\\vendor\\obsidian\\' -and $_.Name -ne 'verify_versions.ps1' } |
     ForEach-Object {
         $text = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
         if (-not $text) { return }

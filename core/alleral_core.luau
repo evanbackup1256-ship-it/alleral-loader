@@ -1,37 +1,32 @@
 local Core = {}
-Core.VERSION = "2.0"
-Core.UI_LIBRARY = "Rayfield"
+Core.VERSION = "2.1"
+Core.UI_LIBRARY = "Obsidian"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
-local RAYFIELD_SOURCE_URL = "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua"
-local RAYFIELD_MIRROR_URLS = {
-	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/vendor/rayfield/source.lua",
-	"https://github.com/evanbackup1256-ship-it/kick/raw/main/vendor/rayfield/source.lua",
-	"https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua",
-	"https://github.com/SiriusSoftwareLtd/Rayfield/raw/main/source.lua",
+local OBSIDIAN_MIRROR_URLS = {
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/vendor/obsidian/",
+	"https://github.com/evanbackup1256-ship-it/kick/raw/main/vendor/obsidian/",
+	"https://raw.githubusercontent.com/deividcomsono/Obsidian/main/",
+	"https://github.com/deividcomsono/Obsidian/raw/main/",
 }
-local RAYFIELD_MIN_BYTES = 50000
-local RAYFIELD_LOCAL_FILES = {
-	"vendor/rayfield/source.lua",
-	"rayfield/source.lua",
+local OBSIDIAN_MIN_BYTES = 200000
+local OBSIDIAN_LOCAL_ROOTS = {
+	"vendor/obsidian/",
+	"obsidian/",
 }
-local RAYFIELD_THEME_NAMES = {
-	"Alleral",
-	"Default",
-	"Ocean",
-	"AmberGlow",
-	"Light",
-	"Amethyst",
-	"Green",
-	"Bloom",
-	"DarkBlue",
-	"Serenity",
+local OBSIDIAN_FILES = {
+	Library = "Library.lua",
+	ThemeManager = "addons/ThemeManager.lua",
+	SaveManager = "addons/SaveManager.lua",
 }
-local ROSCRIPTS_SEARCH_URL = "https://rscripts.net/api/v2/scripts"
-local ROSCRIPTS_SCRIPT_URL = "https://rscripts.net/api/v2/script"
-local ROSCRIPTS_WEB_HOME = "https://roscripts.io/"
-local ROSCRIPTS_WEB_SCRIPT = "https://rscripts.net/script/"
+local ALLERAL_THEME = {
+	FontColor = "ffffff",
+	MainColor = "121212",
+	AccentColor = "53fc18",
+	BackgroundColor = "0a0a0a",
+	OutlineColor = "1e1e1e",
+}
 
 local function genv()
 	local ok, env = pcall(function()
@@ -1005,34 +1000,39 @@ function Core.writeFile(path, data)
 	return pcall(writeFile, path, data)
 end
 
-local function rayfieldOk(library)
-	return type(library) == "table"
-		and type(library.CreateWindow) == "function"
-		and type(library.Notify) == "function"
+local function uiOk(bundle)
+	return type(bundle) == "table"
+		and type(bundle.Library) == "table"
+		and type(bundle.CreateWindow) == "function"
 end
 
-local function stampRayfield(library)
-	if type(library) ~= "table" then
-		return library
+local function stampUi(bundle)
+	if type(bundle) ~= "table" then
+		return bundle
 	end
-	library.InterfaceBuild = Core.UI_LIBRARY
-	library.UI_LIBRARY = Core.UI_LIBRARY
-	return library
+	bundle.InterfaceBuild = Core.UI_LIBRARY
+	bundle.UI_LIBRARY = Core.UI_LIBRARY
+	return bundle
 end
 
-local function rayfieldSourceValid(body)
-	return type(body) == "string"
-		and #body >= RAYFIELD_MIN_BYTES
-		and (body:find("RayfieldLibrary", 1, true) or body:find("CreateWindow", 1, true))
+local function obsidianSourceValid(body, kind)
+	if type(body) ~= "string" or body == "" then
+		return false
+	end
+	local minBytes = kind == "Library" and OBSIDIAN_MIN_BYTES or 8000
+	if #body < minBytes then
+		return false
+	end
+	return body:find("CreateWindow", 1, true) ~= nil or body:find("ThemeManager", 1, true) ~= nil
 end
 
-local function compileRayfieldSource(source, label)
+local function compileObsidianModule(source, label, kind)
 	local loadStringFn = Core.loadStringFn()
 	if not loadStringFn or not source or source == "" then
-		return nil, "Empty Rayfield source"
+		return nil, "Empty Obsidian source"
 	end
-	if not rayfieldSourceValid(source) then
-		return nil, "Rayfield source too small or invalid (" .. tostring(#source) .. " bytes)"
+	if not obsidianSourceValid(source, kind) then
+		return nil, "Obsidian source invalid (" .. tostring(#source) .. " bytes)"
 	end
 	local compiled, compileErr = loadStringFn(source, label)
 	if not compiled and type(load) == "function" and load ~= loadStringFn then
@@ -1042,94 +1042,168 @@ local function compileRayfieldSource(source, label)
 		return nil, tostring(compileErr)
 	end
 	local ok, result = pcall(compiled)
-	if ok and rayfieldOk(result) then
-		return stampRayfield(result)
+	if ok and type(result) == "table" then
+		return result
 	end
 	if not ok then
-		warn("[Alleral] Rayfield runtime error: " .. tostring(result))
+		warn("[Alleral] Obsidian module error: " .. tostring(result))
 	end
-	return nil, ok and "Invalid Rayfield library" or tostring(result)
+	return nil, ok and "Invalid Obsidian module" or tostring(result)
 end
 
-local function fetchRayfieldSourceFromUrl(url)
-	local sep = url:find("?") and "&" or "?"
-	local nonce = tick()
-	local fetchUrl = url .. sep .. "nocache=" .. tostring(nonce)
-	return Core.httpGet(fetchUrl)
+local function readObsidianLocal(relativePath)
+	local roots = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
+	for _, root in ipairs(roots) do
+		for _, vendorRoot in ipairs(OBSIDIAN_LOCAL_ROOTS) do
+			local fullPath = root .. vendorRoot .. relativePath
+			local source = Core.readFile(fullPath)
+			if source then
+				return source, fullPath
+			end
+		end
+	end
+	return nil
 end
 
-local function fetchRayfieldSource()
-	for _, url in ipairs(RAYFIELD_MIRROR_URLS) do
-		local body = fetchRayfieldSourceFromUrl(url)
-		if rayfieldSourceValid(body) then
+local function fetchObsidianRemote(relativePath, kind)
+	for _, base in ipairs(OBSIDIAN_MIRROR_URLS) do
+		local url = base .. relativePath
+		local body = Core.httpGet(url)
+		if obsidianSourceValid(body, kind) then
 			return body, url
 		end
 	end
-	return nil, nil
+	return nil
 end
 
-local function cacheRayfield(library)
-	stampRayfield(library)
-	ENV.Alleral_Rayfield = library
-	ENV.Alleral_UI = library
-	return library
-end
-
-function Core.loadRayfield()
-	local cached = ENV.Alleral_Rayfield or ENV.Alleral_UI
-	if rayfieldOk(cached) then
-		return cacheRayfield(cached)
+local function loadObsidianModule(relativePath, kind)
+	local localSource, localPath = readObsidianLocal(relativePath)
+	if localSource then
+		local module, err = compileObsidianModule(localSource, "@Obsidian/local:" .. localPath, kind)
+		if module then
+			return module
+		end
+		warn("[Alleral] Local Obsidian failed (" .. tostring(localPath) .. "): " .. tostring(err))
 	end
-	ENV.Alleral_Rayfield = nil
+	local remoteSource, remoteUrl = fetchObsidianRemote(relativePath, kind)
+	if remoteSource then
+		local module, err = compileObsidianModule(remoteSource, "@Obsidian/remote:" .. tostring(remoteUrl), kind)
+		if module then
+			warn("[Alleral] Obsidian loaded " .. relativePath .. " from " .. tostring(remoteUrl))
+			return module
+		end
+		warn("[Alleral] Remote Obsidian failed (" .. relativePath .. "): " .. tostring(err))
+	end
+	localSource = readObsidianLocal(relativePath)
+	if localSource then
+		return compileObsidianModule(localSource, "@Obsidian/local", kind)
+	end
+	return nil, "Obsidian download failed for " .. relativePath
+end
+
+local function listUiThemes(themeManager)
+	local names = {}
+	if type(themeManager) == "table" and type(themeManager.BuiltInThemes) == "table" then
+		for name in pairs(themeManager.BuiltInThemes) do
+			table.insert(names, name)
+		end
+		table.sort(names, function(a, b)
+			if a == "Alleral" then
+				return true
+			end
+			if b == "Alleral" then
+				return false
+			end
+			return a < b
+		end)
+	end
+	if #names == 0 then
+		return { "Alleral", "Default" }
+	end
+	return names
+end
+
+local function applyAlleralTheme(bundle)
+	if type(bundle) ~= "table" then
+		return
+	end
+	local themeManager = bundle.ThemeManager
+	local library = bundle.Library
+	if type(themeManager) ~= "table" or type(library) ~= "table" then
+		return
+	end
+	themeManager.BuiltInThemes = themeManager.BuiltInThemes or {}
+	themeManager.BuiltInThemes.Alleral = { 0, ALLERAL_THEME }
+	pcall(function()
+		themeManager:SetLibrary(library)
+		themeManager:ApplyTheme("Alleral")
+	end)
+end
+
+local function cacheUi(bundle)
+	stampUi(bundle)
+	ENV.Alleral_UI = bundle
+	ENV.Alleral_Rayfield = bundle
+	return bundle
+end
+
+function Core.loadUi()
+	local cached = ENV.Alleral_UI or ENV.Alleral_Rayfield
+	if uiOk(cached) then
+		return cacheUi(cached)
+	end
 	ENV.Alleral_UI = nil
+	ENV.Alleral_Rayfield = nil
 
 	local loadStringFn = Core.loadStringFn()
 	if not loadStringFn then
 		return nil, "loadstring unavailable"
 	end
 
-	local function loadLocalRayfield()
-		local roots = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
-		for _, root in ipairs(roots) do
-			for _, path in ipairs(RAYFIELD_LOCAL_FILES) do
-				local fullPath = root .. path
-				local source = Core.readFile(fullPath)
-				if source then
-					local library, err = compileRayfieldSource(source, "@Rayfield/local:" .. fullPath)
-					if library then
-						warn("[Alleral] Rayfield loaded from " .. fullPath)
-						return cacheRayfield(library)
-					end
-					warn("[Alleral] Local Rayfield failed (" .. fullPath .. "): " .. tostring(err))
-				end
+	local Library, libErr = loadObsidianModule(OBSIDIAN_FILES.Library, "Library")
+	if not Library then
+		return nil, libErr or "Obsidian Library missing"
+	end
+	local ThemeManager = loadObsidianModule(OBSIDIAN_FILES.ThemeManager, "ThemeManager")
+	local SaveManager = loadObsidianModule(OBSIDIAN_FILES.SaveManager, "SaveManager")
+	if not ThemeManager or not SaveManager then
+		return nil, "Obsidian addons missing"
+	end
+
+	pcall(function()
+		ThemeManager:SetLibrary(Library)
+		SaveManager:SetLibrary(Library)
+		SaveManager:IgnoreThemeSettings()
+	end)
+
+	local bundle = {
+		Library = Library,
+		ThemeManager = ThemeManager,
+		SaveManager = SaveManager,
+		Toggles = Library.Toggles,
+		Options = Library.Options,
+		CreateWindow = function(_, settings)
+			return Library:CreateWindow(settings)
+		end,
+		Notify = function(_, info)
+			if type(info) == "table" then
+				Library:Notify({
+					Title = info.Title,
+					Description = info.Content or info.Description or info.Text or "",
+					Time = info.Duration or info.Time or 4,
+				})
+			else
+				Library:Notify(tostring(info or ""))
 			end
-		end
-		return nil
-	end
-
-	local localLibrary = loadLocalRayfield()
-	if localLibrary then
-		return localLibrary
-	end
-
-	local source, sourceUrl = fetchRayfieldSource()
-	if source then
-		local library, err = compileRayfieldSource(source, "@Rayfield/remote")
-		if library then
-			warn("[Alleral] Rayfield loaded from " .. tostring(sourceUrl or RAYFIELD_SOURCE_URL))
-			return cacheRayfield(library)
-		end
-		warn("[Alleral] Rayfield compile failed: " .. tostring(err))
-		return nil, err or "Invalid Rayfield library"
-	end
-
-	localLibrary = loadLocalRayfield()
-	if localLibrary then
-		return localLibrary
-	end
-
-	return nil, "Rayfield download failed — check HTTP or docs.sirius.menu/rayfield"
+		end,
+	}
+	applyAlleralTheme(bundle)
+	bundle.ThemeNames = listUiThemes(ThemeManager)
+	warn("[Alleral] Obsidian UI ready")
+	return cacheUi(bundle)
 end
+
+Core.loadRayfield = Core.loadUi
 
 function Core.httpGet(url)
 	if type(url) ~= "string" or url == "" then
@@ -1253,7 +1327,7 @@ function Core.httpGetJson(url)
 		return HttpService:JSONDecode(body)
 	end)
 	if not ok or type(decoded) ~= "table" then
-		return nil, "Invalid response from RoScripts"
+		return nil, "Invalid JSON response"
 	end
 	return decoded
 end
@@ -1267,248 +1341,11 @@ function Core.setClipboard(text)
 	return false
 end
 
-function Core.searchRoScripts(query, options)
-	options = options or {}
-	query = trimText(query)
-	if query == "" then
-		return nil, "Enter a search term"
-	end
-	local params = {
-		"page=" .. tostring(options.page or 1),
-		"orderBy=" .. HttpService:UrlEncode(options.orderBy or "views"),
-		"sort=desc",
-		"q=" .. HttpService:UrlEncode(query),
-	}
-	if options.freeOnly ~= false then
-		table.insert(params, "notPaid=true")
-	end
-	if options.noKey then
-		table.insert(params, "noKeySystem=true")
-	end
-	if options.unpatched then
-		table.insert(params, "unpatched=true")
-	end
-	local url = ROSCRIPTS_SEARCH_URL .. "?" .. table.concat(params, "&")
-	local data, err = Core.httpGetJson(url)
-	if not data then
-		return nil, err
-	end
-	if type(data.scripts) ~= "table" then
-		return nil, "RoScripts returned no results"
-	end
-	return {
-		scripts = data.scripts,
-		page = data.info and data.info.currentPage or 1,
-		maxPages = data.info and data.info.maxPages or 1,
-	}, nil
-end
-
-function Core.formatRoScriptLabel(entry)
-	local title = tostring(entry.title or "Untitled")
-	if #title > 46 then
-		title = title:sub(1, 43) .. "..."
-	end
-	local gameTitle = entry.game and entry.game.title or "Universal"
-	local author = entry.user and entry.user.username or "unknown"
-	local suffix = entry.keySystem and " [Key]" or ""
-	return title .. " — " .. gameTitle .. " (@" .. author .. ")" .. suffix
-end
-
-function Core.roScriptWebUrl(entry)
-	if type(entry) ~= "table" then
-		return ROSCRIPTS_WEB_HOME
-	end
-	if entry.slug and entry.slug ~= "" then
-		return ROSCRIPTS_WEB_SCRIPT .. entry.slug
-	end
-	if entry._id then
-		return ROSCRIPTS_WEB_SCRIPT .. tostring(entry._id)
-	end
-	return ROSCRIPTS_WEB_HOME
-end
-
-function Core.executeRoScript(entry, rayfield)
-	if type(entry) ~= "table" or type(entry.rawScript) ~= "string" or entry.rawScript == "" then
-		return false, "No script selected"
-	end
-	local notify = rayfield and rayfield.Notify
-	if notify then
-		pcall(notify, rayfield, {
-			Title = "RoScripts",
-			Content = "Loading: " .. tostring(entry.title or "script"),
-			Duration = 4,
-		})
-	end
-	local source = Core.httpGet(entry.rawScript)
-	if not source or source == "" then
-		return false, "Could not download script source"
-	end
-	local loadStringFn = Core.loadStringFn()
-	if not loadStringFn then
-		return false, "loadstring unavailable"
-	end
-	local compiled, compileErr = loadStringFn(source, "@RoScripts/" .. tostring(entry.slug or entry._id or "script"))
-	if not compiled then
-		return false, tostring(compileErr)
-	end
-	local ok, runErr = pcall(compiled)
-	if not ok then
-		return false, tostring(runErr)
-	end
-	return true
-end
-
-function Core.buildRoScriptsSearch(tab, column, rayfield)
-	local group = Core.buildRayfieldGroup(tab, "RoScripts", column or 2)
-	local browser = {
-		query = "",
-		freeOnly = true,
-		noKey = false,
-		entries = {},
-		byLabel = {},
-		selected = nil,
-	}
-
-	local status = group:CreateStatus("RoScripts", {
-		Status = "Ready",
-		Results = "0",
-		Selected = "None",
-	})
-
-	group:CreateToggle("Free scripts only", true, nil, function(value)
-		browser.freeOnly = value == true
-	end)
-	group:CreateToggle("No key system", false, nil, function(value)
-		browser.noKey = value == true
-	end)
-
-	local queryInput = group:CreateInput("Search query", "auto farm, hub, ESP...", "", function(text)
-		browser.query = tostring(text or "")
-	end)
-
-	local resultsDropdown
-
-	local function applyResults(entries)
-		browser.entries = entries or {}
-		browser.byLabel = {}
-		local labels = {}
-		for index, entry in ipairs(browser.entries) do
-			local label = Core.formatRoScriptLabel(entry)
-			browser.byLabel[label] = entry
-			labels[index] = label
-		end
-		if #labels == 0 then
-			labels = { "No results" }
-			browser.selected = nil
-		else
-			browser.selected = browser.entries[1]
-		end
-		if resultsDropdown then
-			resultsDropdown:Refresh(labels, labels[1])
-		end
-		status:Update("Results", tostring(#browser.entries))
-		status:Update("Selected", browser.selected and browser.selected.title or "None")
-	end
-
-	local function runSearch(query)
-		query = trimText(query)
-		if query == "" then
-			status:Update("Status", "Enter a search term")
-			return
-		end
-		status:Update("Status", "Searching...")
-		task.spawn(function()
-			local data, err = Core.searchRoScripts(query, {
-				freeOnly = browser.freeOnly,
-				noKey = browser.noKey,
-			})
-			if not data then
-				status:Update("Status", tostring(err or "Search failed"))
-				applyResults({})
-				return
-			end
-			status:Update("Status", "Found " .. tostring(#data.scripts) .. " script(s)")
-			applyResults(data.scripts)
-		end)
-	end
-
-	resultsDropdown = group:AddDropdown("roscripts_results", {
-		Text = "Results",
-		Values = { "Search to populate" },
-		Default = "Search to populate",
-		Callback = function(selected)
-			browser.selected = browser.byLabel[selected]
-			status:Update("Selected", browser.selected and browser.selected.title or "None")
-		end,
-	})
-
-	group:CreateButton("Search RoScripts", function()
-		runSearch(browser.query)
-	end, "Query RoScripts.io via rscripts.net API")
-
-	group:CreateButton("Search this game", function()
-		local gameName = ""
-		pcall(function()
-			gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
-		end)
-		if gameName == "" then
-			gameName = tostring(game.PlaceId)
-		end
-		browser.query = gameName
-		if queryInput and queryInput.Set then
-			queryInput:Set({ CurrentValue = gameName })
-		end
-		runSearch(gameName)
-	end, "Find scripts for the current place")
-
-	group:CreateButton("Load selected script", function()
-		local ok, err = Core.executeRoScript(browser.selected, rayfield)
-		if ok then
-			status:Update("Status", "Script loaded")
-			Core.notify("RoScripts", "Script executed.", 3)
-		else
-			status:Update("Status", tostring(err or "Load failed"))
-			Core.notify("RoScripts", tostring(err or "Load failed"), 5)
-		end
-	end, "Runs the selected script in your executor")
-
-	group:CreateButton("Copy RoScripts link", function()
-		local url = Core.roScriptWebUrl(browser.selected)
-		if Core.setClipboard(url) then
-			status:Update("Status", "Link copied")
-			Core.notify("RoScripts", "Link copied to clipboard.", 3)
-		else
-			status:Update("Status", "Clipboard unavailable")
-		end
-	end)
-
-	group:CreateButton("Open RoScripts.io", function()
-		if Core.setClipboard(ROSCRIPTS_WEB_HOME) then
-			Core.notify("RoScripts", "Open roscripts.io in your browser.", 4)
-		end
-	end)
-
-	group:CreateLabel("Powered by RoScripts.io")
-	return group
-end
-
-local function fakeUiInstance(visible)
-	return {
-		Visible = visible ~= false,
-		Name = "AlleralGroupShell",
-	}
-end
-
-function Core.createRayfieldGroupbox(tab, sectionName)
-	if sectionName and sectionName ~= "" then
-		tab:CreateSection(sectionName)
-	end
-
-	local shell = fakeUiInstance(true)
-	local groupbox = {
-		Instance = shell,
-		ParentingItem = shell,
-	}
+function Core.createObsidianGroupbox(rawGroup, uiBundle)
+	rawGroup = rawGroup or {}
+	uiBundle = uiBundle or {}
+	local toggles = uiBundle.Toggles or {}
+	local options = uiBundle.Options or {}
 	local serial = 0
 
 	local function nextFlag(name, explicit)
@@ -1516,158 +1353,214 @@ function Core.createRayfieldGroupbox(tab, sectionName)
 		return explicit or Core.uiElementId(name) .. "_" .. serial
 	end
 
-	local function wrapElement(elem, applySet)
+	local function wrapElement(applySet)
 		return {
-			Instance = shell,
 			Set = function(_, settings)
 				if type(settings) == "table" then
-					applySet(settings, elem)
+					applySet(settings)
 				else
-					applySet({ CurrentValue = settings }, elem)
+					applySet({ CurrentValue = settings })
 				end
 			end,
 		}
 	end
 
+	local function dropdownDefault(values, current, multi)
+		values = values or {}
+		if multi then
+			if type(current) == "table" then
+				local map = {}
+				for key, value in pairs(current) do
+					if type(key) == "number" then
+						map[tostring(value)] = true
+					elseif value == true then
+						map[tostring(key)] = true
+					end
+				end
+				return map
+			end
+			if current and current ~= "" then
+				return { [tostring(current)] = true }
+			end
+			return {}
+		end
+		if type(current) == "table" then
+			return current[1] or values[1]
+		end
+		if current and current ~= "" then
+			return tostring(current)
+		end
+		return values[1]
+	end
+
+	local groupbox = {}
+
 	function groupbox:CreateToggle(settings, id)
-		local elem = tab:CreateToggle({
-			Name = settings.Name,
-			CurrentValue = settings.CurrentValue == true,
-			Flag = nextFlag(settings.Name, id),
+		local flag = nextFlag(settings.Name, id)
+		rawGroup:AddToggle(flag, {
+			Text = settings.Name,
+			Default = settings.CurrentValue == true,
+			Tooltip = settings.Tooltip,
 			Callback = settings.Callback or function() end,
 		})
-		return wrapElement(elem, function(nextSettings)
-			if nextSettings.CurrentValue ~= nil then
-				elem:Set(nextSettings.CurrentValue == true)
+		local toggle = toggles[flag]
+		return wrapElement(function(nextSettings)
+			if nextSettings.CurrentValue ~= nil and toggle then
+				toggle:SetValue(nextSettings.CurrentValue == true)
 			end
 		end)
 	end
 
 	function groupbox:CreateSlider(settings, id)
 		local range = settings.Range or { 0, 100 }
-		local elem = tab:CreateSlider({
-			Name = settings.Name,
-			Range = range,
-			Increment = settings.Increment or (range[2] <= 5 and 0.05 or 1),
+		local minValue, maxValue = range[1], range[2]
+		local flag = nextFlag(settings.Name, id)
+		rawGroup:AddSlider(flag, {
+			Text = settings.Name,
+			Default = tonumber(settings.CurrentValue) or minValue,
+			Min = minValue,
+			Max = maxValue,
+			Rounding = settings.Increment or (maxValue <= 5 and 1 or 0),
 			Suffix = settings.Suffix,
-			CurrentValue = tonumber(settings.CurrentValue) or range[1],
-			Flag = nextFlag(settings.Name, id),
+			Tooltip = settings.Tooltip,
 			Callback = settings.Callback or function() end,
 		})
-		return wrapElement(elem, function(nextSettings)
-			if nextSettings.CurrentValue ~= nil then
-				elem:Set(tonumber(nextSettings.CurrentValue) or range[1])
+		local slider = options[flag]
+		return wrapElement(function(nextSettings)
+			if nextSettings.CurrentValue ~= nil and slider then
+				slider:SetValue(tonumber(nextSettings.CurrentValue) or minValue)
 			end
 		end)
 	end
 
 	function groupbox:CreateButton(settings, id)
-		local elem = tab:CreateButton({
-			Name = settings.Name,
-			Callback = settings.Callback or function() end,
+		rawGroup:AddButton({
+			Text = settings.Name,
+			Func = settings.Callback or function() end,
+			Tooltip = settings.Tooltip,
 		})
-		return wrapElement(elem, function(nextSettings)
-			if nextSettings.Name then
-				elem:Set(nextSettings.Name)
-			end
-		end)
+		return { Set = function() end }
 	end
 
 	function groupbox:CreateInput(settings, id)
-		local elem = tab:CreateInput({
-			Name = settings.Name,
-			PlaceholderText = settings.PlaceholderText or settings.Placeholder or "",
-			CurrentValue = settings.CurrentValue or "",
-			RemoveTextAfterFocusLost = settings.RemoveTextOnFocus == true,
-			Flag = nextFlag(settings.Name, id),
+		local flag = nextFlag(settings.Name, id)
+		rawGroup:AddInput(flag, {
+			Text = settings.Name,
+			Default = settings.CurrentValue or "",
+			Placeholder = settings.PlaceholderText or settings.Placeholder or "",
+			Tooltip = settings.Tooltip,
 			Callback = settings.Callback or function() end,
 		})
-		return wrapElement(elem, function(nextSettings)
-			if nextSettings.CurrentValue ~= nil then
-				elem:Set(tostring(nextSettings.CurrentValue))
+		local input = options[flag]
+		return wrapElement(function(nextSettings)
+			if nextSettings.CurrentValue ~= nil and input then
+				if input.SetText then
+					input:SetText(tostring(nextSettings.CurrentValue))
+				elseif input.SetValue then
+					input:SetValue(tostring(nextSettings.CurrentValue))
+				end
 			end
 		end)
 	end
 
 	function groupbox:CreateDropdown(settings, id)
-		local current = settings.CurrentOption
-		if type(current) ~= "table" then
-			current = current and current ~= "" and { tostring(current) } or {}
-		end
-		local elem = tab:CreateDropdown({
-			Name = settings.Name,
-			Options = settings.Options or settings.Values or {},
-			CurrentOption = current,
-			MultipleOptions = settings.MultipleOptions == true,
-			Flag = nextFlag(settings.Name, id),
+		local values = settings.Options or settings.Values or {}
+		local multi = settings.MultipleOptions == true
+		local flag = nextFlag(settings.Name, id)
+		rawGroup:AddDropdown(flag, {
+			Text = settings.Name,
+			Values = values,
+			Default = dropdownDefault(values, settings.CurrentOption, multi),
+			Multi = multi,
+			Tooltip = settings.Tooltip,
 			Callback = settings.Callback or function() end,
 		})
-		return wrapElement(elem, function(nextSettings)
-			if nextSettings.CurrentOption or nextSettings.CurrentOptions then
-				elem:Set(nextSettings.CurrentOption or nextSettings.CurrentOptions)
+		local dropdown = options[flag]
+		return wrapElement(function(nextSettings)
+			if not dropdown then
+				return
+			end
+			local nextValues = nextSettings.Options or nextSettings.Values
+			if nextValues then
+				dropdown:SetValues(nextValues)
+			end
+			local pick = nextSettings.CurrentOption or nextSettings.CurrentOptions
+			if pick == nil then
+				return
+			end
+			if multi and type(pick) == "table" then
+				local map = {}
+				for index, value in ipairs(pick) do
+					map[tostring(value)] = true
+				end
+				for key, value in pairs(pick) do
+					if type(key) ~= "number" then
+						map[tostring(key)] = value == true
+					end
+				end
+				dropdown:SetValue(map)
+			else
+				dropdown:SetValue(type(pick) == "table" and pick[1] or pick)
 			end
 		end)
 	end
 
 	function groupbox:CreateLabel(settings, id)
 		local text = type(settings) == "table" and (settings.Name or settings.Text) or tostring(settings or "")
-		local elem = tab:CreateLabel(text)
+		local label = rawGroup:AddLabel(text)
 		return {
-			Instance = shell,
 			Set = function(_, nextSettings)
 				local nextText = type(nextSettings) == "table" and (nextSettings.Name or nextSettings.Text)
 					or tostring(nextSettings or "")
-				elem:Set(nextText)
-			end,
-			AddDropdown = function(_, nestedSettings, nestedId)
-				return groupbox:CreateDropdown({
-					Name = nestedSettings.Name or text,
-					Options = nestedSettings.Options or nestedSettings.Values or {},
-					CurrentOption = nestedSettings.CurrentOption,
-					MultipleOptions = nestedSettings.MultipleOptions,
-					Callback = nestedSettings.Callback,
-				}, nestedId)
+				if label and label.SetText then
+					label:SetText(nextText)
+				end
 			end,
 		}
 	end
 
 	function groupbox:CreateDivider()
-		tab:CreateDivider()
-		return { Instance = shell }
+		rawGroup:AddDivider()
+		return {}
 	end
 
 	return groupbox
 end
 
-function Core.wrapRayfieldTab(rawTab, rayfield, window)
+function Core.wrapUiTab(rawTab, uiBundle, window)
 	local tab = {
 		_rawTab = rawTab,
-		_rayfield = rayfield,
+		_ui = uiBundle,
 		_window = window,
 	}
 
 	function tab:CreateGroupbox(settings)
-		return Core.createRayfieldGroupbox(rawTab, settings and settings.Name)
+		settings = settings or {}
+		local name = settings.Name or "Group"
+		local column = settings.Column or 1
+		local rawGroup = (column == 2) and rawTab:AddRightGroupbox(name) or rawTab:AddLeftGroupbox(name)
+		return Core.createObsidianGroupbox(rawGroup, uiBundle)
 	end
 
 	function tab:BuildThemeGroupbox(column)
-		local group = Core.buildRayfieldGroup(tab, "Appearance", column or 1)
-		group:CreateDropdown("Theme preset", RAYFIELD_THEME_NAMES, "Default", function(selected)
-			if window and type(window.ModifyTheme) == "function" then
-				window:ModifyTheme(selected)
-			elseif rayfield and rayfield.Notify then
-				rayfield:Notify({
-					Title = "Theme",
-					Content = "Applied " .. tostring(selected),
-					Duration = 2,
-				})
+		local group = Core.buildUiGroup(tab, "Appearance", column or 1)
+		local themes = (uiBundle and uiBundle.ThemeNames) or { "Alleral", "Default" }
+		group:CreateDropdown("Theme preset", themes, "Alleral", function(selected)
+			if uiBundle and uiBundle.ThemeManager then
+				pcall(function()
+					uiBundle.ThemeManager:ApplyTheme(selected)
+				end)
 			end
+			Core.notify("Theme", "Applied " .. tostring(selected), 2)
 		end)
 		return group
 	end
 
 	return tab
 end
+
+Core.wrapRayfieldTab = Core.wrapUiTab
+
 
 function Core.ensureCore()
 	if ENV.Alleral_Core then
@@ -1724,9 +1617,9 @@ function Core.prepareGame(state)
 	if state.AntiAFK ~= false then
 		core.setupAntiAfk(game:GetService("Players").LocalPlayer)
 	end
-	local uiLibrary, err = core.loadRayfield()
+	local uiLibrary, err = core.loadUi()
 	if not uiLibrary then
-		local msg = err or "Rayfield unavailable"
+		local msg = err or "UI unavailable"
 		signalBootFailure(msg)
 		return nil, nil, msg
 	end
@@ -1904,9 +1797,8 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 	end
 
 	local function setVisible(element, visible)
-		waitForElement(element, 1)
-		if element and element.Instance then
-			element.Instance.Visible = visible
+		if element and element.TextLabel then
+			element.TextLabel.Visible = visible
 		end
 	end
 
@@ -1987,15 +1879,10 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 		local multi = config.Multi == true or config.MultiSelection == true
 		local values = normalizeOptions(config.Values or config.Options)
 		local current = currentSelection(config.Default or config.CurrentValue or config.CurrentOption, multi)
-		local label = groupbox:CreateLabel({
-			Name = config.Text or config.Name or id,
-			Tooltip = config.Tooltip or config.Description,
-		}, nextId(id))
 		local handle = {
 			Values = values,
 			Selection = current,
 			Dropdown = nil,
-			Label = label,
 			LastSearch = "",
 		}
 		local function safeCallback(selection)
@@ -2019,51 +1906,13 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 				})
 			end
 		end
-		if not waitForElement(label, 3) or not instanceHasChild(label.Instance, "DropdownHolder") then
-			local renderedValues = config.Searchable and compactOptions(values, current) or values
-			local dropdown = groupbox:CreateDropdown({
-				Name = config.Text or config.Name or id,
-				Options = renderedValues,
-				Values = renderedValues,
-				CurrentOption = current,
-				MultipleOptions = multi,
-				Callback = safeCallback,
-			}, nextId(id .. "_dd"))
-			handle.Dropdown = dropdown
-			function handle:SetValues(newValues, newDefault)
-				self.Values = normalizeOptions(newValues)
-				self.Selection = currentSelection(newDefault or self.Selection, multi)
-				rebuild(self.Values)
-			end
-			function handle:Refresh(newValues, newDefault)
-				self:SetValues(newValues, newDefault)
-			end
-			function handle:Search(query)
-				self.LastSearch = tostring(query or "")
-				local filtered = self.LastSearch == "" and self.Values
-					or compactOptions(Core.filterDropdownOptions(self.Values, self.LastSearch), self.Selection)
-				rebuild(filtered)
-			end
-			if config.Searchable then
-				groupbox:CreateInput({
-					Name = (config.Text or config.Name or id) .. " filter",
-					PlaceholderText = "search...",
-					RemoveTextOnFocus = false,
-					Callback = wrap((config.Text or config.Name or id) .. " Search", function(text)
-						handle:Search(text)
-					end),
-				}, nextId(id .. "_search"))
-			end
-			return handle
-		end
 		local renderedValues = config.Searchable and compactOptions(values, current) or values
-		local dropdown = label:AddDropdown({
+		local dropdown = groupbox:CreateDropdown({
+			Name = config.Text or config.Name or id,
 			Options = renderedValues,
 			Values = renderedValues,
 			CurrentOption = current,
-			CurrentOptions = multi and current or nil,
 			MultipleOptions = multi,
-			Placeholder = config.Placeholder or "--",
 			Callback = safeCallback,
 		}, nextId(id .. "_dd"))
 		handle.Dropdown = dropdown
@@ -2148,44 +1997,50 @@ function Core.uiElementId(text)
 	return (tostring(text or "Element"):gsub("[^%w_]", "_"))
 end
 
-function Core.buildRayfieldWindow(rayfield, settings)
+function Core.buildUiWindow(ui, settings)
 	settings = settings or {}
+	local lib = ui and ui.Library
+	if not lib then
+		return nil
+	end
 	local fileSettings = settings.FileSettings or {}
-	local window = rayfield:CreateWindow({
-		Name = settings.Name or "Alleral",
-		LoadingTitle = settings.Name or "Alleral",
-		LoadingSubtitle = settings.Subtitle or "",
+	local window = lib:CreateWindow({
+		Title = settings.Name or "Alleral",
+		Footer = settings.Subtitle or "",
 		Icon = tonumber(Core.uiIcon(settings.Icon or 10723407389)) or 10723407389,
-		ConfigurationSaving = {
-			Enabled = fileSettings.Enabled ~= false,
-			FolderName = fileSettings.RootFolder or fileSettings.ConfigFolder or "Alleral_Configs",
-			FileName = fileSettings.FileName or tostring(game.PlaceId),
-		},
-		DisableRayfieldPrompts = true,
-		DisableBuildWarnings = true,
-		KeySystem = false,
+		Center = true,
+		AutoShow = true,
+		NotifySide = "Right",
+		Resizable = true,
+		GlobalSearch = true,
 	})
-	window._rayfield = rayfield
-	if type(window.ModifyTheme) == "function" then
+	applyAlleralTheme(ui)
+	if ui.SaveManager and fileSettings.Enabled ~= false then
 		pcall(function()
-			window:ModifyTheme("Alleral")
+			ui.SaveManager:SetFolder(fileSettings.RootFolder or fileSettings.ConfigFolder or "Alleral_Configs")
 		end)
 	end
+	window._ui = ui
+	window._library = lib
 	return window
 end
 
-function Core.buildRayfieldSection(window, name, expanded)
+function Core.buildUiSection(window)
 	return {
 		_window = window,
-		_rayfield = window._rayfield,
+		_ui = window._ui,
 	}
 end
 
-function Core.buildRayfieldTab(section, name, icon, columns, id)
+function Core.buildUiTab(section, name, icon, columns, id)
 	local window = section._window or section
-	local rawTab = window:CreateTab(name, tonumber(Core.uiIcon(icon or 10723407389)) or 10723407389)
-	return Core.wrapRayfieldTab(rawTab, window._rayfield or section._rayfield, window)
+	local rawTab = window:AddTab(name)
+	return Core.wrapUiTab(rawTab, window._ui or section._ui, window)
 end
+
+Core.buildRayfieldWindow = Core.buildUiWindow
+Core.buildRayfieldSection = Core.buildUiSection
+Core.buildRayfieldTab = Core.buildUiTab
 
 function Core.onUiSave(saveFn)
 	return function(_, callback)
@@ -2199,7 +2054,7 @@ function Core.onUiSave(saveFn)
 	end
 end
 
-function Core.buildRayfieldGroup(tab, name, column, callbackWrapper, icon, id)
+function Core.buildUiGroup(tab, name, column, callbackWrapper, icon, id)
 	local groupbox = tab:CreateGroupbox({
 		Name = name,
 		Column = column or 1,
@@ -2210,6 +2065,8 @@ function Core.buildRayfieldGroup(tab, name, column, callbackWrapper, icon, id)
 	end
 	return Core.wrapUiGroup(groupbox)
 end
+
+Core.buildRayfieldGroup = Core.buildUiGroup
 
 function Core.filterDropdownOptions(values, query)
 	query = tostring(query or ""):lower()

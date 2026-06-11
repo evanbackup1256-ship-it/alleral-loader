@@ -10,7 +10,7 @@ loader.luau (GitHub HttpGet — only entry point)
     ├── detect game by PlaceId
     ├── download core/alleral_core.luau
     ├── load analytics, helpers, telemetry
-    ├── preload Rayfield
+    ├── preload Obsidian UI
     └── run games/*.luau
 ```
 
@@ -37,12 +37,12 @@ The WEAO client tries every base × transport × cache-busted URL, validates JSO
 
 | Component | Version | File |
 |-----------|---------|------|
-| Loader | 7.0.0 | `loader.luau`, `config/release.json` |
-| Core | 2.0 | `core/alleral_core.luau` |
+| Loader | 7.1.0 | `loader.luau`, `config/release.json` |
+| Core | 2.1 | `core/alleral_core.luau` |
+| UI | Obsidian | `vendor/obsidian/` |
 | Telemetry | 3.0 | `core/telemetry.luau`, `config/telemetry.json` |
 | WEAO | 1.0 | `core/weao.luau`, `config/weao.json` |
 | Analytics | 1.0 | `core/analytics.luau` |
-| Telemetry | 2.2 | `core/telemetry.luau` |
 | Helpers | 1.0 | `core/game_helpers.luau` |
 | Game scripts | per-game | `games/*.luau`, `config/scripts_manifest.json` |
 

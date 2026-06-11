@@ -15,7 +15,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-i
 You should see:
 
 ```
-=== Alleral 7.0.0 active ===
+=== Alleral 7.1.0 active ===
 ```
 
 If you see an old version, delete saved Alleral scripts in Volt and run the line above again.

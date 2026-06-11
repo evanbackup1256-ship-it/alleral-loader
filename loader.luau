@@ -3,8 +3,8 @@
 	Fetch from GitHub; do not use launch/load/bootstrap/run scripts.
 ]]
 
-local LOADER_VERSION = "7.0.0"
-local MIN_CORE = "2.0"
+local LOADER_VERSION = "7.1.0"
+local MIN_CORE = "2.1"
 local CORE_MIN_BYTES = 50000
 local RELEASE_FALLBACK = {
 	core = "2.0",
@@ -879,7 +879,7 @@ local function coreVersionOk(v)
 end
 
 local function coreValid(src)
-	if type(src) ~= "string" or #src < CORE_MIN_BYTES or not src:find("loadRayfield", 1, true) then
+	if type(src) ~= "string" or #src < CORE_MIN_BYTES or not src:find("loadUi", 1, true) then
 		return false
 	end
 	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
@@ -903,8 +903,8 @@ local function coreRejectReason(src)
 	if #src < CORE_MIN_BYTES then
 		return tostring(#src) .. "b, need " .. tostring(CORE_MIN_BYTES) .. "b+"
 	end
-	if not src:find("loadRayfield", 1, true) then
-		return "missing loadRayfield"
+	if not src:find("loadUi", 1, true) then
+		return "missing loadUi"
 	end
 	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
 	if not coreVersionOk(ver) then
@@ -976,7 +976,7 @@ local function loadCore()
 		ENV.Alleral_Core = nil
 		return false, err
 	end
-	if not ENV.Alleral_Core or type(ENV.Alleral_Core.loadRayfield) ~= "function" then
+	if not ENV.Alleral_Core or type(ENV.Alleral_Core.loadUi) ~= "function" then
 		return false, "Core did not initialize"
 	end
 	log("Core v" .. tostring(ENV.Alleral_Core.VERSION) .. " from " .. label)
@@ -1826,14 +1826,14 @@ local function main()
 	loadModule({ "core/telemetry.luau" }, "core/telemetry.luau", "Alleral_Telemetry", "Alleral/telemetry")
 	wireTelemetry(profile)
 
-	if ENV.Alleral_Core and type(ENV.Alleral_Core.loadRayfield) == "function" then
-		local ui, uiErr = ENV.Alleral_Core.loadRayfield()
+	if ENV.Alleral_Core and type(ENV.Alleral_Core.loadUi) == "function" then
+		local ui, uiErr = ENV.Alleral_Core.loadUi()
 		if ui then
 			ENV.Alleral_Rayfield = ui
 			ENV.Alleral_UI = ui
-			log("Rayfield ready")
+			log("Obsidian ready")
 		else
-			log("Rayfield skipped: " .. tostring(uiErr), true)
+			log("UI skipped: " .. tostring(uiErr), true)
 		end
 	end
 
