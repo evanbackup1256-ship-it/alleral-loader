@@ -1,4 +1,4 @@
-local LOADER_VERSION = "3.5.10"
+local LOADER_VERSION = "3.5.11"
 local REQUIRED_CORE_VERSION = "1.15"
 local REQUIRED_STARLIGHT_BUILD = "Alleral-6"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
@@ -1038,8 +1038,16 @@ local function main()
 
 	local coreOk, coreErr = preloadCore(true)
 	if not coreOk then
-		notify("Alleral", "Core failed: " .. tostring(coreErr), 8)
-		log("warn", "Core required but unavailable: " .. tostring(coreErr))
+		local hint = " Run launch.luau from GitHub (not a saved loader copy)."
+		if tostring(coreErr):find("cached/outdated", 1, true) then
+			hint = " Your executor is running an OLD saved loader (log shows v"
+				.. LOADER_VERSION
+				.. "). Delete autoexec/saved loader and use: loadstring(game:HttpGet('"
+				.. REPO_BASE
+				.. "/launch.luau?t='..tick()))()"
+		end
+		notify("Alleral", "Core failed: " .. tostring(coreErr), 10)
+		log("warn", "Core required but unavailable: " .. tostring(coreErr) .. hint)
 		telemetryReport("failed", {
 			scriptName = profile.id,
 			scriptVersion = profile.version,
