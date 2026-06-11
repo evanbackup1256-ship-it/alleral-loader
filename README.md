@@ -6,17 +6,17 @@ One loader — detects your game by PlaceId and runs the matching script.
 
 ## Load
 
-### Stuck on v3.8.6 / core fetch fails? (Volt)
+### Stuck / core fetch fails? (Volt)
 
-**Paste `load.luau` once** — open the file, copy all, Execute in Volt. It downloads core + latest loader, saves `loader.luau` to your workspace, and runs.
+**Paste and Execute `load.luau` once** — it downloads core + loader, saves both to your workspace, and runs. (Do not use the old v3.9.0 loader — it had a syntax error on Volt.)
 
 ```lua
 loadstring(readfile("load.luau"))()
 ```
 
-Or copy/paste the contents of [load.luau](load.luau) directly into Volt and click Execute.
+Or copy/paste all of [load.luau](load.luau) into Volt and Execute.
 
-After that works, use:
+After that:
 
 ```lua
 loadstring(readfile("loader.luau"))()
@@ -24,7 +24,7 @@ loadstring(readfile("loader.luau"))()
 
 ### Normal load
 
-**Local workspace** (full repo with `core/` optional — core is embedded in loader v3.9.0+):
+**Local workspace:**
 
 ```lua
 loadstring(readfile("loader.luau"))()

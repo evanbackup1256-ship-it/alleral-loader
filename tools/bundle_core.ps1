@@ -1,6 +1,4 @@
-# Optional: embed core/alleral_core.luau into loader.luau for offline-only builds.
-# Default GitHub loader stays small (~55KB) so Volt can self-update.
-# Run after changing core/alleral_core.luau:
+# Optional offline build only — do NOT commit bundled loader (Volt breaks on [=[ strings).
 #   powershell -ExecutionPolicy Bypass -File tools/bundle_core.ps1
 
 $ErrorActionPreference = "Stop"

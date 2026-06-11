@@ -1,7 +1,7 @@
 ﻿--[[
 	Alleral one-time fix — paste in Volt and Execute ONCE.
-	Downloads latest loader + core, saves loader.luau to workspace, runs Alleral.
-	After this: loadstring(readfile("loader.luau"))()
+	Downloads core + loader, saves to workspace, runs Alleral.
+	After: loadstring(readfile("loader.luau"))()
 ]]
 local g = (getgenv and getgenv()) or {}
 local L = g.loadstring or g.LoadString or loadstring or load
@@ -32,29 +32,37 @@ local function fetch(url)
 	return nil
 end
 
-local loaderUrl = "https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/loader.luau"
-local coreUrl = "https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/core/alleral_core.luau"
+local base = "https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main"
+local coreSrc = fetch(base .. "/core/alleral_core.luau")
+local writeFile = g.writefile or writefile
+local makeFolder = g.makefolder or makefolder
 
-local coreSrc = fetch(coreUrl)
 if type(coreSrc) == "string" and coreSrc:find("loadRayfield", 1, true) then
+	if type(makeFolder) == "function" then
+		pcall(makeFolder, "core")
+	end
+	if type(writeFile) == "function" then
+		pcall(writeFile, "core/alleral_core.luau", coreSrc)
+		print("[Alleral] Saved core/alleral_core.luau")
+	end
 	local coreFn = L(coreSrc, "Alleral/core-rescue")
 	if type(coreFn) == "function" then
 		coreFn()
 	end
+else
+	warn("[Alleral] Core download failed")
 end
 
-local loaderSrc = fetch(loaderUrl)
+local loaderSrc = fetch(base .. "/loader.luau")
 if type(loaderSrc) ~= "string" or not loaderSrc:find("Alleral Hub", 1, true) then
 	loaderSrc = fetch("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau")
 end
-if type(loaderSrc) ~= "string" then
-	return warn("[Alleral] Could not download loader — check HTTP")
+if type(loaderSrc) ~= "string" or loaderSrc:find("EMBEDDED_CORE = [=", 1, true) then
+	return warn("[Alleral] Loader download failed or corrupted — retry")
 end
-
-local writeFile = g.writefile or writefile
 if type(writeFile) == "function" then
 	pcall(writeFile, "loader.luau", loaderSrc)
-	print("[Alleral] Saved loader.luau to workspace")
+	print("[Alleral] Saved loader.luau")
 end
 
 local fn, err = L(loaderSrc, "Alleral/loader")
