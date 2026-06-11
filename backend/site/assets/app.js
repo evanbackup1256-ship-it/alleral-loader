@@ -158,6 +158,7 @@
     state.site = data;
     document.title = `${data.brand || "Alleral"} — hub`;
     $("#brandName").textContent = data.brand || "Alleral";
+    renderAccess(data);
     renderAnnouncement(data);
     renderHero(data);
     renderFeatures(data);
@@ -165,6 +166,75 @@
     renderFaq(data);
     renderChangelog(data);
     renderBugCategories(data);
+  }
+
+  function renderAccess(site) {
+    const cfg = window.ALLERAL_CONFIG || {};
+    const links = site.links || {};
+    const primary = links.website || cfg.publicUrl || window.location.origin + "/";
+    const mirror = links.mirror || cfg.mirrorUrl || "";
+
+    const primaryEl = $("#primaryUrl");
+    const mirrorEl = $("#mirrorUrl");
+    const openEl = $("#openPrimaryUrl");
+    const footerEl = $("#footerSiteLink");
+
+    if (primaryEl) primaryEl.textContent = primary;
+    if (mirrorEl) mirrorEl.textContent = mirror || "not configured yet";
+    if (openEl) openEl.href = primary;
+    if (footerEl) footerEl.href = primary;
+  }
+
+  async function copyText(text, msg) {
+    try {
+      await navigator.clipboard.writeText(text);
+      flash(msg);
+    } catch {
+      flash("copy failed — select manually", true);
+    }
+  }
+
+  async function checkLiveStatus() {
+    const el = $("#liveStatus");
+    if (!el) return;
+    const base = window.ALLERAL_API || "";
+    try {
+      const res = await fetch(base + "/health", { cache: "no-store" });
+      const data = await res.json();
+      if (data.ok) {
+        el.className = "live-status online";
+        el.innerHTML = '<span class="live-dot"></span> relay online';
+        el.title = `Relay v${data.version || "?"} · ${data.time || ""}`;
+      } else {
+        throw new Error("offline");
+      }
+    } catch {
+      el.className = "live-status offline";
+      el.innerHTML = '<span class="live-dot"></span> relay offline';
+    }
+  }
+
+  function bindAccess() {
+    const cfg = window.ALLERAL_CONFIG || {};
+    $("#copyPrimaryUrl")?.addEventListener("click", () => {
+      const url = $("#primaryUrl")?.textContent || cfg.publicUrl || "";
+      copyText(url, "link copied — send to friends");
+    });
+    $("#copyMirrorUrl")?.addEventListener("click", () => {
+      const url = $("#mirrorUrl")?.textContent || "";
+      if (!url || url.includes("not configured")) {
+        flash("mirror not set up yet", true);
+        return;
+      }
+      copyText(url, "mirror link copied");
+    });
+  }
+
+  function bindMobileNav() {
+    const toggle = $("#navToggle");
+    const nav = $("#mainNav");
+    toggle?.addEventListener("click", () => nav?.classList.toggle("open"));
+    $$(".nav a").forEach((a) => a.addEventListener("click", () => nav?.classList.remove("open")));
   }
 
   async function copyLoadstring() {
@@ -239,6 +309,10 @@
   window.addEventListener("hashchange", setActiveNav);
 
   bindTabs();
+  bindAccess();
+  bindMobileNav();
   setActiveNav();
+  checkLiveStatus();
+  setInterval(checkLiveStatus, 60000);
   loadSite().catch((e) => flash(e.message, true));
 })();

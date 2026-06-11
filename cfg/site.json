@@ -1,6 +1,6 @@
 {
     "version":  1,
-    "updatedAt":  "2026-06-11T04:07:19Z",
+    "updatedAt":  "2026-06-11T04:09:16Z",
     "brand":  "Alleral",
     "tagline":  "One loadstring. Every supported game. Live status.",
     "loaderVersion":  "7.4.0",
@@ -17,16 +17,20 @@
                  ],
     "faq":  [
                 {
+                    "q":  "How do I visit the Alleral website?",
+                    "a":  "Open the hub in any normal browser (phone or PC). Bookmark the main link on the Visit section â€” no Roblox account needed to browse. You only need Roblox + an executor when you actually run the loadstring."
+                },
+                {
                     "q":  "How do I load Alleral?",
-                    "a":  "Copy the loadstring from this page, paste it into your executor, and execute it while in a supported Roblox game."
+                    "a":  "Copy the loadstring from this site, paste it into your executor, and run it while you\u0027re in a supported game. The script downloads from GitHub automatically."
                 },
                 {
                     "q":  "Which games are supported?",
-                    "a":  "Check the Games section Ã¢â‚¬â€ status updates live from the hub. Only games marked working or testing will load."
+                    "a":  "Check the Games section â€” status updates live from the hub. Only games marked working or testing will load."
                 },
                 {
                     "q":  "Why did the script not load?",
-                    "a":  "Make sure you are in the correct game, your executor supports loadstring + HTTP, and the game status is not broken or maintenance."
+                    "a":  "Make sure you\u0027re in the correct game, your executor supports loadstring + HTTP, and the game status isn\u0027t broken or maintenance."
                 },
                 {
                     "q":  "Does it auto-update?",
@@ -34,16 +38,25 @@
                 },
                 {
                     "q":  "How do I report a bug?",
-                    "a":  "Use the Bug Report section on this site. Reports go directly to the maintainer."
+                    "a":  "Use the Bug Report section on this site. Reports go directly to the maintainer via Discord."
                 }
             ],
     "changelog":  [
                       {
                           "date":  "2026-06-11",
+                          "title":  "Hub site + Cloudflare gate",
+                          "items":  [
+                                        "Cloudflare-style security check on first visit",
+                                        "Visit section with shareable links for players",
+                                        "Live relay status in header"
+                                    ]
+                      },
+                      {
+                          "date":  "2026-06-11",
                           "title":  "HWID gate + public hub site",
                           "items":  [
                                         "Security gate on Railway",
-                                        "Public status page on GitHub Pages",
+                                        "Public status page",
                                         "Bug reports to Discord via Railway"
                                     ]
                       },
@@ -109,7 +122,8 @@
                                              }
               },
     "links":  {
-                  "website":  "https://evanbackup1256-ship-it.github.io/kick/",
+                  "website":  "https://alleral-telemetry-production.up.railway.app/",
+                  "mirror":  "https://evanbackup1256-ship-it.github.io/kick/",
                   "github":  "https://github.com/evanbackup1256-ship-it/kick",
                   "loaderRaw":  "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau",
                   "relay":  "https://alleral-telemetry-production.up.railway.app",

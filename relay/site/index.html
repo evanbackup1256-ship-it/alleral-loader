@@ -9,12 +9,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./assets/style.css" />
+  <script src="./assets/config.js"></script>
+  <script src="./assets/gate.js"></script>
 </head>
 <body>
   <canvas id="bgCanvas" aria-hidden="true"></canvas>
   <div class="grain" aria-hidden="true"></div>
   <div class="glow glow-a" aria-hidden="true"></div>
   <div class="glow glow-b" aria-hidden="true"></div>
+  <div class="scanline" aria-hidden="true"></div>
 
   <header class="topbar">
     <div class="wrap topbar-inner">
@@ -25,8 +28,15 @@
         </span>
         <span id="brandName">Alleral</span>
       </a>
-      <nav class="nav">
+      <div class="topbar-right">
+        <span id="liveStatus" class="live-status" title="Relay status">
+          <span class="live-dot"></span> checking…
+        </span>
+        <button id="navToggle" class="nav-toggle" type="button" aria-label="Menu">☰</button>
+      </div>
+      <nav class="nav" id="mainNav">
         <a href="#home" data-section="home">Home</a>
+        <a href="#access" data-section="access">Visit</a>
         <a href="#games" data-section="games">Games</a>
         <a href="#load" data-section="load">Load</a>
         <a href="#faq" data-section="faq">FAQ</a>
@@ -42,7 +52,7 @@
       <p class="eyebrow reveal">roblox script hub</p>
       <h1 class="hero-title reveal">
         <span class="line">one loadstring.</span>
-        <span class="line accent-text">every game we support.</span>
+        <span class="line accent-text shimmer-text">every game we support.</span>
       </h1>
       <p id="tagline" class="hero-sub reveal">One loadstring. Every supported game. Live status.</p>
       <div class="pill-row reveal">
@@ -52,8 +62,41 @@
       </div>
       <div class="hero-actions reveal">
         <a class="btn primary glow-btn" href="#load">get loadstring</a>
-        <a class="btn ghost" href="#games">see what's working</a>
+        <a class="btn ghost" href="#access">how to visit this site</a>
       </div>
+    </section>
+
+    <section id="access" class="section">
+      <div class="section-head reveal">
+        <div>
+          <p class="eyebrow">for players</p>
+          <h2>how to open the hub</h2>
+          <p>you don't need this website to run the script — but it's the easiest place to copy the loadstring, check game status, and report bugs.</p>
+        </div>
+      </div>
+      <div class="access-grid reveal">
+        <article class="card access-card access-primary">
+          <p class="access-label">main link · bookmark this</p>
+          <code id="primaryUrl" class="access-url">…</code>
+          <div class="actions">
+            <button id="copyPrimaryUrl" class="btn primary glow-btn" type="button">copy link</button>
+            <a id="openPrimaryUrl" class="btn ghost" href="#" target="_blank" rel="noopener">open</a>
+          </div>
+        </article>
+        <article class="card access-card">
+          <p class="access-label">mirror (github pages)</p>
+          <code id="mirrorUrl" class="access-url">…</code>
+          <div class="actions">
+            <button id="copyMirrorUrl" class="btn secondary" type="button">copy mirror</button>
+          </div>
+          <p class="access-note">same site, different host — use if the main link is down.</p>
+        </article>
+      </div>
+      <ol class="access-steps reveal">
+        <li><strong>on pc or phone</strong> — open the link in Chrome, Safari, Firefox, whatever you have.</li>
+        <li><strong>copy loadstring</strong> — go to the Load section, copy, paste in your executor in Roblox.</li>
+        <li><strong>share with friends</strong> — send them the main link above. no download, no account needed.</li>
+      </ol>
     </section>
 
     <section id="games" class="section">
@@ -73,7 +116,7 @@
         <div>
           <p class="eyebrow">copy &amp; run</p>
           <h2>loadstring</h2>
-          <p>paste in your executor while you're in a supported game.</p>
+          <p>paste in your executor while you're in a supported game. the script itself loads from GitHub — this page just gives you the one-liner.</p>
         </div>
       </div>
       <div class="load-box reveal">
@@ -187,12 +230,14 @@
   <footer class="footer">
     <div class="wrap footer-row">
       <span>alleral · built for people who actually play these games</span>
-      <span><a href="https://alleral-telemetry-production.up.railway.app/admin" target="_blank" rel="noopener">admin</a></span>
+      <span>
+        <a id="footerSiteLink" href="#">hub</a> ·
+        <a href="https://alleral-telemetry-production.up.railway.app/admin" target="_blank" rel="noopener">admin</a>
+      </span>
     </div>
   </footer>
 
   <div id="toast" class="toast"></div>
-  <script src="./assets/config.js"></script>
   <script src="./assets/effects.js"></script>
   <script src="./assets/app.js"></script>
 </body>

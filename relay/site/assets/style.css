@@ -106,6 +106,7 @@ a:hover { color: var(--accent); }
   justify-content: space-between;
   gap: 16px;
   min-height: 68px;
+  flex-wrap: wrap;
 }
 
 .brand {
@@ -669,13 +670,294 @@ textarea { min-height: 110px; resize: vertical; }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes card-in {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Cloudflare entry gate ── */
+html.cf-gate-lock { overflow: hidden; }
+html.cf-gate-lock body { overflow: hidden; }
+
+#cfGate {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: grid;
+  place-items: center;
+  background: #1a1a1a;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  transition: opacity 0.55s ease, visibility 0.55s;
+}
+#cfGate.cf-gate-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.cf-gate-card {
+  width: min(440px, calc(100vw - 32px));
+  padding: 28px 28px 22px;
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 4px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  color: #e0e0e0;
+}
+
+.cf-gate-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.cf-gate-brand {
+  display: grid;
+  gap: 2px;
+  font-size: 0.82rem;
+  color: #999;
+}
+.cf-gate-brand strong {
+  color: #fff;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+}
+.cf-dot { color: #f6821f; }
+
+.cf-gate-title {
+  margin: 0 0 8px;
+  font-size: 1.45rem;
+  font-weight: 600;
+  color: #fff;
+}
+.cf-gate-lead {
+  margin: 0 0 18px;
+  font-size: 0.92rem;
+  color: #aaa;
+  line-height: 1.5;
+}
+
+.cf-steps {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.cf-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.88rem;
+  color: #777;
+  transition: color 0.3s;
+}
+.cf-steps li.active { color: #ccc; }
+.cf-steps li.done { color: #6dd4a0; }
+
+.cf-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #444;
+  flex-shrink: 0;
+  position: relative;
+  transition: border-color 0.3s, background 0.3s;
+}
+.cf-steps li.active .cf-check {
+  border-color: #f6821f;
+  animation: cf-spin 0.8s linear infinite;
+  border-top-color: transparent;
+}
+.cf-steps li.done .cf-check {
+  border-color: #6dd4a0;
+  background: #6dd4a0;
+}
+.cf-steps li.done .cf-check::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 7px;
+  border: solid #1a1a1a;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+@keyframes cf-spin { to { transform: rotate(360deg); } }
+
+.cf-progress {
+  height: 3px;
+  background: #333;
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.cf-progress-bar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #f6821f, #fbad41);
+  border-radius: 99px;
+  transition: width 0.55s ease;
+}
+
+.cf-turnstile { min-height: 65px; margin-bottom: 12px; }
+.cf-ray {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  color: #666;
+}
+.cf-ray code {
+  font-family: var(--mono);
+  color: #888;
+}
+.cf-powered {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #555;
+  text-align: right;
+}
+.cf-powered strong { color: #f6821f; font-weight: 600; }
+
+/* ── Extra polish ── */
+.scanline {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+}
+
+.shimmer-text {
+  background-size: 200% auto;
+  animation: shimmer 4s linear infinite;
+}
+@keyframes shimmer {
+  to { background-position: 200% center; }
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+@media (min-width: 721px) {
+  .nav {
+    display: flex;
+    margin-left: auto;
+  }
+  .topbar-right {
+    order: 3;
+    margin-left: 8px;
+  }
+}
+
+.live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  white-space: nowrap;
+}
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.live-status.online .live-dot {
+  background: var(--working);
+  box-shadow: 0 0 10px rgba(69, 217, 138, 0.7);
+  animation: pulse-core 2s ease-in-out infinite;
+}
+.live-status.offline .live-dot { background: var(--broken); }
+
+.nav-toggle {
+  display: none;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.access-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  margin-bottom: 24px;
+}
+.access-card { display: grid; gap: 12px; }
+.access-primary {
+  border-color: rgba(255, 120, 70, 0.35);
+  box-shadow: 0 0 40px rgba(255, 120, 70, 0.08);
+}
+.access-label {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  font-weight: 600;
+}
+.access-url {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  word-break: break-all;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--accent-2);
+}
+.access-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.access-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.94rem;
+  max-width: 720px;
+}
+.access-steps strong { color: var(--text); }
+
 @media (max-width: 720px) {
   .topbar-inner {
-    align-items: start;
-    flex-direction: column;
-    padding: 14px 0;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 12px 0;
   }
-  .nav { width: 100%; }
+  .nav-toggle { display: inline-flex; }
+  .nav {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    padding-bottom: 8px;
+  }
+  .nav.open { display: flex; }
+  .nav a { padding: 10px 12px; }
+  .live-status { display: none; }
   .section-head { flex-direction: column; align-items: start; }
 }
 
