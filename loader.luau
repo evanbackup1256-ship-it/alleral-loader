@@ -3,7 +3,7 @@
 	Detects game, fetches core + game script, runs.
 ]]
 
-local LOADER_VERSION = "5.0.2"
+local LOADER_VERSION = "5.0.3"
 local MIN_CORE = "1.18"
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
@@ -82,32 +82,68 @@ local CAPABILITIES = {
 }
 
 local function httpGet(url)
-	url = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(tick())
-	if type(ENV.Volt) == "table" and type(ENV.Volt.request) == "function" then
-		local ok, res = pcall(ENV.Volt.request, { Url = url, Method = "GET" })
-		if ok and res then
-			local body = res.Body or res.body
-			if type(body) == "string" and #body > 0 then
-				return body
-			end
-		end
-	end
-	if type(ENV.request) == "function" then
-		local ok, res = pcall(ENV.request, { Url = url, Method = "GET" })
-		if ok and res then
-			local body = res.Body or res.body
-			if type(body) == "string" and #body > 0 then
-				return body
-			end
-		end
-	end
+	local bust = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(tick())
+
 	if type(game.HttpGet) == "function" then
-		local ok, body = pcall(game.HttpGet, game, url, true)
+		for _, fetchUrl in ipairs({ bust, url }) do
+			local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
+			if type(body) == "string" and #body > 0 then
+				return body
+			end
+			ok, body = pcall(game.HttpGet, game, fetchUrl)
+			if type(body) == "string" and #body > 0 then
+				return body
+			end
+		end
+	end
+
+	for _, fetchUrl in ipairs({ bust, url }) do
+		local ok, body = pcall(function()
+			return game:HttpGet(fetchUrl, true)
+		end)
+		if ok and type(body) == "string" and #body > 0 then
+			return body
+		end
+		ok, body = pcall(function()
+			return game:HttpGet(fetchUrl)
+		end)
 		if ok and type(body) == "string" and #body > 0 then
 			return body
 		end
 	end
+
+	if type(ENV.Volt) == "table" and type(ENV.Volt.request) == "function" then
+		local ok, res = pcall(ENV.Volt.request, { Url = bust, Method = "GET" })
+		if ok and res then
+			local body = res.Body or res.body
+			if type(body) == "string" and #body > 0 then
+				return body
+			end
+		end
+	end
+
+	if type(ENV.request) == "function" then
+		local ok, res = pcall(ENV.request, { Url = bust, Method = "GET" })
+		if ok and res then
+			local body = res.Body or res.body
+			if type(body) == "string" and #body > 0 then
+				return body
+			end
+		end
+	end
+
 	return nil
+end
+
+local function downloadUrl(url)
+	local core = ENV.Alleral_Core
+	if core and type(core.httpGet) == "function" then
+		local body = core.httpGet(url)
+		if type(body) == "string" and #body > 0 then
+			return body
+		end
+	end
+	return httpGet(url)
 end
 
 local function looksLikeLua(body)
@@ -144,8 +180,8 @@ end
 
 local function fetchRemote(relativePath, minBytes)
 	minBytes = minBytes or 0
-	for _, base in ipairs({ CDN, RAW }) do
-		local body = httpGet(base .. "/" .. relativePath)
+	for _, base in ipairs({ RAW, GH_WEB, CDN }) do
+		local body = downloadUrl(base .. "/" .. relativePath)
 		if body and #body >= minBytes and looksLikeLua(body) and not body:find("404: Not Found", 1, true) then
 			return body, base
 		end
@@ -159,14 +195,22 @@ local function getSource(localPaths, remotePath, opts)
 	local marker = opts.marker
 
 	local src, path = readLocal(localPaths, minBytes)
-	if src and (not marker or src:find(marker, 1, true)) then
-		return src, "local:" .. path
+	if src then
+		if marker and not src:find(marker, 1, true) then
+			log("Skipping outdated local " .. path, true)
+		else
+			return src, "local:" .. path
+		end
 	end
 
 	src, path = fetchRemote(remotePath, minBytes)
 	if src then
 		if marker and not src:find(marker, 1, true) then
 			log("Script may be outdated (missing " .. marker .. ")", true)
+		end
+		local writeFile = firstExecFunc("writefile")
+		if type(writeFile) == "function" and remotePath:find("games/", 1, true) then
+			pcall(writeFile, remotePath, src)
 		end
 		return src, "remote"
 	end
