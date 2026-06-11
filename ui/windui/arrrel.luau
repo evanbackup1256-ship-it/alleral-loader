@@ -472,18 +472,33 @@ return function(WindUI)
 		run()
 	end
 
-	local _TweenCreate = TweenService.Create
-	TweenService.Create = function(self, instance, tweenInfo, props)
-		if sliderTrackFrames[instance] and props and props.Size and tweenInfo and tweenInfo.Time <= 0.08 then
-			snapProps(instance, props)
-			return stubTween(instance)
+	local function installTweenCreateHook()
+		local ok, original = pcall(function()
+			return TweenService.Create
+		end)
+		if not ok or type(original) ~= "function" then
+			return false
 		end
-		if WindUI._AlleralSpringMotion ~= false and WindUI._AlleralReducedMotion ~= true and props and instance then
-			Motion.target(instance, Motion.tweenInfoToPreset(tweenInfo), props)
-			return stubTween(instance)
+		local hooked, hookErr = pcall(function()
+			TweenService.Create = function(self, instance, tweenInfo, props)
+				if sliderTrackFrames[instance] and props and props.Size and tweenInfo and tweenInfo.Time <= 0.08 then
+					snapProps(instance, props)
+					return stubTween(instance)
+				end
+				if WindUI._AlleralSpringMotion ~= false and WindUI._AlleralReducedMotion ~= true and props and instance then
+					Motion.target(instance, Motion.tweenInfoToPreset(tweenInfo), props)
+					return stubTween(instance)
+				end
+				return original(self, instance, tweenInfo, props)
+			end
+		end)
+		if not hooked then
+			warn("[Arrrel] TweenService hook skipped: " .. tostring(hookErr))
 		end
-		return _TweenCreate(self, instance, tweenInfo, props)
+		return hooked
 	end
+
+	installTweenCreateHook()
 
 	-- Spring motion presets (fraktality/spr-style: frequency Hz + damping ratio).
 	local ANIM = {
