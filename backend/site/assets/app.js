@@ -452,9 +452,21 @@
     startSitePolling();
   }
 
+  function isGatePassed() {
+    try {
+      const raw = sessionStorage.getItem("alleral_gate_ok");
+      if (!raw) return false;
+      if (raw === "1") return true;
+      const data = JSON.parse(raw);
+      return !!(data?.until && Date.now() < data.until);
+    } catch {
+      return sessionStorage.getItem("alleral_gate_ok") === "1";
+    }
+  }
+
   initWhenReady();
 
-  if (!sessionStorage.getItem("alleral_gate_ok")) {
+  if (!isGatePassed()) {
     window.addEventListener("alleral:gate-passed", () => {
       document.documentElement.classList.remove("cf-gate-lock");
       document.body.classList.remove("cf-gate-lock");

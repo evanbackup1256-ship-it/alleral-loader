@@ -1181,6 +1181,8 @@ def gate_config():
         "siteKey": TURNSTILE_SITE_KEY,
         "provider": "cloudflare-turnstile",
         "required": True,
+        "sessionHours": 4,
+        "mode": "interactive",
     })
 
 
