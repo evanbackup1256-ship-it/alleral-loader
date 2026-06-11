@@ -8,7 +8,6 @@ import re
 import sqlite3
 import threading
 import time
-from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -21,6 +20,7 @@ except ImportError:
 VALID_STATUSES = frozenset({"working", "detected", "broken", "maintenance", "testing"})
 VERSION_RE = re.compile(r'local\s+VERSION\s*=\s*"([^"]+)"', re.IGNORECASE)
 SUBTITLE_RE = re.compile(r'Subtitle\s*=\s*"([^"·]+)', re.IGNORECASE)
+FETCH_TIMEOUT = 5
 
 
 def utc_iso() -> str:
@@ -136,10 +136,12 @@ class AutoSyncEngine:
         self.data_dir = data_dir
         self.stats = TelemetryStatsStore(data_dir / "telemetry_stats.db")
         self._lock = threading.Lock()
+        self._sync_in_progress = threading.Event()
         self._state_path = data_dir / "sync_state.json"
         self._state: dict[str, Any] = self._load_state()
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
+        self._started = False
 
     def _load_state(self) -> dict[str, Any]:
         if not self._state_path.is_file():
@@ -166,6 +168,7 @@ class AutoSyncEngine:
                 "lastError": self._state.get("lastError"),
                 "syncCount": self._state.get("syncCount") or 0,
                 "autoStatus": True,
+                "syncing": self._sync_in_progress.is_set(),
             }
 
     def record_telemetry(self, payload: dict[str, Any]) -> None:
@@ -183,16 +186,15 @@ class AutoSyncEngine:
             self.stats.record(str(game_id), event)
 
     def start(self) -> None:
-        if not self.enabled or self._thread is not None:
+        if not self.enabled or self._started:
             return
+        self._started = True
 
         def runner() -> None:
             try:
                 self.sync(force=True)
             except Exception as exc:
-                with self._lock:
-                    self._state["lastError"] = str(exc)
-                    self._save_state()
+                self._note_error(exc)
             self._loop()
 
         self._thread = threading.Thread(target=runner, name="alleral-auto-sync", daemon=True)
@@ -206,23 +208,46 @@ class AutoSyncEngine:
             try:
                 self.sync_if_stale(force=False)
             except Exception as exc:
-                with self._lock:
-                    self._state["lastError"] = str(exc)
-                    self._save_state()
+                self._note_error(exc)
             self._stop.wait(self.interval_sec)
+
+    def _note_error(self, exc: Exception) -> None:
+        with self._lock:
+            self._state["lastError"] = str(exc)
+            self._save_state()
+
+    def request_refresh(self) -> None:
+        """Non-blocking refresh trigger for hot API paths — never stalls HTTP handlers."""
+        if not self.enabled:
+            return
+        if self._sync_in_progress.is_set():
+            return
+        if not self._is_stale():
+            return
+        threading.Thread(target=self._safe_sync, name="alleral-auto-sync-request", daemon=True).start()
+
+    def _is_stale(self) -> bool:
+        last = self._state.get("lastSyncAt")
+        if not last:
+            return True
+        try:
+            last_dt = datetime.fromisoformat(str(last).replace("Z", "+00:00"))
+            age = (datetime.now(timezone.utc) - last_dt).total_seconds()
+            return age >= self.interval_sec
+        except ValueError:
+            return True
+
+    def _safe_sync(self) -> None:
+        try:
+            self.sync(force=False)
+        except Exception as exc:
+            self._note_error(exc)
 
     def sync_if_stale(self, force: bool = False) -> dict[str, Any]:
         if not self.enabled:
             return self.status()
-        last = self._state.get("lastSyncAt")
-        if not force and last:
-            try:
-                last_dt = datetime.fromisoformat(str(last).replace("Z", "+00:00"))
-                age = (datetime.now(timezone.utc) - last_dt).total_seconds()
-                if age < self.interval_sec:
-                    return self.status()
-            except ValueError:
-                pass
+        if not force and not self._is_stale():
+            return self.status()
         return self.sync(force=force)
 
     def sync(self, force: bool = False) -> dict[str, Any]:
@@ -230,70 +255,88 @@ class AutoSyncEngine:
             return self.status()
         if requests is None:
             raise RuntimeError("requests not installed")
+        if self._sync_in_progress.is_set():
+            return self.status()
+        self._sync_in_progress.set()
+        try:
+            return self._run_sync(force=force)
+        finally:
+            self._sync_in_progress.clear()
 
+    def _run_sync(self, force: bool = False) -> dict[str, Any]:
         with self._lock:
-            commit_sha, commit_msg = self._fetch_head_commit()
-            if not force and commit_sha and commit_sha == self._state.get("commit"):
+            known_commit = self._state.get("commit") or ""
+
+        commit_sha, commit_msg = self._fetch_head_commit()
+        if not force and commit_sha and commit_sha == known_commit:
+            with self._lock:
                 self._state["lastSyncAt"] = utc_iso()
                 self._save_state()
-                return self.status()
+            return self.status()
 
-            release = self._fetch_json(f"cfg/release.json") or {}
-            manifest = self._fetch_json("cfg/scripts_manifest.json") or {}
-            site = self._fetch_json("cfg/site.json") or {}
-            github_scripts = manifest.get("scripts") if isinstance(manifest.get("scripts"), dict) else {}
+        release = self._fetch_json("cfg/release.json") or {}
+        manifest = self._fetch_json("cfg/scripts_manifest.json") or {}
+        site = self._fetch_json("cfg/site.json") or {}
+        github_scripts = manifest.get("scripts") if isinstance(manifest.get("scripts"), dict) else {}
 
-            discovered = self._discover_games(list(github_scripts.keys()))
-            merged_scripts = self._build_scripts(github_scripts, discovered)
-            manifest_payload = {
-                "version": manifest.get("version") or 1,
-                "updatedAt": utc_iso(),
-                "syncedFrom": commit_sha or self._state.get("commit") or "",
-                "autoManaged": True,
-                "scripts": merged_scripts,
-            }
-            self.script_registry.save(manifest_payload)
+        discovered = self._discover_games(list(github_scripts.keys()))
+        merged_scripts = self._build_scripts(github_scripts, discovered)
+        manifest_payload = {
+            "version": manifest.get("version") or 1,
+            "updatedAt": utc_iso(),
+            "syncedFrom": commit_sha or known_commit or "",
+            "autoManaged": True,
+            "scripts": merged_scripts,
+        }
+        self.script_registry.save(manifest_payload)
 
-            site_data = self.site_registry.load()
-            site_data["loaderVersion"] = release.get("loader") or site.get("loaderVersion") or site_data.get("loaderVersion") or ""
-            site_data["loadstring"] = site.get("loadstring") or site_data.get("loadstring") or ""
-            site_data["tagline"] = site.get("tagline") or site_data.get("tagline") or ""
-            site_data["features"] = site.get("features") or site_data.get("features") or []
-            site_data["faq"] = site.get("faq") or site_data.get("faq") or []
-            site_data["bugCategories"] = site.get("bugCategories") or site_data.get("bugCategories") or []
-            site_data["links"] = site.get("links") or site_data.get("links") or {}
-            github_games = site.get("games") if isinstance(site.get("games"), dict) else {}
-            local_games = site_data.get("games") if isinstance(site_data.get("games"), dict) else {}
-            site_data["games"] = {**local_games, **github_games}
-            site_data["changelog"] = self._build_changelog(site.get("changelog") or [], commit_sha, commit_msg)
-            site_data["autoManaged"] = True
-            site_data["githubCommit"] = commit_sha or ""
-            self.site_registry.save(site_data)
+        site_data = self.site_registry.load()
+        site_data["loaderVersion"] = release.get("loader") or site.get("loaderVersion") or site_data.get("loaderVersion") or ""
+        site_data["loadstring"] = site.get("loadstring") or site_data.get("loadstring") or ""
+        site_data["tagline"] = site.get("tagline") or site_data.get("tagline") or ""
+        site_data["features"] = site.get("features") or site_data.get("features") or []
+        site_data["faq"] = site.get("faq") or site_data.get("faq") or []
+        site_data["bugCategories"] = site.get("bugCategories") or site_data.get("bugCategories") or []
+        site_data["links"] = site.get("links") or site_data.get("links") or {}
+        github_games = site.get("games") if isinstance(site.get("games"), dict) else {}
+        local_games = site_data.get("games") if isinstance(site_data.get("games"), dict) else {}
+        site_data["games"] = {**local_games, **github_games}
+        site_data["changelog"] = self._build_changelog(site.get("changelog") or [], commit_sha, commit_msg)
+        site_data["autoManaged"] = True
+        site_data["githubCommit"] = commit_sha or release.get("commit") or known_commit or ""
+        self.site_registry.save(site_data)
 
-            self._state["commit"] = commit_sha or self._state.get("commit") or ""
+        with self._lock:
+            self._state["commit"] = commit_sha or release.get("commit") or known_commit or ""
             self._state["lastSyncAt"] = utc_iso()
             self._state["lastError"] = None
             self._state["syncCount"] = int(self._state.get("syncCount") or 0) + 1
             self._save_state()
-            return self.status()
+        return self.status()
 
     def _raw_url(self, path: str) -> str:
         clean = path.lstrip("/")
         return f"https://raw.githubusercontent.com/{self.repo}/{self.branch}/{clean}"
 
-    def _fetch_text(self, path: str, timeout: int = 12) -> str | None:
+    def _fetch_text(self, path: str) -> str | None:
         url = self._raw_url(path)
-        resp = requests.get(url, timeout=timeout, headers={"Cache-Control": "no-cache"})
-        if resp.status_code == 404:
+        try:
+            resp = requests.get(url, timeout=FETCH_TIMEOUT, headers={"Cache-Control": "no-cache"})
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            return resp.text
+        except requests.RequestException:
             return None
-        resp.raise_for_status()
-        return resp.text
 
     def _fetch_json(self, path: str) -> dict[str, Any] | None:
         text = self._fetch_text(path)
         if not text:
             return None
-        data = json.loads(text)
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            return None
         return data if isinstance(data, dict) else None
 
     def _fetch_head_commit(self) -> tuple[str, str]:
@@ -302,36 +345,23 @@ class AutoSyncEngine:
         token = os.environ.get("GITHUB_TOKEN", "").strip()
         if token:
             headers["Authorization"] = f"Bearer {token}"
-        resp = requests.get(url, timeout=12, headers=headers)
-        if resp.status_code >= 400:
+        try:
+            resp = requests.get(url, timeout=FETCH_TIMEOUT, headers=headers)
+            if resp.status_code >= 400:
+                release = self._fetch_json("cfg/release.json") or {}
+                return str(release.get("commit") or ""), ""
+            data = resp.json()
+            sha = str(data.get("sha") or "")[:12]
+            msg = str((data.get("commit") or {}).get("message") or "").split("\n")[0][:160]
+            return sha, msg
+        except requests.RequestException:
             release = self._fetch_json("cfg/release.json") or {}
             return str(release.get("commit") or ""), ""
-        data = resp.json()
-        sha = str(data.get("sha") or "")[:12]
-        msg = str((data.get("commit") or {}).get("message") or "").split("\n")[0][:160]
-        return sha, msg
 
     def _discover_games(self, known_ids: list[str]) -> dict[str, dict[str, Any]]:
         out: dict[str, dict[str, Any]] = {}
-        ids = list(dict.fromkeys(known_ids))
-        api_url = f"https://api.github.com/repos/{self.repo}/contents/games"
-        headers = {"Accept": "application/vnd.github+json"}
-        token = os.environ.get("GITHUB_TOKEN", "").strip()
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-        try:
-            resp = requests.get(api_url, params={"ref": self.branch}, timeout=12, headers=headers)
-            if resp.status_code == 200:
-                for item in resp.json():
-                    if not isinstance(item, dict):
-                        continue
-                    name = str(item.get("name") or "")
-                    if name.endswith(".luau"):
-                        ids.append(name[:-5])
-        except requests.RequestException:
-            pass
-        ids = list(dict.fromkeys(i.strip().lower() for i in ids if i))
-        for script_id in ids:
+        ids = list(dict.fromkeys(i.strip().lower() for i in known_ids if i))
+        for script_id in ids[:20]:
             parsed = self._parse_game_file(script_id)
             if parsed:
                 out[script_id] = parsed
@@ -340,7 +370,7 @@ class AutoSyncEngine:
     def _parse_game_file(self, script_id: str) -> dict[str, Any] | None:
         text = self._fetch_text(f"games/{script_id}.luau")
         if not text:
-            return None
+            return {"name": humanize_id(script_id), "version": "?", "existsOnGitHub": False}
         version = "?"
         subtitle = humanize_id(script_id)
         match = VERSION_RE.search(text)
@@ -353,7 +383,7 @@ class AutoSyncEngine:
 
     def _compute_status(self, script_id: str, base: dict[str, Any], discovered: dict[str, Any]) -> tuple[str, str]:
         info = discovered.get(script_id) or {}
-        if info and not info.get("existsOnGitHub", True):
+        if info and info.get("existsOnGitHub") is False:
             return "maintenance", "Script file missing on GitHub."
         stats = self.stats.snapshot(script_id)
         loaded = stats["inject_loaded"]

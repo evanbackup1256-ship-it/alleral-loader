@@ -266,9 +266,9 @@ def public_allow_ip(ip: str, bucket: dict[str, deque[float]], limit: int) -> boo
 def build_public_site_payload() -> dict[str, Any]:
     if AUTO_SYNC is not None:
         try:
-            AUTO_SYNC.sync_if_stale(force=False)
+            AUTO_SYNC.request_refresh()
         except Exception as exc:
-            print(f"[auto-sync] site refresh failed: {exc}", file=sys.stderr)
+            print(f"[auto-sync] refresh trigger failed: {exc}", file=sys.stderr)
     site = SITE_REGISTRY.load()
     manifest = SCRIPT_REGISTRY.list_scripts()
     scripts = manifest.get("scripts", {})
@@ -873,7 +873,7 @@ def health():
     sync_meta = AUTO_SYNC.status() if AUTO_SYNC is not None else {}
     return jsonify({
         "ok": True,
-        "version": "3.7",
+        "version": "3.7.1",
         "gate": True,
         "banApi": True,
         "site": True,
@@ -946,9 +946,9 @@ def admin_authorized() -> bool:
 def list_scripts():
     if AUTO_SYNC is not None:
         try:
-            AUTO_SYNC.sync_if_stale(force=False)
+            AUTO_SYNC.request_refresh()
         except Exception as exc:
-            print(f"[auto-sync] scripts refresh failed: {exc}", file=sys.stderr)
+            print(f"[auto-sync] scripts refresh trigger failed: {exc}", file=sys.stderr)
     data = SCRIPT_REGISTRY.list_scripts()
     return jsonify({"ok": True, "scripts": data.get("scripts", {}), "updatedAt": data.get("updatedAt"), "autoManaged": True})
 

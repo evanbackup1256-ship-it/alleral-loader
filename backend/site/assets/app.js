@@ -452,9 +452,12 @@
     startSitePolling();
   }
 
-  if (sessionStorage.getItem("alleral_gate_ok")) {
-    initWhenReady();
-  } else {
-    window.addEventListener("alleral:gate-passed", initWhenReady, { once: true });
+  initWhenReady();
+
+  if (!sessionStorage.getItem("alleral_gate_ok")) {
+    window.addEventListener("alleral:gate-passed", () => {
+      document.documentElement.classList.remove("cf-gate-lock");
+      document.body.classList.remove("cf-gate-lock");
+    }, { once: true });
   }
 })();

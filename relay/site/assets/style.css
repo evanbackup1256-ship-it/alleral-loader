@@ -956,6 +956,10 @@ body.cf-gate-lock {
   font-size: 0.82rem;
   color: var(--red);
 }
+.cf-captcha-wrap .btn {
+  margin-top: 12px;
+  width: 100%;
+}
 .cf-steps {
   list-style: none;
   margin: 0 0 20px;
