@@ -1,5 +1,5 @@
 local LOADER_VERSION = "7.4.0"
-local MIN_CORE = "2.1"
+local MIN_CORE = "2.3"
 local DEFAULT_UPDATE_POLL_SECONDS = 45
 local CORE_MIN_BYTES = 50000
 local HUB = "hub"
@@ -8,7 +8,8 @@ local UI = "ui"
 
 local RELEASE_FALLBACK = {
 	loader = "7.4.0",
-	core = "2.2",
+	core = "2.3",
+	ui = "WindUI",
 	analytics = "1.0",
 	telemetry = "3.0",
 	helpers = "1.0",
@@ -1642,7 +1643,9 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
-				UI .. "/Library.lua",
+				UI .. "/windui/main.lua",
+				"vendor/windui/main.lua",
+				"ui/Library.lua",
 				UI .. "/addons/ThemeManager.lua",
 				UI .. "/addons/SaveManager.lua",
 				"vendor/obsidian/Library.lua",
@@ -2163,7 +2166,7 @@ local function main()
 		if ui then
 			ENV.Alleral_Rayfield = ui
 			ENV.Alleral_UI = ui
-			log("Obsidian ready")
+			log("WindUI ready")
 		else
 			log("UI skipped: " .. tostring(uiErr), true)
 		end

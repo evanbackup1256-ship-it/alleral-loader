@@ -269,6 +269,11 @@ a:hover { color: #7dc4ff; }
   font-weight: 500;
 }
 
+.script-meta-extra {
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
 .script-code {
   margin: 0;
   padding: 24px;

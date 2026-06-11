@@ -1,4 +1,4 @@
-import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePayload, WeaoChange, WeaoExploit, WeaoSummary } from "./types";
+import type { CreditMember, CreditRenderMember, GameEntry, SitePayload } from "./types";
 
 (() => {
   const GRADIENTS = [
@@ -27,25 +27,8 @@ import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePa
     thumbs: {} as Record<string, string>,
     creditRenders: {} as Record<string, CreditRenderMember>,
     gamesRenderToken: 0,
-    weaoExploits: [] as WeaoExploit[],
-    weaoSummary: {} as WeaoSummary,
-    weaoQuery: "",
-    weaoFilter: "all",
-    weaoFetchedAt: "",
-    weaoPollSec: 35,
-    weaoLive: false,
-    weaoChanges: [] as WeaoChange[],
-    weaoRecentChanges: [] as WeaoChange[],
-    weaoChangedSlugs: {} as Record<string, number>,
-    weaoFingerprints: {} as Record<string, string>,
-    weaoPollTimer: 0,
-    weaoCountdownTimer: 0,
-    weaoNextPollAt: 0,
   };
-  const WEAO_LIVE_POLL_MS = 35000;
-  const WEAO_IDLE_POLL_MS = 120000;
   const SITE_POLL_MS = 30000;
-  const EXECUTOR_PREF_KEY = "alleral_last_executor";
   const VISIT_KEY = "alleral_hub_logged";
 
   function escapeHtml(value: unknown): string {
@@ -188,6 +171,13 @@ import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePa
     const su = $("#scriptsUpdated");
     const ls = $("#loadstringCode");
     if (lv) lv.textContent = site.loaderVersion || "—";
+    const coreMeta = $("#coreVersionMeta");
+    if (coreMeta) {
+      const bits: string[] = [];
+      if (site.coreVersion) bits.push(`core ${site.coreVersion}`);
+      if (site.uiLibrary) bits.push(site.uiLibrary);
+      coreMeta.textContent = bits.length ? ` · ${bits.join(" · ")}` : "";
+    }
     if (su) su.textContent = site.scriptsUpdatedAt || "—";
     if (ls) ls.textContent = site.loadstring || "";
     const games = Object.values(site.games || {});
@@ -229,73 +219,6 @@ import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePa
     `;
   }
 
-  function gameFeatureText(game: GameEntry): string {
-    return (game.scriptFeatures || [])
-      .map((f) => `${f.name || ""} ${f.category || ""} ${f.desc || ""}`)
-      .join(" ");
-  }
-
-  function renderFeatureChips(features: ScriptFeature[], limit = 4): string {
-    if (!features.length) return "";
-    const shown = features.slice(0, limit);
-    const rest = features.length - shown.length;
-    return `
-      <div class="game-features-preview">
-        ${shown.map((f) => `<span class="game-feature-chip" title="${escapeHtml(f.desc || f.category || "")}">${escapeHtml(f.name || "Feature")}</span>`).join("")}
-        ${rest > 0 ? `<span class="game-feature-more">+${rest} more</span>` : ""}
-      </div>`;
-  }
-
-  function renderModalFeatures(game: GameEntry): void {
-    const tabsRoot = $("#modalTabs");
-    const featuresRoot = $("#modalFeatures");
-    const countEl = $("#modalFeatureCount");
-    const features = game.scriptFeatures || [];
-    const tabs = game.uiTabs || [];
-
-    if (countEl) countEl.textContent = features.length ? `${features.length} features` : "";
-
-    if (tabsRoot) {
-      if (!tabs.length) {
-        tabsRoot.innerHTML = "";
-        tabsRoot.classList.add("hidden");
-      } else {
-        tabsRoot.classList.remove("hidden");
-        tabsRoot.innerHTML = tabs.map((tab) => `<span class="game-ui-tab">${escapeHtml(tab)}</span>`).join("");
-      }
-    }
-
-    if (!featuresRoot) return;
-    if (!features.length) {
-      featuresRoot.innerHTML = `<p class="modal-desc">Feature list coming soon for this script.</p>`;
-      return;
-    }
-
-    const byCategory: Record<string, ScriptFeature[]> = {};
-    features.forEach((f) => {
-      const cat = f.category || "General";
-      if (!byCategory[cat]) byCategory[cat] = [];
-      byCategory[cat].push(f);
-    });
-
-    featuresRoot.innerHTML = Object.entries(byCategory)
-      .map(
-        ([cat, items]) => `
-      <section class="game-feature-group">
-        <h4>${escapeHtml(cat)}</h4>
-        <ul class="game-feature-list">
-          ${items
-            .map(
-              (f) =>
-                `<li><strong>${escapeHtml(f.name || "Feature")}</strong>${f.desc ? `<span>${escapeHtml(f.desc)}</span>` : ""}</li>`
-            )
-            .join("")}
-        </ul>
-      </section>`
-      )
-      .join("");
-  }
-
   function openGameModal(game: GameEntry, gradient: string, thumbUrl: string | null): void {
     if (!modal) return;
     const title = $("#modalTitle");
@@ -304,7 +227,6 @@ import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePa
     if (title) title.textContent = game.name || game.id || "Game";
     if (meta) meta.textContent = `Version ${game.version || "?"} · ${game.id || ""}`;
     if (desc) desc.textContent = game.description || game.message || "No description available.";
-    renderModalFeatures(game);
     const status = (game.status || "working").toLowerCase();
     const badge = $("#modalBadge");
     if (badge) {
@@ -346,7 +268,7 @@ import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePa
     const query = state.gameQuery.trim().toLowerCase();
     if (query) {
       games = games.filter((g) => {
-        const hay = `${g.name || ""} ${g.id || ""} ${g.description || ""} ${g.message || ""} ${gameFeatureText(g)}`.toLowerCase();
+        const hay = `${g.name || ""} ${g.id || ""} ${g.description || ""} ${g.message || ""}`.toLowerCase();
         return hay.includes(query);
       });
     }
@@ -383,8 +305,7 @@ import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePa
             <span class="game-version">v${escapeHtml(game.version || "?")}</span>
           </div>
           <p class="game-desc">${escapeHtml(game.description || game.message || "")}</p>
-          ${renderFeatureChips(game.scriptFeatures || [])}
-          <button class="btn-link" type="button">View${(game.scriptFeatures || []).length ? ` ${(game.scriptFeatures || []).length}` : ""} Features</button>
+          <button class="btn-link" type="button">View Details</button>
         </div>
       `;
       const img = card.querySelector(".game-thumb") as HTMLImageElement | null;
@@ -568,10 +489,6 @@ import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePa
         return `<button type="button" class="game-stat-chip${state.gameFilter === key ? " active" : ""}" data-filter="${key}">${dot}${labels[key]} <strong>${n}</strong></button>`;
       })
       .join("");
-    const totalFeatures = games.reduce((n, g) => n + (g.scriptFeatures || []).length, 0);
-    if (totalFeatures) {
-      root.innerHTML += `<span class="game-stat-chip game-stat-static">Script features <strong>${totalFeatures}</strong></span>`;
-    }
     root.querySelectorAll(".game-stat-chip").forEach((btn) => {
       btn.addEventListener("click", () => {
         state.gameFilter = (btn as HTMLButtonElement).dataset.filter || "all";
@@ -614,13 +531,12 @@ import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePa
     if (sub) sub.textContent = credits.subheadline || "";
 
     teamsRoot.innerHTML = "";
-    const totalMembers = (credits.teams || []).reduce((n, t) => n + (t.members || []).length, 0);
-      (credits.teams || []).forEach((team) => {
-        const section = document.createElement("div");
-        section.className = `credits-team reveal${totalMembers <= 1 ? " solo-team" : ""}`;
+    (credits.teams || []).forEach((team) => {
+      const section = document.createElement("div");
+      section.className = "credits-team reveal";
       section.innerHTML = `<h3 class="credits-team-title">${escapeHtml(team.title || "Team")}</h3>`;
       const grid = document.createElement("div");
-      grid.className = `credits-grid${totalMembers <= 1 ? " solo" : ""}`;
+      grid.className = "credits-grid";
 
       (team.members || []).forEach((member) => {
         const mid = member.id || member.displayName || "";
@@ -691,7 +607,6 @@ import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePa
 
   function resolveResourceUrl(site: SitePayload, item: { url?: string; urlKey?: string }): string {
     if (item.url) {
-      if (item.url.startsWith("#")) return item.url;
       if (item.url.startsWith("http") || item.url.startsWith("//")) return item.url;
       const base = window.ALLERAL_API || window.location.origin;
       return `${base.replace(/\/$/, "")}${item.url.startsWith("/") ? item.url : `/${item.url}`}`;
@@ -704,88 +619,6 @@ import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePa
     if (key === "admin") return links.admin || "";
     if (key === "website") return links.website || cfg.publicUrl || "";
     return (links as Record<string, string>)[key] || "";
-  }
-
-  async function renderBanApiPanel(): Promise<void> {
-    const statusRoot = $("#banApiStatus");
-    const endpointsRoot = $("#banApiEndpoints");
-    const exampleRoot = $("#banApiExample");
-    try {
-      const base = window.ALLERAL_API || window.location.origin;
-      const res = await fetch(`${base.replace(/\/$/, "")}/api/v1/bans/docs`, { cache: "no-store" });
-      const data = (await res.json()) as Record<string, unknown>;
-      if (statusRoot) {
-        statusRoot.innerHTML = `
-          <div class="ban-api-stat"><span>Active bans</span><strong>${escapeHtml(String(data.activeBans ?? "—"))}</strong></div>
-          <div class="ban-api-stat"><span>API version</span><strong>v${escapeHtml(String(data.version || "1"))}</strong></div>
-          <div class="ban-api-stat"><span>Status</span><strong class="live">${data.partnerApi ? "Auto-enabled" : "Off"}</strong></div>
-          <div class="ban-api-stat"><span>Base URL</span><strong>${escapeHtml(String(data.baseUrl || base).replace(/^https?:\/\//, ""))}</strong></div>
-        `;
-      }
-      const endpoints = (data.endpoints as { method?: string; path?: string; auth?: boolean; desc?: string }[]) || [];
-      if (endpointsRoot) {
-        endpointsRoot.innerHTML = endpoints
-          .map(
-            (ep) => `
-          <article class="ban-api-endpoint">
-            <div class="ban-api-endpoint-head">
-              <span class="ban-api-method">${escapeHtml(ep.method || "GET")}</span>
-              <code>${escapeHtml(ep.path || "")}</code>
-              ${ep.auth ? `<span class="ban-api-auth">Auth</span>` : `<span class="ban-api-auth public">Public</span>`}
-            </div>
-            <p>${escapeHtml(ep.desc || "")}</p>
-          </article>`
-          )
-          .join("");
-      }
-      const example = data.checkExample as { url?: string; body?: Record<string, unknown> } | undefined;
-      if (exampleRoot && example?.body) {
-        exampleRoot.textContent = JSON.stringify(example.body, null, 2);
-      }
-    } catch {
-      if (statusRoot) statusRoot.innerHTML = `<p class="tool-panel-desc">Could not load Ban API docs.</p>`;
-    }
-  }
-
-  async function runBanApiTest(): Promise<void> {
-    const out = $("#banApiTestResult");
-    const key = ($("#banTestKey") as HTMLInputElement | null)?.value.trim() || "";
-    const userId = ($("#banTestUserId") as HTMLInputElement | null)?.value.trim() || "";
-    const username = ($("#banTestUsername") as HTMLInputElement | null)?.value.trim() || "";
-    if (!userId && !username) {
-      flash("Enter a Roblox UserId or username", true);
-      return;
-    }
-    const base = window.ALLERAL_API || window.location.origin;
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (key) headers["X-Ban-Api-Key"] = key;
-    try {
-      const res = await fetch(`${base.replace(/\/$/, "")}/api/v1/bans/check`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          player: { userId: userId || undefined, name: username || undefined },
-        }),
-      });
-      const data = await res.json();
-      if (out) {
-        out.textContent = JSON.stringify(data, null, 2);
-        out.classList.toggle("banned", data.allowed === false);
-        out.classList.toggle("allowed", data.allowed === true);
-      }
-      if (!res.ok) flash(String(data.error || "Check failed"), true);
-      else flash(data.allowed ? "Player allowed" : "Player banned");
-    } catch (e) {
-      if (out) out.textContent = e instanceof Error ? e.message : "Request failed";
-      flash("Ban check failed", true);
-    }
-  }
-
-  function bindBanApiTools(): void {
-    $("#banApiTestBtn")?.addEventListener("click", () => void runBanApiTest());
-    $("#banApiCopyDocs")?.addEventListener("click", () => {
-      void copyText(`${window.location.origin}/api/v1/bans/docs`, "Docs URL copied");
-    });
   }
 
   async function renderSyncPanel(): Promise<void> {
@@ -810,327 +643,20 @@ import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePa
     }
   }
 
-  function weaoStatusLabel(status: string): string {
-    const map: Record<string, string> = {
-      recommended: "Best pick",
-      supported: "Supported",
-      detected: "Detected",
-      outdated: "Outdated",
-      working: "Working",
-      not_working: "Not working",
-    };
-    return map[status] || titleCaseStatus(status);
-  }
-
-  function formatWeaoChangeTime(at?: number): string {
-    if (!at) return "Just now";
-    const diff = Math.max(0, Date.now() - at * 1000);
-    if (diff < 60000) return "Just now";
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    return new Date(at * 1000).toLocaleTimeString();
-  }
-
-  function filterWeaoList(): WeaoExploit[] {
-    let list = state.weaoExploits;
-    const q = state.weaoQuery.trim().toLowerCase();
-    if (q) {
-      list = list.filter(
-        (entry) =>
-          (entry.title || "").toLowerCase().includes(q) ||
-          (entry.slug || "").includes(q) ||
-          (entry.platform || "").toLowerCase().includes(q)
-      );
-    }
-    if (state.weaoFilter === "free") return list.filter((entry) => entry.free);
-    if (state.weaoFilter === "working") return list.filter((entry) => entry.liveStatus === "working");
-    if (state.weaoFilter === "not_working") return list.filter((entry) => entry.liveStatus === "not_working");
-    if (state.weaoFilter !== "all") {
-      return list.filter(
-        (entry) => entry.alleralStatus === state.weaoFilter || entry.liveStatus === state.weaoFilter
-      );
-    }
-    return list;
-  }
-
-  function updateExecutorDatalist(): void {
-    const dl = $("#executorDatalist");
-    if (!dl) return;
-    dl.innerHTML = state.weaoExploits
-      .map((entry) => `<option value="${escapeHtml(entry.title || "")}"></option>`)
-      .join("");
-  }
-
-  function setBugExecutor(name: string): void {
-    const input = $("#bugExecutor") as HTMLInputElement | null;
-    if (!input || !name) return;
-    input.value = name;
-    localStorage.setItem(EXECUTOR_PREF_KEY, name);
-    flash(`Executor set to ${name}`);
-  }
-
-  function renderWeaoStats(): void {
-    const root = $("#weaoStats");
-    if (!root) return;
-    const s = state.weaoSummary;
-    if (!s.total) {
-      root.innerHTML = "";
-      return;
-    }
-    root.innerHTML = `
-      <div class="weao-stat"><span>Tracked</span><strong>${s.total || 0}</strong></div>
-      <div class="weao-stat"><span>Working</span><strong class="live">${s.working || 0}</strong></div>
-      <div class="weao-stat"><span>Not working</span><strong class="warn">${s.notWorking || 0}</strong></div>
-      <div class="weao-stat"><span>Detected</span><strong>${s.detected || 0}</strong></div>
-      <div class="weao-stat"><span>Best for Alleral</span><strong>${s.recommended || 0}</strong></div>
-    `;
-  }
-
-  function renderWeaoLiveBadge(): void {
-    const badge = $("#weaoLiveBadge");
-    const countdown = $("#weaoCountdown");
-    if (!badge) return;
-    if (state.weaoLive) {
-      badge.innerHTML = `<span class="weao-live-dot"></span> Live · WEAO`;
-      badge.classList.add("active");
-    } else {
-      badge.innerHTML = `WEAO`;
-      badge.classList.remove("active");
-    }
-    if (countdown && state.weaoNextPollAt) {
-      const sec = Math.max(0, Math.ceil((state.weaoNextPollAt - Date.now()) / 1000));
-      countdown.textContent = state.weaoLive ? `Next check in ${sec}s` : `Paused · scroll to Tools for live updates`;
-    }
-  }
-
-  function renderWeaoActivityFeed(): void {
-    const feed = $("#weaoActivityFeed");
-    if (!feed) return;
-    const items = [...(state.weaoChanges || []), ...(state.weaoRecentChanges || [])]
-      .filter((item, index, arr) => arr.findIndex((x) => x.message === item.message && x.slug === item.slug) === index)
-      .slice(0, 12);
-
-    if (!items.length) {
-      feed.innerHTML = `<p class="weao-feed-empty">Watching WEAO — status changes appear here in real time when Roblox or executors patch.</p>`;
-      return;
-    }
-
-    feed.innerHTML = items
-      .map(
-        (item) => `
-      <div class="weao-feed-item severity-${escapeHtml(item.severity || "warning")}">
-        <span class="weao-feed-time">${escapeHtml(formatWeaoChangeTime(item.at))}</span>
-        <p>${escapeHtml(item.message || "Status changed")}</p>
-      </div>`
-      )
-      .join("");
-  }
-
-  function markWeaoClientChanges(prev: Record<string, string>, next: WeaoExploit[]): WeaoChange[] {
-    const changes: WeaoChange[] = [];
-    for (const entry of next) {
-      const slug = entry.slug || "";
-      if (!slug) continue;
-      const fp = entry.fingerprint || "";
-      const old = prev[slug];
-      if (old && fp && old !== fp) {
-        changes.push({
-          slug,
-          title: entry.title,
-          severity: entry.liveStatus === "working" ? "good" : entry.liveStatus === "not_working" ? "bad" : "warning",
-          message: `${entry.title}: ${entry.liveLabel || "Status updated"}`,
-          at: Date.now() / 1000,
-        });
-        state.weaoChangedSlugs[slug] = Date.now();
-      }
-      if (slug && fp) prev[slug] = fp;
-    }
-    return changes;
-  }
-
-  function renderWeaoExecutors(): void {
-    const root = $("#executorList");
-    if (!root) return;
-    const list = filterWeaoList();
-    const updated = $("#weaoUpdated");
-    if (updated) {
-      updated.textContent = state.weaoFetchedAt
-        ? `Last sync ${new Date(state.weaoFetchedAt).toLocaleTimeString()} · ${state.weaoExploits.length} executors from WEAO`
-        : "";
-    }
-    renderWeaoLiveBadge();
-    renderWeaoActivityFeed();
-
-    if (!state.weaoExploits.length) {
-      root.innerHTML = `<p class="tool-panel-desc">Loading live executor data from WEAO…</p>`;
-      return;
-    }
-    if (!list.length) {
-      root.innerHTML = `<p class="tool-panel-desc">No executors match your search. Try clearing filters.</p>`;
-      return;
-    }
-
-    const now = Date.now();
-    root.innerHTML = list
-      .map((ex) => {
-        const slug = ex.slug || "";
-        const changed = slug && state.weaoChangedSlugs[slug] && now - state.weaoChangedSlugs[slug] < 120000;
-        const live = ex.liveStatus || "supported";
-        return `
-      <article class="weao-exec-card status-${escapeHtml(live)}${changed ? " weao-changed" : ""}" data-slug="${escapeHtml(slug)}">
-        <div class="weao-exec-live-row">
-          <span class="weao-live-pill ${escapeHtml(live)}"><span class="weao-live-pill-dot"></span>${escapeHtml(ex.liveLabel || weaoStatusLabel(live))}</span>
-          ${ex.updatedDate ? `<span class="weao-updated-date">${escapeHtml(ex.updatedDate)}</span>` : ""}
-        </div>
-        <div class="weao-exec-head">
-          ${
-            ex.logo
-              ? `<img class="weao-exec-logo" src="${escapeHtml(ex.logo)}" alt="" width="44" height="44" loading="lazy" />`
-              : `<span class="weao-exec-logo-fallback">${escapeHtml((ex.title || "?").charAt(0))}</span>`
-          }
-          <div class="weao-exec-title">
-            <strong>${escapeHtml(ex.title || "Executor")}</strong>
-            <small>v${escapeHtml(ex.version || "?")} · ${escapeHtml(ex.platform || "Windows")}</small>
-            ${ex.liveDetail ? `<span class="weao-exec-detail">${escapeHtml(ex.liveDetail)}</span>` : ""}
-          </div>
-          <span class="executor-badge ${escapeHtml(ex.alleralStatus || "supported")}">${escapeHtml(weaoStatusLabel(ex.alleralStatus || "supported"))}</span>
-        </div>
-        <dl class="weao-exec-meta">
-          <div><dt>Hyperion</dt><dd>${ex.detected ? "Detected" : "Undetected"}</dd></div>
-          <div><dt>Roblox patch</dt><dd>${ex.updateStatus ? "Executor updated" : "Needs update"}</dd></div>
-          ${ex.suncPercentage != null ? `<div><dt>sUNC</dt><dd>${ex.suncPercentage}%</dd></div>` : ""}
-          <div><dt>Cost</dt><dd>${escapeHtml(ex.cost || (ex.free ? "Free" : "Paid"))}</dd></div>
-        </dl>
-        <div class="weao-exec-actions">
-          ${ex.websitelink ? `<a class="btn btn-outline btn-sm" href="${escapeHtml(ex.websitelink)}" target="_blank" rel="noopener">Website</a>` : ""}
-          ${ex.discordlink ? `<a class="btn btn-outline btn-sm" href="${escapeHtml(ex.discordlink)}" target="_blank" rel="noopener">Discord</a>` : ""}
-          <button type="button" class="btn btn-outline btn-sm" data-use-exec="${escapeHtml(ex.title || "")}">Use in report</button>
-          <button type="button" class="btn btn-outline btn-sm" data-copy-exec="${escapeHtml(ex.title || "")}">Copy</button>
-        </div>
-      </article>`;
-      })
-      .join("");
-
-    root.querySelectorAll("[data-use-exec]").forEach((btn) => {
-      btn.addEventListener("click", () => setBugExecutor((btn as HTMLElement).dataset.useExec || ""));
-    });
-    root.querySelectorAll("[data-copy-exec]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        void copyText((btn as HTMLElement).dataset.copyExec || "", "Executor copied");
-      });
-    });
-    afterRender();
-  }
-
-  function scheduleWeaoPoll(delayMs?: number): void {
-    clearTimeout(state.weaoPollTimer);
-    const ms = delayMs ?? (state.weaoLive ? WEAO_LIVE_POLL_MS : WEAO_IDLE_POLL_MS);
-    state.weaoNextPollAt = Date.now() + ms;
-    state.weaoPollTimer = window.setTimeout(() => {
-      void fetchWeaoExploits(false, state.weaoLive);
-    }, ms);
-  }
-
-  function startWeaoCountdown(): void {
-    clearInterval(state.weaoCountdownTimer);
-    state.weaoCountdownTimer = window.setInterval(() => renderWeaoLiveBadge(), 1000);
-  }
-
-  async function fetchWeaoExploits(refresh = false, live = state.weaoLive): Promise<void> {
-    const root = $("#executorList");
-    try {
-      const params = new URLSearchParams();
-      if (refresh) params.set("refresh", "1");
-      if (live) params.set("live", "1");
-      const qs = params.toString();
-      const data = await api(`/api/weao/exploits${qs ? `?${qs}` : ""}`);
-      const prevPrints = { ...state.weaoFingerprints };
-      const nextExploits = (data.exploits as WeaoExploit[]) || [];
-      const serverChanges = (data.changes as WeaoChange[]) || [];
-      const clientChanges = markWeaoClientChanges(prevPrints, nextExploits);
-      state.weaoFingerprints = prevPrints;
-
-      state.weaoExploits = nextExploits;
-      state.weaoSummary = (data.summary as WeaoSummary) || {};
-      state.weaoFetchedAt = String(data.fetchedAt || "");
-      state.weaoPollSec = Number(data.pollIntervalSec) || (live ? 35 : 120);
-      state.weaoChanges = serverChanges.length ? serverChanges : clientChanges;
-      state.weaoRecentChanges = (data.recentChanges as WeaoChange[]) || [];
-      const updated = $("#weaoUpdated");
-      if (updated) {
-        if (data.warning) {
-          updated.textContent = `${data.stale ? "Cached WEAO data" : "WEAO warning"} · ${String(data.warning)}`;
-        }
-      }
-
-      for (const change of state.weaoChanges) {
-        if (change.slug) state.weaoChangedSlugs[change.slug] = Date.now();
-      }
-
-      renderWeaoStats();
-      renderWeaoExecutors();
-      updateExecutorDatalist();
-
-      if (state.weaoChanges.length && state.weaoLive) {
-        const headline = state.weaoChanges[0]?.message;
-        if (headline) flash(headline);
-      }
-
-      scheduleWeaoPoll(state.weaoPollSec * 1000);
-    } catch {
-      if (root) {
-        root.innerHTML = `<p class="tool-panel-desc">Could not reach WEAO. <button type="button" class="btn-text" id="weaoRetry">Retry</button></p>`;
-        $("#weaoRetry")?.addEventListener("click", () => void fetchWeaoExploits(true, true));
-      }
-      scheduleWeaoPoll(WEAO_IDLE_POLL_MS);
-    }
-  }
-
-  function bindExecutorTools(): void {
-    $("#executorSearch")?.addEventListener("input", (e) => {
-      state.weaoQuery = (e.target as HTMLInputElement).value;
-      renderWeaoExecutors();
-    });
-    $("#weaoRefresh")?.addEventListener("click", () => void fetchWeaoExploits(true, true));
-    $$("[data-weao-filter]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        state.weaoFilter = (btn as HTMLElement).dataset.weaoFilter || "all";
-        $$("[data-weao-filter]").forEach((chip) => chip.classList.toggle("active", chip === btn));
-        renderWeaoExecutors();
-      });
-    });
-    const bugExec = $("#bugExecutor") as HTMLInputElement | null;
-    const savedExec = localStorage.getItem(EXECUTOR_PREF_KEY);
-    if (bugExec && savedExec) bugExec.value = savedExec;
-    bugExec?.addEventListener("change", () => {
-      const value = bugExec.value.trim();
-      if (value) localStorage.setItem(EXECUTOR_PREF_KEY, value);
-    });
-
-    const tools = $("#tools");
-    if (tools) {
-      const observer = new IntersectionObserver(
-        (entries) => {
-          const visible = entries.some((e) => e.isIntersecting);
-          const wasLive = state.weaoLive;
-          state.weaoLive = visible;
-          renderWeaoLiveBadge();
-          if (visible && !wasLive) void fetchWeaoExploits(false, true);
-          else if (visible !== wasLive) scheduleWeaoPoll(visible ? WEAO_LIVE_POLL_MS : WEAO_IDLE_POLL_MS);
-        },
-        { threshold: 0.15 }
-      );
-      observer.observe(tools);
-    }
-  }
-
-  function startWeaoPolling(): void {
-    startWeaoCountdown();
-    scheduleWeaoPoll(WEAO_IDLE_POLL_MS);
-  }
-
   function renderTools(site: SitePayload): void {
-    void fetchWeaoExploits(false, false);
-    void renderBanApiPanel();
+    const execRoot = $("#executorList");
+    if (execRoot) {
+      execRoot.innerHTML = (site.executors || [])
+        .map(
+          (ex) => `
+        <div class="executor-row">
+          <strong>${escapeHtml(ex.name || "Executor")}</strong>
+          <small>${escapeHtml(ex.note || "")}</small>
+          <span class="executor-badge ${escapeHtml(ex.status || "supported")}">${escapeHtml(ex.status || "supported")}</span>
+        </div>`
+        )
+        .join("");
+    }
 
     const resRoot = $("#resourcesGrid");
     if (resRoot) {
@@ -1138,8 +664,7 @@ import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePa
         .map((item) => {
           const url = resolveResourceUrl(site, item);
           if (!url) return "";
-          const external = !url.startsWith("#");
-          return `<a class="resource-card reveal" href="${escapeHtml(url)}"${external ? ' target="_blank" rel="noopener"' : ""}><strong>${escapeHtml(item.title || "Link")}</strong><span>${escapeHtml(item.desc || "")}</span></a>`;
+          return `<a class="resource-card reveal" href="${escapeHtml(url)}" target="_blank" rel="noopener"><strong>${escapeHtml(item.title || "Link")}</strong><span>${escapeHtml(item.desc || "")}</span></a>`;
         })
         .filter(Boolean)
         .join("");
@@ -1159,11 +684,6 @@ import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePa
       location.hash = "#support";
       $("#support")?.scrollIntoView({ behavior: "smooth" });
     });
-    $("#quickExecutors")?.addEventListener("click", () => {
-      location.hash = "#tools";
-      $("#tools")?.scrollIntoView({ behavior: "smooth" });
-      setTimeout(() => ($("#executorSearch") as HTMLInputElement | null)?.focus(), 350);
-    });
     $("#quickTeam")?.addEventListener("click", () => {
       location.hash = "#credits";
       $("#credits")?.scrollIntoView({ behavior: "smooth" });
@@ -1173,8 +693,8 @@ import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePa
   const CMD_ACTIONS = [
     { label: "Go to Home", hash: "#home", keys: "G H" },
     { label: "Go to Games", hash: "#games", keys: "G G" },
-    { label: "Go to Ban API", hash: "#ban-api", keys: "G B" },
-    { label: "Go to Creator", hash: "#credits", keys: "G C" },
+    { label: "Go to Tools", hash: "#tools", keys: "G T" },
+    { label: "Go to Team / Credits", hash: "#credits", keys: "G C" },
     { label: "Go to FAQ", hash: "#faq", keys: "G F" },
     { label: "Go to Support", hash: "#support", keys: "G S" },
     { label: "Copy loadstring", action: "copy", keys: "C L" },
@@ -1643,9 +1163,6 @@ import type { CreditMember, CreditRenderMember, GameEntry, ScriptFeature, SitePa
     bindMobileNav();
     bindQuickActions();
     bindCommandPalette();
-    bindExecutorTools();
-    bindBanApiTools();
-    startWeaoPolling();
     void initFormCaptcha();
     setActiveNav();
     void checkLiveStatus();

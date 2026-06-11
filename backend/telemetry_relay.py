@@ -204,14 +204,16 @@ except ImportError:
     def search_users(keyword: str, *, limit: int = 8):  # type: ignore
         raise RuntimeError("roblox_api unavailable")
 
+_WEAO_UNAVAILABLE_META: dict[str, Any] = {"stale": False, "warning": "weao_api unavailable"}
+
 try:
     from weao_api import fetch_all_exploits, fetch_exploit, summarize_exploits, recent_changes
 except ImportError:
     def fetch_all_exploits(*, force_refresh: bool = False, live: bool = False):  # type: ignore
-        raise RuntimeError("weao_api unavailable")
+        return [], [], dict(_WEAO_UNAVAILABLE_META)
 
     def fetch_exploit(slug: str):  # type: ignore
-        raise RuntimeError("weao_api unavailable")
+        return None
 
     def summarize_exploits(exploits: list):  # type: ignore
         return {"total": 0}
@@ -1475,11 +1477,17 @@ def ban_api_v1_status():
 
 @app.post("/api/v1/bans/check")
 def ban_api_v1_check():
-    if not ban_partner_authorized():
-        return jsonify({"ok": False, "error": "unauthorized", "hint": "Use X-Ban-Api-Key or X-Alleral-Key"}), 401
     client_ip = resolve_client_ip(request)
     if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
         return jsonify({"ok": False, "error": "rate_limited"}), 429
+    authorized = ban_partner_authorized()
+    if not authorized:
+        if not public_allow_ip(client_ip, BAN_DEMO_IP_HITS, BAN_DEMO_RATE_PER_MIN):
+            return jsonify({
+                "ok": False,
+                "error": "unauthorized",
+                "hint": "Use X-Ban-Api-Key or sign in on the admin panel to copy your auto-provisioned key",
+            }), 401
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         return jsonify({"ok": False, "error": "bad_request"}), 400
@@ -1958,6 +1966,33 @@ def credits_renders():
     return jsonify({"ok": True, "members": profiles})
 
 
+def _weao_exploits_body(
+    exploits: list[Any],
+    changes: list[Any],
+    meta: dict[str, Any],
+    *,
+    live: bool,
+    ok: bool = True,
+) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "ok": ok,
+        "exploits": exploits,
+        "summary": summarize_exploits(exploits),
+        "changes": changes,
+        "recentChanges": recent_changes(20),
+        "source": "weao",
+        "docs": "https://docs.weao.xyz",
+        "fetchedAt": utc_iso(),
+        "live": live,
+        "pollIntervalSec": 35 if live else 120,
+        "stale": bool(meta.get("stale")),
+        "warning": meta.get("warning"),
+    }
+    if not ok:
+        body["error"] = str(meta.get("warning") or "weao_unavailable")
+    return body
+
+
 @app.get("/api/weao/exploits")
 def weao_exploits():
     """Live executor statuses from WEAO (WhatExpsAre.Online)."""
@@ -1969,35 +2004,14 @@ def weao_exploits():
     try:
         exploits, changes, meta = fetch_all_exploits(force_refresh=force, live=live)
     except RuntimeError as exc:
-        return jsonify({
-            "ok": True,
-            "exploits": [],
-            "summary": summarize_exploits([]),
-            "changes": [],
-            "recentChanges": recent_changes(20),
-            "source": "weao",
-            "docs": "https://docs.weao.xyz",
-            "fetchedAt": utc_iso(),
-            "live": live,
-            "pollIntervalSec": 35 if live else 120,
-            "stale": False,
-            "warning": str(exc),
-        })
-    summary = summarize_exploits(exploits)
-    return jsonify({
-        "ok": True,
-        "exploits": exploits,
-        "summary": summary,
-        "changes": changes,
-        "recentChanges": recent_changes(20),
-        "source": "weao",
-        "docs": "https://docs.weao.xyz",
-        "fetchedAt": utc_iso(),
-        "live": live,
-        "pollIntervalSec": 35 if live else 120,
-        "stale": bool(meta.get("stale")),
-        "warning": meta.get("warning"),
-    })
+        meta = {"stale": False, "warning": str(exc)}
+        return jsonify(_weao_exploits_body([], [], meta, live=live, ok=False)), 502
+
+    warning = meta.get("warning")
+    if not exploits and warning and not meta.get("stale"):
+        return jsonify(_weao_exploits_body(exploits, changes, meta, live=live, ok=False)), 502
+
+    return jsonify(_weao_exploits_body(exploits, changes, meta, live=live))
 
 
 @app.get("/api/weao/exploits/<slug>")

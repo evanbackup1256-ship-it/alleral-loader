@@ -92,6 +92,8 @@ export interface SitePayload {
   tagline?: string;
   announcement?: string;
   loaderVersion?: string;
+  coreVersion?: string;
+  uiLibrary?: string;
   loadstring?: string;
   scriptsUpdatedAt?: string;
   siteUpdatedAt?: string;

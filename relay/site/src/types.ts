@@ -7,14 +7,6 @@ export interface GameEntry {
   description?: string;
   placeIds?: number[];
   robloxUrl?: string;
-  uiTabs?: string[];
-  scriptFeatures?: ScriptFeature[];
-}
-
-export interface ScriptFeature {
-  name?: string;
-  category?: string;
-  desc?: string;
 }
 
 export interface FaqItem {
@@ -70,55 +62,6 @@ export interface ExecutorEntry {
   note?: string;
 }
 
-export interface WeaoExploit {
-  title?: string;
-  slug?: string;
-  version?: string;
-  updatedDate?: string;
-  detected?: boolean;
-  updateStatus?: boolean;
-  uncStatus?: boolean;
-  free?: boolean;
-  platform?: string;
-  cost?: string;
-  suncPercentage?: number;
-  uncPercentage?: number;
-  rbxversion?: string;
-  websitelink?: string;
-  discordlink?: string;
-  purchaselink?: string;
-  logo?: string;
-  alleralStatus?: string;
-  liveStatus?: string;
-  liveLabel?: string;
-  liveDetail?: string;
-  fingerprint?: string;
-}
-
-export interface WeaoChange {
-  slug?: string;
-  title?: string;
-  type?: string;
-  severity?: string;
-  message?: string;
-  at?: number;
-  from?: Record<string, unknown>;
-  to?: Record<string, unknown>;
-}
-
-export interface WeaoSummary {
-  total?: number;
-  recommended?: number;
-  supported?: number;
-  detected?: number;
-  outdated?: number;
-  working?: number;
-  notWorking?: number;
-  free?: number;
-  updated?: number;
-  undetected?: number;
-}
-
 export interface ResourceEntry {
   title?: string;
   desc?: string;
@@ -149,6 +92,8 @@ export interface SitePayload {
   tagline?: string;
   announcement?: string;
   loaderVersion?: string;
+  coreVersion?: string;
+  uiLibrary?: string;
   loadstring?: string;
   scriptsUpdatedAt?: string;
   siteUpdatedAt?: string;

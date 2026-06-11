@@ -855,7 +855,10 @@ shop:AddDropdown("Target Items", {
 	Default = state.TargetBuyItems,
 	Multi = true,
 	Callback = function(selected)
-		state.TargetBuyItems = selected
+		state.TargetBuyItems = Core.normalizeMultiSelection(selected)
+		if #state.TargetBuyItems == 0 then
+			state.TargetBuyItems = { "Common" }
+		end
 	end,
 })
 shop:CreateToggle("Auto buy", state.AutoBuyItems, "Buys whatever you picked above.", function(enabled)

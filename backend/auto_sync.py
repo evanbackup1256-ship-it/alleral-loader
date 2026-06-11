@@ -385,6 +385,8 @@ class AutoSyncEngine:
 
         site_data = self.site_registry.load()
         site_data["loaderVersion"] = release.get("loader") or site.get("loaderVersion") or site_data.get("loaderVersion") or ""
+        site_data["coreVersion"] = release.get("core") or site.get("coreVersion") or site_data.get("coreVersion") or ""
+        site_data["uiLibrary"] = release.get("ui") or site.get("uiLibrary") or site_data.get("uiLibrary") or ""
         site_data["loadstring"] = site.get("loadstring") or site_data.get("loadstring") or ""
         site_data["tagline"] = site.get("tagline") or site_data.get("tagline") or ""
         site_data["features"] = site.get("features") or site_data.get("features") or []

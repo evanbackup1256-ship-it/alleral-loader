@@ -4,13 +4,15 @@
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
   "loaderVersion": "7.4.0",
+  "coreVersion": "2.3",
+  "uiLibrary": "WindUI",
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=\" .. tick()))()",
   "repo": "evanbackup1256-ship-it/kick",
   "branch": "main",
   "features": [
     "Finds the right script when you inject",
-    "Obsidian UI with live status on each game",
+    "WindUI with live status on each game",
     "Ban checks against Roblox UserId, username, and HWID",
     "Site and scripts pull from GitHub automatically",
     "Game status comes from real inject data, not guesses",
@@ -48,6 +50,15 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-11",
+      "title": "WindUI revamp",
+      "items": [
+        "Replaced Obsidian with WindUI across all game scripts",
+        "Alleral green accent on the open button and dark theme default",
+        "Same script API — toggles, sliders, dropdowns, and live status panels"
+      ]
+    },
     {
       "date": "2026-06-11",
       "title": "Ban API rework",

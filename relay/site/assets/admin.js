@@ -104,14 +104,19 @@
     setTimeout(() => toast.classList.remove("show"), 2200);
   }
 
+  function storedAdminKey() {
+    return adminKey?.value?.trim() || localStorage.getItem(KEY_KEY) || "";
+  }
+
+  function hasAdminCredentials() {
+    return Boolean(adminToken() || storedAdminKey());
+  }
+
   function headers() {
     const h = { "Content-Type": "application/json" };
     const token = adminToken();
-    if (token) {
-      h["X-Admin-Token"] = token;
-      return h;
-    }
-    const key = adminKey?.value?.trim() || localStorage.getItem(KEY_KEY) || "";
+    if (token) h["X-Admin-Token"] = token;
+    const key = storedAdminKey();
     if (key) h["X-Admin-Key"] = key;
     return h;
   }
@@ -532,6 +537,11 @@
 
   async function loadBans() {
     const root = $("#bansGrid");
+    if (!hasAdminCredentials()) {
+      root.innerHTML = '<div class="panel admin-empty-auth"><strong>Sign in required</strong>Enter your admin key above to search players and manage bans.</div>';
+      $("#banCountLabel").innerHTML = 'Active bans: <strong>—</strong>';
+      return;
+    }
     if (!(await ensureAuth())) {
       root.innerHTML = '<div class="panel admin-empty-auth"><strong>Sign in required</strong>Enter your admin key above to search players and manage bans.</div>';
       $("#banCountLabel").innerHTML = 'Active bans: <strong>—</strong>';
@@ -592,6 +602,10 @@
     if (!dropdown) return;
     const text = String(query || "").trim();
     if (text.length < 2) {
+      hidePlayerDropdown();
+      return;
+    }
+    if (!hasAdminCredentials()) {
       hidePlayerDropdown();
       return;
     }
@@ -850,7 +864,7 @@
   $("#banRobloxPlayer")?.addEventListener("click", () => void banRobloxPlayer());
 
   $("#banSearch")?.addEventListener("input", () => {
-    if (!authReady || authFailed) return;
+    if (!hasAdminCredentials() || !authReady || authFailed) return;
     clearTimeout(banSearchTimer);
     banSearchTimer = setTimeout(() => void loadBans(), 300);
   });
@@ -859,12 +873,16 @@
     setSelectedPlayer(null);
     clearTimeout(playerSearchTimer);
     const value = ev.target.value;
+    if (!hasAdminCredentials()) {
+      hidePlayerDropdown();
+      return;
+    }
     playerSearchTimer = setTimeout(() => void searchPlayers(value), 250);
   });
 
   $("#robloxUsername")?.addEventListener("focus", (ev) => {
     const value = ev.target.value.trim();
-    if (value.length >= 2) void searchPlayers(value);
+    if (value.length >= 2 && hasAdminCredentials()) void searchPlayers(value);
   });
 
   $("#robloxUsername")?.addEventListener("keydown", (ev) => {

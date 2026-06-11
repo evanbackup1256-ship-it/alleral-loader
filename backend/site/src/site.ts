@@ -171,6 +171,13 @@ import type { CreditMember, CreditRenderMember, GameEntry, SitePayload } from ".
     const su = $("#scriptsUpdated");
     const ls = $("#loadstringCode");
     if (lv) lv.textContent = site.loaderVersion || "—";
+    const coreMeta = $("#coreVersionMeta");
+    if (coreMeta) {
+      const bits: string[] = [];
+      if (site.coreVersion) bits.push(`core ${site.coreVersion}`);
+      if (site.uiLibrary) bits.push(site.uiLibrary);
+      coreMeta.textContent = bits.length ? ` · ${bits.join(" · ")}` : "";
+    }
     if (su) su.textContent = site.scriptsUpdatedAt || "—";
     if (ls) ls.textContent = site.loadstring || "";
     const games = Object.values(site.games || {});

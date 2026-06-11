@@ -105,6 +105,7 @@ for key, value in pairs(defaults) do
 end
 
 Core.loadSettings(state, savedKeys, SETTINGS_FILE)
+state.SafeSpot = Core.normalizeDropdownValue(state.SafeSpot, "Classic")
 
 local function saveSettings()
 	Core.saveSettings(state, savedKeys, SETTINGS_FILE)

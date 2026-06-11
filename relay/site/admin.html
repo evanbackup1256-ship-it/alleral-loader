@@ -169,13 +169,15 @@
           <p class="admin-card-lead">REST endpoints for partners to check and manage Alleral bans. Your admin session can call authenticated routes — no separate partner key required in this panel.</p>
           <p class="admin-card-lead muted-inline">Partner keys auto-provision on first boot. Copy yours below after sign-in, or set <code>BAN_PARTNER_API_KEY</code> to override. Docs: <a id="partnerDocsLink" href="/api/v1/bans/docs" target="_blank" rel="noopener">/api/v1/bans/docs</a></p>
           <div id="partnerKeyRow" class="admin-partner-key hidden">
-            <label>Partner API Key
-              <div class="admin-partner-key-row">
-                <input id="partnerApiKey" class="field-input field-mono" type="password" readonly />
-                <button id="partnerRevealKey" class="btn btn-outline btn-sm" type="button">Show</button>
-                <button id="partnerCopyKey" class="btn btn-outline btn-sm" type="button">Copy</button>
-              </div>
-            </label>
+            <form class="admin-partner-key-form" autocomplete="off" onsubmit="return false">
+              <label>Partner API Key
+                <div class="admin-partner-key-row">
+                  <input id="partnerApiKey" class="field-input field-mono" type="text" readonly autocomplete="off" spellcheck="false" />
+                  <button id="partnerRevealKey" class="btn btn-outline btn-sm" type="button">Show</button>
+                  <button id="partnerCopyKey" class="btn btn-outline btn-sm" type="button">Copy</button>
+                </div>
+              </label>
+            </form>
           </div>
           <div class="admin-partner-actions">
             <button id="partnerCopyDocs" class="btn btn-outline btn-sm" type="button">Copy docs URL</button>

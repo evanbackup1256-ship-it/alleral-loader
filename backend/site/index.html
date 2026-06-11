@@ -114,7 +114,7 @@
       <div class="script-panel reveal">
         <div class="script-panel-head">
           <span class="script-file">loader.luau</span>
-          <span class="script-meta">v<span id="loaderVersion">—</span></span>
+          <span class="script-meta">v<span id="loaderVersion">—</span><span id="coreVersionMeta" class="script-meta-extra"></span></span>
         </div>
         <pre id="loadstringCode" class="script-code">Loading…</pre>
         <div class="script-actions">
@@ -293,9 +293,9 @@
         </div>
         <div class="tool-panel">
           <h3>Live ban checker</h3>
-          <p class="tool-panel-desc">Test <code>POST /api/v1/bans/check</code> with an optional partner API key.</p>
+          <p class="tool-panel-desc">Test <code>POST /api/v1/bans/check</code>. Partner key required for live checks — keys auto-provision on first boot.</p>
           <form class="form ban-api-test-form" onsubmit="return false">
-            <label>Partner API Key <span class="muted-inline">optional</span><input id="banTestKey" class="field-input field-mono" type="password" placeholder="X-Ban-Api-Key" autocomplete="off" /></label>
+            <label>Partner API Key<input id="banTestKey" class="field-input field-mono" type="password" placeholder="X-Ban-Api-Key" autocomplete="off" /></label>
             <div class="form-row">
               <label>Roblox UserId<input id="banTestUserId" class="field-input" placeholder="123456789" inputmode="numeric" /></label>
               <label>Username<input id="banTestUsername" class="field-input" placeholder="PlayerName" /></label>

@@ -1,33 +1,24 @@
 local Core = {}
-Core.VERSION = "2.2"
-Core.UI_LIBRARY = "Obsidian"
+Core.VERSION = "2.3"
+Core.UI_LIBRARY = "WindUI"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
-local OBSIDIAN_MIRROR_URLS = {
-	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/",
-	"https://github.com/evanbackup1256-ship-it/kick/raw/main/ui/",
-	"https://raw.githubusercontent.com/deividcomsono/Obsidian/main/",
-	"https://github.com/deividcomsono/Obsidian/raw/main/",
+local WINDUI_MIRROR_URLS = {
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/windui/",
+	"https://github.com/evanbackup1256-ship-it/kick/raw/main/ui/windui/",
+	"https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/",
+	"https://github.com/Footagesus/WindUI/raw/main/dist/",
 }
-local OBSIDIAN_MIN_BYTES = 200000
-local OBSIDIAN_LOCAL_ROOTS = {
-	"ui/",
-	"vendor/obsidian/",
-	"obsidian/",
+local WINDUI_LOCAL_ROOTS = {
+	"ui/windui/",
+	"vendor/windui/",
+	"windui/",
 }
-local OBSIDIAN_FILES = {
-	Library = "Library.lua",
-	ThemeManager = "addons/ThemeManager.lua",
-	SaveManager = "addons/SaveManager.lua",
-}
-local ALLERAL_THEME = {
-	FontColor = "ffffff",
-	MainColor = "121212",
-	AccentColor = "53fc18",
-	BackgroundColor = "0a0a0a",
-	OutlineColor = "1e1e1e",
-}
+local WINDUI_FILE = "main.lua"
+local WINDUI_MIN_BYTES = 50000
+local ALLERAL_ACCENT = Color3.fromHex("#53fc18")
+local ALLERAL_ACCENT_ALT = Color3.fromHex("#30ff6a")
 
 local function genv()
 	local ok, env = pcall(function()
@@ -1016,24 +1007,23 @@ local function stampUi(bundle)
 	return bundle
 end
 
-local function obsidianSourceValid(body, kind)
+local function windUiSourceValid(body)
 	if type(body) ~= "string" or body == "" then
 		return false
 	end
-	local minBytes = kind == "Library" and OBSIDIAN_MIN_BYTES or 8000
-	if #body < minBytes then
+	if #body < WINDUI_MIN_BYTES then
 		return false
 	end
-	return body:find("CreateWindow", 1, true) ~= nil or body:find("ThemeManager", 1, true) ~= nil
+	return body:find("CreateWindow", 1, true) ~= nil or body:find("WindUI", 1, true) ~= nil
 end
 
-local function compileObsidianModule(source, label, kind)
+local function compileWindUiModule(source, label)
 	local loadStringFn = Core.loadStringFn()
 	if not loadStringFn or not source or source == "" then
-		return nil, "Empty Obsidian source"
+		return nil, "Empty WindUI source"
 	end
-	if not obsidianSourceValid(source, kind) then
-		return nil, "Obsidian source invalid (" .. tostring(#source) .. " bytes)"
+	if not windUiSourceValid(source) then
+		return nil, "WindUI source invalid (" .. tostring(#source) .. " bytes)"
 	end
 	local compiled, compileErr = loadStringFn(source, label)
 	if not compiled and type(load) == "function" and load ~= loadStringFn then
@@ -1043,19 +1033,19 @@ local function compileObsidianModule(source, label, kind)
 		return nil, tostring(compileErr)
 	end
 	local ok, result = pcall(compiled)
-	if ok and type(result) == "table" then
+	if ok and type(result) == "table" and type(result.CreateWindow) == "function" then
 		return result
 	end
 	if not ok then
-		warn("[Alleral] Obsidian module error: " .. tostring(result))
+		warn("[Alleral] WindUI module error: " .. tostring(result))
 	end
-	return nil, ok and "Invalid Obsidian module" or tostring(result)
+	return nil, ok and "Invalid WindUI module" or tostring(result)
 end
 
-local function readObsidianLocal(relativePath)
+local function readWindUiLocal(relativePath)
 	local roots = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
 	for _, root in ipairs(roots) do
-		for _, vendorRoot in ipairs(OBSIDIAN_LOCAL_ROOTS) do
+		for _, vendorRoot in ipairs(WINDUI_LOCAL_ROOTS) do
 			local fullPath = root .. vendorRoot .. relativePath
 			local source = Core.readFile(fullPath)
 			if source then
@@ -1066,60 +1056,57 @@ local function readObsidianLocal(relativePath)
 	return nil
 end
 
-local function fetchObsidianRemote(relativePath, kind)
-	for _, base in ipairs(OBSIDIAN_MIRROR_URLS) do
+local function fetchWindUiRemote(relativePath)
+	for _, base in ipairs(WINDUI_MIRROR_URLS) do
 		local url = base .. relativePath
 		local body = Core.httpGet(url)
-		if obsidianSourceValid(body, kind) then
+		if windUiSourceValid(body) then
 			return body, url
 		end
 	end
 	return nil
 end
 
-local function loadObsidianModule(relativePath, kind)
-	local localSource, localPath = readObsidianLocal(relativePath)
+local function loadWindUiModule()
+	local localSource, localPath = readWindUiLocal(WINDUI_FILE)
 	if localSource then
-		local module, err = compileObsidianModule(localSource, "@Obsidian/local:" .. localPath, kind)
+		local module, err = compileWindUiModule(localSource, "@WindUI/local:" .. localPath)
 		if module then
 			return module
 		end
-		warn("[Alleral] Local Obsidian failed (" .. tostring(localPath) .. "): " .. tostring(err))
+		warn("[Alleral] Local WindUI failed (" .. tostring(localPath) .. "): " .. tostring(err))
 	end
-	local remoteSource, remoteUrl = fetchObsidianRemote(relativePath, kind)
+	local remoteSource, remoteUrl = fetchWindUiRemote(WINDUI_FILE)
 	if remoteSource then
-		local module, err = compileObsidianModule(remoteSource, "@Obsidian/remote:" .. tostring(remoteUrl), kind)
+		local module, err = compileWindUiModule(remoteSource, "@WindUI/remote:" .. tostring(remoteUrl))
 		if module then
-			warn("[Alleral] Obsidian loaded " .. relativePath .. " from " .. tostring(remoteUrl))
+			warn("[Alleral] WindUI loaded from " .. tostring(remoteUrl))
 			return module
 		end
-		warn("[Alleral] Remote Obsidian failed (" .. relativePath .. "): " .. tostring(err))
+		warn("[Alleral] Remote WindUI failed: " .. tostring(err))
 	end
-	localSource = readObsidianLocal(relativePath)
+	localSource = readWindUiLocal(WINDUI_FILE)
 	if localSource then
-		return compileObsidianModule(localSource, "@Obsidian/local", kind)
+		return compileWindUiModule(localSource, "@WindUI/local")
 	end
-	return nil, "Obsidian download failed for " .. relativePath
+	return nil, "WindUI download failed for " .. WINDUI_FILE
 end
 
-local function listUiThemes(themeManager)
+local function listUiThemes(windUi)
 	local names = {}
-	if type(themeManager) == "table" and type(themeManager.BuiltInThemes) == "table" then
-		for name in pairs(themeManager.BuiltInThemes) do
-			table.insert(names, name)
-		end
-		table.sort(names, function(a, b)
-			if a == "Alleral" then
-				return true
-			end
-			if b == "Alleral" then
-				return false
-			end
-			return a < b
+	if type(windUi) == "table" and type(windUi.GetThemes) == "function" then
+		local ok, themes = pcall(function()
+			return windUi:GetThemes()
 		end)
+		if ok and type(themes) == "table" then
+			for name in pairs(themes) do
+				table.insert(names, name)
+			end
+			table.sort(names)
+		end
 	end
 	if #names == 0 then
-		return { "Alleral", "Default" }
+		return { "Dark", "Light" }
 	end
 	return names
 end
@@ -1128,16 +1115,12 @@ local function applyAlleralTheme(bundle)
 	if type(bundle) ~= "table" then
 		return
 	end
-	local themeManager = bundle.ThemeManager
-	local library = bundle.Library
-	if type(themeManager) ~= "table" or type(library) ~= "table" then
+	local windUi = bundle.WindUI or bundle.Library
+	if type(windUi) ~= "table" or type(windUi.SetTheme) ~= "function" then
 		return
 	end
-	themeManager.BuiltInThemes = themeManager.BuiltInThemes or {}
-	themeManager.BuiltInThemes.Alleral = { 0, ALLERAL_THEME }
 	pcall(function()
-		themeManager:SetLibrary(library)
-		themeManager:ApplyTheme("Alleral")
+		windUi:SetTheme("Dark")
 	end)
 end
 
@@ -1161,46 +1144,36 @@ function Core.loadUi()
 		return nil, "loadstring unavailable"
 	end
 
-	local Library, libErr = loadObsidianModule(OBSIDIAN_FILES.Library, "Library")
-	if not Library then
-		return nil, libErr or "Obsidian Library missing"
+	local WindUI, libErr = loadWindUiModule()
+	if not WindUI then
+		return nil, libErr or "WindUI missing"
 	end
-	local ThemeManager = loadObsidianModule(OBSIDIAN_FILES.ThemeManager, "ThemeManager")
-	local SaveManager = loadObsidianModule(OBSIDIAN_FILES.SaveManager, "SaveManager")
-	if not ThemeManager or not SaveManager then
-		return nil, "Obsidian addons missing"
-	end
-
-	pcall(function()
-		ThemeManager:SetLibrary(Library)
-		SaveManager:SetLibrary(Library)
-		SaveManager:IgnoreThemeSettings()
-	end)
 
 	local bundle = {
-		Library = Library,
-		ThemeManager = ThemeManager,
-		SaveManager = SaveManager,
-		Toggles = Library.Toggles,
-		Options = Library.Options,
+		WindUI = WindUI,
+		Library = WindUI,
 		CreateWindow = function(_, settings)
-			return Library:CreateWindow(settings)
+			return WindUI:CreateWindow(settings)
 		end,
 		Notify = function(_, info)
 			if type(info) == "table" then
-				Library:Notify({
+				WindUI:Notify({
 					Title = info.Title,
-					Description = info.Content or info.Description or info.Text or "",
-					Time = info.Duration or info.Time or 4,
+					Content = info.Content or info.Description or info.Text or "",
+					Duration = info.Duration or info.Time or 4,
 				})
 			else
-				Library:Notify(tostring(info or ""))
+				WindUI:Notify({
+					Title = "Alleral",
+					Content = tostring(info or ""),
+					Duration = 4,
+				})
 			end
 		end,
 	}
 	applyAlleralTheme(bundle)
-	bundle.ThemeNames = listUiThemes(ThemeManager)
-	warn("[Alleral] Obsidian UI ready")
+	bundle.ThemeNames = listUiThemes(WindUI)
+	warn("[Alleral] WindUI ready")
 	return cacheUi(bundle)
 end
 
@@ -1342,11 +1315,37 @@ function Core.setClipboard(text)
 	return false
 end
 
-function Core.createObsidianGroupbox(rawGroup, uiBundle)
+function Core.windUiIcon(icon)
+	if type(icon) == "number" then
+		return "rbxassetid://" .. tostring(icon)
+	end
+	local numeric = Core.uiIcon(icon)
+	if numeric ~= "" then
+		return "rbxassetid://" .. numeric
+	end
+	if type(icon) == "string" and icon ~= "" and not icon:find("rbxassetid", 1, true) then
+		return icon
+	end
+	return "circle"
+end
+
+local function windUiVisibilityTarget(label)
+	if type(label) ~= "table" then
+		return nil
+	end
+	local frame = label.ParagraphFrame or label
+	if type(frame.UIElements) == "table" and frame.UIElements.Main then
+		return frame.UIElements.Main
+	end
+	if label.Instance then
+		return label.Instance
+	end
+	return nil
+end
+
+function Core.createWindUiGroupbox(rawGroup, uiBundle)
 	rawGroup = rawGroup or {}
 	uiBundle = uiBundle or {}
-	local toggles = uiBundle.Toggles or {}
-	local options = uiBundle.Options or {}
 	local serial = 0
 
 	local function nextFlag(name, explicit)
@@ -1369,24 +1368,14 @@ function Core.createObsidianGroupbox(rawGroup, uiBundle)
 	local function dropdownDefault(values, current, multi)
 		values = values or {}
 		if multi then
-			if type(current) == "table" then
-				local map = {}
-				for key, value in pairs(current) do
-					if type(key) == "number" then
-						map[tostring(value)] = true
-					elseif value == true then
-						map[tostring(key)] = true
-					end
-				end
-				return map
-			end
-			if current and current ~= "" then
-				return { [tostring(current)] = true }
+			local selected = Core.normalizeMultiSelection(current)
+			if #selected > 0 then
+				return selected
 			end
 			return {}
 		end
 		if type(current) == "table" then
-			return current[1] or values[1]
+			return Core.normalizeDropdownValue(current, values[1])
 		end
 		if current and current ~= "" then
 			return tostring(current)
@@ -1394,20 +1383,36 @@ function Core.createObsidianGroupbox(rawGroup, uiBundle)
 		return values[1]
 	end
 
+	local function labelVisibilityTarget(label)
+		return windUiVisibilityTarget(label)
+	end
+
+	local function setElementValue(element, value)
+		if not element then
+			return
+		end
+		if element.Select then
+			element:Select(value)
+		elseif element.Set then
+			element:Set(value)
+		elseif element.SetValue then
+			element:SetValue(value)
+		end
+	end
+
 	local groupbox = {}
 
 	function groupbox:CreateToggle(settings, id)
-		local flag = nextFlag(settings.Name, id)
-		rawGroup:AddToggle(flag, {
-			Text = settings.Name,
-			Default = settings.CurrentValue == true,
-			Tooltip = settings.Tooltip,
+		local handle
+		handle = rawGroup:Toggle({
+			Title = settings.Name,
+			Value = settings.CurrentValue == true,
+			Desc = settings.Tooltip,
 			Callback = settings.Callback or function() end,
 		})
-		local toggle = toggles[flag]
 		return wrapElement(function(nextSettings)
-			if nextSettings.CurrentValue ~= nil and toggle then
-				toggle:SetValue(nextSettings.CurrentValue == true)
+			if nextSettings.CurrentValue ~= nil then
+				setElementValue(handle, nextSettings.CurrentValue == true)
 			end
 		end)
 	end
@@ -1415,118 +1420,132 @@ function Core.createObsidianGroupbox(rawGroup, uiBundle)
 	function groupbox:CreateSlider(settings, id)
 		local range = settings.Range or { 0, 100 }
 		local minValue, maxValue = range[1], range[2]
-		local flag = nextFlag(settings.Name, id)
-		rawGroup:AddSlider(flag, {
-			Text = settings.Name,
-			Default = tonumber(settings.CurrentValue) or minValue,
-			Min = minValue,
-			Max = maxValue,
-			Rounding = settings.Increment or (maxValue <= 5 and 1 or 0),
-			Suffix = settings.Suffix,
-			Tooltip = settings.Tooltip,
+		local defaultValue = tonumber(settings.CurrentValue) or minValue
+		local handle = rawGroup:Slider({
+			Title = settings.Name,
+			Desc = settings.Tooltip,
+			Step = settings.Increment or (maxValue <= 5 and 0.05 or 1),
+			Value = {
+				Min = minValue,
+				Max = maxValue,
+				Default = defaultValue,
+			},
 			Callback = settings.Callback or function() end,
 		})
-		local slider = options[flag]
 		return wrapElement(function(nextSettings)
-			if nextSettings.CurrentValue ~= nil and slider then
-				slider:SetValue(tonumber(nextSettings.CurrentValue) or minValue)
+			if nextSettings.CurrentValue ~= nil then
+				setElementValue(handle, tonumber(nextSettings.CurrentValue) or minValue)
 			end
 		end)
 	end
 
 	function groupbox:CreateButton(settings, id)
-		rawGroup:AddButton({
-			Text = settings.Name,
-			Func = settings.Callback or function() end,
-			Tooltip = settings.Tooltip,
+		rawGroup:Button({
+			Title = settings.Name,
+			Desc = settings.Tooltip,
+			Callback = settings.Callback or function() end,
 		})
 		return { Set = function() end }
 	end
 
 	function groupbox:CreateInput(settings, id)
-		local flag = nextFlag(settings.Name, id)
-		rawGroup:AddInput(flag, {
-			Text = settings.Name,
-			Default = settings.CurrentValue or "",
+		local handle = rawGroup:Input({
+			Title = settings.Name,
+			Value = settings.CurrentValue or settings.Default or "",
 			Placeholder = settings.PlaceholderText or settings.Placeholder or "",
-			Tooltip = settings.Tooltip,
+			Desc = settings.Tooltip,
 			Callback = settings.Callback or function() end,
 		})
-		local input = options[flag]
 		return wrapElement(function(nextSettings)
-			if nextSettings.CurrentValue ~= nil and input then
-				if input.SetText then
-					input:SetText(tostring(nextSettings.CurrentValue))
-				elseif input.SetValue then
-					input:SetValue(tostring(nextSettings.CurrentValue))
-				end
+			if nextSettings.CurrentValue ~= nil then
+				setElementValue(handle, tostring(nextSettings.CurrentValue))
 			end
 		end)
 	end
 
 	function groupbox:CreateDropdown(settings, id)
 		local values = settings.Options or settings.Values or {}
-		local multi = settings.MultipleOptions == true
-		local flag = nextFlag(settings.Name, id)
-		rawGroup:AddDropdown(flag, {
-			Text = settings.Name,
+		local multi = settings.MultipleOptions == true or settings.Multi == true
+		local current = dropdownDefault(values, settings.CurrentOption, multi)
+		local userCallback = settings.Callback or function() end
+		local handle = rawGroup:Dropdown({
+			Title = settings.Name,
 			Values = values,
-			Default = dropdownDefault(values, settings.CurrentOption, multi),
+			Value = multi and current or current,
 			Multi = multi,
-			Tooltip = settings.Tooltip,
-			Callback = settings.Callback or function() end,
+			Desc = settings.Tooltip,
+			Callback = function(selection)
+				if multi then
+					userCallback(Core.normalizeMultiSelection(selection))
+				else
+					userCallback(Core.normalizeDropdownValue(selection, current))
+				end
+			end,
 		})
-		local dropdown = options[flag]
 		return wrapElement(function(nextSettings)
-			if not dropdown then
+			if not handle then
 				return
 			end
 			local nextValues = nextSettings.Options or nextSettings.Values
-			if nextValues then
-				dropdown:SetValues(nextValues)
+			if nextValues and handle.Refresh then
+				handle:Refresh(nextValues)
+			elseif nextValues and handle.SetValues then
+				handle:SetValues(nextValues)
 			end
 			local pick = nextSettings.CurrentOption or nextSettings.CurrentOptions
 			if pick == nil then
 				return
 			end
 			if multi and type(pick) == "table" then
-				local map = {}
+				local selected = {}
 				for index, value in ipairs(pick) do
-					map[tostring(value)] = true
+					table.insert(selected, tostring(value))
 				end
 				for key, value in pairs(pick) do
-					if type(key) ~= "number" then
-						map[tostring(key)] = value == true
+					if type(key) ~= "number" and value == true then
+						table.insert(selected, tostring(key))
 					end
 				end
-				dropdown:SetValue(map)
+				setElementValue(handle, selected)
 			else
-				dropdown:SetValue(type(pick) == "table" and pick[1] or pick)
+				setElementValue(handle, type(pick) == "table" and pick[1] or pick)
 			end
 		end)
 	end
 
 	function groupbox:CreateLabel(settings, id)
 		local text = type(settings) == "table" and (settings.Name or settings.Text) or tostring(settings or "")
-		local label = rawGroup:AddLabel(text)
+		local label = rawGroup:Paragraph({
+			Title = text,
+		})
+		local visibleTarget = labelVisibilityTarget(label)
 		return {
 			Set = function(_, nextSettings)
 				local nextText = type(nextSettings) == "table" and (nextSettings.Name or nextSettings.Text)
 					or tostring(nextSettings or "")
-				if label and label.SetText then
-					label:SetText(nextText)
+				if label and label.SetTitle then
+					label:SetTitle(nextText)
+				elseif label and label.Set then
+					label:Set(nextText)
 				end
 			end,
+			_windLabel = label,
+			_visibleTarget = visibleTarget,
+			TextLabel = visibleTarget,
 		}
 	end
 
 	function groupbox:CreateDivider()
-		rawGroup:AddDivider()
+		if rawGroup.Space then
+			rawGroup:Space()
+		end
 		return {}
 	end
 
 	return groupbox
 end
+
+Core.createObsidianGroupbox = Core.createWindUiGroupbox
 
 function Core.wrapUiTab(rawTab, uiBundle, window)
 	local tab = {
@@ -1538,18 +1557,32 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 	function tab:CreateGroupbox(settings)
 		settings = settings or {}
 		local name = settings.Name or "Group"
-		local column = settings.Column or 1
-		local rawGroup = (column == 2) and rawTab:AddRightGroupbox(name) or rawTab:AddLeftGroupbox(name)
-		return Core.createObsidianGroupbox(rawGroup, uiBundle)
+		local rawGroup = rawTab:Section({
+			Title = name,
+			Box = true,
+			BoxBorder = true,
+			Opened = true,
+		})
+		return Core.createWindUiGroupbox(rawGroup, uiBundle)
 	end
 
 	function tab:BuildThemeGroupbox(column)
 		local group = Core.buildUiGroup(tab, "Appearance", column or 1)
-		local themes = (uiBundle and uiBundle.ThemeNames) or { "Alleral", "Default" }
-		group:CreateDropdown("Theme preset", themes, "Alleral", function(selected)
-			if uiBundle and uiBundle.ThemeManager then
+		local windUi = uiBundle and (uiBundle.WindUI or uiBundle.Library)
+		local themes = (uiBundle and uiBundle.ThemeNames) or { "Dark", "Light" }
+		local current = "Dark"
+		if windUi and type(windUi.GetCurrentTheme) == "function" then
+			local ok, theme = pcall(function()
+				return windUi:GetCurrentTheme()
+			end)
+			if ok and theme then
+				current = theme
+			end
+		end
+		group:CreateDropdown("Theme preset", themes, current, function(selected)
+			if windUi and type(windUi.SetTheme) == "function" then
 				pcall(function()
-					uiBundle.ThemeManager:ApplyTheme(selected)
+					windUi:SetTheme(selected)
 				end)
 			end
 			Core.notify("Theme", "Applied " .. tostring(selected), 2)
@@ -1803,17 +1836,28 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 	local function waitForElement(element, timeout)
 		local started = tick()
 		repeat
-			if element and element.Instance then
+			if element and (element._visibleTarget or element.TextLabel or element._windLabel) then
 				return true
 			end
 			task.wait()
 		until tick() - started >= (timeout or 3)
-		return element and element.Instance ~= nil
+		return element and (element._visibleTarget or element.TextLabel or element._windLabel) ~= nil
 	end
 
 	local function setVisible(element, visible)
-		if element and element.TextLabel then
-			element.TextLabel.Visible = visible
+		if not element then
+			return
+		end
+		local target = element._visibleTarget or element.TextLabel
+		if target and target.Visible ~= nil then
+			target.Visible = visible
+			return
+		end
+		if element._windLabel then
+			local fallback = windUiVisibilityTarget(element._windLabel)
+			if fallback and fallback.Visible ~= nil then
+				fallback.Visible = visible
+			end
 		end
 	end
 
@@ -1901,8 +1945,10 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 			LastSearch = "",
 		}
 		local function safeCallback(selection)
-			handle.Selection = currentSelection(selection, multi)
-			wrap(config.Text or config.Name or id, config.Callback or function() end)(selection)
+			local normalized = multi and Core.normalizeMultiSelection(selection)
+				or Core.normalizeDropdownValue(selection, current)
+			handle.Selection = multi and normalized or currentSelection(normalized, false)
+			wrap(config.Text or config.Name or id, config.Callback or function() end)(normalized)
 		end
 		local function rebuild(currentValues)
 			local nextValues = currentValues or handle.Values
@@ -2004,6 +2050,110 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 	return group
 end
 
+function Core.dropdownEntryText(value)
+	if type(value) == "table" then
+		return tostring(value.Title or value.Name or value.Text or value[1] or "")
+	end
+	return tostring(value or "")
+end
+
+function Core.normalizeMultiSelection(selection)
+	local picked = {}
+	if type(selection) == "string" then
+		if selection ~= "" then
+			table.insert(picked, selection)
+		end
+		return picked
+	end
+	if type(selection) ~= "table" then
+		return picked
+	end
+	local hasBooleanMap = false
+	for key, value in pairs(selection) do
+		if type(key) ~= "number" and type(value) == "boolean" then
+			hasBooleanMap = true
+			break
+		end
+	end
+	if hasBooleanMap then
+		for item, enabled in pairs(selection) do
+			if type(item) == "number" then
+				if enabled ~= nil and enabled ~= false then
+					local text = Core.dropdownEntryText(enabled)
+					if text ~= "" then
+						table.insert(picked, text)
+					end
+				end
+			elseif enabled then
+				local text = Core.dropdownEntryText(item)
+				if text ~= "" then
+					table.insert(picked, text)
+				end
+			end
+		end
+		return picked
+	end
+	for _, value in ipairs(selection) do
+		local text = Core.dropdownEntryText(value)
+		if text ~= "" then
+			table.insert(picked, text)
+		end
+	end
+	if #picked == 0 then
+		for key, value in pairs(selection) do
+			if type(key) ~= "number" and value == true then
+				local text = Core.dropdownEntryText(key)
+				if text ~= "" then
+					table.insert(picked, text)
+				end
+			end
+		end
+	end
+	return picked
+end
+
+function Core.normalizeDropdownValue(selection, fallback)
+	if type(selection) == "table" then
+		local text = Core.dropdownEntryText(selection)
+		if text ~= "" then
+			return text
+		end
+		if selection[1] ~= nil then
+			return Core.normalizeDropdownValue(selection[1], fallback)
+		end
+	elseif type(selection) == "string" or type(selection) == "number" or type(selection) == "boolean" then
+		return tostring(selection)
+	end
+	return fallback
+end
+
+function Core.selectionFirst(selection, fallback)
+	local items = Core.normalizeMultiSelection(selection)
+	if items[1] and items[1] ~= "" then
+		return items[1]
+	end
+	return fallback or ""
+end
+
+function Core.listContains(selection, value)
+	local list = Core.normalizeMultiSelection(selection)
+	if #list == 0 then
+		return false
+	end
+	return table.find(list, value) ~= nil
+end
+
+function Core.listMatches(selection, value)
+	local list = Core.normalizeMultiSelection(selection)
+	if #list == 0 then
+		return true
+	end
+	if Core.listContains(list, "Any") or Core.listContains(list, "All") or Core.listContains(list, "any") then
+		return true
+	end
+	return Core.listContains(list, value)
+end
+
 function Core.uiIcon(icon)
 	return tostring(icon or ""):match("%d+$") or ""
 end
@@ -2014,26 +2164,46 @@ end
 
 function Core.buildUiWindow(ui, settings)
 	settings = settings or {}
-	local lib = ui and ui.Library
+	local lib = ui and (ui.WindUI or ui.Library)
 	if not lib then
 		return nil
 	end
 	local fileSettings = settings.FileSettings or {}
-	local window = lib:CreateWindow({
+	local folder = fileSettings.RootFolder or fileSettings.ConfigFolder or "Alleral_Configs"
+	local rawWindow = lib:CreateWindow({
 		Title = settings.Name or "Alleral",
-		Footer = settings.Subtitle or "",
-		Icon = tonumber(Core.uiIcon(settings.Icon or 10723407389)) or 10723407389,
-		Center = true,
-		AutoShow = true,
-		NotifySide = "Right",
-		Resizable = true,
-		GlobalSearch = true,
+		Author = settings.Subtitle or "",
+		Folder = folder,
+		Icon = Core.windUiIcon(settings.Icon or "leaf"),
+		Theme = "Dark",
+		NewElements = true,
+		HideSearchBar = false,
+		OpenButton = {
+			Title = "Alleral",
+			Enabled = true,
+			Draggable = true,
+			OnlyMobile = false,
+			Color = ColorSequence.new(ALLERAL_ACCENT, ALLERAL_ACCENT_ALT),
+		},
 	})
 	applyAlleralTheme(ui)
-	if ui.SaveManager and fileSettings.Enabled ~= false then
-		pcall(function()
-			ui.SaveManager:SetFolder(fileSettings.RootFolder or fileSettings.ConfigFolder or "Alleral_Configs")
-		end)
+	local window = {
+		_rawWindow = rawWindow,
+		_ui = ui,
+		_library = lib,
+		_windSection = nil,
+	}
+	function window:AddTab(name, icon)
+		if not self._windSection then
+			self._windSection = self._rawWindow:Section({
+				Title = "Alleral",
+			})
+		end
+		return self._windSection:Tab({
+			Title = name,
+			Icon = Core.windUiIcon(icon),
+			Border = true,
+		})
 	end
 	window._ui = ui
 	window._library = lib

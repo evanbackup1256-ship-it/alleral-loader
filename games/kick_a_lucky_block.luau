@@ -4,7 +4,7 @@ do
 		local g = getgenv()
 		if type(g) == "table" then
 			if bridge.Alleral_Rayfield
-				and bridge.Alleral_Rayfield.InterfaceBuild == "Obsidian"
+				and bridge.Alleral_Rayfield.InterfaceBuild == "WindUI"
 				and type(bridge.Alleral_Rayfield.CreateWindow) == "function" then
 				g.Alleral_Rayfield = bridge.Alleral_Rayfield
 				g.Alleral_UI = bridge.Alleral_Rayfield
@@ -904,6 +904,9 @@ local function withAny(options)
 end
 
 local function listFromSelection(selection)
+	if Core and Core.normalizeMultiSelection then
+		return Core.normalizeMultiSelection(selection)
+	end
 	if type(selection) == "string" then
 		return { selection }
 	end
@@ -916,7 +919,11 @@ local function listFromSelection(selection)
 		if type(key) == "number" then
 			arrayLike = true
 			if value ~= nil and value ~= false then
-				table.insert(output, tostring(value))
+				local text = type(value) == "table" and (value.Title or value.Name or value.Text or value[1])
+					or value
+				if text ~= nil and text ~= false then
+					table.insert(output, tostring(text))
+				end
 			end
 		elseif value then
 			table.insert(output, tostring(key))
@@ -1948,6 +1955,9 @@ local function selectedDropdownKeys(selection)
 end
 
 local function selectedDropdownValue(selection, fallback)
+	if Core and Core.selectionFirst then
+		return Core.selectionFirst(selection, fallback)
+	end
 	local items = listFromSelection(selection)
 	if items[1] ~= nil and items[1] ~= "" then
 		return items[1]

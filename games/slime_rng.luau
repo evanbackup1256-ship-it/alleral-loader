@@ -145,20 +145,11 @@ local function resetSettings()
 end
 
 local function listContains(list, value)
-	if not list or #list == 0 then
-		return false
-	end
-	return table.find(list, value) ~= nil
+	return Core.listContains(list, value)
 end
 
 local function listMatches(list, value)
-	if not list or #list == 0 then
-		return true
-	end
-	if listContains(list, "Any") then
-		return true
-	end
-	return listContains(list, value)
+	return Core.listMatches(list, value)
 end
 
 local function getRemoteFunction(serviceName)
@@ -239,6 +230,17 @@ local InventoryServiceUtils
 pcall(function()
 	InventoryServiceUtils = require(ReplicatedStorage.Source.Features.Inventory.InventoryServiceUtils)
 end)
+
+local function inventoryUtilsCall(methodName, ...)
+	if not InventoryServiceUtils then
+		return nil
+	end
+	local method = InventoryServiceUtils[methodName]
+	if type(method) ~= "function" then
+		return nil
+	end
+	return method(InventoryServiceUtils, ...)
+end
 
 local XpTransferServiceUtils
 pcall(function()
@@ -434,14 +436,20 @@ local function refreshSlimeNameList()
 	if not dataClient or not InventoryServiceUtils or not Mutations or not Slimes then
 		return
 	end
+	if type(InventoryServiceUtils.getSlimeData) ~= "function" then
+		return
+	end
 	slimeNameList = { "Best", "Any" }
 	local inventory = dataClient:get("inventory")
 	if not inventory then
 		return
 	end
 	for slimeKey, slimeValue in pairs(inventory) do
-		local slimeData = InventoryServiceUtils.getSlimeData(slimeKey, slimeValue)
-		local slimeInfo = slimeData and Slimes.getSlime(slimeData.id)
+		local slimeData = inventoryUtilsCall("getSlimeData", slimeKey, slimeValue)
+		if not slimeData then
+			continue
+		end
+		local slimeInfo = Slimes.getSlime and Slimes.getSlime(slimeData.id)
 		if slimeInfo and slimeInfo.name then
 			local displayName = Mutations.getDisplayName(slimeInfo.name, slimeData.mutations)
 			if type(slimeValue) == "number" then
@@ -686,8 +694,8 @@ local function pickSlimeKey(targetList, inventory)
 		local bestKey
 		local bestScore = -1
 		for slimeKey, slimeValue in pairs(inventory) do
-			local slimeData = InventoryServiceUtils.getSlimeData(slimeKey, slimeValue)
-			local dps = InventoryServiceUtils.getDpsFromData(slimeData) or 0
+			local slimeData = inventoryUtilsCall("getSlimeData", slimeKey, slimeValue)
+			local dps = slimeData and inventoryUtilsCall("getDpsFromData", slimeData) or 0
 			if dps > bestScore then
 				bestScore = dps
 				bestKey = slimeKey
@@ -701,8 +709,11 @@ local function pickSlimeKey(targetList, inventory)
 		end
 	end
 	for slimeKey, slimeValue in pairs(inventory) do
-		local slimeData = InventoryServiceUtils.getSlimeData(slimeKey, slimeValue)
-		local slimeInfo = Slimes.getSlime(slimeData.id)
+		local slimeData = inventoryUtilsCall("getSlimeData", slimeKey, slimeValue)
+		if not slimeData then
+			continue
+		end
+		local slimeInfo = Slimes.getSlime and Slimes.getSlime(slimeData.id)
 		if slimeInfo and slimeInfo.name then
 			local displayName = Mutations.getDisplayName(slimeInfo.name, slimeData.mutations)
 			if listContains(targetList, displayName) or listContains(targetList, sanitizeDisplayName(displayName)) then
@@ -853,7 +864,10 @@ local function equipBestSlimes()
 	if state.equipLock then
 		return
 	end
-	if not dataClient or not InventoryServiceUtils then
+	if not dataClient or type(dataClient.get) ~= "function" or not InventoryServiceUtils then
+		return
+	end
+	if type(InventoryServiceUtils.getSlimeData) ~= "function" then
 		return
 	end
 	local inventory = dataClient:get("inventory")
@@ -861,25 +875,25 @@ local function equipBestSlimes()
 		return
 	end
 	local inventoryRemote = getRemoteFunction("InventoryService")
-	if not inventoryRemote then
+	if not inventoryRemote or type(inventoryRemote.InvokeServer) ~= "function" then
 		return
 	end
 	state.equipLock = true
 	local ok, err = pcall(function()
 		local upgrades = dataClient:get("upgrades") or {}
-		local slotCount = InventoryServiceUtils.getOwnedSlotCount(upgrades, 0) or 1
-		local mode = state.BestMode[1] or "Any"
+		local slotCount = inventoryUtilsCall("getOwnedSlotCount", upgrades, 0) or 1
+		local mode = Core.selectionFirst(state.BestMode, "Any")
 		local ranked = {}
 		for slimeKey, slimeValue in pairs(inventory) do
-			local slimeData = InventoryServiceUtils.getSlimeData(slimeKey, slimeValue)
+			local slimeData = inventoryUtilsCall("getSlimeData", slimeKey, slimeValue)
 			if slimeData then
-				local stats = InventoryServiceUtils.getSlimeStatsFromData(slimeData)
-				local damage = (stats and stats.damage) or 0
-				local health = (stats and stats.health) or 0
-				local dps = InventoryServiceUtils.getDpsFromData(slimeData) or 0
+				local stats = inventoryUtilsCall("getSlimeStatsFromData", slimeData) or {}
+				local damage = stats.damage or 0
+				local health = stats.health or 0
+				local dps = inventoryUtilsCall("getDpsFromData", slimeData) or 0
 				local level = slimeData.level or 1
-				local xp = InventoryServiceUtils.getAccumulatedXp(slimeData) or 0
-				local rarity = InventoryServiceUtils.getRarity(slimeData) or 0
+				local xp = inventoryUtilsCall("getAccumulatedXp", slimeData) or slimeData.xp or 0
+				local rarity = inventoryUtilsCall("getRarity", slimeData) or slimeData.rarity or 0
 				local hasMutation = slimeData.mutations and next(slimeData.mutations) ~= nil
 				local score
 				if mode == "Damage" then
@@ -939,10 +953,10 @@ local function equipBestSlimes()
 			pcall(function()
 				inventoryRemote:InvokeServer("requestUnequip", idx)
 			end)
-			task.wait(0.08)
+			task.wait(0.04)
 		end
 		local waited = 0
-		while #(dataClient:get("equipped") or {}) > 0 and waited < 0.75 do
+		while #(dataClient:get("equipped") or {}) > 0 and waited < 0.4 do
 			task.wait(0.05)
 			waited = waited + 0.05
 		end
@@ -950,7 +964,7 @@ local function equipBestSlimes()
 			pcall(function()
 				inventoryRemote:InvokeServer("requestEquip", slimeKey)
 			end)
-			task.wait(0.08)
+			task.wait(0.04)
 		end
 	end)
 	if not ok then
@@ -968,7 +982,7 @@ local function usePotionIfAvailable()
 	if not inventoryRemote then
 		return
 	end
-	local selectedPotion = state.TargetPotion[1] or "Any"
+	local selectedPotion = Core.selectionFirst(state.TargetPotion, "Any")
 	local potionId
 	if selectedPotion == "Any" then
 		for name, id in pairs(potionNameToId) do
@@ -1006,7 +1020,7 @@ local function useFruitIfAvailable()
 	if not inventoryRemote then
 		return
 	end
-	local targetFruit = state.TargetFruit[1] or "Any"
+	local targetFruit = Core.selectionFirst(state.TargetFruit, "Any")
 	local fruitInfo = fruitUnlockInfo[targetFruit]
 	if targetFruit == "Any" then
 		for name, info in pairs(fruitUnlockInfo) do
@@ -1507,17 +1521,7 @@ local function addMultiDropdown(group, name, label, values, default, callback)
 		Multi = true,
 		Searchable = true,
 		Callback = function(selection)
-			local picked = {}
-			for item, enabled in pairs(selection) do
-				if type(item) == "number" then
-					if enabled ~= nil and enabled ~= false then
-						table.insert(picked, tostring(enabled))
-					end
-				elseif enabled then
-					table.insert(picked, tostring(item))
-				end
-			end
-			callback(picked)
+			callback(selection)
 			saveSettings()
 		end,
 	})

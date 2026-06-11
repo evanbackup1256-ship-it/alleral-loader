@@ -163,6 +163,13 @@
       const su = $("#scriptsUpdated");
       const ls = $("#loadstringCode");
       if (lv) lv.textContent = site.loaderVersion || "\u2014";
+      const coreMeta = $("#coreVersionMeta");
+      if (coreMeta) {
+        const bits = [];
+        if (site.coreVersion) bits.push(`core ${site.coreVersion}`);
+        if (site.uiLibrary) bits.push(site.uiLibrary);
+        coreMeta.textContent = bits.length ? ` \u00b7 ${bits.join(" \u00b7 ")}` : "";
+      }
       if (su) su.textContent = site.scriptsUpdatedAt || "\u2014";
       if (ls) ls.textContent = site.loadstring || "";
       const games = Object.values(site.games || {});
@@ -671,6 +678,17 @@
       const username = $("#banTestUsername")?.value.trim() || "";
       if (!userId && !username) {
         flash("Enter a Roblox UserId or username", true);
+        return;
+      }
+      if (!key) {
+        flash("Partner API key required — copy from admin after sign-in or set BAN_PARTNER_API_KEY", true);
+        if (out) {
+          out.textContent = JSON.stringify({
+            ok: false,
+            error: "unauthorized",
+            hint: "Send X-Ban-Api-Key. Keys auto-provision on first relay boot.",
+          }, null, 2);
+        }
         return;
       }
       const base = window.ALLERAL_API || window.location.origin;

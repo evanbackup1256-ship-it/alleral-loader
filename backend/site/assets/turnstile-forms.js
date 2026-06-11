@@ -48,10 +48,29 @@
     return loadPromise;
   }
 
+  function unmountWidget(formId) {
+    const entry = widgets.get(formId);
+    if (!entry) return;
+    if (entry.widgetId != null && window.turnstile) {
+      try {
+        window.turnstile.remove(entry.widgetId);
+      } catch {
+        /* ignore stale widget ids */
+      }
+    }
+    if (entry.mount) {
+      entry.mount.dataset.rendered = "";
+      entry.mount.innerHTML = "";
+    }
+    widgets.delete(formId);
+  }
+
   async function renderWidget(mount) {
     const id = mount.dataset.turnstile;
-    if (!id || widgets.has(id) || mount.dataset.rendered === "1") return;
+    if (!id || mount.dataset.rendered === "1") return;
     if (!mount.isConnected || mount.closest(".hidden")) return;
+
+    if (widgets.has(id)) unmountWidget(id);
 
     await loadTurnstileScript();
     const key = await resolveSiteKey();
@@ -94,16 +113,21 @@
 
     reset(formId) {
       const entry = widgets.get(formId);
-      if (!entry || entry.widgetId == null || !window.turnstile) return;
-      try {
-        window.turnstile.reset(entry.widgetId);
-      } catch {
-        /* ignore */
+      if (!entry) return;
+      if (entry.widgetId != null && window.turnstile) {
+        try {
+          window.turnstile.reset(entry.widgetId);
+        } catch {
+          unmountWidget(formId);
+        }
       }
-      entry.token = "";
+      if (widgets.has(formId)) {
+        widgets.get(formId).token = "";
+      }
     },
 
     hideAll() {
+      [...widgets.keys()].forEach((formId) => unmountWidget(formId));
       document.querySelectorAll(".form-turnstile").forEach((el) => {
         el.classList.add("hidden");
       });

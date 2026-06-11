@@ -345,20 +345,11 @@ sortAnyFirst(eggNameOptions)
 sortAnyFirst(eventItemOptions)
 
 local function listContains(list, value)
-	if not list or #list == 0 then
-		return false
-	end
-	return table.find(list, value) ~= nil
+	return Core.listContains(list, value)
 end
 
 local function listMatches(list, value)
-	if not list or #list == 0 then
-		return true
-	end
-	if listContains(list, "Any") or listContains(list, "All") or listContains(list, "any") then
-		return true
-	end
-	return listContains(list, value)
+	return Core.listMatches(list, value)
 end
 
 local function firePrompt(prompt)
@@ -1158,7 +1149,7 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoUnlockPlot", 0.1, functi
 	end)
 end)
 
-Core.makeSupervisor(state, loops, loopControllers, "AutoSell", 0.05, function()
+Core.makeSupervisor(state, loops, loopControllers, "AutoSell", 0.15, function()
 	if not state.AutoSell or not runtime.playerPlot then
 		return
 	end
@@ -1241,7 +1232,7 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoRemoveSeed", 0.5, functi
 	end)
 end)
 
-Core.makeSupervisor(state, loops, loopControllers, "AutoDiscardSeed", 0.05, function()
+Core.makeSupervisor(state, loops, loopControllers, "AutoDiscardSeed", 0.2, function()
 	if not state.AutoDiscardSeed or not DiscardSeedRemote then
 		return
 	end
@@ -1732,7 +1723,7 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoSellPet", 1.5, function(
 	end)
 end)
 
-Core.makeSupervisor(state, loops, loopControllers, "AutoOpenBox", 0.05, function()
+Core.makeSupervisor(state, loops, loopControllers, "AutoOpenBox", 0.35, function()
 	if not state.AutoOpenBox then
 		return
 	end
