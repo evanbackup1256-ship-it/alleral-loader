@@ -35,11 +35,10 @@ end
 
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 
-if not getgenv().Alleral_Boot then
-	warn("[Alleral] load the hub first")
+local Core = getgenv().Alleral_Core
+if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
-getgenv().Alleral_Boot = nil
 
 local VERSION = "6.6.2"
 getgenv().Alleral_ActiveScriptVersion = VERSION
@@ -5295,7 +5294,7 @@ if state.AAutoFav then
 	scanTools()
 end
 
-notify("Alleral", "v" .. VERSION .. " loaded. Tabs on the left.", 5)
+notify("Alleral", "v" .. VERSION .. " ready", 5)
 end
 
 startRuntime()
