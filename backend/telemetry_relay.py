@@ -117,7 +117,7 @@ REPLAY_CACHE_SEC = int(os.environ.get("TELEMETRY_REPLAY_CACHE_SEC", "300"))
 MAX_EVENT_AGE_SEC = int(os.environ.get("TELEMETRY_MAX_EVENT_AGE_SEC", "600"))
 ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", API_KEY).strip()
 SCRIPTS_MANIFEST_PATH = resolve_manifest_path()
-MIN_API_KEY_LEN = 24
+MIN_API_KEY_LEN = 8
 
 EVENT_COLORS = {
     "session_start": 10181046,

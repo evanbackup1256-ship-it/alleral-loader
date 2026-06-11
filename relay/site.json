@@ -1,6 +1,6 @@
 {
     "version":  1,
-    "updatedAt":  "2026-06-11T03:55:28Z",
+    "updatedAt":  "2026-06-11T03:57:19Z",
     "brand":  "Alleral",
     "tagline":  "One loadstring. Every supported game. Live status.",
     "loaderVersion":  "7.4.0",
@@ -22,7 +22,7 @@
                 },
                 {
                     "q":  "Which games are supported?",
-                    "a":  "Check the Games section — status updates live from the hub. Only games marked working or testing will load."
+                    "a":  "Check the Games section â€” status updates live from the hub. Only games marked working or testing will load."
                 },
                 {
                     "q":  "Why did the script not load?",
