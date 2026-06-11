@@ -32,10 +32,24 @@ Paste this in your executor and **Execute**:
 end)()
 ```
 
-**Important:** If you still see `[Alleral Loader v3.x]` in the console, that is an **old script in Volt Autoexec** — not this loader.
+**Important:** If you see `[Alleral Loader v3.x]` instead of `=== Alleral loader 5.3.x active ===`, you are **not** running the current loader.
 
-1. Open **Volt → Settings → Autoexec**
-2. **Delete** any Alleral / loader scripts (v3.7.4, bootstrap, launch, etc.)
-3. Paste and **Execute** the snippet above once
+Common causes (even with empty Autoexec):
+
+1. **Saved Scripts tab** — old Alleral one-liner saved there (especially `readfile("loader.luau")` or `launch.luau` URLs)
+2. **Workspace file** — old `loader.luau` in Volt's workspace folder on disk
+3. **Stale console** — scroll down; old logs stay visible from earlier injects
+
+**Find workspace copies** (after loading v5.3 once):
+
+```lua
+getgenv().Alleral_ScanLegacy()
+```
+
+**Correct load** (always fetches latest from GitHub):
+
+```lua
+loadstring(game:HttpGet("https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/loader.luau?t=" .. tick()))()
+```
 
 Reload: `getgenv().Alleral_Reload()`

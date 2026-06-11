@@ -3,7 +3,7 @@
 	Detects game, fetches core + game script, runs.
 ]]
 
-local LOADER_VERSION = "5.3.1"
+local LOADER_VERSION = "5.3.2"
 local MIN_CORE = "1.18"
 local RELEASE_FALLBACK = {
 	core = "1.19",
@@ -27,11 +27,14 @@ local LEGACY_LOADER_MARKERS = {
 	"[Alleral Loader v",
 	"Alleral loader 3.",
 	"Alleral loader 4.",
+	"Alleral loader 3.7",
 	"[Alleral Bootstrap]",
 	"Alleral Bootstrap]",
 	"__Alleral_LaunchHandled",
 	"EMBEDDED_LOADER =",
 	"launch.template.luau",
+	"LOADER_VERSION = \"3.",
+	"LOADER_VERSION = \"4.",
 }
 local LEGACY_ENTRY_NAMES = {
 	"loader.luau",
@@ -1240,7 +1243,19 @@ local function isLegacyAlleralLoader(src)
 	if src:find("Alleral loader", 1, true) and src:find("Detected Kick", 1, true) then
 		return true
 	end
+	if src:find("local=true", 1, true) and src:find("[Alleral Loader v", 1, true) then
+		return true
+	end
 	return false
+end
+
+local function legacyVersionLabel(src)
+	if type(src) ~= "string" then
+		return nil
+	end
+	return src:match('LOADER_VERSION%s*=%s*"([%d%.]+)"')
+		or src:match("%[Alleral Loader v([%d%.]+)%]")
+		or src:match("Alleral loader ([%d%.]+)")
 end
 
 local function readFileIfExists(relativePath)
@@ -1253,6 +1268,90 @@ local function readFileIfExists(relativePath)
 	end
 	local okRead, src = pcall(readFile, relativePath)
 	return okRead and src or nil
+end
+
+local function isScannableScriptPath(path)
+	return path:match("%.luau$")
+		or path:match("%.lua$")
+		or path:match("%.txt$")
+		or path:lower():find("loader", 1, true)
+		or path:lower():find("alleral", 1, true)
+		or path:lower():find("bootstrap", 1, true)
+		or path:lower():find("launch", 1, true)
+end
+
+local function forEachWorkspaceFile(callback, depthLimit)
+	depthLimit = depthLimit or 14
+	local listFn = firstExecFunc("listfiles", "list_files", "ListFiles")
+	local isFolderFn = firstExecFunc("isfolder", "is_folder", "IsFolder")
+	if not listFn then
+		return false
+	end
+
+	local seen = {}
+	local function walk(dir, depth)
+		if depth > depthLimit then
+			return
+		end
+		dir = dir:gsub("^/", ""):gsub("/$", "")
+		local ok, entries = pcall(listFn, dir)
+		if not ok or type(entries) ~= "table" then
+			return
+		end
+		for _, entry in ipairs(entries) do
+			if type(entry) == "string" then
+				local path = entry:gsub("^/", "")
+				if seen[path] then
+					-- skip
+				else
+					seen[path] = true
+					local isDir = false
+					if isFolderFn then
+						local okFolder, folder = pcall(isFolderFn, path)
+						isDir = okFolder and folder == true
+					end
+					if isDir then
+						walk(path, depth + 1)
+					elseif isScannableScriptPath(path) then
+						callback(path, readFileIfExists(path))
+					end
+				end
+			end
+		end
+	end
+
+	for _, root in ipairs({ "", ".", "workspace", "scripts" }) do
+		walk(root, 0)
+	end
+	for _, dir in ipairs(SCAN_DIRS) do
+		walk(dir, 0)
+	end
+	return true
+end
+
+local function scanLegacyLoaders()
+	local hits = {}
+	local function consider(path, src)
+		if isLegacyAlleralLoader(src) then
+			table.insert(hits, {
+				path = path,
+				version = legacyVersionLabel(src) or "unknown",
+			})
+		end
+	end
+
+	for _, dir in ipairs(SCAN_DIRS) do
+		for _, name in ipairs(LEGACY_ENTRY_NAMES) do
+			local path = dir == "" and name or (dir .. "/" .. name)
+			consider(path, readFileIfExists(path))
+		end
+	end
+
+	forEachWorkspaceFile(function(path, src)
+		consider(path, src)
+	end)
+
+	return hits
 end
 
 local function clearLegacySession()
@@ -1280,65 +1379,46 @@ end
 
 local function purgeLegacyLoaders()
 	if not isFile or not readFile then
-		return 0, false
+		return 0, false, {}
 	end
 
 	local removed = 0
 	local autoexecHit = false
+	local deletedPaths = {}
 
-	local function tryDelete(path, src)
-		if not isLegacyAlleralLoader(src) then
-			return
-		end
-		if deleteWorkspaceFile(path) then
+	for _, hit in ipairs(scanLegacyLoaders()) do
+		if deleteWorkspaceFile(hit.path) then
 			removed += 1
-			if path:lower():find("autoexec", 1, true) then
+			table.insert(deletedPaths, hit.path)
+			if hit.path:lower():find("autoexec", 1, true) then
 				autoexecHit = true
 			end
 		end
 	end
 
-	for _, dir in ipairs(SCAN_DIRS) do
-		for _, name in ipairs(LEGACY_ENTRY_NAMES) do
-			local path = dir == "" and name or (dir .. "/" .. name)
-			tryDelete(path, readFileIfExists(path))
+	return removed, autoexecHit, deletedPaths
+end
+
+local function reportLegacyScan(hits, deletedPaths)
+	if type(hits) ~= "table" then
+		hits = scanLegacyLoaders()
+	end
+	if #hits == 0 then
+		log("No legacy loader files found in executor workspace")
+		return
+	end
+	for _, hit in ipairs(hits) do
+		local deleted = false
+		for _, path in ipairs(deletedPaths or {}) do
+			if path == hit.path then
+				deleted = true
+				break
+			end
+		end
+		if not deleted then
+			log("Legacy loader still on disk: " .. hit.path .. " (v" .. hit.version .. ")", true)
 		end
 	end
-
-	local listFn = firstExecFunc("listfiles", "list_files", "ListFiles")
-	local isFolderFn = firstExecFunc("isfolder", "is_folder", "IsFolder")
-	if listFn then
-		local function walk(dir, depth)
-			if depth > 8 then
-				return
-			end
-			dir = dir:gsub("/$", "")
-			local ok, entries = pcall(listFn, dir)
-			if not ok or type(entries) ~= "table" then
-				return
-			end
-			for _, entry in ipairs(entries) do
-				if type(entry) == "string" then
-					local path = entry:gsub("^/", "")
-					local isDir = false
-					if isFolderFn then
-						local okFolder, folder = pcall(isFolderFn, path)
-						isDir = okFolder and folder == true
-					end
-					if isDir then
-						walk(path, depth + 1)
-					elseif path:match("%.luau$") or path:match("%.lua$") then
-						tryDelete(path, readFileIfExists(path))
-					end
-				end
-			end
-		end
-		for _, dir in ipairs(SCAN_DIRS) do
-			walk(dir, 0)
-		end
-	end
-
-	return removed, autoexecHit
 end
 
 local function purgeOutdatedWorkspace()
@@ -1446,11 +1526,21 @@ local function main()
 
 	clearLegacySession()
 
-	local legacyRemoved, autoexecHit = purgeLegacyLoaders()
+	local legacyRemoved, autoexecHit, deletedPaths = purgeLegacyLoaders()
 	if legacyRemoved > 0 then
 		log("Removed " .. tostring(legacyRemoved) .. " legacy loader file(s)")
 		if autoexecHit then
 			installAutoexecRedirect()
+		end
+	else
+		local remaining = scanLegacyLoaders()
+		if #remaining > 0 then
+			reportLegacyScan(remaining, deletedPaths)
+			notify(
+				"Alleral",
+				"Old loader files found — check console or run getgenv().Alleral_ScanLegacy()",
+				12
+			)
 		end
 	end
 
@@ -1458,10 +1548,10 @@ local function main()
 		log(
 			"Old loader v"
 				.. PREVIOUS_LOADER_VERSION
-				.. " ran this session — delete it from Volt → Settings → Autoexec",
+				.. " ran before this script — check Volt Saved Scripts / workspace files",
 			true
 		)
-		notify("Alleral", "Delete Alleral v3.x from Volt Autoexec tab, then re-run this script.", 15)
+		notify("Alleral", "v3.x ran earlier. Check Saved Scripts tab and workspace loader.luau.", 15)
 	end
 
 	purgeOutdatedWorkspace()
@@ -1575,6 +1665,19 @@ ENV.Alleral_LoaderInfo = function()
 	}
 end
 
+ENV.Alleral_ScanLegacy = function()
+	local hits = scanLegacyLoaders()
+	print("[Alleral v" .. LOADER_VERSION .. "] Legacy scan (" .. tostring(#hits) .. " hit(s)):")
+	for _, hit in ipairs(hits) do
+		print("  - " .. hit.path .. " (v" .. hit.version .. ")")
+	end
+	if #hits == 0 then
+		print("  (none — if you still see v3.x logs, it is a Saved Script or old one-liner, not a workspace file)")
+	end
+	return hits
+end
+
+print("=== Alleral loader " .. LOADER_VERSION .. " active ===")
 print("[Alleral] v" .. LOADER_VERSION .. " | PlaceId " .. tostring(game.PlaceId) .. " | executor=" .. EXECUTOR.slug)
 
 local ok, err = pcall(main)
