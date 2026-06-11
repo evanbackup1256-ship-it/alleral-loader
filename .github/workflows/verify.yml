@@ -18,3 +18,7 @@ jobs:
       - name: Version and deploy copy checks
         shell: pwsh
         run: ./maint/verify_versions.ps1
+
+      - name: UI compatibility checks
+        shell: pwsh
+        run: ./maint/verify_ui_compat.ps1

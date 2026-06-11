@@ -993,6 +993,7 @@ function Core.createStubUiGroup(label)
 	stub.CreateDropdown = noop
 	stub.CreateInput = noop
 	stub.CreateLabel = noop
+	stub.CreateDivider = noop
 	stub.AddDropdown = noop
 	stub.CreateStatus = function(_, fields)
 		local status = { Labels = {}, LastValues = {}, Visible = true }

@@ -729,7 +729,7 @@ return function(Core)
 	end
 
 	function Core.buildUiTab(section, name, icon, columns, id)
-		local window = section
+		local window = (type(section) == "table" and section._window) or section
 		if type(window) ~= "table" or not window._rawWindow then
 			Core.logWarn("buildUiTab skipped — window missing")
 			return Core.wrapUiTab(nil, nil, window)

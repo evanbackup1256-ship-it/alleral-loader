@@ -2984,6 +2984,48 @@ local Library do
  end
  end
 
+ local WindowOpenDebounce = false
+
+ function Window:SetOpen(Bool)
+ if WindowOpenDebounce then 
+ return
+ end
+
+ Window.IsOpen = Bool
+
+ WindowOpenDebounce = true 
+
+ if Window.IsOpen then 
+ Items["MainFrame"].Instance.Visible = true 
+ end
+
+ local Descendants = Items["MainFrame"].Instance:GetDescendants()
+ TableInsert(Descendants, Items["MainFrame"].Instance)
+
+ local NewTween
+
+ for Index, Value in Descendants do 
+ local TransparencyProperty = Tween:GetProperty(Value)
+
+ if not TransparencyProperty then
+ continue 
+ end
+
+ if type(TransparencyProperty) == "table" then 
+ for _, Property in TransparencyProperty do 
+ NewTween = Tween:FadeItem(Value, Property, Bool, Library.FadeSpeed)
+ end
+ else
+ NewTween = Tween:FadeItem(Value, TransparencyProperty, Bool, Library.FadeSpeed)
+ end
+ end
+ 
+ NewTween.Tween.Completed:Connect(function()
+ WindowOpenDebounce = false 
+ Items["MainFrame"].Instance.Visible = Window.IsOpen
+ end)
+ end
+
  Instances:Create("UIGradient", {
  Parent = Items["CloseIconAccent"].Instance,
  Name = "\0",
@@ -3380,15 +3422,16 @@ local Library do
  Name = "Menu Keybind",
  Flag = "MenuBind",
  Default = Enum.KeyCode.Z,
- Callback = function(Value)
- Window:SetOpen(Value)
+ Callback = function()
+ local bind = Library.Flags["MenuBind"]
+ if type(bind) == "table" and bind.Key then
+ Library.MenuKeybind = bind.Key
+ end
  end
  })
 
  Window.Items = Items
  end
- 
- local Debounce = false
 
  function Window:SetCenter()
  local CenterPosition = Items["MainFrame"].Instance.AbsolutePosition
@@ -3396,48 +3439,6 @@ local Library do
  Items["MainFrame"].Instance.AnchorPoint = Vector2New(0, 0)
 
  Items["MainFrame"].Instance.Position = UDim2New(0, CenterPosition.X, 0, CenterPosition.Y)
- end
-
- local Debounce = false
-
- function Window:SetOpen(Bool)
- if Debounce then 
- return
- end
-
- Window.IsOpen = Bool
-
- Debounce = true 
-
- if Window.IsOpen then 
- Items["MainFrame"].Instance.Visible = true 
- end
-
- local Descendants = Items["MainFrame"].Instance:GetDescendants()
- TableInsert(Descendants, Items["MainFrame"].Instance)
-
- local NewTween
-
- for Index, Value in Descendants do 
- local TransparencyProperty = Tween:GetProperty(Value)
-
- if not TransparencyProperty then
- continue 
- end
-
- if type(TransparencyProperty) == "table" then 
- for _, Property in TransparencyProperty do 
- NewTween = Tween:FadeItem(Value, Property, Bool, Library.FadeSpeed)
- end
- else
- NewTween = Tween:FadeItem(Value, TransparencyProperty, Bool, Library.FadeSpeed)
- end
- end
- 
- NewTween.Tween.Completed:Connect(function()
- Debounce = false 
- Items["MainFrame"].Instance.Visible = Window.IsOpen
- end)
  end
 
  if IsMobile then 
