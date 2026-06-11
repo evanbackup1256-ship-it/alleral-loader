@@ -111,8 +111,8 @@ local saveSettings
 
 saveSettings, savedKeys = Core.initSettings(state, defaults, SETTINGS_FILE)
 
-local function notify(title, text, duration)
-	Core.notify(title, text, duration)
+local function notify(title, text, duration, notifyType)
+	Core.notify(title, text, duration, notifyType)
 end
 
 local runtime = {
@@ -1949,7 +1949,7 @@ Core.buildStandardSettingsExtras(settingsTab, {
 	window = window,
 })
 
-	notify("Alleral", "loaded", 4)
+	notify("Alleral", "loaded", 4, "success")
 
 state.Alleral_Unload = function()
 	state.HubRunning = false

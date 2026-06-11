@@ -1,35 +1,36 @@
 local Telemetry = {}
-Telemetry.Version = "3.0"
+Telemetry.Version = "3.1"
+
+local ALLERAL_GREEN = 5489688
+local ALLERAL_SOFT = 3197370
+local ALLERAL_WARN = 16766758
+local ALLERAL_ERROR = 16729156
+local ALLERAL_MILESTONE = 15844367
+
+local EVENT_META = {
+	session_start = { icon = "🟢", title = "Session Online", color = ALLERAL_GREEN, headline = "A new Alleral hub session is live." },
+	inject_start = { icon = "🚀", title = "Inject Started", color = 3447003, headline = "Loader is bringing the hub online." },
+	inject_loaded = { icon = "✅", title = "Inject Complete", color = ALLERAL_SOFT, headline = "Hub finished loading successfully." },
+	inject_failed = { icon = "❌", title = "Inject Failed", color = ALLERAL_ERROR, headline = "The loader hit a fatal boot error." },
+	error = { icon = "⚠️", title = "Runtime Error", color = ALLERAL_ERROR, headline = "Something threw inside the script." },
+	heartbeat = { icon = "💓", title = "Session Heartbeat", color = 9807270, headline = "Periodic health ping while the hub stays open." },
+	session_end = { icon = "🛑", title = "Session Ended", color = 9936031, headline = "The player left or the hub was unloaded." },
+	milestone = { icon = "🏆", title = "Milestone", color = ALLERAL_MILESTONE, headline = "Notable progress was recorded." },
+	log = { icon = "📝", title = "Event Log", color = 7506394, headline = "General telemetry event." },
+}
+
+local EVENT_COLORS = {}
+local TITLE_MAP = {}
+for event, meta in pairs(EVENT_META) do
+	EVENT_COLORS[event] = meta.color
+	TITLE_MAP[event] = meta.title
+end
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Stats = game:GetService("Stats")
 local UserInputService = game:GetService("UserInputService")
-
-local EVENT_COLORS = {
-	session_start = 10181046,
-	inject_start = 3447003,
-	inject_loaded = 3066993,
-	inject_failed = 15158332,
-	error = 15105570,
-	heartbeat = 9807270,
-	session_end = 9936031,
-	milestone = 15844367,
-	log = 7506394,
-}
-
-local TITLE_MAP = {
-	session_start = "Session started",
-	inject_start = "Inject started",
-	inject_loaded = "Inject succeeded",
-	inject_failed = "Inject failed",
-	error = "Runtime error",
-	heartbeat = "Session heartbeat",
-	session_end = "Session ended",
-	milestone = "Milestone",
-	log = "Event log",
-}
 
 local EXECUTOR_GLOBALS = {
 	"syn", "fluxus", "http", "http_service", "Xeno", "Volt", "Madium", "Nihon",
@@ -439,6 +440,7 @@ function Telemetry:_context(extra)
 	local srv = serverInfo()
 	local stats = liveStats()
 	local identity = ENV.Alleral_DeviceIdentity
+	local core = ENV.Alleral_Core
 	local context = {
 		sessionId = self:EnsureSession(),
 		executor = exec.name,
@@ -446,6 +448,8 @@ function Telemetry:_context(extra)
 		executorVersion = exec.version,
 		executorProfile = exec,
 		loaderVersion = loaderMeta.version or ENV.Alleral_LoaderVersion,
+		coreVersion = type(core) == "table" and core.VERSION or nil,
+		windUiVersion = type(core) == "table" and core.WINDUI_VERSION or nil,
 		gameId = loaderMeta.profile,
 		gameName = placeName,
 		scriptName = loaderMeta.profile,
@@ -479,14 +483,21 @@ function Telemetry:_buildPayload(event, contextExtra, errorInfo, notes)
 end
 
 function Telemetry:_buildDescription(event, player, context)
+	local meta = EVENT_META[event] or {}
 	local join = context.joinUrl or joinUrl(context.placeId, context.jobId)
 	local lines = {}
+	if meta.headline then
+		table.insert(lines, meta.headline)
+		table.insert(lines, "")
+	end
 	if event == "inject_loaded" or event == "session_start" or event == "inject_start" then
-		table.insert(lines, string.format("**[Join this server](%s)**", join))
-		table.insert(lines, string.format("[Open in Roblox app](%s)", context.robloxJoinUrl or robloxJoinUrl()))
+		table.insert(lines, string.format("**[Join this server](%s)** · [Roblox app](%s)", join, context.robloxJoinUrl or robloxJoinUrl()))
 	end
 	if player.profileUrl then
 		table.insert(lines, string.format("[Player profile](%s)", player.profileUrl))
+	end
+	if context.gameName then
+		table.insert(lines, string.format("Experience: **%s**", tostring(context.gameName)))
 	end
 	if #lines == 0 then
 		return nil
@@ -494,8 +505,17 @@ function Telemetry:_buildDescription(event, player, context)
 	return table.concat(lines, "\n")
 end
 
+local function progressBar(ratio, width)
+	width = width or 12
+	ratio = math.clamp(tonumber(ratio) or 0, 0, 1)
+	local filled = math.floor(ratio * width + 0.5)
+	local empty = math.max(0, width - filled)
+	return string.rep("█", filled) .. string.rep("░", empty)
+end
+
 function Telemetry:_buildEmbed(payload)
 	local event = tostring(payload.event or "unknown")
+	local meta = EVENT_META[event] or { icon = "📡", title = "Event: " .. event, color = ALLERAL_GREEN, headline = nil }
 	local player = payload.player or {}
 	local context = payload.context or {}
 	local errorInfo = payload.error or {}
@@ -512,6 +532,7 @@ function Telemetry:_buildEmbed(payload)
 		embedField("Executor", context.executorVersion and (context.executor .. " v" .. context.executorVersion) or context.executor, true),
 		embedField("HTTP / Files", string.format("http=%s readfile=%s loadstring=%s", tostring(exec.http), tostring(exec.readfile), tostring(exec.loadstring)), true),
 		embedField("Loader", context.loaderVersion, true),
+		embedField("Core / UI", string.format("%s / %s", tostring(context.coreVersion or "?"), tostring(context.windUiVersion or "?")), true),
 		embedField("Game", context.gameName or context.gameId, true),
 		embedField(
 			"Script",
@@ -521,7 +542,6 @@ function Telemetry:_buildEmbed(payload)
 		linkField("Join link", "Click to join server", context.joinUrl, false),
 		embedField("PlaceId / Universe", string.format("%s / %s", tostring(context.placeId), tostring(context.universeId)), true),
 		embedField("JobId", context.jobId, false),
-		embedField("IP", context.clientIp, true),
 		embedField("Source", context.source, true),
 	}
 
@@ -553,7 +573,9 @@ function Telemetry:_buildEmbed(payload)
 	end
 
 	if context.durationMs then
+		local ratio = math.clamp((tonumber(context.durationMs) or 0) / 5000, 0, 1)
 		fields[#fields + 1] = embedField("Inject duration", tostring(context.durationMs) .. " ms", true)
+		fields[#fields + 1] = embedField("Boot speed", progressBar(ratio), true)
 	end
 
 	if type(errorInfo) == "table" and next(errorInfo) ~= nil then
@@ -579,11 +601,11 @@ function Telemetry:_buildEmbed(payload)
 	end
 
 	local embed = {
-		title = TITLE_MAP[event] or ("Event: " .. event),
+		title = string.format("%s %s", meta.icon or "📡", meta.title or (TITLE_MAP[event] or ("Event: " .. event))),
 		description = self:_buildDescription(event, player, context),
-		color = EVENT_COLORS[event] or 16733440,
+		color = meta.color or EVENT_COLORS[event] or ALLERAL_GREEN,
 		fields = fields,
-		footer = { text = brand },
+		footer = { text = brand .. " · telemetry v" .. tostring(Telemetry.Version) },
 		timestamp = payload.timestamp or isoNow(),
 		thumbnail = player.avatarUrl and { url = player.avatarUrl } or nil,
 		author = {
@@ -593,6 +615,29 @@ function Telemetry:_buildEmbed(payload)
 		},
 	}
 	return embed
+end
+
+function Telemetry:_buildSummaryEmbed(payload)
+	local event = tostring(payload.event or "unknown")
+	local meta = EVENT_META[event] or { icon = "📡", title = event, color = ALLERAL_GREEN, headline = nil }
+	local player = payload.player or {}
+	local context = payload.context or {}
+	local cfg = self._config or {}
+	local brand = trim(cfg.brand) ~= "" and trim(cfg.brand) or "Alleral"
+	local stats = context.stats or {}
+	return {
+		title = string.format("%s %s", meta.icon or "📡", meta.title or event),
+		description = meta.headline,
+		color = meta.color or ALLERAL_GREEN,
+		fields = {
+			embedField("Player", string.format("%s (%s)", player.name or "?", tostring(player.userId or "?")), true),
+			embedField("Game", tostring(context.gameName or context.gameId or "?"), true),
+			embedField("Script", string.format("%s v%s", tostring(context.scriptName or "?"), tostring(context.scriptVersion or "?")), true),
+			embedField("Live", string.format("ping=%sms fps=%s players=%s", tostring(stats.pingMs or "?"), tostring(stats.fps or "?"), tostring(stats.players or "?")), false),
+		},
+		footer = { text = brand .. " · quick summary" },
+		timestamp = payload.timestamp or isoNow(),
+	}
 end
 
 function Telemetry:_sendRelay(payload)
@@ -666,10 +711,17 @@ function Telemetry:_sendDiscord(payload)
 		return false, "HTTP unavailable"
 	end
 
+	local event = tostring(payload.event or "unknown")
 	local embed = self:_buildEmbed(payload)
+	local embeds = { embed }
+	if event == "session_start" or event == "inject_loaded" or event == "inject_failed" then
+		table.insert(embeds, 1, self:_buildSummaryEmbed(payload))
+	end
+	local player = payload.player or {}
 	local body = HttpService:JSONEncode({
 		username = trim(cfg.brand) ~= "" and trim(cfg.brand) or "Alleral",
-		embeds = { embed },
+		avatar_url = player.avatarUrl,
+		embeds = embeds,
 	})
 
 	local ok, response = pcall(function()

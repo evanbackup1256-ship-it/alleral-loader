@@ -84,8 +84,8 @@ local saveSettings
 saveSettings, savedKeys = Core.initSettings(state, defaults, SETTINGS_FILE)
 state.SafeSpot = Core.normalizeDropdownValue(state.SafeSpot, "Classic")
 
-local function notify(title, text, duration)
-	Core.notify(title, text, duration)
+local function notify(title, text, duration, notifyType)
+	Core.notify(title, text, duration, notifyType)
 end
 
 local function track(connection)
@@ -780,7 +780,7 @@ Core.buildStandardSettingsExtras(settingsTab, {
 	window = window,
 })
 
-notify("Alleral", "v" .. VERSION .. " ready", 4)
+notify("Alleral", "v" .. VERSION .. " ready", 4, "success")
 
 state.Alleral_Unload = function()
 	state.HubRunning = false

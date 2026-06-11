@@ -1,15 +1,26 @@
 local Analytics = {}
-Analytics.Version = "1.0"
+Analytics.Version = "1.1"
 Analytics.Config = {
 	webhookUrl = "",
 	webhookEnabled = false,
 	brand = "Alleral",
-	color = 16733440,
+	color = 5489688,
 }
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
+
+local RARITY_COLORS = {
+	Common = 9807270,
+	Uncommon = 3447003,
+	Rare = 10181046,
+	Epic = 10181046,
+	Legendary = 15844367,
+	Mythic = 16729156,
+	Secret = 16766758,
+	Exclusive = 5489688,
+}
 
 local function trim(value)
 	return tostring(value or ""):gsub("^%s*(.-)%s*$", "%1")
@@ -26,6 +37,69 @@ local function postWebhook(url, payload)
 		return core.postWebhook(url, payload)
 	end
 	return false, "Run loader.luau first."
+end
+
+local function buildEmbed(opts)
+	local core = coreApi()
+	if core and type(core.buildDiscordEmbed) == "function" then
+		return core.buildDiscordEmbed(opts)
+	end
+	return {
+		title = opts.title,
+		description = opts.description,
+		color = opts.color or Analytics.Config.color,
+		fields = opts.fields or {},
+		footer = opts.footer or { text = Analytics.Config.brand or "Alleral" },
+		timestamp = opts.timestamp,
+		thumbnail = opts.thumbnail,
+		image = opts.image,
+		author = opts.author,
+	}
+end
+
+local function buildPayload(opts)
+	local core = coreApi()
+	if core and type(core.buildDiscordPayload) == "function" then
+		return core.buildDiscordPayload(opts)
+	end
+	return {
+		username = opts.username or Analytics.Config.brand,
+		avatar_url = opts.avatarUrl,
+		content = opts.content,
+		embeds = opts.embeds or { buildEmbed(opts) },
+	}
+end
+
+local function field(name, value, inline)
+	local core = coreApi()
+	if core and type(core.discordField) == "function" then
+		return core.discordField(name, value, inline)
+	end
+	return { name = name, value = "```" .. tostring(value or "—") .. "```", inline = inline == true }
+end
+
+local function playerAuthor()
+	local player = Players.LocalPlayer
+	if not player then
+		return nil
+	end
+	local avatarUrl = string.format(
+		"https://www.roblox.com/headshot-thumbnail/image?userId=%d&width=420&height=420&format=png",
+		player.UserId
+	)
+	return {
+		name = string.format("%s (@%s)", player.DisplayName, player.Name),
+		icon_url = avatarUrl,
+		url = string.format("https://www.roblox.com/users/%d/profile", player.UserId),
+	}
+end
+
+local function embedFooter(extra)
+	return { text = (Analytics.Config.brand or "Alleral") .. (extra and (" · " .. extra) or "") }
+end
+
+local function rarityColor(rarity)
+	return RARITY_COLORS[tostring(rarity or "")] or Analytics.Config.color
 end
 
 local function executorName()
@@ -68,10 +142,6 @@ local function isoNow()
 		return DateTime.now():ToIsoDate()
 	end)
 	return ok and value or nil
-end
-
-local function embedFooter()
-	return { text = Analytics.Config.brand or "Alleral" }
 end
 
 local function hashSeed(text)
@@ -151,22 +221,29 @@ function Analytics:SendSatelliteLog()
 end
 
 function Analytics:SendTestConnection(webhookUrl)
-	return postWebhook(webhookUrl, {
-		username = Analytics.Config.brand,
-		embeds = {
-			{
-				title = "Webhook works",
-				description = "Webhook test from " .. (Analytics.Config.brand or "Alleral") .. ".",
-				color = Analytics.Config.color,
-				fields = {
-					{ name = "Executor", value = "```" .. executorName() .. "```", inline = true },
-					{ name = "Client", value = "```" .. self:GetClientId():sub(1, 12) .. "...```", inline = true },
-				},
-				footer = embedFooter(),
-				timestamp = isoNow(),
+	return postWebhook(
+		webhookUrl,
+		buildPayload({
+			brand = Analytics.Config.brand,
+			avatarUrl = playerAuthor() and playerAuthor().icon_url or nil,
+			embeds = {
+				buildEmbed({
+					title = "✅ Webhook Connected",
+					description = "Your Discord webhook is wired up and ready for Alleral alerts.",
+					color = 5489688,
+					fields = {
+						field("Executor", executorName(), true),
+						field("Client", self:GetClientId():sub(1, 16) .. "…", true),
+						field("PlaceId", tostring(game.PlaceId), true),
+						field("JobId", tostring(game.JobId), false),
+					},
+					footer = embedFooter("test ping"),
+					timestamp = isoNow(),
+					author = playerAuthor(),
+				}),
 			},
-		},
-	})
+		})
+	)
 end
 
 local function breakdownToFields(breakdown)
@@ -181,7 +258,7 @@ local function breakdownToFields(breakdown)
 		if #lines > 0 then
 			table.sort(lines)
 			table.insert(fields, {
-				name = rarity,
+				name = "📦 " .. tostring(rarity),
 				value = "```" .. table.concat(lines, "\n") .. "```",
 				inline = false,
 			})
@@ -192,55 +269,68 @@ end
 
 function Analytics:SendStatusReport(webhookUrl, kickLevel, petCount, coinsText, breakdown, rebirthLevel)
 	local fields = {
-		{ name = "Coins", value = "```" .. tostring(coinsText or "0") .. "```", inline = true },
-		{ name = "Kick level", value = "```" .. tostring(kickLevel or 0) .. "```", inline = true },
-		{ name = "Rebirths", value = "```" .. tostring(rebirthLevel or 0) .. "```", inline = true },
-		{ name = "Bag count", value = "```" .. tostring(petCount or 0) .. "```", inline = true },
+		field("Coins", tostring(coinsText or "0"), true),
+		field("Kick level", tostring(kickLevel or 0), true),
+		field("Rebirths", tostring(rebirthLevel or 0), true),
+		field("Bag count", tostring(petCount or 0), true),
+		field("Server JobId", tostring(game.JobId), false),
 	}
-	for _, field in ipairs(breakdownToFields(breakdown)) do
-		table.insert(fields, field)
+	for _, extra in ipairs(breakdownToFields(breakdown)) do
+		table.insert(fields, extra)
 	end
 	if (petCount or 0) == 0 then
-		table.insert(fields, { name = "Bag", value = "Nothing matched your filters.", inline = false })
+		table.insert(fields, { name = "Bag", value = "_Nothing matched your filters._", inline = false })
 	end
-	return postWebhook(webhookUrl, {
-		username = Analytics.Config.brand,
-		embeds = {
-			{
-				title = "Status report",
-				color = Analytics.Config.color,
-				fields = fields,
-				footer = embedFooter(),
-				timestamp = isoNow(),
+	return postWebhook(
+		webhookUrl,
+		buildPayload({
+			brand = Analytics.Config.brand,
+			avatarUrl = playerAuthor() and playerAuthor().icon_url or nil,
+			embeds = {
+				buildEmbed({
+					title = "📊 Status Report",
+					description = "Snapshot of your current Kick-a-Lucky-Block progress.",
+					color = 5489688,
+					fields = fields,
+					footer = embedFooter("status report"),
+					timestamp = isoNow(),
+					author = playerAuthor(),
+				}),
 			},
-		},
-	})
+		})
+	)
 end
 
 function Analytics:SendNewPetClaim(webhookUrl, name, rarity, mutation, chance, cpsText, imageUrl)
-	local embed = {
-		title = "New brainrot",
-		color = Analytics.Config.color,
+	local embed = buildEmbed({
+		title = "🎉 New Brainrot Claimed",
+		description = string.format("**%s** rolled in with **%s** rarity.", tostring(name), tostring(rarity)),
+		color = rarityColor(rarity),
 		fields = {
-			{ name = "Brainrot", value = "```" .. tostring(name) .. "```", inline = true },
-			{ name = "Rarity", value = "```" .. tostring(rarity) .. "```", inline = true },
-			{ name = "Mutation", value = "```" .. tostring(mutation) .. "```", inline = true },
-			{ name = "Chance", value = "```" .. tostring(chance or "Unknown") .. "```", inline = true },
-			{ name = "CPS", value = "```" .. tostring(cpsText or "N/A") .. "```", inline = true },
-			{ name = "Server JobId", value = "```" .. tostring(game.JobId) .. "```", inline = false },
+			field("Brainrot", name, true),
+			field("Rarity", rarity, true),
+			field("Mutation", mutation, true),
+			field("Chance", chance or "Unknown", true),
+			field("CPS", cpsText or "N/A", true),
+			field("Server JobId", tostring(game.JobId), false),
 		},
-		footer = embedFooter(),
+		footer = embedFooter("claim alert"),
 		timestamp = isoNow(),
-	}
+		author = playerAuthor(),
+	})
 	if imageUrl and imageUrl ~= "" then
 		embed.image = { url = imageUrl }
 		embed.thumbnail = { url = imageUrl }
 	end
-	return postWebhook(webhookUrl, {
-		username = Analytics.Config.brand,
-		content = "@everyone",
-		embeds = { embed },
-	})
+	return postWebhook(
+		webhookUrl,
+		buildPayload({
+			brand = Analytics.Config.brand,
+			content = "@everyone",
+			avatarUrl = playerAuthor() and playerAuthor().icon_url or nil,
+			embeds = { embed },
+		})
+	)
 end
 
 function Analytics:SendGlobalLog(playerName, brainrot, mutation, rarity, cpsText)
@@ -248,27 +338,32 @@ function Analytics:SendGlobalLog(playerName, brainrot, mutation, rarity, cpsText
 	if not self.Config.webhookEnabled or trim(url) == "" then
 		return false, "Webhook disabled"
 	end
-	return postWebhook(url, {
-		username = Analytics.Config.brand,
-		content = "@everyone",
-		embeds = {
-			{
-				title = "Highlight roll",
-				description = "Rare roll spotted in-server.",
-				color = Analytics.Config.color,
-				fields = {
-					{ name = "Player", value = "```" .. tostring(playerName) .. "```", inline = true },
-					{ name = "Brainrot", value = "```" .. tostring(brainrot) .. "```", inline = true },
-					{ name = "Rarity", value = "```" .. tostring(rarity) .. "```", inline = true },
-					{ name = "Mutation", value = "```" .. tostring(mutation) .. "```", inline = true },
-					{ name = "CPS", value = "```" .. tostring(cpsText or "N/A") .. "```", inline = true },
-					{ name = "Server JobId", value = "```" .. tostring(game.JobId) .. "```", inline = false },
-				},
-				footer = embedFooter(),
-				timestamp = isoNow(),
+	return postWebhook(
+		url,
+		buildPayload({
+			brand = Analytics.Config.brand,
+			content = "@everyone",
+			avatarUrl = playerAuthor() and playerAuthor().icon_url or nil,
+			embeds = {
+				buildEmbed({
+					title = "✨ Highlight Roll",
+					description = "Rare roll spotted in-server.",
+					color = rarityColor(rarity),
+					fields = {
+						field("Player", playerName, true),
+						field("Brainrot", brainrot, true),
+						field("Rarity", rarity, true),
+						field("Mutation", mutation, true),
+						field("CPS", cpsText or "N/A", true),
+						field("Server JobId", tostring(game.JobId), false),
+					},
+					footer = embedFooter("highlight"),
+					timestamp = isoNow(),
+					author = playerAuthor(),
+				}),
 			},
-		},
-	})
+		})
+	)
 end
 
 getgenv().Alleral_Analytics = Analytics

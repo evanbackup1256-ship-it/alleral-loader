@@ -66,8 +66,8 @@ local savedKeys
 saveSettings, savedKeys = Core.initSettings(state, defaults, SETTINGS_FILE, SETTINGS_EXCLUDE)
 _G.TweenSpeed = state.TweenSpeed
 
-local function notify(title, text, duration)
-	Core.notify(title, text, duration)
+local function notify(title, text, duration, notifyType)
+	Core.notify(title, text, duration, notifyType)
 end
 
 local ROUTE_WORLD1 = {
@@ -929,7 +929,7 @@ Core.buildStandardSettingsExtras(settingsTab, {
 	window = window,
 })
 
-notify("Alleral", "v" .. VERSION .. " ready", 4)
+notify("Alleral", "v" .. VERSION .. " ready", 4, "success")
 
 saveSettings()
 

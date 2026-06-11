@@ -4,7 +4,7 @@
     | |/ |/ / / _ \/ _  / /_/ // /  
     |__/|__/_/_//_/\_,_/\____/___/
     
-    v1.6.64-fix-aller2  |  2026-06-11  |  Alleral-hardened WindUI
+    v1.6.64-fix-aller4  |  2026-06-11  |  Alleral notifications + custom toggles
     
     To view the source code, see the `src/` folder on the official GitHub repository.
     
@@ -2118,7 +2118,7 @@ New=a.load'i'.New
 return[[
 {
     "name": "windui",
-    "version": "1.6.64-fix-aller2",
+    "version": "1.6.64-fix-aller4",
     "main": "./dist/main.lua",
     "repository": "https://github.com/Footagesus/WindUI",
     "discord": "https://discord.gg/ftgs-development-hub-1300692552005189632",
@@ -12274,7 +12274,8 @@ local m,p=pcall(function()
 
 
 local m=game.HttpGet and game:HttpGet(h)
-writefile(l,m.Body)
+if type(m)=="table" then m=m.Body end
+writefile(l,m)
 end)
 if not m then
 warn("[ WindUI.Window.Background ] Failed to download video: "..tostring(p))
@@ -12318,7 +12319,8 @@ local m,p=pcall(function()
 
 
 local m=game.HttpGet and game:HttpGet(j)
-writefile(l,m.Body)
+if type(m)=="table" then m=m.Body end
+writefile(l,m)
 end)
 if not m then
 warn("[ Window.Background ] Failed to download image: "..tostring(p))
@@ -14259,73 +14261,65 @@ return b
 end
 
 --[[ ============================================================================
-	Alleral patch bootstrap
-	Upstream WindUI lives above. Our edits live in aller.luau.
+	Alleral patch bootstrap — loads ui/windui/aller.luau (local, cache, or GitHub)
 ============================================================================ ]]
 
-local ALLERAL_PATCH_FILE = "aller.luau"
-local ALLERAL_PATCH_ROOTS = {
-	"ui/windui/",
-	"vendor/windui/",
-	"windui/",
-	"kick/ui/windui/",
-}
-
-local function readAlleralPatch()
-	local readFn = readfile or (syn and syn.readfile) or (fluxus and fluxus.readfile)
+local function loadBootstrap()
+	local roots = { "ui/windui/", "vendor/windui/", "windui/", "kick/ui/windui/" }
+	local readFn = readfile or (syn and syn.readfile)
 	local isFileFn = isfile or (syn and syn.isfile)
-	if type(readFn) ~= "function" or type(isFileFn) ~= "function" then
-		return nil
-	end
-	for _, root in ipairs(ALLERAL_PATCH_ROOTS) do
-		local path = root .. ALLERAL_PATCH_FILE
-		if isFileFn(path) then
-			local ok, body = pcall(readFn, path)
-			if ok and type(body) == "string" and body ~= "" then
-				return body, path
+	if type(readFn) == "function" and type(isFileFn) == "function" then
+		for _, root in ipairs(roots) do
+			local path = root .. "bootstrap.lua"
+			if isFileFn(path) then
+				local ok, src = pcall(readFn, path)
+				if ok and type(src) == "string" and src ~= "" then
+					local compile = loadstring or load
+					if type(compile) == "function" then
+						local chunk = compile(src, "@" .. path)
+						if chunk then
+							local runOk, result = pcall(chunk)
+							if runOk and type(result) == "function" then
+								return result
+							end
+						end
+					end
+				end
 			end
 		end
 	end
+
+	local urls = {
+		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/windui/bootstrap.lua",
+		"https://github.com/evanbackup1256-ship-it/kick/raw/main/ui/windui/bootstrap.lua",
+	}
+	for _, url in ipairs(urls) do
+		local bust = url .. "?t=" .. tostring(tick())
+		local ok, src = pcall(function()
+			return game:HttpGet(bust)
+		end)
+		if ok and type(src) == "string" and src:find("return function", 1, true) then
+			local compile = loadstring or load
+			if type(compile) == "function" then
+				local chunk = compile(src, "@Alleral/bootstrap")
+				if chunk then
+					local runOk, result = pcall(chunk)
+					if runOk and type(result) == "function" then
+						return result
+					end
+				end
+			end
+		end
+	end
+
 	return nil
 end
 
-local function applyAlleralPatch(WindUI)
-	if type(WindUI) ~= "table" then
-		return WindUI
-	end
-
-	local source, path = readAlleralPatch()
-	if not source then
-		warn("[Alleral] missing ui/windui/aller.luau, using plain WindUI")
-		return WindUI
-	end
-
-	local compile = loadstring or load
-	if type(compile) ~= "function" then
-		warn("[Alleral] loadstring missing, can't apply UI patch")
-		return WindUI
-	end
-
-	local chunk, compileErr = compile(source, "@" .. tostring(path))
-	if not chunk then
-		warn("[Alleral] UI patch compile error: " .. tostring(compileErr))
-		return WindUI
-	end
-
-	local ok, patchOrErr = pcall(chunk)
-	if not ok or type(patchOrErr) ~= "function" then
-		warn("[Alleral] UI patch load error: " .. tostring(patchOrErr))
-		return WindUI
-	end
-
-	local applied, applyErr = pcall(patchOrErr, WindUI)
-	if not applied then
-		warn("[Alleral] UI patch apply error: " .. tostring(applyErr))
-	end
-
-	return WindUI
+local applyAlleralPatch = loadBootstrap()
+if type(applyAlleralPatch) == "function" then
+	applyAlleralPatch(aa)
+else
+	warn("[Alleral] bootstrap.lua missing — UI patch skipped")
 end
-
-applyAlleralPatch(aa)
 
 return aa

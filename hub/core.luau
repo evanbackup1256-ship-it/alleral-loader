@@ -1,7 +1,7 @@
 local Core = {}
 Core.VERSION = "2.7.0"
 Core.UI_LIBRARY = "WindUI"
-Core.WINDUI_VERSION = "1.6.64-fix-aller2"
+Core.WINDUI_VERSION = "1.6.64-fix-aller4"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
@@ -167,6 +167,7 @@ function Core.installResilience()
 		"fetchWeaoExecutorStatus",
 		"buildHubActionsGroup",
 		"buildStandardSettingsExtras",
+		"buildUiPreferencesGroup",
 		"buildConfigProfileGroup",
 		"buildScriptStatusGroupbox",
 		"postWebhook",
@@ -181,12 +182,91 @@ function Core.installResilience()
 	end
 end
 
-function Core.notify(title, text, duration)
+function Core.getWindUi()
+	local ui = ENV.Alleral_UI or ENV.Alleral_Rayfield
+	if type(ui) ~= "table" then
+		return nil
+	end
+	return ui.WindUI or ui.Library
+end
+
+function Core.notifyWindUi(payload)
+	local windUi = Core.getWindUi()
+	if not windUi or type(windUi.Notify) ~= "function" then
+		return false
+	end
+	local ok = pcall(function()
+		windUi:Notify(payload)
+	end)
+	return ok == true
+end
+
+function Core.queueNotification(payload)
+	if type(payload) ~= "table" then
+		return
+	end
+	ENV._AlleralPendingNotifies = ENV._AlleralPendingNotifies or {}
+	table.insert(ENV._AlleralPendingNotifies, payload)
+end
+
+function Core.flushPendingNotifications()
+	local queue = ENV._AlleralPendingNotifies
+	if type(queue) ~= "table" or #queue == 0 then
+		return
+	end
+	ENV._AlleralPendingNotifies = {}
+	for _, payload in ipairs(queue) do
+		Core.notifyWindUi(payload)
+	end
+end
+
+function Core.notifyBootReady(settings)
+	settings = type(settings) == "table" and settings or {}
+	local profile = Core.executorProfile()
+	local scriptVer = ENV.Alleral_ActiveScriptVersion
+		or (type(ENV.Alleral_LoaderMeta) == "table" and ENV.Alleral_LoaderMeta.scriptVersion)
+	local loaderVer = ENV.Alleral_LoaderVersion
+		or (type(ENV.Alleral_LoaderMeta) == "table" and ENV.Alleral_LoaderMeta.version)
+	local lines = {}
+	if settings.Subtitle and settings.Subtitle ~= "" then
+		table.insert(lines, tostring(settings.Subtitle))
+	end
+	if scriptVer then
+		table.insert(lines, "Script v" .. tostring(scriptVer))
+	elseif loaderVer then
+		table.insert(lines, "Loader v" .. tostring(loaderVer))
+	end
+	table.insert(lines, profile.displayName .. " ready · tabs on the left")
+	Core.notify(settings.Name or "Alleral", table.concat(lines, "\n"), 5, "success")
+end
+
+function Core.notify(title, text, duration, notifyType)
+	title = title or "Alleral"
+	text = text or ""
+	duration = duration or 4
+	notifyType = notifyType or "info"
+
+	local payload = {
+		Title = title,
+		Content = text,
+		Duration = duration,
+		Type = notifyType,
+	}
+
+	if Core.notifyWindUi(payload) then
+		return
+	end
+
+	if Core.getWindUi() then
+		Core.queueNotification(payload)
+		return
+	end
+
 	pcall(function()
 		StarterGui:SetCore("SendNotification", {
-			Title = title or "Alleral",
-			Text = text or "",
-			Duration = duration or 4,
+			Title = title,
+			Text = text,
+			Duration = duration,
 		})
 	end)
 end
@@ -836,7 +916,7 @@ function Core.notifyExecutorCompat(profile)
 	else
 		msg = msg .. " — ready."
 	end
-	Core.notify("Executor", msg, 5)
+	Core.say("Executor: " .. msg)
 end
 
 local SCRIPT_STATUS_META = {
@@ -1565,6 +1645,83 @@ function Core.setupHubKeybinds(options)
 	end)
 end
 
+function Core.buildUiPreferencesGroup(tab, options)
+	options = type(options) == "table" and options or {}
+	local column = options.column or 2
+	local uiBundle = options.uiBundle
+	if not uiBundle and type(options.window) == "table" then
+		uiBundle = options.window._ui
+	end
+	local windUi = uiBundle and (uiBundle.WindUI or uiBundle.Library)
+	local group = Core.buildUiGroup(tab, "UI & notifications", column, nil, nil, "UiPreferences")
+
+	group:CreateToggle(
+		"Reduced motion",
+		ENV.Alleral_UiReducedMotion == true,
+		"Turns off accent flashes and extra UI motion.",
+		function(value)
+			ENV.Alleral_UiReducedMotion = value == true
+			if windUi and type(windUi.SetReducedMotion) == "function" then
+				windUi:SetReducedMotion(value)
+			end
+		end
+	)
+
+	group:CreateToggle(
+		"Bottom notifications",
+		ENV.Alleral_NotifyLower == true,
+		"Move WindUI toasts to the bottom-right.",
+		function(value)
+			ENV.Alleral_NotifyLower = value == true
+			if windUi and type(windUi.SetNotificationLower) == "function" then
+				pcall(function()
+					windUi:SetNotificationLower(value)
+				end)
+			end
+		end
+	)
+
+	group:CreateToggle(
+		"Compact toasts",
+		ENV.Alleral_NotifyCompact == true,
+		"Smaller notification cards with tighter spacing.",
+		function(value)
+			ENV.Alleral_NotifyCompact = value == true
+			if windUi and type(windUi.SetNotificationCompact) == "function" then
+				windUi:SetNotificationCompact(value)
+			end
+		end
+	)
+
+	group:CreateButton("Test success toast", function()
+		Core.notify("Alleral", "UI notifications are working.", 4, "success")
+	end, "Preview the styled toast stack.")
+
+	group:CreateButton("Test warning toast", function()
+		Core.notify("Alleral", "This is a warning-style toast.", 4, "warn")
+	end, "Preview warning styling.")
+
+	group:CreateButton("Clear all toasts", function()
+		if windUi and type(windUi.ClearNotifications) == "function" then
+			local cleared = windUi:ClearNotifications()
+			Core.notify("Alleral", "cleared " .. tostring(cleared or 0) .. " toast(s)", 2, "info")
+		else
+			Core.notify("Alleral", "Clear unavailable.", 3, "warn")
+		end
+	end, "Dismiss every visible WindUI notification.")
+
+	group:CreateButton("Repair UI chrome", function()
+		if windUi and type(windUi.RepairWindow) == "function" then
+			local ok = windUi:RepairWindow()
+			Core.notify("Alleral", ok and "UI chrome repaired." or "Repair failed.", 3, ok and "success" or "error")
+		else
+			Core.notify("Alleral", "Repair unavailable.", 3, "warn")
+		end
+	end, "Re-apply Alleral theme rails, strokes, and polish.")
+
+	return group
+end
+
 function Core.buildStandardSettingsExtras(tab, options)
 	options = type(options) == "table" and options or {}
 	Core.installErrorLogHook()
@@ -1574,6 +1731,7 @@ function Core.buildStandardSettingsExtras(tab, options)
 	Core.buildSessionStatsGroup(tab, options.sessionColumn or 1)
 	Core.buildServerToolsGroup(tab, options.serverColumn or 1)
 	Core.buildQuickTogglesGroup(tab, options)
+	Core.buildUiPreferencesGroup(tab, options)
 	Core.buildErrorLogGroup(tab, options.errorColumn or 2)
 	Core.buildSettingsBackupGroup(tab, options)
 	if options.setupKeybinds ~= false then
@@ -1813,6 +1971,66 @@ function Core.normalizeWebhookUrl(url)
 	return text, nil
 end
 
+function Core.buildDiscordEmbed(opts)
+	opts = type(opts) == "table" and opts or {}
+	local embed = {
+		title = opts.title,
+		description = opts.description,
+		color = opts.color or 5489688,
+		fields = opts.fields,
+		footer = opts.footer or { text = opts.brand or "Alleral" },
+		timestamp = opts.timestamp,
+		thumbnail = opts.thumbnail,
+		image = opts.image,
+		author = opts.author,
+	}
+	if embed.fields == nil then
+		embed.fields = {}
+	end
+	return embed
+end
+
+function Core.buildDiscordPayload(opts)
+	opts = type(opts) == "table" and opts or {}
+	local embeds = opts.embeds
+	if type(embeds) ~= "table" or #embeds == 0 then
+		embeds = { Core.buildDiscordEmbed(opts) }
+	end
+	return {
+		username = opts.username or opts.brand or "Alleral",
+		avatar_url = opts.avatarUrl,
+		content = opts.content,
+		embeds = embeds,
+	}
+end
+
+function Core.discordField(name, value, inline)
+	local text = trimText(value)
+	if text == "" then
+		text = "—"
+	end
+	if #text > 1024 then
+		text = text:sub(1, 1021) .. "..."
+	end
+	return {
+		name = tostring(name or "Field"),
+		value = "```" .. text .. "```",
+		inline = inline == true,
+	}
+end
+
+function Core.discordLinkField(name, label, url, inline)
+	url = trimText(url)
+	if url == "" then
+		return Core.discordField(name, "—", inline)
+	end
+	return {
+		name = tostring(name or "Link"),
+		value = string.format("[%s](%s)", label or "Open", url),
+		inline = inline == true,
+	}
+end
+
 function Core.postWebhook(url, payload)
 	local sender = Core.requestFunction()
 	if not sender then
@@ -1967,29 +2185,90 @@ local function fetchWindUiRemote(relativePath)
 	return nil
 end
 
+local function patchSourceValid(body)
+	return type(body) == "string"
+		and #body > 400
+		and body:find("ALLERAL_UI_VERSION", 1, true) ~= nil
+		and body:find("return function", 1, true) ~= nil
+end
+
+local function bootstrapSourceValid(body)
+	return type(body) == "string"
+		and #body > 200
+		and body:find("return function", 1, true) ~= nil
+end
+
 local function applyAlleralWindUiPatch(windUi)
 	if type(windUi) ~= "table" or type(windUi.GetAlleralVersion) == "function" then
 		return windUi
 	end
-	local source = readWindUiLocal(WINDUI_PATCH_FILE)
-	if type(source) ~= "string" then
-		return windUi
-	end
+
 	local loadStringFn = Core.loadStringFn()
 	if type(loadStringFn) ~= "function" then
 		return windUi
 	end
-	local chunk, compileErr = loadStringFn(source, "@Alleral/aller")
-	if not chunk then
-		Core.logWarn("UI patch compile: " .. tostring(compileErr))
+
+	local function runPatchLoader(source, label)
+		if not source then
+			return false
+		end
+		local chunk, compileErr = loadStringFn(source, label)
+		if not chunk then
+			Core.logWarn("UI loader compile: " .. tostring(compileErr))
+			return false
+		end
+		local ok, loader = pcall(chunk)
+		if not ok or type(loader) ~= "function" then
+			Core.logWarn("UI loader: " .. tostring(loader))
+			return false
+		end
+		local applied, applyErr = pcall(loader, windUi)
+		if not applied then
+			Core.logWarn("UI patch: " .. tostring(applyErr))
+			return false
+		end
+		return type(windUi.GetAlleralVersion) == "function"
+	end
+
+	local bootstrapSource, bootstrapPath = readWindUiLocal("bootstrap.lua")
+	if runPatchLoader(bootstrapSource, "@Alleral/bootstrap:" .. tostring(bootstrapPath or "local")) then
 		return windUi
 	end
-	local ok, patchOrErr = pcall(chunk)
-	if not ok or type(patchOrErr) ~= "function" then
-		Core.logWarn("UI patch load: " .. tostring(patchOrErr))
-		return windUi
+
+	for _, base in ipairs(WINDUI_MIRROR_URLS) do
+		local body = Core.httpGet(base .. "bootstrap.lua")
+		if bootstrapSourceValid(body) and runPatchLoader(body, "@Alleral/bootstrap:remote") then
+			return windUi
+		end
 	end
-	pcall(patchOrErr, windUi)
+
+	local patchSource, patchPath = readWindUiLocal(WINDUI_PATCH_FILE)
+	if patchSource and patchSourceValid(patchSource) then
+		local chunk, compileErr = loadStringFn(patchSource, "@Alleral/aller:" .. tostring(patchPath))
+		if chunk then
+			local ok, patchFn = pcall(chunk)
+			if ok and type(patchFn) == "function" then
+				pcall(patchFn, windUi)
+			end
+		else
+			Core.logWarn("UI patch compile: " .. tostring(compileErr))
+		end
+	end
+
+	for _, base in ipairs(WINDUI_MIRROR_URLS) do
+		local body = Core.httpGet(base .. WINDUI_PATCH_FILE)
+		if patchSourceValid(body) then
+			local chunk = loadStringFn(body, "@Alleral/aller:remote")
+			if chunk then
+				local ok, patchFn = pcall(chunk)
+				if ok and type(patchFn) == "function" then
+					pcall(patchFn, windUi)
+					break
+				end
+			end
+		end
+	end
+
 	return windUi
 end
 
@@ -2032,7 +2311,7 @@ local function listUiThemes(windUi)
 		end
 	end
 	if #names == 0 then
-		return { "Alleral", "AlleralNeon", "Dark", "Light" }
+		return { "Alleral", "AlleralNeon", "AlleralMidnight", "Dark", "Light" }
 	end
 	return names
 end
@@ -2097,12 +2376,15 @@ function Core.loadUi()
 						Title = info.Title,
 						Content = info.Content or info.Description or info.Text or "",
 						Duration = info.Duration or info.Time or 4,
+						Type = info.Type or info.Level,
+						Icon = info.Icon,
 					})
 				else
 					WindUI:Notify({
 						Title = "Alleral",
 						Content = tostring(info or ""),
 						Duration = 4,
+						Type = "info",
 					})
 				end
 			end)
@@ -2110,6 +2392,19 @@ function Core.loadUi()
 	}
 	applyAlleralTheme(bundle)
 	bundle.ThemeNames = listUiThemes(WindUI)
+	if ENV.Alleral_UiReducedMotion == true and type(WindUI.SetReducedMotion) == "function" then
+		WindUI:SetReducedMotion(true)
+	end
+	if ENV.Alleral_NotifyLower == true and type(WindUI.SetNotificationLower) == "function" then
+		pcall(function()
+			WindUI:SetNotificationLower(true)
+		end)
+	end
+	if ENV.Alleral_NotifyCompact == true and type(WindUI.SetNotificationCompact) == "function" then
+		pcall(function()
+			WindUI:SetNotificationCompact(true)
+		end)
+	end
 	Core.say("WindUI " .. tostring(WindUI.GetAlleralVersion and WindUI:GetAlleralVersion() or Core.WINDUI_VERSION) .. " loaded")
 	return cacheUi(bundle)
 end
@@ -2542,15 +2837,15 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 					end
 				end)
 			end
-			Core.notify("Theme", "theme: " .. tostring(selected), 2)
-		end, "Alleral, AlleralNeon, Dark, and more.")
+			Core.notify("Theme", "theme: " .. tostring(selected), 2, "success")
+		end, "Alleral, AlleralNeon, AlleralMidnight, Dark, etc.")
 		group:CreateButton("Next theme", function()
 			if windUi and type(windUi.CycleTheme) == "function" then
 				local ok, nextTheme = pcall(function()
 					return windUi:CycleTheme(1)
 				end)
 				if ok and nextTheme and nextTheme.Name then
-					Core.notify("Theme", "Applied " .. tostring(nextTheme.Name), 2)
+					Core.notify("Theme", "Applied " .. tostring(nextTheme.Name), 2, "success")
 				end
 			end
 		end, "Cycles through available presets.")
@@ -3264,10 +3559,10 @@ function Core.buildUiWindow(ui, settings)
 		Theme = "Alleral",
 		NewElements = true,
 		HideSearchBar = false,
-		UICorner = 14,
-		UIPadding = 12,
-		SideBarWidth = 218,
-		ElementPadding = 8,
+		UICorner = 16,
+		UIPadding = 14,
+		SideBarWidth = 232,
+		ElementPadding = 10,
 		Resizable = true,
 		OpenButton = {
 			Title = "Alleral",
@@ -3278,6 +3573,11 @@ function Core.buildUiWindow(ui, settings)
 		},
 	})
 	applyAlleralTheme(ui)
+	if rawWindow and type(lib.PolishWindow) == "function" then
+		pcall(function()
+			lib:PolishWindow(rawWindow)
+		end)
+	end
 	local window = {
 		_rawWindow = rawWindow,
 		_ui = ui,
@@ -3285,6 +3585,7 @@ function Core.buildUiWindow(ui, settings)
 		_windSection = nil,
 	}
 	Core.registerUiWindow(window)
+	Core.flushPendingNotifications()
 	function window:AddTab(name, icon)
 		if not self._windSection then
 			self._windSection = self._rawWindow:Section({

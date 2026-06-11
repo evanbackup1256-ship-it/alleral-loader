@@ -35,10 +35,11 @@ end
 
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 
-local Core = getgenv().Alleral_Core
-if not Core or not Core.assertLoader or not Core.assertLoader() then
+if not getgenv().Alleral_Boot then
+	warn("[Alleral] load the hub first")
 	return
 end
+getgenv().Alleral_Boot = nil
 
 local VERSION = "6.6.2"
 getgenv().Alleral_ActiveScriptVersion = VERSION
@@ -334,7 +335,12 @@ local function trim(value)
 	return tostring(value or ""):gsub("^%s*(.-)%s*$", "%1")
 end
 
-local function notify(title, text, duration)
+local function notify(title, text, duration, notifyType)
+	local core = getgenv().Alleral_Core
+	if core and type(core.notify) == "function" then
+		core.notify(title, text, duration, notifyType)
+		return
+	end
 	pcall(function()
 		StarterGui:SetCore("SendNotification", {
 			Title = title or "Alleral",
@@ -5294,7 +5300,7 @@ if state.AAutoFav then
 	scanTools()
 end
 
-notify("Alleral", "v" .. VERSION .. " ready", 5)
+notify("Alleral", "v" .. VERSION .. " loaded. Tabs on the left.", 5, "success")
 end
 
 startRuntime()

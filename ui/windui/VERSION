@@ -1,3 +1,4 @@
-1.6.64-fix-aller2
+1.6.64-fix-aller4
 Base: https://github.com/Footagesus/WindUI/releases/tag/1.6.64-fix
-Patch: ui/windui/aller.luau (themes, polish, safe wrappers)
+Patch: ui/windui/aller.luau
+Loader: ui/windui/bootstrap.lua
