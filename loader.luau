@@ -1131,6 +1131,12 @@ local function loadTelemetryConfig()
 			if trim(boot.gateUrl or "") ~= "" then
 				cfg.gateUrl = normalizeHttps(boot.gateUrl)
 			end
+			if trim(boot.banCheckUrl or "") ~= "" then
+				cfg.banCheckUrl = normalizeHttps(boot.banCheckUrl)
+				if trim(cfg.gateUrl or "") == "" then
+					cfg.gateUrl = cfg.banCheckUrl
+				end
+			end
 		end
 	end
 	if trim(cfg.relayUrl or "") ~= "" then
@@ -1161,6 +1167,12 @@ local function loadSecurityConfig()
 		end
 		if owner.gateUrl then
 			cfg.gateUrl = owner.gateUrl
+		end
+		if trim(cfg.banCheckUrl or "") == "" and trim(owner.banCheckUrl or "") ~= "" then
+			cfg.banCheckUrl = normalizeHttps(owner.banCheckUrl)
+		end
+		if trim(cfg.gateUrl or "") == "" and trim(cfg.banCheckUrl or "") ~= "" then
+			cfg.gateUrl = cfg.banCheckUrl
 		end
 		if trim(cfg.apiKey) == "" and trim(owner.apiKey) ~= "" then
 			cfg.apiKey = owner.apiKey

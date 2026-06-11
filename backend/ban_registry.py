@@ -1,4 +1,4 @@
-"""SQLite-backed HWID / user ban registry for the Alleral gate."""
+"""SQLite-backed ban registry — HWID, Roblox userId, username, fingerprint, IP, executor."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ import threading
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
-VALID_BAN_TYPES = frozenset({"hwid", "userid", "fingerprint", "ip", "executor"})
+VALID_BAN_TYPES = frozenset({"hwid", "userid", "username", "fingerprint", "ip", "executor"})
 
 
 def utc_iso() -> str:
@@ -31,14 +31,10 @@ def normalize_ban_value(ban_type: str, value: object) -> str:
         if not text.isdigit():
             raise ValueError("userid bans must be numeric")
         return text
-    if ban_type == "hwid":
-        return text.lower()
-    if ban_type == "fingerprint":
+    if ban_type in {"hwid", "fingerprint", "executor", "username"}:
         return text.lower()
     if ban_type == "ip":
         return text
-    if ban_type == "executor":
-        return text.lower()
     return text
 
 
@@ -66,6 +62,7 @@ class BanRegistry:
                     value TEXT NOT NULL,
                     reason TEXT NOT NULL DEFAULT '',
                     player_name TEXT NOT NULL DEFAULT '',
+                    roblox_user_id TEXT NOT NULL DEFAULT '',
                     created_at TEXT NOT NULL,
                     expires_at TEXT,
                     created_by TEXT NOT NULL DEFAULT 'admin',
@@ -74,8 +71,12 @@ class BanRegistry:
                 );
                 CREATE INDEX IF NOT EXISTS idx_bans_lookup ON bans(ban_type, value, active);
                 CREATE INDEX IF NOT EXISTS idx_bans_active ON bans(active, expires_at);
+                CREATE INDEX IF NOT EXISTS idx_bans_roblox ON bans(roblox_user_id, active);
                 """
             )
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(bans)").fetchall()}
+            if "roblox_user_id" not in cols:
+                conn.execute("ALTER TABLE bans ADD COLUMN roblox_user_id TEXT NOT NULL DEFAULT ''")
 
     def _row_to_dict(self, row: sqlite3.Row | None) -> dict[str, Any] | None:
         if row is None:
@@ -84,14 +85,23 @@ class BanRegistry:
         data["active"] = bool(data.get("active"))
         return data
 
-    def list_bans(self, include_inactive: bool = False) -> list[dict[str, Any]]:
-        query = "SELECT * FROM bans"
-        params: tuple[Any, ...] = ()
+    def list_bans(self, include_inactive: bool = False, query: str = "") -> list[dict[str, Any]]:
+        sql = "SELECT * FROM bans"
+        clauses: list[str] = []
+        params: list[Any] = []
         if not include_inactive:
-            query += " WHERE active = 1"
-        query += " ORDER BY id DESC"
+            clauses.append("active = 1")
+        if query.strip():
+            like = f"%{query.strip()}%"
+            clauses.append(
+                "(value LIKE ? OR player_name LIKE ? OR reason LIKE ? OR roblox_user_id LIKE ? OR ban_type LIKE ?)"
+            )
+            params.extend([like, like, like, like, like])
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
+        sql += " ORDER BY id DESC"
         with self._lock, self._connect() as conn:
-            rows = conn.execute(query, params).fetchall()
+            rows = conn.execute(sql, params).fetchall()
         return [self._row_to_dict(row) for row in rows if row is not None]
 
     def get_ban(self, ban_id: int) -> dict[str, Any] | None:
@@ -106,26 +116,39 @@ class BanRegistry:
         *,
         reason: str = "",
         player_name: str = "",
+        roblox_user_id: str = "",
         expires_at: str | None = None,
         created_by: str = "admin",
     ) -> dict[str, Any]:
         ban_type = normalize_ban_type(ban_type)
         normalized = normalize_ban_value(ban_type, value)
+        if ban_type == "userid" and not roblox_user_id:
+            roblox_user_id = normalized
         now = utc_iso()
         with self._lock, self._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO bans (ban_type, value, reason, player_name, created_at, expires_at, created_by, active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+                INSERT INTO bans (ban_type, value, reason, player_name, roblox_user_id, created_at, expires_at, created_by, active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
                 ON CONFLICT(ban_type, value) DO UPDATE SET
                     reason = excluded.reason,
                     player_name = excluded.player_name,
+                    roblox_user_id = excluded.roblox_user_id,
                     expires_at = excluded.expires_at,
                     created_by = excluded.created_by,
                     active = 1,
                     created_at = excluded.created_at
                 """,
-                (ban_type, normalized, reason or "", player_name or "", now, expires_at, created_by or "admin"),
+                (
+                    ban_type,
+                    normalized,
+                    reason or "",
+                    player_name or "",
+                    str(roblox_user_id or ""),
+                    now,
+                    expires_at,
+                    created_by or "admin",
+                ),
             )
             row = conn.execute(
                 "SELECT * FROM bans WHERE ban_type = ? AND value = ?",
@@ -159,6 +182,8 @@ class BanRegistry:
         self,
         *,
         user_id: object = None,
+        player_name: str = "",
+        display_name: str = "",
         hwid: str = "",
         fingerprint: str = "",
         client_ip: str = "",
@@ -167,6 +192,10 @@ class BanRegistry:
         checks: list[tuple[str, str]] = []
         if user_id is not None and str(user_id).strip().isdigit():
             checks.append(("userid", str(user_id).strip()))
+        for name in {player_name, display_name}:
+            text = str(name or "").strip().lower()
+            if text:
+                checks.append(("username", text))
         if hwid and str(hwid).strip():
             checks.append(("hwid", normalize_ban_value("hwid", hwid)))
         if fingerprint and str(fingerprint).strip():
@@ -177,7 +206,7 @@ class BanRegistry:
             checks.append(("executor", normalize_ban_value("executor", executor)))
 
         if not checks:
-            return {"allowed": True, "ban": None}
+            return {"allowed": True, "ban": None, "matched": None}
 
         clauses = " OR ".join(["(ban_type = ? AND value = ?)"] * len(checks))
         params: list[str] = []
@@ -196,10 +225,98 @@ class BanRegistry:
                 continue
             if self._is_expired(entry.get("expires_at")):
                 continue
+            matched = entry.get("ban_type")
             return {
                 "allowed": False,
                 "ban": deepcopy(entry),
-                "reason": entry.get("reason") or entry.get("ban_type") or "banned",
+                "matched": matched,
+                "reason": entry.get("reason") or matched or "banned",
             }
 
-        return {"allowed": True, "ban": None}
+        return {"allowed": True, "ban": None, "matched": None}
+
+    def ban_roblox_player(
+        self,
+        *,
+        username: str = "",
+        user_id: object = None,
+        hwid: str = "",
+        fingerprint: str = "",
+        client_ip: str = "",
+        executor: str = "",
+        reason: str = "",
+        expires_at: str | None = None,
+        created_by: str = "admin",
+        cascade: bool = True,
+        resolve_username: Callable[[str], dict[str, Any] | None] | None = None,
+    ) -> dict[str, Any]:
+        profile: dict[str, Any] | None = None
+        uid = str(user_id).strip() if user_id is not None else ""
+        uname = str(username or "").strip()
+
+        if not uid.isdigit() and uname and resolve_username:
+            profile = resolve_username(uname)
+            if profile and profile.get("id"):
+                uid = str(profile["id"])
+                uname = profile.get("name") or uname
+
+        label = (profile or {}).get("displayName") or (profile or {}).get("name") or uname or uid
+        created: list[dict[str, Any]] = []
+
+        def push(ban_type: str, value: object) -> None:
+            if value is None or str(value).strip() == "":
+                return
+            created.append(
+                self.add_ban(
+                    ban_type,
+                    value,
+                    reason=reason,
+                    player_name=label,
+                    roblox_user_id=uid if uid.isdigit() else "",
+                    expires_at=expires_at,
+                    created_by=created_by,
+                )
+            )
+
+        if uid.isdigit():
+            push("userid", uid)
+        if uname:
+            push("username", uname)
+        if cascade:
+            push("hwid", hwid)
+            push("fingerprint", fingerprint)
+            push("ip", client_ip)
+            push("executor", executor)
+
+        if not created:
+            raise ValueError("Provide a Roblox username, userId, or hardware identifier to ban")
+
+        return {
+            "ok": True,
+            "roblox": profile or {"id": int(uid) if uid.isdigit() else None, "name": uname or None},
+            "bans": created,
+            "cascade": cascade,
+        }
+
+    def add_batch(
+        self,
+        entries: list[dict[str, Any]],
+        *,
+        created_by: str = "admin",
+    ) -> list[dict[str, Any]]:
+        created: list[dict[str, Any]] = []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            created.append(
+                self.add_ban(
+                    str(entry.get("banType") or entry.get("ban_type") or ""),
+                    entry.get("value"),
+                    reason=str(entry.get("reason") or ""),
+                    player_name=str(entry.get("playerName") or entry.get("player_name") or ""),
+                    roblox_user_id=str(entry.get("robloxUserId") or entry.get("roblox_user_id") or ""),
+                    expires_at=str(entry.get("expiresAt") or entry.get("expires_at") or "") or None,
+                    created_by=str(entry.get("createdBy") or entry.get("created_by") or created_by),
+                )
+            )
+        return created

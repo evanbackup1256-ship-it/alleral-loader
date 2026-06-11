@@ -6,81 +6,100 @@
   <title>Alleral Admin</title>
   <link rel="stylesheet" href="/assets/style.css" />
   <style>
-    .editor label { display: grid; gap: 6px; color: var(--muted); font-size: 0.88rem; }
-    .ban-form { display: grid; gap: 10px; margin-bottom: 16px; }
+    .editor label { display: grid; gap: 6px; color: var(--text-secondary); font-size: 0.88rem; }
+    .ban-form { display: grid; gap: 12px; margin-bottom: 16px; }
+    .ban-tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .ban-tabs button { font: inherit; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer; }
+    .ban-tabs button.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+    .panel-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="wrap topbar-inner">
-      <div class="brand"><span class="brand-dot"></span> Alleral Admin</div>
-      <nav class="nav">
-        <a href="/">← Public site</a>
+  <header class="nav-shell">
+    <nav class="nav-bar wrap">
+      <a class="nav-logo" href="/">Alleral Admin</a>
+      <div class="nav-links">
+        <a href="/">Public Site</a>
         <a href="/health">Health</a>
-      </nav>
-    </div>
+      </div>
+    </nav>
   </header>
 
   <main class="wrap section">
-    <div class="section-head">
-      <div>
-        <h2>Control panel</h2>
-        <p>Script status, HWID bans, and public site content.</p>
-      </div>
+    <div class="section-intro" style="text-align:left;margin-bottom:24px;">
+      <h2 style="margin:0;">Control Panel</h2>
+      <p class="section-desc" style="margin-top:8px;text-align:left;">Script status, Roblox ban API, and public site content.</p>
     </div>
 
-    <div class="card" style="margin-bottom:16px;">
-      <div class="grid two">
-        <label>Admin API key
+    <div class="panel-card">
+      <div class="form-row" style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;">
+        <label>Admin API Key
           <input id="adminKey" type="password" placeholder="ADMIN_API_KEY from Railway" />
         </label>
-        <div class="actions" style="align-items:end;">
-          <button id="saveKey" class="secondary" type="button">Remember key</button>
-          <button id="reload" class="primary" type="button">Reload tab</button>
+        <div style="display:flex;gap:8px;">
+          <button id="saveKey" class="btn btn-outline" type="button">Remember Key</button>
+          <button id="reload" class="btn btn-fill" type="button">Reload Tab</button>
         </div>
       </div>
-      <div id="error" class="error" style="margin-top:10px;"></div>
+      <div id="error" class="form-error" style="margin-top:10px;"></div>
     </div>
 
-    <div class="tabs admin-tabs">
+    <div class="support-tabs admin-tabs">
       <button class="active" data-tab="scripts" type="button">Scripts</button>
-      <button data-tab="bans" type="button">Bans</button>
-      <button data-tab="site" type="button">Site content</button>
+      <button data-tab="bans" type="button">Ban API</button>
+      <button data-tab="site" type="button">Site Content</button>
     </div>
 
     <section data-tab-panel="scripts">
-      <div id="scriptsGrid" class="grid"></div>
+      <div id="scriptsGrid" class="games-grid"></div>
     </section>
 
     <section data-tab-panel="bans" class="hidden">
-      <div class="card ban-form">
-        <div class="title" style="margin-bottom:8px;">Add ban</div>
+      <div class="panel-card ban-form">
+        <div class="title" style="margin-bottom:8px;font-weight:600;">Ban Roblox Player</div>
+        <p style="color:var(--text-secondary);font-size:0.88rem;margin:0 0 12px;">Resolves Roblox username to UserId and can cascade HWID, fingerprint, IP, and executor bans.</p>
+        <label>Roblox Username<input id="robloxUsername" placeholder="Player username" /></label>
+        <label>Roblox UserId <span class="muted-inline">optional if username set</span><input id="robloxUserId" placeholder="123456789" /></label>
+        <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <label>HWID<input id="robloxHwid" placeholder="Optional HWID" /></label>
+          <label>Fingerprint<input id="robloxFingerprint" placeholder="Optional fingerprint" /></label>
+        </div>
+        <label>Reason<textarea id="robloxReason" placeholder="Why is this player banned?"></textarea></label>
+        <label><input id="robloxCascade" type="checkbox" checked /> Cascade ban (UserId + username + hardware identifiers)</label>
+        <button id="banRobloxPlayer" class="btn btn-fill" type="button">Ban Player</button>
+      </div>
+
+      <div class="panel-card ban-form">
+        <div class="title" style="margin-bottom:8px;font-weight:600;">Manual Ban Entry</div>
         <label>Type
           <select id="banType">
-            <option value="hwid">hwid</option>
-            <option value="userid">userid</option>
-            <option value="fingerprint">fingerprint</option>
-            <option value="ip">ip</option>
-            <option value="executor">executor</option>
+            <option value="userid">Roblox UserId</option>
+            <option value="username">Roblox Username</option>
+            <option value="hwid">HWID</option>
+            <option value="fingerprint">Fingerprint</option>
+            <option value="ip">IP</option>
+            <option value="executor">Executor</option>
           </select>
         </label>
-        <label>Value <input id="banValue" placeholder="HWID, Roblox userId, IP…" /></label>
-        <label>Player label <input id="banPlayer" placeholder="Optional display name" /></label>
-        <label>Reason <textarea id="banReason" placeholder="Why"></textarea></label>
-        <button id="addBan" class="primary" type="button">Add ban</button>
+        <label>Value<input id="banValue" placeholder="UserId, username, HWID, IP…" /></label>
+        <label>Player Label<input id="banPlayer" placeholder="Display name for admin list" /></label>
+        <label>Reason<textarea id="banReason" placeholder="Ban reason"></textarea></label>
+        <button id="addBan" class="btn btn-outline" type="button">Add Ban</button>
       </div>
-      <div id="bansGrid" class="grid"></div>
+
+      <label>Search Bans<input id="banSearch" placeholder="Search by value, username, reason…" /></label>
+      <div id="bansGrid" class="games-grid" style="margin-top:12px;"></div>
     </section>
 
     <section data-tab-panel="site" class="hidden">
-      <div class="card editor">
-        <label>Tagline <input id="siteTagline" /></label>
-        <label>Announcement banner <input id="siteAnnouncement" placeholder="Shown on public homepage" /></label>
-        <label>Loader version label <input id="siteLoaderVersion" /></label>
-        <label>Loadstring <textarea id="siteLoadstring" style="min-height:100px;font-family:var(--mono);"></textarea></label>
-        <label>Features (one per line) <textarea id="siteFeatures"></textarea></label>
-        <label>FAQ JSON <textarea id="siteFaq" style="min-height:180px;font-family:var(--mono);"></textarea></label>
-        <button id="saveSite" class="primary" type="button">Save site content</button>
+      <div class="panel-card editor">
+        <label>Tagline<input id="siteTagline" /></label>
+        <label>Announcement Banner<input id="siteAnnouncement" placeholder="Shown on public homepage" /></label>
+        <label>Loader Version Label<input id="siteLoaderVersion" /></label>
+        <label>Loadstring<textarea id="siteLoadstring" style="min-height:100px;font-family:var(--mono);"></textarea></label>
+        <label>Features (one per line)<textarea id="siteFeatures"></textarea></label>
+        <label>FAQ JSON<textarea id="siteFaq" style="min-height:180px;font-family:var(--mono);"></textarea></label>
+        <button id="saveSite" class="btn btn-fill" type="button">Save Site Content</button>
       </div>
     </section>
   </main>

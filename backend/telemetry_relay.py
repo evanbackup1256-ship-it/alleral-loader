@@ -161,6 +161,18 @@ from script_registry import ScriptRegistry, VALID_STATUSES
 from ban_registry import BanRegistry, VALID_BAN_TYPES
 from site_registry import SiteRegistry
 
+try:
+    from roblox_api import fetch_user, resolve_username, resolve_usernames
+except ImportError:
+    def resolve_username(username: str):  # type: ignore
+        raise RuntimeError("roblox_api unavailable")
+
+    def resolve_usernames(usernames: list[str]):  # type: ignore
+        raise RuntimeError("roblox_api unavailable")
+
+    def fetch_user(user_id: int | str):  # type: ignore
+        raise RuntimeError("roblox_api unavailable")
+
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES
 
@@ -177,6 +189,8 @@ def apply_cors(response):
 @app.route("/api/site", methods=["OPTIONS"])
 @app.route("/api/bug-report", methods=["OPTIONS"])
 @app.route("/api/feature-request", methods=["OPTIONS"])
+@app.route("/api/ban/check", methods=["OPTIONS"])
+@app.route("/gate/check", methods=["OPTIONS"])
 def cors_preflight():
     return "", 204
 
@@ -289,11 +303,44 @@ def ban_check_payload(body: dict, client_ip: str = "") -> dict[str, Any]:
     context = as_dict(body.get("context"))
     return BAN_REGISTRY.evaluate(
         user_id=player.get("userId") or body.get("userId"),
+        player_name=str(player.get("name") or body.get("playerName") or ""),
+        display_name=str(player.get("displayName") or body.get("displayName") or ""),
         hwid=str(body.get("hwid") or context.get("hwid") or ""),
         fingerprint=str(body.get("fingerprint") or context.get("fingerprint") or ""),
         client_ip=client_ip or str(context.get("clientIp") or ""),
         executor=str(body.get("executor") or context.get("executor") or context.get("executorSlug") or ""),
     )
+
+
+def build_ban_response(body: dict, client_ip: str = "") -> dict[str, Any]:
+    player = as_dict(body.get("player"))
+    context = as_dict(body.get("context"))
+    result = ban_check_payload(body, client_ip)
+    identity = {
+        "userId": player.get("userId") or body.get("userId"),
+        "playerName": player.get("name") or body.get("playerName"),
+        "displayName": player.get("displayName") or body.get("displayName"),
+        "hwid": str(body.get("hwid") or context.get("hwid") or "") or None,
+        "fingerprint": str(body.get("fingerprint") or context.get("fingerprint") or "") or None,
+        "executor": str(body.get("executor") or context.get("executor") or context.get("executorSlug") or "") or None,
+        "placeId": context.get("placeId") or body.get("placeId"),
+        "universeId": context.get("universeId") or body.get("universeId"),
+        "clientIp": client_ip or None,
+    }
+    if not result.get("allowed"):
+        ban = result.get("ban") or {}
+        return {
+            "ok": True,
+            "allowed": False,
+            "reason": result.get("reason") or "banned",
+            "banType": ban.get("ban_type") or result.get("matched"),
+            "banId": ban.get("id"),
+            "expiresAt": ban.get("expires_at"),
+            "playerName": ban.get("player_name") or identity.get("playerName"),
+            "robloxUserId": ban.get("roblox_user_id") or identity.get("userId"),
+            "identity": identity,
+        }
+    return {"ok": True, "allowed": True, "identity": identity}
 
 
 def secure_compare(provided: str, expected: str) -> bool:
@@ -788,8 +835,9 @@ ENGINE = RelayEngine()
 def health():
     return jsonify({
         "ok": True,
-        "version": "3.4",
+        "version": "3.5",
         "gate": True,
+        "banApi": True,
         "site": True,
         "bans": len(BAN_REGISTRY.list_bans()),
         "time": utc_iso(),
@@ -894,25 +942,70 @@ def gate_check():
     if not isinstance(body, dict):
         return jsonify({"ok": False, "error": "bad_request"}), 400
 
-    result = ban_check_payload(body, client_ip)
-    if not result.get("allowed"):
-        ban = result.get("ban") or {}
-        return jsonify({
-            "ok": True,
-            "allowed": False,
-            "reason": result.get("reason") or "banned",
-            "banType": ban.get("ban_type"),
-            "expiresAt": ban.get("expires_at"),
-        })
+    return jsonify(build_ban_response(body, client_ip))
 
-    return jsonify({"ok": True, "allowed": True})
+
+@app.post("/api/ban/check")
+def api_ban_check():
+    return gate_check()
+
+
+@app.get("/api/ban/status")
+def api_ban_status():
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    return jsonify({
+        "ok": True,
+        "activeBans": len(BAN_REGISTRY.list_bans()),
+        "banTypes": sorted(VALID_BAN_TYPES),
+        "endpoints": {
+            "check": "/api/ban/check",
+            "gate": "/gate/check",
+            "robloxResolve": "/api/ban/roblox/resolve",
+        },
+    })
+
+
+@app.post("/api/ban/roblox/resolve")
+def api_ban_roblox_resolve():
+    if not admin_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    names = payload.get("usernames") or payload.get("username")
+    if isinstance(names, str):
+        names = [names]
+    if not isinstance(names, list) or not names:
+        return jsonify({"ok": False, "error": "usernames_required"}), 400
+    try:
+        profiles = resolve_usernames([str(n) for n in names if str(n).strip()])
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+    return jsonify({"ok": True, "profiles": profiles})
+
+
+@app.get("/api/ban/roblox/<int:user_id>")
+def api_ban_roblox_user(user_id: int):
+    if not admin_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    try:
+        profile = fetch_user(user_id)
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+    if not profile:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    active = [b for b in BAN_REGISTRY.list_bans() if str(b.get("roblox_user_id") or "") == str(user_id)]
+    return jsonify({"ok": True, "profile": profile, "activeBans": active})
 
 
 @app.get("/admin/bans")
 def admin_list_bans():
     if not admin_authorized():
         return jsonify({"ok": False, "error": "unauthorized"}), 401
-    bans = BAN_REGISTRY.list_bans()
+    query = request.args.get("q", "")
+    bans = BAN_REGISTRY.list_bans(query=query)
     return jsonify({"ok": True, "bans": bans, "validBanTypes": sorted(VALID_BAN_TYPES)})
 
 
@@ -929,6 +1022,7 @@ def admin_add_ban():
             payload.get("value"),
             reason=str(payload.get("reason") or ""),
             player_name=str(payload.get("playerName") or payload.get("player_name") or ""),
+            roblox_user_id=str(payload.get("robloxUserId") or payload.get("roblox_user_id") or ""),
             expires_at=str(payload.get("expiresAt") or payload.get("expires_at") or "") or None,
             created_by=str(payload.get("createdBy") or payload.get("created_by") or "admin"),
         )
@@ -944,6 +1038,49 @@ def admin_remove_ban(ban_id: int):
     if not BAN_REGISTRY.remove_ban(ban_id):
         return jsonify({"ok": False, "error": "not_found"}), 404
     return jsonify({"ok": True, "removed": ban_id})
+
+
+@app.post("/admin/bans/roblox")
+def admin_ban_roblox_player():
+    if not admin_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    try:
+        result = BAN_REGISTRY.ban_roblox_player(
+            username=str(payload.get("username") or payload.get("playerName") or ""),
+            user_id=payload.get("userId") or payload.get("user_id"),
+            hwid=str(payload.get("hwid") or ""),
+            fingerprint=str(payload.get("fingerprint") or ""),
+            client_ip=str(payload.get("ip") or payload.get("clientIp") or ""),
+            executor=str(payload.get("executor") or ""),
+            reason=str(payload.get("reason") or ""),
+            expires_at=str(payload.get("expiresAt") or payload.get("expires_at") or "") or None,
+            created_by=str(payload.get("createdBy") or payload.get("created_by") or "admin"),
+            cascade=bool(payload.get("cascade", True)),
+            resolve_username=resolve_username,
+        )
+    except (ValueError, RuntimeError) as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify(result)
+
+
+@app.post("/admin/bans/batch")
+def admin_ban_batch():
+    if not admin_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    entries = payload.get("bans")
+    if not isinstance(entries, list) or not entries:
+        return jsonify({"ok": False, "error": "bans_required"}), 400
+    try:
+        created = BAN_REGISTRY.add_batch(entries, created_by=str(payload.get("createdBy") or "admin"))
+    except (ValueError, RuntimeError) as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "bans": created, "count": len(created)})
 
 
 @app.get("/")
@@ -975,6 +1112,8 @@ def client_bootstrap():
         "ok": True,
         "relayUrl": f"{base}/ingest",
         "gateUrl": f"{base}/gate/check",
+        "banCheckUrl": f"{base}/api/ban/check",
+        "banApiUrl": f"{base}/api/ban",
         "apiKey": API_KEY,
         "brand": BRAND,
     })

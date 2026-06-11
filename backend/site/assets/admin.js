@@ -60,21 +60,21 @@
   function renderScriptCard(id, entry, root) {
     const status = (entry.status || "working").toLowerCase();
     const card = document.createElement("div");
-    card.className = "card";
+    card.className = "panel-card";
     card.innerHTML = `
-      <div class="card-head">
+      <div class="modal-head">
         <div>
-          <div class="title">${entry.name || id}</div>
-          <div class="meta">${id} · v${entry.version || "?"} · ${entry.updatedAt || "?"}</div>
+          <div class="title" style="font-weight:600;">${entry.name || id}</div>
+          <div class="modal-meta">${id} · v${entry.version || "?"} · ${entry.updatedAt || "?"}</div>
         </div>
-        <span class="badge ${status}">${status}</span>
+        <span class="status-chip ${status}">${status}</span>
       </div>
-      <div class="desc">${entry.message || ""}</div>
+      <div class="modal-desc">${entry.message || ""}</div>
       <div class="editor" style="margin-top:12px;display:grid;gap:10px;">
         <label>Status <select data-f="status">${STATUSES.map((s) => `<option ${s===status?"selected":""}>${s}</option>`).join("")}</select></label>
         <label>Version <input data-f="version" value="${entry.version || ""}" /></label>
         <label>Message <textarea data-f="message">${entry.message || ""}</textarea></label>
-        <button class="primary" type="button">Save script</button>
+        <button class="btn btn-fill" type="button">Save Script</button>
       </div>`;
     card.querySelector("button").onclick = async () => {
       if (!requireKey()) return;
@@ -92,7 +92,8 @@
   async function loadBans() {
     if (!requireKey()) { $("#bansGrid").innerHTML = ""; return; }
     $("#bansGrid").innerHTML = "Loading…";
-    const res = await fetch("/admin/bans", { headers: headers() });
+    const q = encodeURIComponent($("#banSearch")?.value?.trim() || "");
+    const res = await fetch(`/admin/bans?q=${q}`, { headers: headers() });
     const data = await res.json();
     if (!res.ok || !data.ok) {
       errorEl.textContent = data.error || "Failed to load bans";
@@ -107,17 +108,17 @@
     }
     data.bans.forEach((ban) => {
       const card = document.createElement("div");
-      card.className = "card";
+      card.className = "panel-card";
       card.innerHTML = `
-        <div class="card-head">
+        <div class="modal-head">
           <div>
-            <div class="title">${ban.player_name || ban.value}</div>
-            <div class="meta">#${ban.id} · ${ban.ban_type} · ${ban.value}</div>
+            <div class="title" style="font-weight:600;">${ban.player_name || ban.value}</div>
+            <div class="modal-meta">#${ban.id} · ${ban.ban_type} · ${ban.value}${ban.roblox_user_id ? ` · Roblox ${ban.roblox_user_id}` : ""}</div>
           </div>
-          <span class="badge broken">${ban.ban_type}</span>
+          <span class="status-chip broken">${ban.ban_type}</span>
         </div>
-        <div class="desc">${ban.reason || ""}</div>
-        <button class="secondary" type="button" style="margin-top:10px;">Remove ban</button>`;
+        <div class="modal-desc">${ban.reason || "No reason provided."}</div>
+        <button class="btn btn-outline" type="button" style="margin-top:10px;">Remove Ban</button>`;
       card.querySelector("button").onclick = async () => {
         const res = await fetch(`/admin/bans/${ban.id}`, { method: "DELETE", headers: headers() });
         const out = await res.json();
@@ -137,12 +138,33 @@
       playerName: $("#banPlayer").value.trim(),
       reason: $("#banReason").value.trim(),
     };
-    if (!payload.value) { errorEl.textContent = "Ban value required"; return; }
+    if (!payload.value) { errorEl.textContent = "Ban value is required."; return; }
     const res = await fetch("/admin/bans", { method: "POST", headers: headers(), body: JSON.stringify(payload) });
     const data = await res.json();
     if (!res.ok || !data.ok) { errorEl.textContent = data.error || "Ban failed"; return; }
     $("#banValue").value = ""; $("#banPlayer").value = ""; $("#banReason").value = "";
     flash("Ban added");
+    loadBans();
+  }
+
+  async function banRobloxPlayer() {
+    if (!requireKey()) return;
+    const payload = {
+      username: $("#robloxUsername").value.trim(),
+      userId: $("#robloxUserId").value.trim(),
+      hwid: $("#robloxHwid").value.trim(),
+      fingerprint: $("#robloxFingerprint").value.trim(),
+      reason: $("#robloxReason").value.trim(),
+      cascade: $("#robloxCascade").checked,
+    };
+    if (!payload.username && !payload.userId && !payload.hwid && !payload.fingerprint) {
+      errorEl.textContent = "Provide a Roblox username, UserId, or hardware identifier.";
+      return;
+    }
+    const res = await fetch("/admin/bans/roblox", { method: "POST", headers: headers(), body: JSON.stringify(payload) });
+    const data = await res.json();
+    if (!res.ok || !data.ok) { errorEl.textContent = data.error || "Roblox ban failed"; return; }
+    flash(`Banned ${data.bans?.length || 1} identifier(s)`);
     loadBans();
   }
 
@@ -177,7 +199,7 @@
     const res = await fetch("/api/site", { method: "PATCH", headers: headers(), body: JSON.stringify(payload) });
     const data = await res.json();
     if (!res.ok || !data.ok) { errorEl.textContent = data.error || "Site save failed"; return; }
-    flash("Site content saved — public page updates immediately");
+    flash("Site content saved");
   }
 
   $("#saveKey").onclick = () => {
@@ -187,6 +209,11 @@
   $("#reload").onclick = () => setTab(activeTab);
   $$(".admin-tabs button").forEach((b) => b.onclick = () => setTab(b.dataset.tab));
   $("#addBan").onclick = addBan;
+  $("#banRobloxPlayer").onclick = banRobloxPlayer;
+  $("#banSearch")?.addEventListener("input", () => {
+    clearTimeout(window._banSearchTimer);
+    window._banSearchTimer = setTimeout(loadBans, 250);
+  });
   $("#saveSite").onclick = saveSite;
 
   setTab("scripts");

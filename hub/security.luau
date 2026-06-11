@@ -1,5 +1,5 @@
 local Security = {}
-Security.VERSION = "1.0"
+Security.VERSION = "1.1"
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
@@ -219,6 +219,9 @@ function Security.getConfig()
 		if owner.gateUrl then
 			cfg.gateUrl = owner.gateUrl
 		end
+		if trim(cfg.gateUrl) == "" and trim(owner.banCheckUrl) ~= "" then
+			cfg.gateUrl = owner.banCheckUrl
+		end
 	end
 	return cfg
 end
@@ -318,6 +321,15 @@ function Security.checkAccess(options)
 	end
 
 	local identity = Security.collectIdentity()
+	local placeId = 0
+	local universeId = 0
+	local jobId = ""
+	pcall(function()
+		placeId = game.PlaceId
+		universeId = game.GameId
+		jobId = tostring(game.JobId or "")
+	end)
+
 	local payload = {
 		userId = identity.userId,
 		player = {
@@ -331,6 +343,15 @@ function Security.checkAccess(options)
 		executor = identity.executor,
 		loaderVersion = identity.loaderVersion,
 		stage = options.stage or "loader",
+		context = {
+			placeId = placeId,
+			universeId = universeId,
+			jobId = jobId,
+			hwid = identity.hwid,
+			fingerprint = identity.fingerprint,
+			executor = identity.executor,
+			executorSlug = identity.executor,
+		},
 	}
 
 	local body = HttpService:JSONEncode(payload)
@@ -358,8 +379,13 @@ function Security.checkAccess(options)
 	local parsed = decodeBody(response.Body or response.body)
 	if status == 403 or (parsed and parsed.allowed == false) then
 		local reason = (parsed and (parsed.reason or parsed.error)) or "Access denied"
-		writeCache(false, reason, parsed and parsed.banType)
-		return false, reason
+		local banType = parsed and (parsed.banType or parsed.ban_type)
+		local detail = reason
+		if banType and banType ~= "" then
+			detail = detail .. " (" .. tostring(banType) .. ")"
+		end
+		writeCache(false, reason, banType)
+		return false, detail
 	end
 	if status == 401 then
 		if cfg.failOpenOnError ~= false then

@@ -47,6 +47,11 @@
     $$(".nav-links a[data-section]").forEach((a) => a.classList.toggle("active", a.dataset.section === id));
   }
 
+  function titleCaseStatus(value) {
+    const text = String(value || "working").toLowerCase();
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
   function afterRender() {
     window.AlleralEffects?.observeReveals?.();
   }
@@ -76,7 +81,7 @@
     $("#modalDesc").textContent = game.description || game.message || "No description available.";
     const status = (game.status || "working").toLowerCase();
     const badge = $("#modalBadge");
-    badge.textContent = status;
+    badge.textContent = titleCaseStatus(status);
     badge.className = `status-chip ${status}`;
     $("#modalArt").style.background = gradient;
     const roblox = $("#modalRoblox");
@@ -100,6 +105,7 @@
     }
     games.forEach((game, i) => {
       const status = (game.status || "working").toLowerCase();
+      const statusLabel = titleCaseStatus(status);
       const grad = gradientFor(game.id, i);
       const card = document.createElement("article");
       card.className = "game-card card-enter";
@@ -109,11 +115,11 @@
         <div class="game-body">
           <h3>${game.name || game.id}</h3>
           <div class="game-meta">
-            <span class="status-chip ${status}">${status}</span>
+            <span class="status-chip ${status}">${statusLabel}</span>
             <span class="game-version">v${game.version || "?"}</span>
           </div>
           <p class="game-desc">${game.description || game.message || ""}</p>
-          <button class="btn-link" type="button">View details →</button>
+          <button class="btn-link" type="button">View Details →</button>
         </div>
       `;
       card.addEventListener("click", (e) => {
