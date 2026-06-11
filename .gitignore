@@ -5,3 +5,10 @@ __pycache__/
 dist/
 build/
 .cache/
+
+# Runtime / local artifacts (keep out of git + OneDrive sync)
+*.db
+supabase/.temp/
+backend/data/
+.alleral/
+runtime_secrets.json

@@ -492,8 +492,9 @@ return function(WindUI)
 				return original(self, instance, tweenInfo, props)
 			end
 		end)
-		if not hooked then
-			warn("[Arrrel] TweenService hook skipped: " .. tostring(hookErr))
+		if not hooked and WindUI._AlleralTweenHookWarned ~= true then
+			WindUI._AlleralTweenHookWarned = true
+			uiWarn("tween", "executor TweenService.Create unavailable — using Motion fallback")
 		end
 		return hooked
 	end
@@ -4336,7 +4337,6 @@ return function(WindUI)
 		end
 		local roots = {
 			"ui/windui/v2/",
-			"vendor/windui/v2/",
 			"windui/v2/",
 			"kick/ui/windui/v2/",
 			"kick/kick/ui/windui/v2/",

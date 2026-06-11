@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "1.3.0"
+local VERSION = "1.3.1"
 local state = getgenv().Alleral_State
 local connections = {}
 local loops = {}
@@ -1870,6 +1870,9 @@ local fly = Core.buildUiGroup(miscTab, "Movement", 1, saveWrap, nil, "fly")
 local util = Core.buildUiGroup(miscTab, "Utilities", 1, saveWrap, nil, "util")
 
 local function bindToggle(group, label, key, tooltip)
+	if not group or type(group.CreateToggle) ~= "function" then
+		return
+	end
 	group:CreateToggle(label, state[key], tooltip, function(value)
 		state[key] = value
 		saveSettings()
@@ -1877,6 +1880,9 @@ local function bindToggle(group, label, key, tooltip)
 end
 
 local function bindSlider(group, label, minVal, maxVal, key)
+	if not group or type(group.CreateSlider) ~= "function" then
+		return
+	end
 	group:CreateSlider(label, minVal, maxVal, state[key], function(value)
 		state[key] = value
 		saveSettings()

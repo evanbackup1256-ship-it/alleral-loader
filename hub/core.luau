@@ -1,5 +1,5 @@
 local Core = {}
-Core.VERSION = "2.7.0"
+Core.VERSION = "2.7.1"
 Core.UI_LIBRARY = "Alleral"
 Core.ALLERAL_UI_VERSION = "2.0.0-alleral-v2"
 Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
@@ -14,13 +14,9 @@ local WINDUI_MIRROR_URLS = {
 }
 local WINDUI_LOCAL_ROOTS = {
 	"ui/windui/",
-	"ui/alleral/",
 	"kick/ui/windui/",
 	"kick/kick/ui/windui/",
-	"vendor/windui/",
-	"vendor/alleral/",
 	"windui/",
-	"alleral/",
 }
 local WINDUI_FILE = "main.lua"
 local WINDUI_PATCH_FILE = "arrrel.luau"
@@ -4082,6 +4078,9 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 	local groupbox = {}
 
 	function groupbox:CreateToggle(settings, id)
+		if type(rawGroup.Toggle) ~= "function" then
+			return wrapElement(function() end, { kind = "toggle" })
+		end
 		local handle
 		handle = rawGroup:Toggle({
 			Title = settings.Name,
@@ -4102,6 +4101,9 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 	end
 
 	function groupbox:CreateSlider(settings, id)
+		if type(rawGroup.Slider) ~= "function" then
+			return wrapElement(function() end, { kind = "slider" })
+		end
 		local range = settings.Range or { 0, 100 }
 		local minValue, maxValue = range[1], range[2]
 		local defaultValue = tonumber(settings.CurrentValue) or minValue
@@ -4250,6 +4252,34 @@ function Core.createWindUiGroupbox(rawGroup, uiBundle)
 	return groupbox
 end
 
+function Core.createStubUiGroup(label)
+	label = tostring(label or "Group")
+	local stub = {
+		_stub = true,
+		_label = label,
+	}
+	local function noop()
+		return stub
+	end
+	stub.CreateToggle = noop
+	stub.CreateSlider = noop
+	stub.CreateButton = noop
+	stub.CreateDropdown = noop
+	stub.CreateInput = noop
+	stub.CreateLabel = noop
+	stub.AddDropdown = noop
+	stub.CreateStatus = function(_, fields)
+		local status = { Labels = {}, LastValues = {}, Visible = true }
+		for key, value in pairs(fields or {}) do
+			status.LastValues[key] = tostring(value)
+		end
+		function status:Update() end
+		function status:SetVisible() end
+		return status
+	end
+	return stub
+end
+
 function Core.wrapUiTab(rawTab, uiBundle, window)
 	local tab = {
 		_rawTab = rawTab,
@@ -4266,13 +4296,25 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 		tab._layout = tab._layout or {}
 		local layout = tab._layout
 		if not layout.ready then
-			layout.hstack = rawTab:HStack({})
+			local hstack
+			local ok, result = pcall(function()
+				return rawTab:HStack({})
+			end)
+			if ok then
+				hstack = result
+			end
+			layout.hstack = hstack
 			if layout.hstack and type(layout.hstack.VStack) == "function" then
-				layout.cols = {
-					layout.hstack:VStack({}),
-					layout.hstack:VStack({}),
-				}
-				layout.ready = layout.cols[1] ~= nil and layout.cols[2] ~= nil
+				local colOk, colA = pcall(function()
+					return layout.hstack:VStack({})
+				end)
+				local colBOk, colB = pcall(function()
+					return layout.hstack:VStack({})
+				end)
+				if colOk and colBOk and colA and colB then
+					layout.cols = { colA, colB }
+					layout.ready = type(layout.cols[1].Section) == "function" and type(layout.cols[2].Section) == "function"
+				end
 			end
 		end
 		if layout.ready and layout.cols and layout.cols[column] and type(layout.cols[column].Section) == "function" then
@@ -4284,16 +4326,30 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 	function tab:CreateGroupbox(settings)
 		settings = settings or {}
 		local name = settings.Name or "Group"
+		if not rawTab then
+			Core.logWarn("CreateGroupbox skipped — tab missing for " .. tostring(name))
+			return Core.createWindUiGroupbox({}, uiBundle)
+		end
 		local parent = select(1, resolveSectionParent(settings.Column or 1))
 		if not parent or type(parent.Section) ~= "function" then
 			parent = rawTab
 		end
-		local rawGroup = parent:Section({
-			Title = name,
-			Box = true,
-			BoxBorder = true,
-			Opened = true,
-		})
+		if not parent or type(parent.Section) ~= "function" then
+			Core.logWarn("CreateGroupbox skipped — Section unavailable for " .. tostring(name))
+			return Core.createWindUiGroupbox({}, uiBundle)
+		end
+		local ok, rawGroup = pcall(function()
+			return parent:Section({
+				Title = name,
+				Box = true,
+				BoxBorder = true,
+				Opened = true,
+			})
+		end)
+		if not ok or not rawGroup then
+			Core.logWarn("CreateGroupbox Section failed for " .. tostring(name) .. ": " .. tostring(rawGroup))
+			return Core.createWindUiGroupbox({}, uiBundle)
+		end
 		return Core.createWindUiGroupbox(rawGroup, uiBundle)
 	end
 
@@ -4538,6 +4594,13 @@ function Core.prepareGame(state)
 		local msg = "Core not loaded"
 		signalBootFailure(msg)
 		return nil, nil, msg
+	end
+	for _, fnName in ipairs({ "buildUiWindow", "buildUiTab", "buildUiGroup", "wrapUiGroup", "createWindUiGroupbox" }) do
+		if type(core[fnName]) ~= "function" then
+			local msg = "Core outdated — missing " .. fnName
+			signalBootFailure(msg)
+			return nil, nil, msg
+		end
 	end
 	state.HubRunning = true
 	core.initAnalytics()
@@ -5327,7 +5390,15 @@ function Core.buildUiTab(section, name, icon, columns, id)
 			iconArg = icon
 		end
 	end
-	local rawTab = iconArg and window:AddTab(name, iconArg) or window:AddTab(name)
+	local rawTab
+	if iconArg then
+		rawTab = window:AddTab(name, iconArg)
+	else
+		rawTab = window:AddTab(name)
+	end
+	if not rawTab then
+		Core.logWarn("buildUiTab AddTab failed for " .. tostring(name))
+	end
 	local wrapped = Core.wrapUiTab(rawTab, window._ui or section._ui, window)
 	wrapped._columnCount = math.max(1, tonumber(columns) or 1)
 	return wrapped
@@ -5346,11 +5417,26 @@ function Core.onUiSave(saveFn)
 end
 
 function Core.buildUiGroup(tab, name, column, callbackWrapper, icon, id)
-	local groupbox = tab:CreateGroupbox({
-		Name = name,
-		Column = column or 1,
-		Icon = icon and Core.uiIcon(icon) or nil,
-	}, id or Core.uiElementId(name))
+	name = tostring(name or "Group")
+	if type(tab) ~= "table" or type(tab.CreateGroupbox) ~= "function" then
+		Core.logWarn("buildUiGroup skipped — tab missing for " .. name)
+		return Core.createStubUiGroup(name)
+	end
+	local ok, groupbox = pcall(function()
+		return tab:CreateGroupbox({
+			Name = name,
+			Column = column or 1,
+			Icon = icon and Core.uiIcon(icon) or nil,
+		}, id or Core.uiElementId(name))
+	end)
+	if not ok or not groupbox then
+		Core.logWarn("buildUiGroup CreateGroupbox failed for " .. name .. ": " .. tostring(groupbox))
+		return Core.createStubUiGroup(name)
+	end
+	if type(Core.wrapUiGroup) ~= "function" then
+		Core.logWarn("wrapUiGroup missing — returning stub for " .. name)
+		return Core.createStubUiGroup(name)
+	end
 	if callbackWrapper then
 		return Core.wrapUiGroup(groupbox, callbackWrapper)
 	end

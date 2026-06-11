@@ -5,7 +5,6 @@
 
 local PATCH_ROOTS = {
 	"ui/windui/",
-	"vendor/windui/",
 	"windui/",
 	"kick/ui/windui/",
 	"kick/kick/ui/windui/",

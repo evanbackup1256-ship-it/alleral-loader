@@ -1,6 +1,7 @@
 local LOADER_VERSION = "7.6.0"
 local MIN_CORE = "2.7.0"
-local DEFAULT_UPDATE_POLL_SECONDS = 45
+local DEFAULT_UPDATE_POLL_SECONDS = 120
+local EXPECTED_VERSIONS_CACHE_SECONDS = 60
 local CORE_MIN_BYTES = 50000
 local HUB = "hub"
 local CFG = "cfg"
@@ -8,7 +9,7 @@ local UI = "ui"
 
 local RELEASE_FALLBACK = {
 	loader = "7.6.0",
-	core = "2.7.0",
+	core = "2.7.1",
 	ui = "Alleral",
 	analytics = "1.2",
 	telemetry = "3.2",
@@ -1000,6 +1001,9 @@ local function coreValid(src)
 	if type(src) ~= "string" or #src < CORE_MIN_BYTES or not src:find("loadUi", 1, true) then
 		return false
 	end
+	if not src:find("buildUiGroup", 1, true) or not src:find("buildUiWindow", 1, true) then
+		return false
+	end
 	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
 	if not coreVersionOk(ver) then
 		return false
@@ -1536,7 +1540,7 @@ local GAMES = {
 	{
 		id = "build_a_ring_farm",
 		name = "Build A Ring Farm",
-		version = "1.3.0",
+		version = "1.3.1",
 		placeIds = { 107646426076756 },
 		scriptFiles = { "games/build_a_ring_farm.luau", "build_a_ring_farm.luau" },
 		scriptUrl = "games/build_a_ring_farm.luau",
@@ -1618,7 +1622,18 @@ local function writeInstalledManifest(data)
 	pcall(writeFileFn, INSTALL_MANIFEST, HttpService:JSONEncode(data))
 end
 
-local function fetchExpectedVersions()
+local function fetchExpectedVersions(forceRefresh)
+	local cached = ENV._Alleral_ExpectedVersions
+	local cachedAt = ENV._Alleral_ExpectedVersionsAt
+	if
+		not forceRefresh
+		and type(cached) == "table"
+		and type(cachedAt) == "number"
+		and tick() - cachedAt < EXPECTED_VERSIONS_CACHE_SECONDS
+	then
+		return cached
+	end
+
 	local expected = {
 		loader = RELEASE_FALLBACK.loader,
 		core = RELEASE_FALLBACK.core,
@@ -1658,11 +1673,6 @@ local function fetchExpectedVersions()
 		end
 	end
 
-	local weaoCfg = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/weao.json?t=" .. tick())))
-	if weaoCfg then
-		ENV._Alleral_WeaoConfigRemote = weaoCfg
-	end
-
 	local manifest = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/scripts_manifest.json?t=" .. tick())))
 	if manifest and type(manifest.scripts) == "table" then
 		for id, entry in pairs(manifest.scripts) do
@@ -1677,6 +1687,8 @@ local function fetchExpectedVersions()
 		end
 	end
 
+	ENV._Alleral_ExpectedVersions = expected
+	ENV._Alleral_ExpectedVersionsAt = tick()
 	return expected
 end
 
@@ -1739,7 +1751,7 @@ local function applyRemoteUpdate(profile, expected, reason)
 end
 
 local function checkForRemoteUpdate(profile, quiet)
-	local expected = fetchExpectedVersions()
+	local expected = fetchExpectedVersions(true)
 	local fingerprint = buildUpdateFingerprint(expected, profile)
 	local previous = ENV._Alleral_UpdateFingerprint
 	ENV._Alleral_ExpectedVersions = expected
@@ -1789,9 +1801,12 @@ local function startAutoUpdater(profile)
 			pcall(function()
 				checkForRemoteUpdate(profile, true)
 			end)
-			pcall(function()
-				syncWeaoConfig(true)
-			end)
+			if ENV._Alleral_AutoUpdatePollCount == nil or ENV._Alleral_AutoUpdatePollCount % 3 == 0 then
+				pcall(function()
+					syncWeaoConfig(true)
+				end)
+			end
+			ENV._Alleral_AutoUpdatePollCount = (ENV._Alleral_AutoUpdatePollCount or 0) + 1
 		end
 	end)
 	log("Auto-update polling every " .. tostring(pollSeconds) .. "s")
@@ -1842,13 +1857,6 @@ local function buildManagedFiles()
 				UI .. "/windui/aller.luau",
 				UI .. "/windui/bootstrap.lua",
 				UI .. "/windui/v2/boost.luau",
-				"vendor/windui/main.lua",
-				"vendor/windui/arrrel.luau",
-				"vendor/windui/aller.luau",
-				"vendor/windui/bootstrap.lua",
-				"vendor/windui/v2/boost.luau",
-				UI .. "/addons/ThemeManager.lua",
-				UI .. "/addons/SaveManager.lua",
 			},
 			expectedKey = "loader",
 			purgeOnLoaderChange = true,

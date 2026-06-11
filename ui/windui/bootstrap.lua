@@ -7,7 +7,6 @@ local PATCH_FILE = "arrrel.luau"
 local PATCH_FALLBACK = "aller.luau"
 local PATCH_ROOTS = {
 	"ui/windui/",
-	"vendor/windui/",
 	"windui/",
 	"kick/ui/windui/",
 	"kick/kick/ui/windui/",
