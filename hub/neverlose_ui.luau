@@ -449,7 +449,7 @@ return function(Core)
 		end
 
 		local function nextFlag(name, explicit)
-			serial += 1
+			serial = serial + 1
 			return explicit or Core.uiElementId(name) .. "_" .. serial
 		end
 

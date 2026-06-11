@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.8.1"
+local LOADER_VERSION = "7.8.2"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -7,11 +7,11 @@ local CORE_MIN_BYTES = 50000
 local CORE_BASE_MIN_BYTES = 30000
 local CORE_BASE_MAX_BYTES = 45000
 local CORE_UI_MIN_BYTES = 50000
-local CORE_UI_MAX_BYTES = 70000
+local CORE_UI_MAX_BYTES = 90000
 local CORE_HUB_UI_MIN_BYTES = 60000
 local CORE_HUB_UI_MAX_BYTES = 75000
 local CORE_NEVERLOSE_UI_MIN_BYTES = 10000
-local CORE_NEVERLOSE_UI_MAX_BYTES = 30000
+local CORE_NEVERLOSE_UI_MAX_BYTES = 40000
 local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
@@ -23,7 +23,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_NEVERLOSE_UI_PATH = HUB .. "/neverlose_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.8.1",
+	loader = "7.8.2",
 	core = "2.8.8",
 	ui = "Alleral",
 	neverlose = "1.1.0-kick",
@@ -1070,6 +1070,13 @@ local function compileCoreSource(src, label)
 		COMPILE_VALIDATE_CACHE[cacheKey] = true
 		return true
 	end
+	-- Volt/AWP often reject compile-only checks on large layered modules that still run fine.
+	if (EXECUTOR.slug == "volt" or EXECUTOR.slug == "awp") and #src >= 15000 then
+		if src:find("return function", 1, true) and looksLikeLua(src) then
+			COMPILE_VALIDATE_CACHE[cacheKey] = true
+			return true
+		end
+	end
 	COMPILE_VALIDATE_CACHE[cacheKey] = err or "compile failed"
 	return false, err
 end
@@ -1161,6 +1168,9 @@ local function neverloseUiValid(src)
 	end
 	if not src:find("Neverlose UI layer", 1, true) then
 		return false
+	end
+	if EXECUTOR.slug == "volt" or EXECUTOR.slug == "awp" then
+		return looksLikeLua(src)
 	end
 	return compileCoreSource(src, "Alleral/neverlose_ui")
 end
@@ -1278,14 +1288,32 @@ end
 
 local function fetchRemoteCoreFile(relativePath, validFn, rejectReasonFn, minBytes)
 	minBytes = minBytes or CORE_BASE_MIN_BYTES
-	for _, base in ipairs(CORE_REMOTE_BASES) do
-		local body, via = httpGet(base .. "/" .. relativePath, minBytes)
-		if body and validFn(body) then
-			cacheRemote(relativePath, body)
-			return body, base .. " via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
+	local lastReason = "no response"
+	for attempt = 1, 2 do
+		for _, base in ipairs(CORE_REMOTE_BASES) do
+			local body, via = httpGet(base .. "/" .. relativePath, minBytes)
+			if type(body) == "string" and #body >= minBytes then
+				if validFn(body) then
+					cacheRemote(relativePath, body)
+					return body, base .. " via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
+				end
+				if rejectReasonFn then
+					lastReason = rejectReasonFn(body)
+				else
+					lastReason = "validation failed"
+				end
+				lastReason = lastReason .. " (" .. tostring(#body) .. "b via " .. tostring(via) .. ")"
+			elseif type(body) == "string" then
+				lastReason = "too small (" .. tostring(#body) .. "b, need " .. tostring(minBytes) .. "b+ via " .. tostring(via) .. ")"
+			else
+				lastReason = tostring(via or "http failed")
+			end
+		end
+		if attempt == 1 then
+			task.wait(0.2)
 		end
 	end
-	return nil, "all transports failed"
+	return nil, relativePath .. ": " .. lastReason
 end
 
 local function fetchCoreRemote()
@@ -1412,34 +1440,12 @@ local function loadCore()
 		return resolveCoreSource(args[1], args[2], args[3], args[4], args[5], args[6])
 	end
 
-	local function unwrap(result)
-		if not result or result[1] ~= true then
-			return nil, result and result[2]
-		end
-		return result[2], result[3]
-	end
-
-	local parallel = runParallel({
-		function()
-			return resolveArgs(baseArgs)
-		end,
-		function()
-			return resolveArgs(uiArgs)
-		end,
-		function()
-			return resolveArgs(neverloseArgs)
-		end,
-		function()
-			return resolveArgs(hubArgs)
-		end,
-	})
-
-	local baseSrc, baseLabel = unwrap(parallel[1])
-	local uiSrc, uiLabel = unwrap(parallel[2])
-	local neverloseUiSrc, neverloseUiLabel = unwrap(parallel[3])
-	local hubUiSrc, hubUiLabel = unwrap(parallel[4])
+	local baseSrc, baseLabel = resolveArgs(baseArgs)
+	local uiSrc, uiLabel = resolveArgs(uiArgs)
+	local neverloseUiSrc, neverloseUiLabel = resolveArgs(neverloseArgs)
+	local hubUiSrc, hubUiLabel = resolveArgs(hubArgs)
 	if not baseSrc then
-		return false, baseLabel or "Core download failed"
+		return false, baseLabel or "core_base download failed"
 	end
 
 	local ok, err = compileAndRun(baseSrc, "Alleral/core")
