@@ -237,7 +237,8 @@ function Core.installResilience()
 		"resolveActiveGameId",
 		"buildUiPreferencesGroup",
 		"buildConfigProfileGroup",
-		"buildCloudConfigGroup",
+		"buildCloudConfigStudio",
+		"buildCloudConfigTab",
 		"buildScriptStatusGroupbox",
 		"postWebhook",
 		"writeFile",
@@ -252,7 +253,7 @@ function Core.installResilience()
 end
 
 function Core.getWindUi()
-	local ui = ENV.Alleral_UI or ENV.Alleral_Rayfield
+	local ui = ENV.Alleral_UI
 	if type(ui) ~= "table" then
 		return nil
 	end
@@ -1443,7 +1444,7 @@ function Core.syncUiState(state, options)
 end
 
 function Core.releaseUiWindow()
-	local ui = ENV.Alleral_UI or ENV.Alleral_Rayfield
+	local ui = ENV.Alleral_UI
 	local wind = ui and (ui.WindUI or ui.Library)
 	if type(wind) == "table" and type(wind.ReleaseWindow) == "function" then
 		pcall(function()
@@ -2371,7 +2372,7 @@ function Core.buildAdvancedHubGroup(tab, options)
 		end
 	)
 	group:CreateButton("Repair UI", function()
-		local ui = ENV.Alleral_UI or ENV.Alleral_Rayfield
+		local ui = ENV.Alleral_UI
 		local windUi = ui and (ui.WindUI or ui.Library)
 		if windUi and type(windUi.RepairWindow) == "function" then
 			local ok = windUi:RepairWindow()
@@ -2399,7 +2400,11 @@ function Core.buildStandardSettingsExtras(tab, options)
 		Core.buildHubActionsGroup(tab, options.hubActionsColumn or 2)
 	end
 	if options.skipCloudConfig ~= true and type(options.savedKeys) == "table" and #options.savedKeys > 0 then
-		Core.buildCloudConfigGroup(tab, options)
+		if type(options.window) == "table" then
+			Core.buildCloudConfigTab(options.window, options)
+		else
+			Core.buildCloudConfigStudio(tab, options)
+		end
 	end
 	Core.buildSessionStatsGroup(tab, options.sessionColumn or 1)
 	Core.buildServerToolsGroup(tab, options.serverColumn or 1)
@@ -2634,7 +2639,7 @@ function Core.buildConfigProfileGroup(tab, options)
 	return group
 end
 
-function Core.buildCloudConfigGroup(tab, options)
+function Core.buildCloudConfigStudio(tab, options)
 	options = type(options) == "table" and options or {}
 	local state = options.state or ENV.Alleral_State or {}
 	local savedKeys = options.savedKeys or {}
@@ -2642,10 +2647,14 @@ function Core.buildCloudConfigGroup(tab, options)
 	local onApply = options.onApply
 	local scriptVersion = options.version or options.profileVersion or "1.0"
 	local gameId = Core.resolveActiveGameId(options) or options.gameId or "unknown"
-	local column = options.column or 1
+	local libraryColumn = options.cloudLibraryColumn or 1
+	local communityColumn = options.cloudCommunityColumn or 2
 	local shareCode = tostring(state.Alleral_CloudConfigCode or "")
 	local sharePublic = state.Alleral_CloudConfigPublic ~= false
-	local previewText = ""
+	local browseEntries = {}
+	local browseLabels = { "Refresh community list" }
+	local selectedBrowseCode = shareCode
+	local previewCache = nil
 
 	local function collectSnapshot()
 		local snapshot = {}
@@ -2692,17 +2701,93 @@ function Core.buildCloudConfigGroup(tab, options)
 		return changed
 	end
 
-	local group = Core.buildUiGroup(tab, "Cloud configs", column, nil, nil, "CloudConfigs")
-	group:CreateInput("Setup name", "my public build", state.Alleral_CloudConfigName or "My setup", function(value)
+	local function formatBrowseLabel(entry)
+		return string.format(
+			"[%s] %s · %s · %s dl",
+			tostring(entry.code or "??????"),
+			tostring(entry.name or "Untitled"),
+			tostring(entry.author or "?"),
+			tostring(entry.downloads or 0)
+		)
+	end
+
+	local library = Core.buildUiGroup(tab, "Cloud library", libraryColumn, nil, nil, "CloudLibrary")
+	local community = Core.buildUiGroup(tab, "Community browser", communityColumn, nil, nil, "CloudCommunity")
+
+	local cloudStatus = library:CreateStatus("Cloud", {
+		Code = shareCode ~= "" and shareCode or "--",
+		Setup = state.Alleral_CloudConfigName or "My setup",
+		DNA = "--",
+		Diff = "--",
+		Downloads = "--",
+		Status = "Ready",
+	})
+	cloudStatus:SetSummary("Upload, preview DNA, then import when you're happy.")
+
+	local function setStatus(message, tone)
+		cloudStatus:Update("Status", message or "Ready")
+		if tone then
+			Core.notify("Alleral Cloud", tostring(message or ""), 5, tone)
+		end
+	end
+
+	local function updatePreviewStatus(decoded)
+		previewCache = decoded
+		if type(decoded) ~= "table" then
+			cloudStatus:Update("DNA", "--")
+			cloudStatus:Update("Diff", "--")
+			cloudStatus:Update("Downloads", "--")
+			return
+		end
+		local diff = countDiff(decoded.data)
+		cloudStatus:Update("Code", tostring(decoded.code or shareCode or "--"))
+		cloudStatus:Update("Setup", tostring(decoded.name or state.Alleral_CloudConfigName or "My setup"))
+		cloudStatus:Update("DNA", tostring(decoded.dna or "?"))
+		cloudStatus:Update("Diff", tostring(diff) .. " keys")
+		cloudStatus:Update("Downloads", tostring(decoded.downloads or 0))
+		cloudStatus:SetSummary(
+			string.format(
+				"%s by %s · v%s · DNA %s · %s keys would change",
+				tostring(decoded.name or "Untitled"),
+				tostring(decoded.author or "?"),
+				tostring(decoded.scriptVersion or "?"),
+				tostring(decoded.dna or "?"),
+				tostring(diff)
+			)
+		)
+	end
+
+	local function fetchRemote(code)
+		code = trimText(code):upper()
+		if code == "" then
+			return nil, "Enter a share code."
+		end
+		local base = Core.resolveRelayBase()
+		local decoded = Core.httpGetJson(base .. "/api/configs/" .. code)
+		if not decoded or decoded.ok ~= true or type(decoded.data) ~= "table" then
+			return nil, decoded and decoded.error or "Config not found."
+		end
+		return decoded, nil
+	end
+
+	library:CreateLabel("Publish your current setup to the Alleral cloud. Each upload gets a DNA fingerprint so you can preview before importing.")
+	library:CreateInput("Setup name", "my public build", state.Alleral_CloudConfigName or "My setup", function(value)
 		state.Alleral_CloudConfigName = trimText(value)
+		cloudStatus:Update("Setup", state.Alleral_CloudConfigName)
 		saveFn()
-	end, "Name shown in the community browser.")
-	group:CreateToggle("List publicly", sharePublic, "Public configs appear in browse — the twist: each upload gets a DNA fingerprint so players preview before importing.", function(value)
-		sharePublic = value ~= false
-		state.Alleral_CloudConfigPublic = sharePublic
-		saveFn()
-	end)
-	group:CreateButton("Upload to cloud", function()
+	end, "Shown in the community browser when public.")
+	library:CreateToggle(
+		"List publicly",
+		sharePublic,
+		"Public configs appear in the community browser for this game.",
+		function(value)
+			sharePublic = value ~= false
+			state.Alleral_CloudConfigPublic = sharePublic
+			saveFn()
+		end
+	)
+	library:CreateButton("Upload current setup", function()
+		setStatus("Uploading...", nil)
 		local base = Core.resolveRelayBase()
 		local payload = {
 			gameId = gameId,
@@ -2715,84 +2800,193 @@ function Core.buildCloudConfigGroup(tab, options)
 		}
 		local decoded, err = Core.httpPostJson(base .. "/api/configs/publish", payload)
 		if not decoded or decoded.ok ~= true or not decoded.code then
-			Core.notify("Alleral", tostring(err or decoded and decoded.error or "Upload failed."), 5, "error")
+			setStatus("Upload failed", "error")
 			return
 		end
 		shareCode = tostring(decoded.code)
 		state.Alleral_CloudConfigCode = shareCode
 		saveFn()
-		local dna = decoded.dna and (" · DNA " .. tostring(decoded.dna)) or ""
-		Core.notify("Alleral", "Uploaded! Share code: " .. shareCode .. dna, 6, "success")
+		cloudStatus:Update("Code", shareCode)
+		cloudStatus:Update("DNA", tostring(decoded.dna or "?"))
+		cloudStatus:Update("Diff", "0 keys")
+		cloudStatus:SetSummary("Uploaded " .. shareCode .. " · DNA " .. tostring(decoded.dna or "?"))
+		setStatus("Uploaded " .. shareCode, "success")
 		if Core.setClipboard then
 			pcall(Core.setClipboard, shareCode)
 		end
-	end, "Publishes your current settings and copies the share code.")
-	group:CreateInput("Share code", "ABC123", shareCode, function(value)
+		task.defer(refreshBrowse)
+	end, "Uploads this session and copies the share code.")
+	library:CreateDivider()
+	library:CreateInput("Share code", "ABC123", shareCode, function(value)
 		shareCode = trimText(value):upper()
 		state.Alleral_CloudConfigCode = shareCode
+		cloudStatus:Update("Code", shareCode ~= "" and shareCode or "--")
 		saveFn()
-	end, "6-character code from a friend or the community browser.")
-	group:CreateButton("Preview DNA", function()
+	end, "Paste a friend's 6-character code.")
+	library:CreateButton("Preview DNA", function()
 		if shareCode == "" then
-			Core.notify("Alleral", "Enter a share code first.", 4, "warn")
+			setStatus("Enter a share code first.", "warn")
 			return
 		end
-		local base = Core.resolveRelayBase()
-		local decoded = Core.httpGetJson(base .. "/api/configs/" .. shareCode)
-		if not decoded or decoded.ok ~= true or type(decoded.data) ~= "table" then
-			Core.notify("Alleral", "Config not found.", 4, "error")
+		setStatus("Fetching preview...", nil)
+		local decoded, err = fetchRemote(shareCode)
+		if not decoded then
+			setStatus(tostring(err or "Preview failed."), "error")
 			return
 		end
-		local diff = countDiff(decoded.data)
-		previewText = string.format(
-			"%s by %s · v%s · %s downloads · DNA %s · %s keys would change",
-			tostring(decoded.name or "Untitled"),
-			tostring(decoded.author or "?"),
-			tostring(decoded.scriptVersion or "?"),
-			tostring(decoded.downloads or 0),
-			tostring(decoded.dna or "?"),
-			tostring(diff)
-		)
-		Core.notify("Alleral", previewText, 7, "info")
-	end, "Shows what would change before you import.")
-	group:CreateButton("Import from cloud", function()
+		updatePreviewStatus(decoded)
+		setStatus("Preview ready", "info")
+	end, "Loads remote DNA and shows how many keys would change.")
+	library:CreateButton("Import selected setup", function()
 		if shareCode == "" then
-			Core.notify("Alleral", "Enter a share code first.", 4, "warn")
+			setStatus("Enter a share code first.", "warn")
 			return
 		end
-		local base = Core.resolveRelayBase()
-		local decoded = Core.httpGetJson(base .. "/api/configs/" .. shareCode)
-		if not decoded or decoded.ok ~= true or type(decoded.data) ~= "table" then
-			Core.notify("Alleral", "Config not found.", 4, "error")
-			return
+		setStatus("Importing...", nil)
+		local decoded = previewCache
+		if not decoded or tostring(decoded.code or ""):upper() ~= shareCode then
+			local remote, err = fetchRemote(shareCode)
+			if not remote then
+				setStatus(tostring(err or "Import failed."), "error")
+				return
+			end
+			decoded = remote
 		end
 		local applied, err = applySnapshot(decoded.data)
 		if applied then
-			Core.notify("Alleral", "Imported '" .. tostring(decoded.name or shareCode) .. "'. Reload UI if labels look stale.", 6, "success")
+			updatePreviewStatus(decoded)
+			setStatus("Imported " .. tostring(decoded.name or shareCode), "success")
 		else
-			Core.notify("Alleral", tostring(err), 5, "error")
+			setStatus(tostring(err or "Import failed."), "error")
 		end
-	end, "Applies a shared cloud config to this session.")
-	group:CreateButton("Browse community", function()
+	end, "Applies the previewed cloud config to this session.")
+
+	local communityStatus = community:CreateStatus("Browse", {
+		Game = gameId,
+		Listed = "0",
+		Selected = shareCode ~= "" and shareCode or "--",
+	})
+	communityStatus:SetSummary("Pick a public setup, preview it, then import from the library panel.")
+
+	local browseDropdown
+	local function refreshBrowse()
 		local base = Core.resolveRelayBase()
-		local decoded = Core.httpGetJson(base .. "/api/configs/browse?game=" .. HttpService:UrlEncode(gameId) .. "&limit=12")
-		if not decoded or decoded.ok ~= true or type(decoded.configs) ~= "table" or #decoded.configs == 0 then
-			Core.notify("Alleral", "No public configs yet — upload yours first.", 5, "warn")
+		local decoded = Core.httpGetJson(base .. "/api/configs/browse?game=" .. HttpService:UrlEncode(gameId) .. "&limit=20")
+		browseEntries = {}
+		browseLabels = {}
+		if decoded and decoded.ok == true and type(decoded.configs) == "table" then
+			for _, entry in ipairs(decoded.configs) do
+				if type(entry) == "table" and entry.code then
+					table.insert(browseEntries, entry)
+					table.insert(browseLabels, formatBrowseLabel(entry))
+				end
+			end
+		end
+		if #browseLabels == 0 then
+			table.insert(browseLabels, "No public configs yet")
+		end
+		communityStatus:Update("Listed", tostring(#browseEntries))
+		if browseDropdown and browseDropdown.Refresh then
+			browseDropdown:Refresh(browseLabels, browseLabels[1])
+		end
+		if #browseEntries > 0 then
+			selectedBrowseCode = tostring(browseEntries[1].code or "")
+			communityStatus:Update("Selected", selectedBrowseCode)
+		end
+	end
+
+	community:CreateLabel("Browse player-uploaded setups for this game. Select one to load its share code into the library panel.")
+	browseDropdown = community:AddDropdown("CloudBrowse", {
+		Text = "Public setups",
+		Values = browseLabels,
+		Default = browseLabels[1],
+		Tooltip = "Sorted by downloads.",
+		Callback = function(selected)
+			local label = type(selected) == "table" and selected[1] or selected
+			for index, entry in ipairs(browseEntries) do
+				if browseLabels[index] == label then
+					selectedBrowseCode = tostring(entry.code or "")
+					shareCode = selectedBrowseCode
+					state.Alleral_CloudConfigCode = shareCode
+					cloudStatus:Update("Code", shareCode)
+					communityStatus:Update("Selected", shareCode)
+					saveFn()
+					task.defer(function()
+						local decoded, err = fetchRemote(shareCode)
+						if decoded then
+							updatePreviewStatus(decoded)
+							communityStatus:SetSummary(formatBrowseLabel(entry))
+						else
+							communityStatus:SetSummary(tostring(err or "Preview failed."))
+						end
+					end)
+					return
+				end
+			end
+		end,
+	})
+	community:CreateButton("Refresh community list", refreshBrowse, "Pull the latest public configs from the relay.")
+	community:CreateButton("Load into library", function()
+		if selectedBrowseCode == "" or selectedBrowseCode == "No public configs yet" then
+			setStatus("Pick a public setup first.", "warn")
 			return
 		end
-		local top = decoded.configs[1]
-		shareCode = tostring(top.code or "")
+		shareCode = selectedBrowseCode
 		state.Alleral_CloudConfigCode = shareCode
+		cloudStatus:Update("Code", shareCode)
 		saveFn()
-		Core.notify(
-			"Alleral",
-			string.format("Top pick: %s by %s [%s] · %s downloads", top.name or "?", top.author or "?", shareCode, tostring(top.downloads or 0)),
-			7,
-			"info"
-		)
-	end, "Pulls the most-downloaded public config for this game.")
+		task.defer(function()
+			local decoded, err = fetchRemote(shareCode)
+			if decoded then
+				updatePreviewStatus(decoded)
+				setStatus("Loaded " .. shareCode .. " into library.", "success")
+			else
+				setStatus(tostring(err or "Load failed."), "error")
+			end
+		end)
+	end, "Copies the selected community code into the library panel.")
+	community:CreateButton("Import selected setup", function()
+		if selectedBrowseCode == "" then
+			setStatus("Pick a public setup first.", "warn")
+			return
+		end
+		shareCode = selectedBrowseCode
+		state.Alleral_CloudConfigCode = shareCode
+		local decoded, err = fetchRemote(shareCode)
+		if not decoded then
+			setStatus(tostring(err or "Import failed."), "error")
+			return
+		end
+		local applied, applyErr = applySnapshot(decoded.data)
+		if applied then
+			updatePreviewStatus(decoded)
+			setStatus("Imported " .. tostring(decoded.name or shareCode), "success")
+		else
+			setStatus(tostring(applyErr or "Import failed."), "error")
+		end
+	end, "Imports the highlighted community setup immediately.")
 
-	return group
+	task.defer(refreshBrowse)
+
+	return library, community, cloudStatus, communityStatus
+end
+
+Core.buildCloudConfigGroup = Core.buildCloudConfigStudio
+
+function Core.buildCloudConfigTab(window, options)
+	options = type(options) == "table" and options or {}
+	window = window or options.window
+	if not window then
+		return nil
+	end
+	local tab = Core.buildUiTab(
+		{ _window = window, _ui = options.uiBundle or window._ui },
+		options.cloudTabName or "Configs",
+		options.cloudTabIcon or "cloud",
+		2
+	)
+	Core.buildCloudConfigStudio(tab, options)
+	return tab
 end
 
 function Core.normalizeWebhookUrl(url)
@@ -3226,7 +3420,7 @@ local function cacheUi(bundle)
 end
 
 function Core.loadUi()
-	local cached = ENV.Alleral_UI or ENV.Alleral_Rayfield
+	local cached = ENV.Alleral_UI
 	if uiOk(cached) then
 		return cacheUi(cached)
 	end
@@ -3347,7 +3541,7 @@ function Core.loadUi()
 end
 
 function Core.preloadUi()
-	local cached = ENV.Alleral_UI or ENV.Alleral_Rayfield
+	local cached = ENV.Alleral_UI
 	if uiOk(cached) then
 		return cacheUi(cached)
 	end
@@ -3356,7 +3550,7 @@ function Core.preloadUi()
 		while ENV._AlleralUiPreloadRunning == true and tick() - started < 15 do
 			task.wait()
 		end
-		cached = ENV.Alleral_UI or ENV.Alleral_Rayfield
+		cached = ENV.Alleral_UI
 		if uiOk(cached) then
 			return cacheUi(cached)
 		end
@@ -4050,8 +4244,6 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 	return tab
 end
 
-Core.wrapRayfieldTab = Core.wrapUiTab
-
 
 function Core.ensureCore()
 	if ENV.Alleral_Core then
@@ -4118,7 +4310,7 @@ function Core.prepareGame(state)
 	if state.AntiAFK ~= false then
 		core.setupAntiAfk(game:GetService("Players").LocalPlayer)
 	end
-	local cachedUi = ENV.Alleral_UI or ENV.Alleral_Rayfield
+	local cachedUi = ENV.Alleral_UI
 	local uiLibrary = type(cachedUi) == "table" and type(cachedUi.Library) == "table" and cachedUi or nil
 	local err
 	if not uiLibrary then

@@ -5,8 +5,6 @@ do
 		if type(g) == "table" then
 			if bridge.Alleral_UI and type(bridge.Alleral_UI.CreateWindow) == "function" then
 				g.Alleral_UI = bridge.Alleral_UI
-			elseif bridge.Alleral_Rayfield and type(bridge.Alleral_Rayfield.CreateWindow) == "function" then
-				g.Alleral_UI = bridge.Alleral_Rayfield
 			end
 			if bridge.Alleral_Core then g.Alleral_Core = bridge.Alleral_Core end
 			if bridge.Alleral_Analytics then g.Alleral_Analytics = bridge.Alleral_Analytics end
@@ -116,7 +114,7 @@ if not Tracker then
 		local loadStringLocal = env.loadstring or loadstring
 		local source
 		if type(readFileFn) == "function" and type(isFileFn) == "function" then
-			for _, path in ipairs({ "hub/analytics.luau", "core/analytics.luau", "src/analytics.luau", "analytics.luau" }) do
+			for _, path in ipairs({ "hub/analytics.luau", "analytics.luau" }) do
 				if isFileFn(path) then
 					source = readFileFn(path)
 					break

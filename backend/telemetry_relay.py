@@ -2664,9 +2664,13 @@ def fetch_shared_config(code: str):
         return jsonify({"ok": False, "error": "not_found"}), 404
     record["downloads"] = int(record.get("downloads") or 0) + 1
     record["updatedAt"] = utc_iso()
+    save_code = str(code or record.get("code") or "").strip().upper()
+    if not save_code:
+        save_code = str(code or "").strip().upper()
+    record["code"] = save_code
     try:
-        _save_shared_config(record["code"], record)
-    except OSError:
+        _save_shared_config(save_code, record)
+    except (OSError, ValueError):
         pass
     return jsonify(
         {
@@ -2692,7 +2696,11 @@ def browse_shared_configs():
     if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
         return jsonify({"ok": False, "error": "rate_limited"}), 429
     game_id = str(request.args.get("game") or request.args.get("gameId") or "").strip().lower()
-    limit = max(1, min(int(request.args.get("limit") or 20), 50))
+    raw_limit = request.args.get("limit")
+    try:
+        limit = max(1, min(int(raw_limit if raw_limit not in (None, "") else 20), 50))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "invalid_limit"}), 400
     SHARED_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     rows: list[dict[str, Any]] = []
     for path in SHARED_CONFIG_DIR.glob("*.json"):

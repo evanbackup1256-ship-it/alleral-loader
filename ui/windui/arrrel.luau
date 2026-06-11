@@ -2987,6 +2987,13 @@ return function(WindUI)
 		if layout then
 			layout.Padding = UDim.new(0, WindUI._AlleralNotifyCompact and 6 or 10)
 		end
+		local function applyNotifyLayoutPadding()
+			local activeLayout = holder:FindFirstChildWhichIsA("UIListLayout")
+			if activeLayout then
+				activeLayout.Padding = UDim.new(0, WindUI._AlleralNotifyCompact and 6 or 10)
+			end
+		end
+		WindUI._AlleralApplyNotifyPadding = applyNotifyLayoutPadding
 		holder.ChildAdded:Connect(function(wrapper)
 			local style = WindUI._AlleralPendingNotifyStyle or NOTIFY_STYLES.info
 			task.defer(function()
@@ -3645,11 +3652,13 @@ return function(WindUI)
 
 	function WindUI.SetNotificationCompact(_self, enabled)
 		WindUI._AlleralNotifyCompact = enabled == true
-		local holder = WindUI._AlleralNotifyHolder
-		if holder then
-			local layout = holder:FindFirstChildWhichIsA("UIListLayout")
+		if type(WindUI._AlleralApplyNotifyPadding) == "function" then
+			pcall(WindUI._AlleralApplyNotifyPadding)
+		else
+			local holder = WindUI._AlleralNotifyHolder
+			local layout = holder and holder:FindFirstChildWhichIsA("UIListLayout")
 			if layout then
-				layout.Padding = UDim.new(0, enabled and 5 or 8)
+				layout.Padding = UDim.new(0, WindUI._AlleralNotifyCompact and 6 or 10)
 			end
 		end
 	end

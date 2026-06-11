@@ -1416,7 +1416,6 @@ do
 		local g = getgenv()
 		if type(g) == "table" then
 			if bridge.Alleral_UI then g.Alleral_UI = bridge.Alleral_UI end
-			if bridge.Alleral_Rayfield and not g.Alleral_UI then g.Alleral_UI = bridge.Alleral_Rayfield end
 			if bridge.Alleral_Core then g.Alleral_Core = bridge.Alleral_Core end
 			if bridge.Alleral_Telemetry then g.Alleral_Telemetry = bridge.Alleral_Telemetry end
 			if bridge.Alleral_Weao then g.Alleral_Weao = bridge.Alleral_Weao end
@@ -1807,7 +1806,7 @@ local function buildManagedFiles()
 			isValid = coreValid,
 		},
 		{
-			paths = { HUB .. "/analytics.luau", "core/analytics.luau" },
+			paths = { HUB .. "/analytics.luau" },
 			expectedKey = "analytics",
 			extract = "analytics",
 		},
@@ -1827,7 +1826,7 @@ local function buildManagedFiles()
 			extract = "weao",
 		},
 		{
-			paths = { HUB .. "/security.luau", "core/security.luau" },
+			paths = { HUB .. "/security.luau" },
 			expectedKey = "security",
 			extract = "security",
 		},
@@ -2618,7 +2617,7 @@ local function main()
 			gameSrc, gameLabel = fetchGameScript(profile)
 		end,
 		function()
-			loadModule({ HUB .. "/analytics.luau", "core/analytics.luau" }, HUB .. "/analytics.luau", "Alleral_Analytics", "Alleral/analytics")
+			loadModule({ HUB .. "/analytics.luau" }, HUB .. "/analytics.luau", "Alleral_Analytics", "Alleral/analytics")
 		end,
 		function()
 			loadModule({ HUB .. "/helpers.luau", "core/game_helpers.luau" }, HUB .. "/helpers.luau", "GameHelpers", "Alleral/helpers")
@@ -2627,7 +2626,7 @@ local function main()
 			loadModule({ HUB .. "/telemetry.luau", "core/telemetry.luau" }, HUB .. "/telemetry.luau", "Alleral_Telemetry", "Alleral/telemetry")
 		end,
 		function()
-			loadModule({ HUB .. "/security.luau", "core/security.luau" }, HUB .. "/security.luau", "Alleral_Security", "Alleral/security")
+			loadModule({ HUB .. "/security.luau" }, HUB .. "/security.luau", "Alleral_Security", "Alleral/security")
 		end,
 		function()
 			loadModule({ HUB .. "/access.luau", "core/access.luau" }, HUB .. "/access.luau", "Alleral_Access", "Alleral/access")
