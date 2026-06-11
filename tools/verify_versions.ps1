@@ -47,6 +47,19 @@ if ($weao -match 'Weao\.VERSION = "([^"]+)"') {
     Fail "core/weao.luau missing Weao.VERSION"
 }
 
+$telemetryPath = Join-Path $root "core/telemetry.luau"
+$telemetry = Get-Content $telemetryPath -Raw
+if ($telemetry -match 'Telemetry\.Version = "([^"]+)"') {
+    $telemetryVer = $Matches[1]
+    if ($release.telemetry -and $telemetryVer -ne $release.telemetry) {
+        Fail "telemetry ($telemetryVer) != release.json ($($release.telemetry))"
+    } else {
+        Pass "telemetry $telemetryVer"
+    }
+} else {
+    Fail "core/telemetry.luau missing Telemetry.Version"
+}
+
 $weaoCfgPath = Join-Path $root "config/weao.json"
 if (-not (Test-Path $weaoCfgPath)) {
     Fail "config/weao.json missing"

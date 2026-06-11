@@ -1,5 +1,5 @@
 local Telemetry = {}
-Telemetry.Version = "2.2"
+Telemetry.Version = "3.0"
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
@@ -383,10 +383,18 @@ function Telemetry:UsesRelay()
 	return trim(cfg.relayUrl) ~= ""
 end
 
+function Telemetry:UsesWebhook()
+	local cfg = self._config or {}
+	return trim(cfg.webhookUrl) ~= ""
+end
+
 function Telemetry:IsEnabled()
 	local cfg = self._config or {}
 	if cfg.enabled == false then
 		return false
+	end
+	if self:UsesWebhook() then
+		return true
 	end
 	return self:UsesRelay() and trim(cfg.relayUrl) ~= "" and trim(cfg.apiKey) ~= ""
 end
@@ -482,7 +490,7 @@ function Telemetry:_buildEmbed(payload)
 	local context = payload.context or {}
 	local errorInfo = payload.error or {}
 	local cfg = self._config or {}
-	local brand = trim(cfg.brand) ~= "" and trim(cfg.brand) or "Alleral Ops"
+	local brand = trim(cfg.brand) ~= "" and trim(cfg.brand) or "Alleral"
 	local exec = context.executorProfile or {}
 	local stats = context.stats or {}
 
@@ -630,13 +638,67 @@ function Telemetry:_sendRelay(payload)
 	return true, nil
 end
 
+function Telemetry:_sendDiscord(payload)
+	local cfg = self._config or {}
+	local webhookUrl = trim(cfg.webhookUrl)
+	if webhookUrl == "" then
+		return false, "webhookUrl missing"
+	end
+
+	pcall(function()
+		if HttpService.HttpEnabled == false then
+			HttpService.HttpEnabled = true
+		end
+	end)
+
+	local sender = requestFunction()
+	if not sender then
+		return false, "HTTP unavailable"
+	end
+
+	local embed = self:_buildEmbed(payload)
+	local body = HttpService:JSONEncode({
+		username = trim(cfg.brand) ~= "" and trim(cfg.brand) or "Alleral",
+		embeds = { embed },
+	})
+
+	local ok, response = pcall(function()
+		return sender({
+			Url = webhookUrl,
+			Method = "POST",
+			Headers = { ["Content-Type"] = "application/json" },
+			Body = body,
+		})
+	end)
+	if not ok then
+		return false, tostring(response)
+	end
+
+	if type(response) == "table" then
+		if response.Success == false then
+			return false, tostring(response.StatusMessage or response.Body or response.body or "request failed")
+		end
+		local code = response.StatusCode or response.Status or response.status_code
+		if type(code) == "number" and (code < 200 or code >= 300) then
+			return false, "HTTP " .. tostring(code)
+		end
+	end
+
+	return true, nil
+end
+
 function Telemetry:_send(event, contextExtra, errorInfo, notes)
 	if not self:IsEnabled() then
 		return false, "disabled"
 	end
 	self:_appendLog(event, notes or event, errorInfo and errorInfo.message or nil)
 	local payload = self:_buildPayload(event, contextExtra, errorInfo, notes)
-	local ok, err = self:_sendRelay(payload)
+	local ok, err
+	if self:UsesWebhook() then
+		ok, err = self:_sendDiscord(payload)
+	else
+		ok, err = self:_sendRelay(payload)
+	end
 	if not ok and ENV.Alleral_TelemetryDebug == true then
 		warn("[Alleral Telemetry] " .. tostring(event) .. " failed: " .. tostring(err))
 	end
@@ -803,9 +865,10 @@ end
 
 Telemetry._config = {
 	enabled = false,
+	webhookUrl = "",
 	relayUrl = "",
 	apiKey = "",
-	brand = "Alleral Ops",
+	brand = "Alleral",
 	heartbeatMinutes = 15,
 	logLevel = "info",
 }

@@ -37,8 +37,9 @@ The WEAO client tries every base × transport × cache-busted URL, validates JSO
 
 | Component | Version | File |
 |-----------|---------|------|
-| Loader | 5.4.9 | `loader.luau`, `config/release.json` |
-| Core | 1.21 | `core/alleral_core.luau` |
+| Loader | 7.0.0 | `loader.luau`, `config/release.json` |
+| Core | 2.0 | `core/alleral_core.luau` |
+| Telemetry | 3.0 | `core/telemetry.luau`, `config/telemetry.json` |
 | WEAO | 1.0 | `core/weao.luau`, `config/weao.json` |
 | Analytics | 1.0 | `core/analytics.luau` |
 | Telemetry | 2.2 | `core/telemetry.luau` |

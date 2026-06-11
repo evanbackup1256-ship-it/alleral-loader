@@ -1,8 +1,9 @@
 return {
 	enabled = true,
-	relayUrl = "https://alleral-telemetry-production.up.railway.app/ingest",
-	apiKey = "paste-TELEMETRY_API_KEY-from-backend-env",
-	brand = "Alleral Ops",
+	webhookUrl = "",
+	relayUrl = "",
+	apiKey = "",
+	brand = "Alleral",
 	heartbeatMinutes = 15,
 	logLevel = "info",
 }

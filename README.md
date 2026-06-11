@@ -6,22 +6,22 @@ One script. Detects your game and runs it.
 
 ## Load
 
-There is **only one entry point:** `loader.luau`. Paste this in Volt and click **Execute**:
+Paste in Volt and execute:
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=" .. tick()))()
 ```
 
-You must see this line in the console:
+You should see:
 
 ```
-=== Alleral loader 5.4.11 active ===
+=== Alleral 7.0.0 active ===
 ```
 
-If you see `[Alleral Loader v3.x]` instead, you are running an **old saved script inside Volt** — not this repo. Delete every Alleral script from Volt's **Scripts / Saved** tab and use the line above.
+If you see an old version, delete saved Alleral scripts in Volt and run the line above again.
 
-Reload in the same session: `getgenv().Alleral_Reload()`
+Reload: `getgenv().Alleral_Reload()`
 
-Scan executor workspace for stale files: `getgenv().Alleral_ScanLegacy()`
+Clear cached files: `getgenv().Alleral_PurgeCache()`
 
-Purge outdated workspace cache: `getgenv().Alleral_PurgeCache()`
+Scan for old loaders: `getgenv().Alleral_ScanLegacy()`

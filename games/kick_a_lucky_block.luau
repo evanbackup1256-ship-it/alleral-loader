@@ -36,7 +36,7 @@ end
 getgenv().Alleral_State = getgenv().Alleral_State or {}
 
 if not getgenv().Alleral_Boot then
-	warn("[Alleral] run loader.luau first")
+	warn("[Alleral] load the hub first")
 	return
 end
 getgenv().Alleral_Boot = nil
@@ -319,7 +319,7 @@ local Core = getgenv().Alleral_Core
 local rayfield
 local bootErr
 if not Core or not Core.prepareGame then
-	warn("[Alleral] Core missing, run loader.luau first")
+	warn("[Alleral] Core not loaded")
 	getgenv().Alleral_StartupFailed = "Alleral_Core missing"
 	return
 end

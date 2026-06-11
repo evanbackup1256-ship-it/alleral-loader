@@ -1,5 +1,5 @@
 local Core = {}
-Core.VERSION = "1.22"
+Core.VERSION = "2.0"
 Core.UI_LIBRARY = "Rayfield"
 
 local HttpService = game:GetService("HttpService")
@@ -17,6 +17,7 @@ local RAYFIELD_LOCAL_FILES = {
 	"rayfield/source.lua",
 }
 local RAYFIELD_THEME_NAMES = {
+	"Alleral",
 	"Default",
 	"Ocean",
 	"AmberGlow",
@@ -424,7 +425,7 @@ end
 function Core.fetchWeaoExploits(forceRefresh)
 	local Weao = Core.weaoClient()
 	if not Weao then
-		return nil, "WEAO module missing — run loader.luau first"
+		return nil, "WEAO module missing"
 	end
 	local profile = Core.detectExecutor()
 	return Weao.fetchExploits({
@@ -1714,7 +1715,7 @@ function Core.prepareGame(state)
 	end
 	local core = Core.ensureCore()
 	if not core then
-		local msg = "Alleral_Core missing, run loader.luau first"
+		local msg = "Core not loaded"
 		signalBootFailure(msg)
 		return nil, nil, msg
 	end
@@ -2165,6 +2166,11 @@ function Core.buildRayfieldWindow(rayfield, settings)
 		KeySystem = false,
 	})
 	window._rayfield = rayfield
+	if type(window.ModifyTheme) == "function" then
+		pcall(function()
+			window:ModifyTheme("Alleral")
+		end)
+	end
 	return window
 end
 

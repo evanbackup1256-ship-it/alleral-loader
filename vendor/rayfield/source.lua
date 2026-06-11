@@ -316,6 +316,48 @@ end
 local RayfieldLibrary = {
  Flags = {},
  Theme = {
+ Alleral = {
+ TextColor = Color3.fromRGB(245, 247, 252),
+
+ Background = Color3.fromRGB(9, 11, 15),
+ Topbar = Color3.fromRGB(14, 18, 26),
+ Shadow = Color3.fromRGB(0, 0, 0),
+
+ NotificationBackground = Color3.fromRGB(12, 16, 22),
+ NotificationActionsBackground = Color3.fromRGB(83, 252, 24),
+
+ TabBackground = Color3.fromRGB(28, 34, 46),
+ TabStroke = Color3.fromRGB(45, 55, 72),
+ TabBackgroundSelected = Color3.fromRGB(83, 252, 24),
+ TabTextColor = Color3.fromRGB(200, 210, 225),
+ SelectedTabTextColor = Color3.fromRGB(9, 11, 15),
+
+ ElementBackground = Color3.fromRGB(18, 23, 32),
+ ElementBackgroundHover = Color3.fromRGB(24, 30, 42),
+ SecondaryElementBackground = Color3.fromRGB(12, 16, 22),
+ ElementStroke = Color3.fromRGB(45, 55, 72),
+ SecondaryElementStroke = Color3.fromRGB(35, 42, 58),
+
+ SliderBackground = Color3.fromRGB(35, 48, 64),
+ SliderProgress = Color3.fromRGB(83, 252, 24),
+ SliderStroke = Color3.fromRGB(110, 255, 60),
+
+ ToggleBackground = Color3.fromRGB(18, 23, 32),
+ ToggleEnabled = Color3.fromRGB(83, 252, 24),
+ ToggleDisabled = Color3.fromRGB(70, 78, 92),
+ ToggleEnabledStroke = Color3.fromRGB(110, 255, 60),
+ ToggleDisabledStroke = Color3.fromRGB(90, 98, 112),
+ ToggleEnabledOuterStroke = Color3.fromRGB(45, 55, 72),
+ ToggleDisabledOuterStroke = Color3.fromRGB(35, 42, 58),
+
+ DropdownSelected = Color3.fromRGB(28, 36, 50),
+ DropdownUnselected = Color3.fromRGB(18, 23, 32),
+
+ InputBackground = Color3.fromRGB(14, 18, 26),
+ InputStroke = Color3.fromRGB(45, 55, 72),
+ PlaceholderColor = Color3.fromRGB(130, 140, 158)
+ },
+
  Default = {
  TextColor = Color3.fromRGB(240, 240, 240),
 
@@ -907,7 +949,7 @@ local searchOpen = false
 local Notifications = Rayfield.Notifications
 local keybindConnections = {} -- For storing keybind connections to disconnect when Rayfield is destroyed
 
-local SelectedTheme = RayfieldLibrary.Theme.Default
+local SelectedTheme = RayfieldLibrary.Theme.Alleral
 
 local function ChangeTheme(Theme)
  if typeof(Theme) == 'string' then

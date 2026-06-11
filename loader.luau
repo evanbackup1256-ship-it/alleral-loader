@@ -3,13 +3,13 @@
 	Fetch from GitHub; do not use launch/load/bootstrap/run scripts.
 ]]
 
-local LOADER_VERSION = "5.4.11"
-local MIN_CORE = "1.18"
+local LOADER_VERSION = "7.0.0"
+local MIN_CORE = "2.0"
 local CORE_MIN_BYTES = 50000
 local RELEASE_FALLBACK = {
-	core = "1.23",
+	core = "2.0",
 	analytics = "1.0",
-	telemetry = "2.2",
+	telemetry = "3.0",
 	helpers = "1.0",
 	weao = "1.0",
 }
@@ -1014,6 +1014,72 @@ local function loadWeaoStack()
 	return false
 end
 
+local function loadReturnTable(localPaths, remotePath)
+	local src, _ = getSource(localPaths, remotePath, { minBytes = 20 })
+	if not src or not loadStringFn then
+		return nil
+	end
+	local fn, err = loadStringFn(src, "Alleral/return-module")
+	if not fn and type(load) == "function" then
+		fn, err = load(src, "Alleral/return-module")
+	end
+	if not fn then
+		return nil
+	end
+	if setfenv then
+		pcall(setfenv, fn, ENV)
+	end
+	local ok, result = pcall(fn)
+	if ok and type(result) == "table" then
+		return result
+	end
+	return nil
+end
+
+local function mergeTables(base, extra)
+	if type(base) ~= "table" then
+		base = {}
+	end
+	if type(extra) ~= "table" then
+		return base
+	end
+	for key, value in pairs(extra) do
+		base[key] = value
+	end
+	return base
+end
+
+local function loadTelemetryConfig()
+	local cfg = nil
+	local raw = select(1, httpFetch(GITHUB_RAW .. "/config/telemetry.json"))
+	cfg = decodeJson(raw)
+	if not cfg then
+		local localRaw = readLocal({ "config/telemetry.json" }, 20)
+		if localRaw then
+			cfg = decodeJson(localRaw)
+		end
+	end
+	cfg = type(cfg) == "table" and cfg or { enabled = false }
+	cfg = mergeTables(cfg, loadReturnTable({ "config/owner_telemetry.luau" }, "config/owner_telemetry.luau"))
+	ENV.Alleral_OwnerTelemetry = cfg
+	return cfg
+end
+
+local function wireTelemetry(profile)
+	local telemetry = ENV.Alleral_Telemetry
+	if type(telemetry) ~= "table" or type(telemetry.IsEnabled) ~= "function" or not telemetry:IsEnabled() then
+		return
+	end
+	log("Telemetry on")
+	local meta = {
+		gameId = profile and profile.id,
+		scriptVersion = profile and profile.version,
+	}
+	telemetry:ReportInject("start", meta)
+	telemetry:ReportSessionStart(meta)
+	telemetry:StartHeartbeat()
+end
+
 local ENV_BRIDGE = [=[
 do
 	local bridge = shared
@@ -1283,6 +1349,10 @@ local function buildManagedFiles()
 		},
 		{
 			paths = { "config/weao.json" },
+			purgeOnLoaderChange = true,
+		},
+		{
+			paths = { "config/telemetry.json" },
 			purgeOnLoaderChange = true,
 		},
 		{
@@ -1750,10 +1820,11 @@ local function main()
 		return
 	end
 
+	loadTelemetryConfig()
 	loadModule({ "core/analytics.luau" }, "core/analytics.luau", "Alleral_Analytics", "Alleral/analytics")
 	loadModule({ "core/game_helpers.luau" }, "core/game_helpers.luau", "GameHelpers", "Alleral/helpers")
-	loadModule({ "config/owner_telemetry.luau" }, "config/owner_telemetry.luau", nil, "Alleral/owner-telemetry")
 	loadModule({ "core/telemetry.luau" }, "core/telemetry.luau", "Alleral_Telemetry", "Alleral/telemetry")
+	wireTelemetry(profile)
 
 	if ENV.Alleral_Core and type(ENV.Alleral_Core.loadRayfield) == "function" then
 		local ui, uiErr = ENV.Alleral_Core.loadRayfield()
@@ -1790,7 +1861,17 @@ local function main()
 	end
 	if ENV.Alleral_StartupFailed then
 		notify("Alleral", tostring(ENV.Alleral_StartupFailed), 8)
+		if ENV.Alleral_Telemetry and ENV.Alleral_Telemetry.ReportInject then
+			ENV.Alleral_Telemetry:ReportInject("failed", { error = tostring(ENV.Alleral_StartupFailed) })
+		end
 		return
+	end
+
+	if ENV.Alleral_Telemetry and ENV.Alleral_Telemetry.ReportInject then
+		ENV.Alleral_Telemetry:ReportInject("loaded", {
+			gameId = profile.id,
+			scriptVersion = profile.version,
+		})
 	end
 
 	recordInstalledVersions()
@@ -1835,7 +1916,7 @@ ENV.Alleral_PurgeCache = function()
 	print("[Alleral v" .. LOADER_VERSION .. "] Workspace cache purge complete")
 end
 
-print("=== Alleral loader " .. LOADER_VERSION .. " active ===")
+print("=== Alleral " .. LOADER_VERSION .. " active ===")
 print("[Alleral] v" .. LOADER_VERSION .. " | PlaceId " .. tostring(game.PlaceId) .. " | executor=" .. EXECUTOR.slug)
 
 local ok, err = pcall(main)
