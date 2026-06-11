@@ -6,9 +6,25 @@ One loader — detects your game by PlaceId and runs the matching script.
 
 ## Load
 
-> **Stuck on v3.8.6 or core fetch fails?** Re-run the **remote** snippet below (not `readfile`). v3.8.8 uses `Volt.request` directly for core downloads.
+### Stuck on v3.8.6 / core fetch fails? (Volt)
 
-**Local workspace** (full repo required — needs `core/` folder):
+**Paste `load.luau` once** — open the file, copy all, Execute in Volt. It downloads core + latest loader, saves `loader.luau` to your workspace, and runs.
+
+```lua
+loadstring(readfile("load.luau"))()
+```
+
+Or copy/paste the contents of [load.luau](load.luau) directly into Volt and click Execute.
+
+After that works, use:
+
+```lua
+loadstring(readfile("loader.luau"))()
+```
+
+### Normal load
+
+**Local workspace** (full repo with `core/` optional — core is embedded in loader v3.9.0+):
 
 ```lua
 loadstring(readfile("loader.luau"))()
@@ -20,30 +36,25 @@ loadstring(readfile("loader.luau"))()
 (function()
 	local g = (getgenv and getgenv()) or {}
 	local L = g.loadstring or g.LoadString or loadstring or load
-	local url = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=" .. tick()
+	local url = "https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/loader.luau?t=" .. tick()
 	local src
 	if type(L) ~= "function" then
 		return warn("[Alleral] This executor needs loadstring.")
 	end
-	if type(game.HttpGet) == "function" then
+	if type(g.Volt) == "table" and type(g.Volt.request) == "function" then
+		pcall(function()
+			local res = g.Volt.request({ Url = url, Method = "GET" })
+			src = res and (res.Body or res.body)
+		end)
+	end
+	if type(src) ~= "string" and type(game.HttpGet) == "function" then
 		pcall(function()
 			src = game.HttpGet(game, url, true)
 		end)
-		if type(src) ~= "string" then
-			pcall(function()
-				src = game.HttpGet(game, url)
-			end)
-		end
 	end
 	if type(src) ~= "string" then
 		pcall(function()
 			src = game:HttpGet(url, true)
-		end)
-	end
-	if type(src) ~= "string" and g.Volt and type(g.Volt.request) == "function" then
-		pcall(function()
-			local res = g.Volt.request({ Url = url, Method = "GET" })
-			src = res and (res.Body or res.body)
 		end)
 	end
 	if type(src) ~= "string" and type(g.request) == "function" then
@@ -68,7 +79,8 @@ Reload: `getgenv().Alleral_Reload()` · Debug: `getgenv().Alleral_LoaderInfo()`
 ## Layout
 
 ```
-loader.luau          ← only entry point
+loader.luau          ← main entry (core embedded)
+load.luau            ← one-time Volt rescue script
 core/                ← shared UI, helpers, telemetry
 games/               ← one script per supported game
 ```
