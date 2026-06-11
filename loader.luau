@@ -1520,7 +1520,7 @@ local GAMES = {
 	{
 		id = "build_a_ring_farm",
 		name = "Build A Ring Farm",
-		version = "1.2",
+		version = "1.2.1",
 		placeIds = { 107646426076756 },
 		scriptFiles = { "games/build_a_ring_farm.luau", "build_a_ring_farm.luau" },
 		scriptUrl = "games/build_a_ring_farm.luau",

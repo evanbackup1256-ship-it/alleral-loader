@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "1.2"
+local VERSION = "1.2.1"
 local state = getgenv().Alleral_State
 local connections = {}
 local loops = {}
@@ -130,40 +130,49 @@ local runtime = {
 	afkSpinStarted = false,
 }
 
-local Remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
-local RollSeedsRemote = Remotes and Remotes:WaitForChild("RollSeeds", 5)
-local BuySeedRemote = Remotes and Remotes:WaitForChild("BuySeed", 5)
-local DiscardSeedRemote = Remotes and Remotes:WaitForChild("DiscardSeed", 5)
-local PlantSeedRemote = Remotes and Remotes:WaitForChild("PlantSeed", 5)
-local UnlockPlotRemote = Remotes and Remotes:WaitForChild("UnlockPlot", 5)
-local SellCratesRemote = Remotes and Remotes:WaitForChild("SellCrates", 5)
-local PlotRemotes = Remotes and Remotes:WaitForChild("Plot", 5)
-local GetPlotRemote = PlotRemotes and PlotRemotes:WaitForChild("GetPlot", 5)
-local UpgradePlantRemote = Remotes:WaitForChild("UpgradePlant")
-local RemovePlantRemote = Remotes:WaitForChild("RemovePlant")
-local UpgradeSeedRollsRemote = Remotes:WaitForChild("UpgradeSeedRolls")
-local UpgradeSeedLuckRemote = Remotes:WaitForChild("UpgradeSeedLuck")
-local UpgradeFarmRemote = Remotes:WaitForChild("UpgradeFarm")
-local GearTransactionRemote = Remotes:WaitForChild("Gear"):WaitForChild("Transaction")
-local PlotUpgradeTransactionRemote = Remotes:WaitForChild("PlotUpgradeTransaction")
-local EggShopTransactionRemote = Remotes:WaitForChild("EggShop"):WaitForChild("Transaction")
-local ComposterRemotes = Remotes:WaitForChild("Composter")
-local ComposterInsertRemote = ComposterRemotes:WaitForChild("InsertSeed")
-local ComposterPullLeverRemote = ComposterRemotes:WaitForChild("PullLever")
-local ComposterRequestStateRemote = ComposterRemotes:WaitForChild("RequestState")
-local RollEggRemote = Remotes:WaitForChild("RollEgg")
-local EquipToolRemote = Remotes:WaitForChild("EquipTool")
-local UseSprayRemote = Remotes:WaitForChild("UseSpray")
-local UseFertilizerRemote = Remotes:WaitForChild("UseFertilizer")
-local UsePetTreatRemote = Remotes:WaitForChild("UsePetTreat")
-local ContractsFolder = ReplicatedStorage:WaitForChild("Contracts"):WaitForChild("RF")
-local ContractSubmitRemote = ContractsFolder:WaitForChild("Submit")
-local ContractRerollRemote = ContractsFolder:WaitForChild("Reroll")
-local PetsRemotes = Remotes:WaitForChild("Pets")
-local EquipPetRemote = PetsRemotes:WaitForChild("EquipPet")
-local UnequipPetRemote = PetsRemotes:FindFirstChild("UnequipPet")
-local SellPetRemote = PetsRemotes:WaitForChild("SellPet")
-local PlantRushBuyRemote = Remotes:FindFirstChild("PlantRush") and Remotes.PlantRush:FindFirstChild("BuyShopItem")
+local function waitChild(parent, name, timeout)
+	if not parent then
+		return nil
+	end
+	return parent:WaitForChild(name, timeout or 5)
+end
+
+local Remotes = waitChild(ReplicatedStorage, "Remotes", 10)
+local RollSeedsRemote = Remotes and waitChild(Remotes, "RollSeeds", 5)
+local BuySeedRemote = Remotes and waitChild(Remotes, "BuySeed", 5)
+local DiscardSeedRemote = Remotes and waitChild(Remotes, "DiscardSeed", 5)
+local PlantSeedRemote = Remotes and waitChild(Remotes, "PlantSeed", 5)
+local UnlockPlotRemote = Remotes and waitChild(Remotes, "UnlockPlot", 5)
+local SellCratesRemote = Remotes and waitChild(Remotes, "SellCrates", 5)
+local PlotRemotes = Remotes and waitChild(Remotes, "Plot", 5)
+local GetPlotRemote = PlotRemotes and waitChild(PlotRemotes, "GetPlot", 5)
+local UpgradePlantRemote = Remotes and waitChild(Remotes, "UpgradePlant", 5)
+local RemovePlantRemote = Remotes and waitChild(Remotes, "RemovePlant", 5)
+local UpgradeSeedRollsRemote = Remotes and waitChild(Remotes, "UpgradeSeedRolls", 5)
+local UpgradeSeedLuckRemote = Remotes and waitChild(Remotes, "UpgradeSeedLuck", 5)
+local UpgradeFarmRemote = Remotes and waitChild(Remotes, "UpgradeFarm", 5)
+local GearRemotes = Remotes and waitChild(Remotes, "Gear", 5)
+local GearTransactionRemote = GearRemotes and waitChild(GearRemotes, "Transaction", 5)
+local PlotUpgradeTransactionRemote = Remotes and waitChild(Remotes, "PlotUpgradeTransaction", 5)
+local EggShopRemotes = Remotes and waitChild(Remotes, "EggShop", 5)
+local EggShopTransactionRemote = EggShopRemotes and waitChild(EggShopRemotes, "Transaction", 5)
+local ComposterRemotes = Remotes and waitChild(Remotes, "Composter", 5)
+local ComposterInsertRemote = ComposterRemotes and waitChild(ComposterRemotes, "InsertSeed", 5)
+local ComposterPullLeverRemote = ComposterRemotes and waitChild(ComposterRemotes, "PullLever", 5)
+local ComposterRequestStateRemote = ComposterRemotes and waitChild(ComposterRemotes, "RequestState", 5)
+local RollEggRemote = Remotes and waitChild(Remotes, "RollEgg", 5)
+local EquipToolRemote = Remotes and waitChild(Remotes, "EquipTool", 5)
+local UseSprayRemote = Remotes and waitChild(Remotes, "UseSpray", 5)
+local UseFertilizerRemote = Remotes and waitChild(Remotes, "UseFertilizer", 5)
+local UsePetTreatRemote = Remotes and waitChild(Remotes, "UsePetTreat", 5)
+local ContractsFolder = waitChild(waitChild(ReplicatedStorage, "Contracts", 5), "RF", 5)
+local ContractSubmitRemote = ContractsFolder and waitChild(ContractsFolder, "Submit", 5)
+local ContractRerollRemote = ContractsFolder and waitChild(ContractsFolder, "Reroll", 5)
+local PetsRemotes = Remotes and waitChild(Remotes, "Pets", 5)
+local EquipPetRemote = PetsRemotes and waitChild(PetsRemotes, "EquipPet", 5)
+local UnequipPetRemote = PetsRemotes and PetsRemotes:FindFirstChild("UnequipPet")
+local SellPetRemote = PetsRemotes and PetsRemotes:FindFirstChild("SellPet")
+local PlantRushBuyRemote = Remotes and Remotes:FindFirstChild("PlantRush") and Remotes.PlantRush:FindFirstChild("BuyShopItem")
 
 local DataReplicator, Configuration, SharedUtils, EconomyTuning
 pcall(function()
@@ -186,12 +195,13 @@ end)
 
 local CompostCooldownClient
 pcall(function()
-	CompostCooldownClient = require(
-		LocalPlayer:WaitForChild("PlayerScripts")
-			:WaitForChild("ClientLoader")
-			:WaitForChild("Handlers")
-			:WaitForChild("CompostCooldownClient")
-	)
+	local playerScripts = LocalPlayer:WaitForChild("PlayerScripts", 10)
+	local clientLoader = playerScripts and playerScripts:WaitForChild("ClientLoader", 10)
+	local handlers = clientLoader and clientLoader:WaitForChild("Handlers", 10)
+	local mod = handlers and handlers:FindFirstChild("CompostCooldownClient")
+	if mod then
+		CompostCooldownClient = require(mod)
+	end
 end)
 
 local PlantRushShooter
