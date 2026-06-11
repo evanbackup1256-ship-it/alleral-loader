@@ -1,9 +1,12 @@
 --[[
-	Alleral bootstrap — always run THIS via loadstring + HttpGet (with ?t=tick() cache bust).
-	Do not save/cache loader.luau in your executor; use this entry point every time.
+	Alleral bootstrap — single entry point for players.
+	Always fetches fresh modules via multiple CDN mirrors automatically.
 ]]
-local REPO = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
-local JSdelivr = "https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main"
+local GITHUB_REPO = "evanbackup1256-ship-it/kick"
+local REPO_BRANCH = "main"
+local REPO = "https://raw.githubusercontent.com/" .. GITHUB_REPO .. "/" .. REPO_BRANCH
+local JSdelivr = "https://cdn.jsdelivr.net/gh/" .. GITHUB_REPO .. "@" .. REPO_BRANCH
+local GITHUB_WEB_RAW = "https://github.com/" .. GITHUB_REPO .. "/raw/" .. REPO_BRANCH
 local DEFAULT_TELEMETRY_RELAY = "https://alleral-telemetry-production.up.railway.app/ingest"
 local MIN_LOADER_PARTS = { 3, 7, 0 }
 
@@ -209,41 +212,70 @@ local function readLocalLoader()
 	return nil, nil, nil
 end
 
+local function releaseCommit()
+	for _, source in ipairs({
+		JSdelivr .. "/config/release.json",
+		REPO .. "/config/release.json",
+		GITHUB_WEB_RAW .. "/config/release.json",
+	}) do
+		local body = fetchRemote(source)
+		if body then
+			local commit = body:match('"commit"%s*:%s*"([^"]+)"')
+			if commit and commit ~= "" and commit ~= "HEAD" then
+				return commit
+			end
+		end
+	end
+	return nil
+end
+
+local function buildLoaderSources(commit)
+	local sources = {}
+	if commit then
+		table.insert(sources, "https://cdn.jsdelivr.net/gh/" .. GITHUB_REPO .. "@" .. commit .. "/loader.luau")
+		table.insert(sources, "https://raw.githubusercontent.com/" .. GITHUB_REPO .. "/" .. commit .. "/loader.luau")
+	end
+	table.insert(sources, JSdelivr .. "/loader.luau")
+	table.insert(sources, GITHUB_WEB_RAW .. "/loader.luau")
+	table.insert(sources, REPO .. "/loader.luau")
+	return sources
+end
+
 local function fetchLoaderBody()
 	local localBody, localLabel, localVersion = readLocalLoader()
 	if localBody then
 		return localBody, localLabel, localVersion
 	end
 
-	local remoteSources = {
-		JSdelivr .. "/loader.luau",
-		REPO .. "/loader.luau",
-	}
+	local commit = releaseCommit()
+	local remoteSources = buildLoaderSources(commit)
 	local lastReason = "download failed"
 
-	for _, source in ipairs(remoteSources) do
-		for attempt = 1, 4 do
-			local body = fetchRemote(source)
-			if body then
-				local valid, version, reason = loaderBodyValid(body)
-				if valid then
-					local label = source:find("jsdelivr", 1, true) and "jsdelivr" or "github"
-					return body, label, version
+	for round = 1, 2 do
+		for _, source in ipairs(remoteSources) do
+			for attempt = 1, 3 do
+				local body = fetchRemote(source)
+				if body then
+					local valid, version, reason = loaderBodyValid(body)
+					if valid then
+						local label = source:find("jsdelivr", 1, true) and "jsdelivr"
+							or (source:find("/raw/", 1, true) and "github-web" or "github-raw")
+						return body, label, version
+					end
+					lastReason = reason or ("invalid v" .. tostring(version))
 				end
-				lastReason = reason or ("invalid v" .. tostring(version))
+				if typeof(task) == "table" and type(task.wait) == "function" then
+					task.wait(0.35 * attempt)
+				end
 			end
-			if typeof(task) == "table" and type(task.wait) == "function" then
-				task.wait(0.35 * attempt)
-			end
+		end
+		if round == 1 then
+			commit = releaseCommit()
+			remoteSources = buildLoaderSources(commit)
 		end
 	end
 
-	local hint = " Your executor cached an OLD loader (v3.5.x Starlight). "
-		.. "Delete any saved/autoexec loader.luau and run launch.luau with ?t=tick()."
-	if typeof(isfile) == "function" and typeof(readfile) == "function" then
-		hint = hint .. " Or attach this repo as your Volt workspace so local loader.luau is used."
-	end
-	error("[Alleral Bootstrap] Could not fetch Rayfield loader (3.7+). Last issue: " .. lastReason .. hint)
+	error("[Alleral Bootstrap] Could not load Alleral. Please rejoin and try again.")
 end
 
 local g = typeof(getgenv) == "function" and getgenv() or {}
@@ -253,6 +285,7 @@ if type(g) == "table" then
 	g.Alleral_UI = nil
 	g.Alleral_Starlight = nil
 	g.Alleral_LoaderVersion = nil
+	g._Alleral_AutoRecoveryAttempted = nil
 	preloadOwnerTelemetry(g)
 end
 

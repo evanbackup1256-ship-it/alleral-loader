@@ -1,10 +1,15 @@
-local LOADER_VERSION = "3.7.3"
+local LOADER_VERSION = "3.7.4"
 local REQUIRED_CORE_VERSION = "1.17"
 local REQUIRED_UI_LIBRARY = "Rayfield"
-local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
-local SCRIPT_MANIFEST_URL = REPO_BASE .. "/config/scripts_manifest.json"
-local FETCH_RETRIES = 3
-local FETCH_BACKOFF = 0.75
+local GITHUB_REPO = "evanbackup1256-ship-it/kick"
+local REPO_BRANCH = "main"
+local REPO_BASE = "https://raw.githubusercontent.com/" .. GITHUB_REPO .. "/" .. REPO_BRANCH
+local JSDELIVR_BASE = "https://cdn.jsdelivr.net/gh/" .. GITHUB_REPO .. "@" .. REPO_BRANCH
+local GITHUB_WEB_RAW = "https://github.com/" .. GITHUB_REPO .. "/raw/" .. REPO_BRANCH
+local SCRIPT_MANIFEST_PATH = "config/scripts_manifest.json"
+local SCRIPT_MANIFEST_URL = JSDELIVR_BASE .. "/" .. SCRIPT_MANIFEST_PATH
+local FETCH_RETRIES = 4
+local FETCH_BACKOFF = 0.5
 local MIN_SCRIPT_BYTES = 1000
 
 local SHARED_CORE_FILES = {
@@ -49,12 +54,16 @@ local OWNER_TELEMETRY_ENV_FILES = {
 	"config/telemetry.env",
 }
 local TELEMETRY_MODULE_VERSION = "2.2"
-local SHARED_CORE_URL = REPO_BASE .. "/core/alleral_core.luau"
-local SHARED_ANALYTICS_URL = REPO_BASE .. "/core/analytics.luau"
-local SHARED_TELEMETRY_URL = REPO_BASE .. "/core/telemetry.luau"
-local SHARED_HELPERS_URL = REPO_BASE .. "/core/game_helpers.luau"
+local SHARED_CORE_PATH = "core/alleral_core.luau"
+local SHARED_ANALYTICS_PATH = "core/analytics.luau"
+local SHARED_TELEMETRY_PATH = "core/telemetry.luau"
+local SHARED_HELPERS_PATH = "core/game_helpers.luau"
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = nil
+pcall(function()
+	HttpService = game:GetService("HttpService")
+end)
 local Workspace = game:GetService("Workspace")
 
 local function genv()
@@ -180,7 +189,7 @@ local GAMES = {
 			"kick_a_lucky_block.luau",
 			"kick a lucky block.luau",
 		},
-		scriptUrl = REPO_BASE .. "/games/kick_a_lucky_block.luau",
+		scriptUrl = "games/kick_a_lucky_block.luau",
 		sourceMarker = "Alleral_Rayfield",
 		preload = function()
 			waitForPath(ReplicatedStorage, { "Shared" }, 20)
@@ -211,7 +220,7 @@ local GAMES = {
 			"src/speed_keyboard_escape.luau",
 			"speed_keyboard_escape.luau",
 		},
-		scriptUrl = REPO_BASE .. "/games/speed_keyboard_escape.luau",
+		scriptUrl = "games/speed_keyboard_escape.luau",
 		preload = function()
 			waitForPath(ReplicatedStorage, { "Remotes" }, 20)
 			return true
@@ -235,7 +244,7 @@ local GAMES = {
 			"src/slime_rng.luau",
 			"slime_rng.luau",
 		},
-		scriptUrl = REPO_BASE .. "/games/slime_rng.luau",
+		scriptUrl = "games/slime_rng.luau",
 		preload = function()
 			waitForPath(ReplicatedStorage, { "Packages", "DataService" }, 25)
 			return true
@@ -284,7 +293,7 @@ local GAMES = {
 			"src/survive_a_zombie_arena.luau",
 			"survive_a_zombie_arena.luau",
 		},
-		scriptUrl = REPO_BASE .. "/games/survive_a_zombie_arena.luau",
+		scriptUrl = "games/survive_a_zombie_arena.luau",
 		preload = function()
 			waitForPath(ReplicatedStorage, { "ZombieRemotes", "ZombieDamage" }, 20)
 			waitForPath(ReplicatedStorage, { "WaveRemotes", "SkipVote" }, 15)
@@ -416,6 +425,33 @@ local function markerMatches(body, marker)
 	return body:find(marker, 1, true) ~= nil
 end
 
+local function repoRelativePath(urlOrPath)
+	local path = tostring(urlOrPath or "")
+	if path:find("^https?://") then
+		local stripped = path
+			:gsub("^https://raw%.githubusercontent%.com/" .. GITHUB_REPO:gsub("%-", "%%-") .. "/[^/]+/", "")
+			:gsub("^https://cdn%.jsdelivr%.net/gh/" .. GITHUB_REPO:gsub("%-", "%%-") .. "/@[^/]+/", "")
+			:gsub("^https://github%.com/" .. GITHUB_REPO:gsub("%-", "%%-") .. "/raw/[^/]+/", "")
+		if stripped ~= path then
+			return stripped
+		end
+	end
+	return path:gsub("^/", "")
+end
+
+local function mirrorLabel(url)
+	if url:find("jsdelivr", 1, true) then
+		return "jsdelivr"
+	end
+	if url:find("github%.com/.+/raw/", 1) then
+		return "github-web"
+	end
+	if url:find("raw%.githubusercontent%.com", 1) then
+		return "github-raw"
+	end
+	return "remote"
+end
+
 local function withCacheBust(url, nonce)
 	local sep = url:find("?") and "&" or "?"
 	return url
@@ -430,7 +466,78 @@ local function withCacheBust(url, nonce)
 		.. tostring(math.random(100000, 999999))
 end
 
-local function fetchRemote(url, label, marker)
+local function buildMirrorUrls(relativePath)
+	relativePath = repoRelativePath(relativePath)
+	local urls = {}
+	local commit = ENV._Alleral_ReleaseCommit
+	if type(commit) == "string" and commit ~= "" and commit ~= "HEAD" then
+		table.insert(urls, "https://cdn.jsdelivr.net/gh/" .. GITHUB_REPO .. "@" .. commit .. "/" .. relativePath)
+		table.insert(urls, "https://raw.githubusercontent.com/" .. GITHUB_REPO .. "/" .. commit .. "/" .. relativePath)
+	end
+	table.insert(urls, JSDELIVR_BASE .. "/" .. relativePath)
+	table.insert(urls, GITHUB_WEB_RAW .. "/" .. relativePath)
+	table.insert(urls, REPO_BASE .. "/" .. relativePath)
+	return urls
+end
+
+local function httpFetchBody(url, nonce)
+	local fetchUrl = withCacheBust(url, nonce)
+	if httpRequest then
+		local ok, response = pcall(httpRequest, {
+			Url = fetchUrl,
+			Method = "GET",
+			Headers = {
+				["Cache-Control"] = "no-cache, no-store, must-revalidate",
+				["Pragma"] = "no-cache",
+			},
+		})
+		if ok and response then
+			local status = response.StatusCode or response.status or 0
+			local body = response.Body or response.body or ""
+			if status >= 200 and status < 300 and body ~= "" and not body:find("404: Not Found", 1, true) then
+				return body
+			end
+		end
+	end
+	if type(game.HttpGet) == "function" then
+		local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
+		if ok and body and body ~= "" and not body:find("404: Not Found", 1, true) then
+			return body
+		end
+	end
+	return nil
+end
+
+local function ensureReleaseManifest(forceRefresh)
+	if ENV._Alleral_ReleaseLoaded and not forceRefresh then
+		return
+	end
+	for _, url in ipairs(buildMirrorUrls("config/release.json")) do
+		for attempt = 1, 2 do
+			local body = httpFetchBody(url, tick() + attempt)
+			if body and not body:find("404: Not Found", 1, true) then
+				local commit = body:match('"commit"%s*:%s*"([^"]+)"')
+				if commit and commit ~= "" and commit ~= "HEAD" then
+					ENV._Alleral_ReleaseCommit = commit
+				end
+				if HttpService then
+					local ok, decoded = pcall(function()
+						return HttpService:JSONDecode(body)
+					end)
+					if ok and type(decoded) == "table" and type(decoded.commit) == "string" then
+						if decoded.commit ~= "" and decoded.commit ~= "HEAD" then
+							ENV._Alleral_ReleaseCommit = decoded.commit
+						end
+					end
+				end
+				ENV._Alleral_ReleaseLoaded = true
+				return
+			end
+		end
+	end
+end
+
+local function fetchRemoteMirrors(urls, label, marker)
 	local lastErr = nil
 	local nonces = {
 		tick(),
@@ -438,96 +545,77 @@ local function fetchRemote(url, label, marker)
 		os.time(),
 		os.time() + 1,
 		math.random(100000, 999999),
+		math.random(100000, 999999),
 	}
 
-	for attempt = 1, #nonces do
-		local fetchUrl = withCacheBust(url, nonces[attempt])
-
-		if type(game.HttpGet) == "function" then
-			local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
-			if ok and body and body ~= "" and not body:find("404: Not Found") then
+	for _, baseUrl in ipairs(urls) do
+		for attempt = 1, math.min(FETCH_RETRIES, #nonces) do
+			local body = httpFetchBody(baseUrl, nonces[attempt])
+			if body and body ~= "" then
 				if markerMatches(body, marker) then
-					return body, nil
+					return body, mirrorLabel(baseUrl)
 				end
-				lastErr = label .. " HttpGet response looked cached/outdated"
-			end
-		end
-
-		if httpRequest then
-			local ok, response = pcall(httpRequest, {
-				Url = fetchUrl,
-				Method = "GET",
-				Headers = {
-					["Cache-Control"] = "no-cache, no-store, must-revalidate",
-					["Pragma"] = "no-cache",
-				},
-			})
-			if ok and response then
-				local status = response.StatusCode or response.status or 0
-				local body = response.Body or response.body or ""
-				if status >= 200 and status < 300 and body ~= "" then
-					if markerMatches(body, marker) then
-						return body, nil
-					end
-					lastErr = label .. " response looked cached/outdated"
-				else
-					lastErr = string.format("%s HTTP %s (empty=%s)", label, tostring(status), tostring(body == ""))
-				end
+				lastErr = label .. " mirror returned stale payload (" .. mirrorLabel(baseUrl) .. ")"
 			else
-				lastErr = tostring(response)
+				lastErr = label .. " download failed (" .. mirrorLabel(baseUrl) .. ")"
 			end
-		end
-
-		if attempt < #nonces then
-			task.wait(FETCH_BACKOFF * attempt)
+			if attempt < FETCH_RETRIES then
+				task.wait(FETCH_BACKOFF * attempt)
+			end
 		end
 	end
 
-	return nil, lastErr or "Download failed"
+	return nil, lastErr or (label .. " download failed")
 end
 
-local function resolveFromFiles(files, label, url, marker)
+local function resolveLocalMarked(files, marker)
+	if not CAPABILITIES.readfile then
+		return nil, nil
+	end
+	for _, file in ipairs(files) do
+		local source = readLocalFile(file)
+		if source and markerMatches(source, marker) then
+			return source, "local:" .. file
+		end
+	end
+	for _, hit in ipairs(discoverLocalFiles(files)) do
+		if markerMatches(hit.source, marker) then
+			return hit.source, "discovered:" .. hit.path
+		end
+	end
+	return nil, nil
+end
+
+local function resolveFromFiles(files, label, urlOrPath, marker)
 	local devMode = ENV.Alleral_DevMode == true
 	local preferLocal = devMode or ENV.Alleral_PreferLocal == true
-	if preferLocal and CAPABILITIES.readfile then
-		for _, file in ipairs(files) do
-			local source = readLocalFile(file)
-			if source then
-				return source, "local:" .. file
-			end
-		end
-		if devMode then
-			for _, hit in ipairs(discoverLocalFiles(files)) do
-				return hit.source, "discovered:" .. hit.path
-			end
+	if preferLocal then
+		local localSource, localLabel = resolveLocalMarked(files, marker)
+		if localSource then
+			return localSource, localLabel
 		end
 	end
-	if url then
-		local source, err = fetchRemote(url, label, marker)
-		if source then
-			return source, url
-		end
-		if CAPABILITIES.readfile then
-			local staleRemote = err and tostring(err):find("cached/outdated", 1, true)
-			if staleRemote or marker then
-				for _, file in ipairs(files) do
-					local localSource = readLocalFile(file)
-					if localSource and markerMatches(localSource, marker) then
-						if staleRemote then
-							log("warn", label .. " remote cache stale; using local " .. file)
-						else
-							log("info", label .. " using local " .. file)
-						end
-						return localSource, "local:" .. file
-					end
-				end
-			end
-		end
-		if not devMode then
-			return nil, err
+
+	ensureReleaseManifest(false)
+	local mirrors = buildMirrorUrls(urlOrPath)
+	local source, mirrorLabel = fetchRemoteMirrors(mirrors, label, marker)
+	if source then
+		return source, mirrorLabel
+	end
+
+	local localSource, localLabel = resolveLocalMarked(files, marker)
+	if localSource then
+		log("info", label .. " loaded from " .. localLabel .. " (remote mirrors stale)")
+		return localSource, localLabel
+	end
+
+	if devMode then
+		for _, hit in ipairs(discoverLocalFiles(files)) do
+			return hit.source, "discovered:" .. hit.path
 		end
 	end
-	return nil, "No " .. label .. " source found"
+
+	return nil, label .. " unavailable after mirror retries"
 end
 
 local ENV_BRIDGE = [=[
@@ -681,33 +769,45 @@ local function preloadCore(required)
 	ENV.Alleral_Core = nil
 	ENV.Alleral_Rayfield = nil
 	ENV.Alleral_UI = nil
-	local source, sourceLabel = resolveFromFiles(
-		SHARED_CORE_FILES,
-		"core",
-		SHARED_CORE_URL,
-		coreSourceMarker()
-	)
-	if not source then
-		if required then
+
+	for attempt = 1, 2 do
+		if attempt > 1 then
+			log("info", "Retrying core download from alternate mirrors...")
+			ENV._Alleral_ReleaseLoaded = nil
+			ensureReleaseManifest(true)
+			task.wait(FETCH_BACKOFF * 2)
+		end
+
+		local source, sourceLabel = resolveFromFiles(
+			SHARED_CORE_FILES,
+			"core",
+			SHARED_CORE_PATH,
+			coreSourceMarker()
+		)
+		if source then
+			local ok, err = compileAndRun(source, "Alleral/core")
+			if ok and coreVersionOk(ENV.Alleral_Core) then
+				log("info", "Core loaded from " .. sourceLabel .. " (v" .. tostring(ENV.Alleral_Core.VERSION) .. ")")
+				return true
+			end
+			ENV.Alleral_Core = nil
+			if required and attempt == 2 then
+				return false, err or "Core failed to initialize"
+			end
+		elseif required and attempt == 2 then
 			return false, sourceLabel
 		end
-		log("warn", "Core skipped: " .. tostring(sourceLabel))
-		return false
 	end
-	local ok, err = compileAndRun(source, "Alleral/core")
-	if ok and ENV.Alleral_Core then
-		log("info", "Core loaded from " .. sourceLabel .. " (v" .. tostring(ENV.Alleral_Core.VERSION) .. ")")
-		return true
-	end
+
 	if required then
-		return false, err or "Core failed to initialize"
+		return false, "Core unavailable"
 	end
-	log("warn", "Core failed: " .. tostring(err))
+	log("warn", "Core skipped")
 	return false
 end
 
 local function preloadAnalytics()
-	local source, sourceLabel = resolveFromFiles(SHARED_ANALYTICS_FILES, "analytics", SHARED_ANALYTICS_URL, "Alleral_Analytics")
+	local source, sourceLabel = resolveFromFiles(SHARED_ANALYTICS_FILES, "analytics", SHARED_ANALYTICS_PATH, "Alleral_Analytics")
 	if not source then
 		log("warn", "Analytics skipped: " .. tostring(sourceLabel))
 		return false
@@ -859,7 +959,7 @@ local function preloadHelpers()
 	if ENV.Alleral_GameHelpers and ENV.Alleral_GameHelpers.VERSION == "1.0" then
 		return true
 	end
-	local source, sourceLabel = resolveFromFiles(SHARED_HELPERS_FILES, "helpers", SHARED_HELPERS_URL, "Alleral_GameHelpers")
+	local source, sourceLabel = resolveFromFiles(SHARED_HELPERS_FILES, "helpers", SHARED_HELPERS_PATH, "Alleral_GameHelpers")
 	if not source then
 		log("warn", "Game helpers skipped: " .. tostring(sourceLabel))
 		return false
@@ -879,7 +979,7 @@ local function preloadTelemetry()
 	local source, sourceLabel = resolveFromFiles(
 		SHARED_TELEMETRY_FILES,
 		"telemetry",
-		SHARED_TELEMETRY_URL,
+		SHARED_TELEMETRY_PATH,
 		telemetrySourceMarker()
 	)
 	if not source then
@@ -1108,6 +1208,7 @@ local function main()
 
 	invalidateStaleModules()
 	clearSharedBridge()
+	ensureReleaseManifest(false)
 	loadOwnerTelemetryConfig()
 	ENV.Alleral_StartupFailed = nil
 	ENV.Alleral_Rayfield = nil
@@ -1143,16 +1244,18 @@ local function main()
 
 	local coreOk, coreErr = preloadCore(true)
 	if not coreOk then
-		local hint = " Run launch.luau from GitHub (not a saved loader copy)."
-		if tostring(coreErr):find("cached/outdated", 1, true) then
-			hint = " Your executor is running an OLD saved loader (log shows v"
-				.. LOADER_VERSION
-				.. "). Delete autoexec/saved loader and use: loadstring(game:HttpGet('"
-				.. REPO_BASE
-				.. "/launch.luau?t='..tick()))()"
+		if not ENV._Alleral_AutoRecoveryAttempted then
+			ENV._Alleral_AutoRecoveryAttempted = true
+			log("info", "Auto-recovering Alleral modules...")
+			ENV.Alleral_LoaderRunning = false
+			ENV._Alleral_ReleaseLoaded = nil
+			task.delay(2.5, function()
+				main()
+			end)
+			return
 		end
-		notify("Alleral", "Core failed: " .. tostring(coreErr), 10)
-		log("warn", "Core required but unavailable: " .. tostring(coreErr) .. hint)
+		notify("Alleral", "Alleral could not start. Please rejoin and try again.", 8)
+		log("warn", "Core required but unavailable: " .. tostring(coreErr))
 		telemetryReport("failed", {
 			scriptName = profile.id,
 			scriptVersion = profile.version,
@@ -1238,6 +1341,7 @@ local function main()
 
 	notify("Alleral", profile.name .. " loaded.", 4)
 	log("info", "Ready")
+	ENV._Alleral_AutoRecoveryAttempted = nil
 end
 
 ENV.Alleral_Reload = function()
