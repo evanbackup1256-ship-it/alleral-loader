@@ -2206,78 +2206,89 @@ local function installGlobalBootstrap()
 		if g.Alleral_AutoRelaunch == false then
 			return
 		end
-		if g.Alleral_LoaderRunning then
-			return
-		end
-
-		if g.Alleral_State and type(g.Alleral_State.Alleral_Unload) == "function" then
-			pcall(g.Alleral_State.Alleral_Unload)
-		end
-		g.Alleral_LoaderRunning = false
-		g._Alleral_TeleportWatchConnected = nil
-		g._Alleral_RelaunchScheduledAt = nil
-		g._Alleral_AutoUpdateRunning = false
-		g._Alleral_AutoUpdateToken = nil
-		if reason then
-			g._Alleral_PendingRelaunch = true
-		end
-
-		local function pick(names)
-			for _, name in ipairs(names) do
-				local fn = g[name]
-				if type(fn) ~= "function" and _G then
-					fn = _G[name]
-				end
-				if type(fn) == "function" then
-					return fn
-				end
-			end
-			return nil
-		end
-
-		local readFileFn = pick({ "readfile", "ReadFile", "read_file" })
-		local isFileFn = pick({ "isfile", "IsFile", "is_file" })
-		local loadStringFn = pick({ "loadstring", "LoadString", "load" })
-
-		for _, path in ipairs(LOADER_LOCAL_PATHS) do
-			if isFileFn and readFileFn and isFileFn(path) then
-				local ok, src = pcall(readFileFn, path)
-				if ok and type(src) == "string" and #src > 500 and loadStringFn then
-					local compiled, compileErr = loadStringFn(src, "Alleral/loader")
-					if compiled then
-						task.defer(compiled)
-						return
-					end
-					warn("[Alleral] Local loader compile failed: " .. tostring(compileErr))
-				end
-			end
-		end
-
-		local url = GITHUB_RAW .. "/loader.luau?t=" .. tostring(tick())
-		local src
-		pcall(function()
-			src = game:HttpGet(url, true)
-		end)
-		if type(src) ~= "string" or #src < 500 then
-			pcall(function()
-				src = game:HttpGet(url)
-			end)
-		end
-		if type(src) == "string" and #src > 500 and loadStringFn then
-			local compiled, compileErr = loadStringFn(src, "Alleral/loader")
-			if compiled then
-				local writeFileFn = pick({ "writefile", "WriteFile", "write_file" })
-				local makeFolderFn = pick({ "makefolder", "MakeFolder", "make_folder" })
-				if writeFileFn and makeFolderFn then
-					pcall(makeFolderFn, "kick")
-					pcall(writeFileFn, "loader.luau", src)
-				end
-				task.defer(compiled)
+		g._Alleral_RunLoaderToken = (g._Alleral_RunLoaderToken or 0) + 1
+		local token = g._Alleral_RunLoaderToken
+		task.delay(0.75, function()
+			if g._Alleral_RunLoaderToken ~= token then
 				return
 			end
-			warn("[Alleral] Remote loader compile failed: " .. tostring(compileErr))
-		end
-		warn("[Alleral] Could not relaunch loader after teleport")
+			if g.Alleral_LoaderRunning then
+				return
+			end
+
+			if g.Alleral_State and type(g.Alleral_State.Alleral_Unload) == "function" then
+				pcall(g.Alleral_State.Alleral_Unload)
+			end
+			local prevCore = g.Alleral_Core
+			if type(prevCore) == "table" and type(prevCore.releaseUiWindow) == "function" then
+				pcall(prevCore.releaseUiWindow)
+			end
+			g.Alleral_LoaderRunning = false
+			g._Alleral_TeleportWatchConnected = nil
+			g._Alleral_RelaunchScheduledAt = nil
+			g._Alleral_AutoUpdateRunning = false
+			g._Alleral_AutoUpdateToken = nil
+			if reason then
+				g._Alleral_PendingRelaunch = true
+			end
+
+			local function pick(names)
+				for _, name in ipairs(names) do
+					local fn = g[name]
+					if type(fn) ~= "function" and _G then
+						fn = _G[name]
+					end
+					if type(fn) == "function" then
+						return fn
+					end
+				end
+				return nil
+			end
+
+			local readFileFn = pick({ "readfile", "ReadFile", "read_file" })
+			local isFileFn = pick({ "isfile", "IsFile", "is_file" })
+			local loadStringFn = pick({ "loadstring", "LoadString", "load" })
+
+			for _, path in ipairs(LOADER_LOCAL_PATHS) do
+				if isFileFn and readFileFn and isFileFn(path) then
+					local ok, src = pcall(readFileFn, path)
+					if ok and type(src) == "string" and #src > 500 and loadStringFn then
+						local compiled, compileErr = loadStringFn(src, "Alleral/loader")
+						if compiled then
+							task.defer(compiled)
+							return
+						end
+						warn("[Alleral] Local loader compile failed: " .. tostring(compileErr))
+					end
+				end
+			end
+
+			local url = GITHUB_RAW .. "/loader.luau?t=" .. tostring(tick())
+			local src
+			pcall(function()
+				src = game:HttpGet(url, true)
+			end)
+			if type(src) ~= "string" or #src < 500 then
+				pcall(function()
+					src = game:HttpGet(url)
+				end)
+			end
+			if type(src) == "string" and #src > 500 and loadStringFn then
+				local compiled, compileErr = loadStringFn(src, "Alleral/loader")
+				if compiled then
+					local writeFileFn = pick({ "writefile", "WriteFile", "write_file" })
+					local makeFolderFn = pick({ "makefolder", "MakeFolder", "make_folder" })
+					if writeFileFn and makeFolderFn then
+						pcall(makeFolderFn, "kick")
+						pcall(writeFileFn, "loader.luau", src)
+					end
+					task.defer(compiled)
+					return
+				end
+				warn("[Alleral] Remote loader compile failed: " .. tostring(compileErr))
+			end
+			warn("[Alleral] Could not relaunch loader after teleport")
+		end)
 	end
 
 	pcall(function()
@@ -2428,6 +2439,11 @@ local function main()
 		notify("Alleral", "This executor needs loadstring.", 8)
 		ENV.Alleral_LoaderRunning = false
 		return
+	end
+
+	local prevCore = ENV.Alleral_Core
+	if type(prevCore) == "table" and type(prevCore.releaseUiWindow) == "function" then
+		pcall(prevCore.releaseUiWindow)
 	end
 
 	ENV.Alleral_Core = nil

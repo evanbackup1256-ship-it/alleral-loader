@@ -1,5 +1,6 @@
 --[[
 	Alleral WindUI revamp (Footagesus 1.6.64-fix base)
+	Exe 6-inspired bento layout + motion: neutral dark canvas, solid section cards, Quint page transitions.
 	Loaded by ui/windui/main.lua after upstream WindUI initializes.
 ]]
 
@@ -14,13 +15,31 @@ return function(WindUI)
 
 	local TweenService = game:GetService("TweenService")
 
-	local ACCENT = Color3.fromHex("#53fc18")
-	local ACCENT_SOFT = Color3.fromHex("#30ff6a")
-	local ACCENT_HOT = Color3.fromHex("#7dff35")
-	local INK = Color3.fromHex("#050805")
-	local PANEL = Color3.fromHex("#0f1a0c")
+	-- Exe 6-inspired tokens: neutral dark canvas, accent used sparingly (see devforum Exe 6 bento layout).
+	local palette = {
+		accent = Color3.fromHex("#53fc18"),
+		accentSoft = Color3.fromHex("#7dff35"),
+		accentHot = Color3.fromHex("#30ff6a"),
+		canvas = Color3.fromHex("#0b0b0d"),
+		surface = Color3.fromHex("#141418"),
+		card = Color3.fromHex("#1c1c22"),
+		cardHover = Color3.fromHex("#22222a"),
+		line = Color3.fromHex("#2a2a32"),
+		text = Color3.fromHex("#f2f2f7"),
+		muted = Color3.fromHex("#8e8e93"),
+	}
 
-	WindUI.ALLERAL_UI_VERSION = "1.6.64-fix-aller4"
+	local function accent()
+		return palette.accent
+	end
+	local function accentSoft()
+		return palette.accentSoft
+	end
+	local function accentHot()
+		return palette.accentHot
+	end
+
+	WindUI.ALLERAL_UI_VERSION = "1.6.64-fix-aller8"
 	WindUI._AlleralNotifyCount = 0
 	WindUI._AlleralMaxNotify = 8
 	WindUI._AlleralWatchdogToken = 0
@@ -31,11 +50,11 @@ return function(WindUI)
 
 	local NOTIFY_STYLES = {
 		info = {
-			accent = ACCENT,
-			icon = "leaf",
+			accent = palette.text,
+			icon = "info",
 		},
 		success = {
-			accent = ACCENT_SOFT,
+			accent = accent(),
 			icon = "check",
 		},
 		warn = {
@@ -60,16 +79,16 @@ return function(WindUI)
 		return NOTIFY_STYLES[key] or NOTIFY_STYLES.info, key
 	end
 
-	local WINDOW_DEFAULTS = {
-		Theme = "Alleral",
-		NewElements = true,
-		UICorner = 16,
-		UIPadding = 14,
-		SideBarWidth = 232,
-		ElementPadding = 10,
-		Resizable = true,
-		HideSearchBar = false,
-	}
+	local function mergeTokens(base, extra)
+		local out = {}
+		for key, value in pairs(base) do
+			out[key] = value
+		end
+		for key, value in pairs(extra or {}) do
+			out[key] = value
+		end
+		return out
+	end
 
 	local function uiWarn(scope, err)
 		warn(string.format("[Alleral UI/%s] %s", tostring(scope), tostring(err)))
@@ -84,39 +103,337 @@ return function(WindUI)
 		end)
 	end
 
-	local function mergeTokens(base, extra)
-		local out = {}
-		for key, value in pairs(base) do
-			out[key] = value
-		end
-		for key, value in pairs(extra or {}) do
-			out[key] = value
-		end
-		return out
-	end
-
-	local SHARED_CHROME = {
-		WindowShadow = Color3.fromHex("#000000"),
-		WindowTopbarButtonIcon = ACCENT,
-		SearchBarBorder = ACCENT,
-		SectionExpandIcon = ACCENT,
-		DropdownTabBorder = ACCENT,
-		CheckboxBorder = ACCENT,
-		SliderThumb = Color3.fromHex("#ffffff"),
-		Hover = ACCENT,
-		BackgroundTransparency = 0,
+	-- Exe 6-style motion (Quint/Quart/Exponential — matches Flare page + menu easing).
+	local ANIM = {
+		open = TweenInfo.new(0.42, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+		close = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In),
+		page = TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+		pageOut = TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
+		micro = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+		notify = TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+		dropdown = TweenInfo.new(0.26, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+		sweep = TweenInfo.new(0.52, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
 	}
 
-	local function fullTheme(name, accent, bg, panel, text, muted, button, tabActive)
-		return mergeTokens(SHARED_CHROME, {
+	WindUI._AlleralStartupEffect = WindUI._AlleralStartupEffect ~= false
+
+	local POLISH_SKIP = {
+		AlleralPageFade = true,
+		AlleralStartupSweep = true,
+		AlleralSidebarDivider = true,
+		AlleralToggleGlow = true,
+		AlleralNotifyRail = true,
+		AlleralTopbarLine = true,
+		MenuCanvas = true,
+		Menu = true,
+	}
+
+	local function motionEnabled()
+		return WindUI._AlleralReducedMotion ~= true
+	end
+
+	local function isDropdownDescendant(gui)
+		local dropdownGui = WindUI.DropdownGui
+		return dropdownGui and gui and gui:IsDescendantOf(dropdownGui)
+	end
+
+	local function cleanupLegacyPolish(root)
+		if not root then
+			return
+		end
+		for _, desc in ipairs(root:GetDescendants()) do
+			if desc.Name == "AlleralMenuScale" or desc.Name == "AlleralNotifyScale" then
+				desc:Destroy()
+			end
+		end
+	end
+
+	local function ensureUiScale(gui, name)
+		if not gui or not gui:IsA("GuiObject") then
+			return nil
+		end
+		local scale = gui:FindFirstChild(name)
+		if not scale then
+			scale = Instance.new("UIScale")
+			scale.Name = name
+			scale.Parent = gui
+		end
+		return scale
+	end
+
+	local function ensurePageFade(container)
+		if not container or not container:IsA("GuiObject") then
+			return nil
+		end
+		local fade = container:FindFirstChild("AlleralPageFade")
+		if not fade then
+			fade = Instance.new("Frame")
+			fade.Name = "AlleralPageFade"
+			fade.BackgroundColor3 = palette.canvas
+			fade.BackgroundTransparency = 1
+			fade.BorderSizePixel = 0
+			fade.Size = UDim2.fromScale(1, 1)
+			fade.Position = UDim2.fromOffset(0, 0)
+			fade.ZIndex = 8
+			fade.Active = false
+			fade.Selectable = false
+			fade.Parent = container
+		end
+		return fade
+	end
+
+	local function playStartupEffect(window)
+		if not motionEnabled() or WindUI._AlleralStartupEffect == false then
+			return
+		end
+		local main = window.UIElements and window.UIElements.Main
+		if not main then
+			return
+		end
+
+		cleanupLegacyPolish(main)
+
+		local scale = ensureUiScale(main, "AlleralStartupScale")
+		if scale then
+			scale.Scale = 0.968
+			tween(scale, ANIM.open, { Scale = 1 })
+		end
+
+		local topbar = window.UIElements.Topbar and window.UIElements.Topbar.Main
+		if topbar then
+			local sweep = topbar:FindFirstChild("AlleralStartupSweep")
+			if not sweep then
+				sweep = Instance.new("Frame")
+				sweep.Name = "AlleralStartupSweep"
+				sweep.BackgroundColor3 = accent()
+				sweep.BorderSizePixel = 0
+				sweep.Size = UDim2.new(0, 0, 0, 2)
+				sweep.Position = UDim2.new(0, 0, 1, -1)
+				sweep.ZIndex = topbar.ZIndex + 5
+				sweep.Parent = topbar
+			end
+			sweep.BackgroundTransparency = 0.35
+			sweep.Size = UDim2.new(0, 0, 0, 2)
+			tween(sweep, ANIM.sweep, {
+				Size = UDim2.new(1, 0, 0, 2),
+				BackgroundTransparency = 0.78,
+			})
+		end
+
+		WindUI:FlashAccent(window)
+	end
+
+	local function animateNotificationIn(card, rail)
+		if not motionEnabled() or not card then
+			return
+		end
+		cleanupLegacyPolish(card)
+		if card:IsA("ImageLabel") or card:IsA("ImageButton") then
+			local target = card.ImageTransparency
+			card.ImageTransparency = math.clamp(target + 0.18, 0, 1)
+			tween(card, ANIM.notify, { ImageTransparency = target })
+		end
+		local stroke = card:FindFirstChild("AlleralNotifyStroke")
+		if stroke then
+			stroke.Transparency = 0.88
+			tween(stroke, ANIM.micro, { Transparency = 0.62 })
+		end
+		if rail then
+			local full = rail.Size
+			rail.Size = UDim2.new(0, 0, full.Y.Scale, full.Y.Offset)
+			tween(rail, ANIM.micro, { Size = full })
+		end
+	end
+
+	local function animateDropdownMenu(canvas)
+		if not motionEnabled() or not canvas then
+			return
+		end
+		cleanupLegacyPolish(canvas)
+
+		local menu = canvas:FindFirstChild("Menu")
+		if not menu or not menu:IsA("GuiObject") then
+			return
+		end
+
+		if menu:IsA("ImageLabel") then
+			local target = menu.ImageTransparency
+			menu.ImageTransparency = math.clamp(target + 0.22, 0, 1)
+			tween(menu, ANIM.dropdown, { ImageTransparency = target })
+		end
+
+		local stroke = menu:FindFirstChild("AlleralMenuStroke")
+		if not stroke then
+			stroke = Instance.new("UIStroke")
+			stroke.Name = "AlleralMenuStroke"
+			stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			stroke.BorderStrokePosition = Enum.BorderStrokePosition.Inner
+			stroke.LineJoinMode = Enum.LineJoinMode.Round
+			stroke.Color = palette.line
+			stroke.Thickness = 1
+			stroke.Parent = menu
+		end
+		stroke.Transparency = 0.82
+		tween(stroke, ANIM.dropdown, { Transparency = 0.52 })
+	end
+
+	local function resetDropdownMenu(canvas)
+		if not canvas then
+			return
+		end
+		cleanupLegacyPolish(canvas)
+		local menu = canvas:FindFirstChild("Menu")
+		if menu and menu:IsA("ImageLabel") then
+			menu.ImageTransparency = 0.05
+		end
+	end
+
+	local function trackDropdownCanvas(canvas)
+		if not canvas or canvas._AlleralDropdownTracked then
+			return
+		end
+		canvas._AlleralDropdownTracked = true
+		pcall(function()
+			canvas:GetPropertyChangedSignal("Visible"):Connect(function()
+				if canvas.Visible then
+					task.defer(function()
+						animateDropdownMenu(canvas)
+					end)
+				else
+					resetDropdownMenu(canvas)
+				end
+			end)
+		end)
+	end
+
+	local function installDropdownAnimations()
+		if WindUI._AlleralDropdownHook then
+			return
+		end
+		local gui = WindUI.DropdownGui
+		if not gui then
+			WindUI._AlleralDropdownRetries = (WindUI._AlleralDropdownRetries or 0) + 1
+			if WindUI._AlleralDropdownRetries < 12 then
+				task.delay(0.35, installDropdownAnimations)
+			end
+			return
+		end
+		WindUI._AlleralDropdownHook = true
+		for _, desc in ipairs(gui:GetDescendants()) do
+			if desc.Name == "MenuCanvas" then
+				trackDropdownCanvas(desc)
+			end
+		end
+		gui.DescendantAdded:Connect(function(desc)
+			if desc.Name == "MenuCanvas" then
+				trackDropdownCanvas(desc)
+			end
+		end)
+	end
+
+	local function installWindowAnimations(window)
+		if type(window) ~= "table" or window._AlleralAnimWrapped then
+			return window
+		end
+		window._AlleralAnimWrapped = true
+
+		if type(window.Open) == "function" and not window._AlleralOpenWrapped then
+			window._AlleralOpenWrapped = true
+			local origOpen = window.Open
+			function window:Open(...)
+				local result = origOpen(self, ...)
+				if WindUI._AlleralStartupEffect ~= false then
+					task.defer(function()
+						task.wait(0.06)
+						playStartupEffect(self)
+					end)
+				end
+				return result
+			end
+		end
+
+		if type(window.Close) == "function" and not window._AlleralCloseWrapped then
+			window._AlleralCloseWrapped = true
+			local origClose = window.Close
+			function window:Close(...)
+				if motionEnabled() then
+					local main = self.UIElements and self.UIElements.Main
+					local scale = main and main:FindFirstChild("AlleralStartupScale")
+					if scale then
+						tween(scale, ANIM.close, { Scale = 0.988 })
+					end
+				end
+				local result = origClose(self, ...)
+				task.delay(0.45, function()
+					local main = self.UIElements and self.UIElements.Main
+					local scale = main and main:FindFirstChild("AlleralStartupScale")
+					if scale then
+						scale.Scale = 1
+					end
+				end)
+				return result
+			end
+		end
+
+		if type(window.SelectTab) == "function" and not window._AlleralSelectTabWrapped then
+			window._AlleralSelectTabWrapped = true
+			local origSelectTab = window.SelectTab
+			function window:SelectTab(index)
+				if not motionEnabled() then
+					return origSelectTab(self, index)
+				end
+				local result = origSelectTab(self, index)
+				local tabMod = self.TabModule
+				local nextContainer = tabMod and tabMod.Containers and tabMod.Containers[index]
+				if nextContainer then
+					local fade = ensurePageFade(nextContainer)
+					if fade then
+						fade.BackgroundTransparency = 0.22
+						tween(fade, ANIM.page, { BackgroundTransparency = 1 })
+					end
+				end
+				return result
+			end
+		end
+
+		return window
+	end
+
+	local WINDOW_DEFAULTS = {
+		Theme = "Alleral",
+		NewElements = true,
+		UICorner = 18,
+		UIPadding = 18,
+		SideBarWidth = 248,
+		ElementPadding = 12,
+		Resizable = true,
+		HideSearchBar = false,
+	}
+
+	local function getSharedChrome()
+		return {
+			WindowShadow = Color3.fromHex("#000000"),
+			WindowTopbarButtonIcon = palette.muted,
+			SearchBarBorder = palette.line,
+			SectionExpandIcon = palette.muted,
+			DropdownTabBorder = palette.line,
+			CheckboxBorder = palette.line,
+			SliderThumb = Color3.fromHex("#ffffff"),
+			Hover = accent(),
+			BackgroundTransparency = 0,
+		}
+	end
+
+	local function fullTheme(name, accentCol, bg, panel, text, muted, button, tabActive)
+		return mergeTokens(getSharedChrome(), {
 			Name = name,
-			Accent = accent,
-			Primary = accent,
-			Outline = accent,
-			Icon = accent,
-			Toggle = accent,
+			Accent = accentCol,
+			Primary = accentCol,
+			Outline = palette.line,
+			Icon = accentCol,
+			Toggle = accentCol,
 			Slider = button,
-			Checkbox = accent,
+			Checkbox = accentCol,
 			SliderIcon = button,
 			Dialog = panel,
 			Background = bg,
@@ -124,98 +441,103 @@ return function(WindUI)
 			Text = text,
 			Placeholder = muted,
 			PanelBackground = panel,
-			PanelBackgroundTransparency = 0.86,
-			LabelBackground = Color3.fromHex("#000000"),
-			LabelBackgroundTransparency = 0.84,
-			ElementBackground = panel,
-			ElementBackgroundTransparency = 0.08,
+			PanelBackgroundTransparency = 0.04,
+			LabelBackground = palette.surface,
+			LabelBackgroundTransparency = 0.08,
+			ElementBackground = palette.card,
+			ElementBackgroundTransparency = 0.02,
 			ElementTitle = text,
 			ElementDesc = muted,
-			ElementIcon = accent,
+			ElementIcon = accentCol,
 			TabBackground = bg,
-			TabBackgroundHover = panel,
-			TabBackgroundHoverTransparency = 0.76,
+			TabBackgroundHover = palette.cardHover,
+			TabBackgroundHoverTransparency = 0.12,
 			TabBackgroundActive = tabActive,
-			TabBackgroundActiveTransparency = 0.62,
+			TabBackgroundActiveTransparency = 0.06,
 			TabText = text,
-			TabTextTransparency = 0.28,
+			TabTextTransparency = 0.22,
 			TabTextTransparencyActive = 0,
-			TabIcon = accent,
-			TabIconTransparency = 0.32,
+			TabIcon = muted,
+			TabIconTransparency = 0.18,
 			TabIconTransparencyActive = 0,
-			TabBorder = accent,
-			TabBorderTransparency = 0.86,
-			TabBorderTransparencyActive = 0.38,
+			TabBorder = palette.line,
+			TabBorderTransparency = 0.72,
+			TabBorderTransparencyActive = 0.42,
 			WindowBackground = bg,
 			WindowTopbarTitle = text,
 			WindowTopbarAuthor = muted,
-			WindowTopbarIcon = accent,
-			WindowSearchBarBackground = panel,
-			SearchBarBorderTransparency = 0.62,
-			SectionBoxBackground = panel,
-			SectionBoxBackgroundTransparency = 0.84,
-			SectionBoxBorder = accent,
-			SectionBoxBorderTransparency = 0.7,
-			SectionExpandIconTransparency = 0.28,
-			Notification = panel,
+			WindowTopbarIcon = accentCol,
+			WindowSearchBarBackground = palette.surface,
+			SearchBarBorderTransparency = 0.55,
+			SectionBoxBackground = palette.card,
+			SectionBoxBackgroundTransparency = 0.04,
+			SectionBoxBorder = palette.line,
+			SectionBoxBorderTransparency = 0.58,
+			SectionExpandIconTransparency = 0.12,
+			Notification = palette.card,
 			NotificationTitle = text,
 			NotificationContent = muted,
-			NotificationBorder = accent,
-			NotificationBorderTransparency = 0.5,
-			PopupBackground = panel,
-			DialogBackground = panel,
-			ToggleBar = tabActive,
-			CheckboxBorderTransparency = 0.48,
-			Tooltip = panel,
+			NotificationBorder = palette.line,
+			NotificationBorderTransparency = 0.45,
+			PopupBackground = palette.card,
+			DialogBackground = palette.card,
+			ToggleBar = accentCol,
+			CheckboxBorderTransparency = 0.55,
+			Tooltip = palette.card,
 			TooltipText = text,
 		})
 	end
 
-	local THEME_PACK = {
-		Alleral = fullTheme(
-			"Alleral",
-			ACCENT,
-			INK,
-			PANEL,
-			Color3.fromHex("#f0fff0"),
-			Color3.fromHex("#6b9e5a"),
-			ACCENT_SOFT,
-			Color3.fromHex("#183018")
-		),
-		AlleralNeon = fullTheme(
-			"AlleralNeon",
-			ACCENT_HOT,
-			Color3.fromHex("#020402"),
-			Color3.fromHex("#0a1808"),
-			Color3.fromHex("#f6fff0"),
-			Color3.fromHex("#5ecf45"),
-			ACCENT,
-			Color3.fromHex("#183820")
-		),
-		AlleralMidnight = fullTheme(
-			"AlleralMidnight",
-			Color3.fromHex("#3ddc84"),
-			Color3.fromHex("#020302"),
-			Color3.fromHex("#081008"),
-			Color3.fromHex("#dfeedd"),
-			Color3.fromHex("#4a7a42"),
-			Color3.fromHex("#2ecc71"),
-			Color3.fromHex("#102818")
-		),
-		Dark = fullTheme(
-			"Dark",
-			ACCENT,
-			Color3.fromHex("#080a08"),
-			Color3.fromHex("#101810"),
-			Color3.fromHex("#f4fff0"),
-			Color3.fromHex("#7a9a72"),
-			ACCENT_SOFT,
-			Color3.fromHex("#1a2814")
-		),
-	}
+	local function buildThemePack()
+		return {
+			Alleral = fullTheme(
+				"Alleral",
+				accent(),
+				palette.canvas,
+				palette.surface,
+				palette.text,
+				palette.muted,
+				accentSoft(),
+				palette.cardHover
+			),
+			AlleralNeon = fullTheme(
+				"AlleralNeon",
+				accentHot(),
+				Color3.fromHex("#070708"),
+				Color3.fromHex("#101014"),
+				palette.text,
+				palette.muted,
+				accent(),
+				Color3.fromHex("#26262e")
+			),
+			AlleralMidnight = fullTheme(
+				"AlleralMidnight",
+				Color3.fromHex("#3ddc84"),
+				Color3.fromHex("#050506"),
+				Color3.fromHex("#0e0e12"),
+				Color3.fromHex("#ececf1"),
+				Color3.fromHex("#7c7c86"),
+				Color3.fromHex("#2ecc71"),
+				Color3.fromHex("#1a1a22")
+			),
+			Dark = fullTheme(
+				"Dark",
+				accent(),
+				palette.canvas,
+				palette.surface,
+				palette.text,
+				palette.muted,
+				accentSoft(),
+				palette.cardHover
+			),
+		}
+	end
+
+	local THEME_PACK = buildThemePack()
 
 	local function installThemes()
-		for themeName, tokens in pairs(THEME_PACK) do
+		local pack = buildThemePack()
+		for themeName, tokens in pairs(pack) do
 			if WindUI.Themes then
 				WindUI.Themes[themeName] = mergeTokens(WindUI.Themes[themeName] or {}, tokens)
 				WindUI.Themes[themeName].Name = themeName
@@ -249,113 +571,106 @@ return function(WindUI)
 	-- Visual polish
 	-- -------------------------------------------------------------------------
 
-	local function ensureStroke(frame, name, color, transparency, thickness)
+	local function ensureStroke(frame, name, color, transparency, thickness, opts)
+		opts = opts or {}
 		if not frame or not frame:IsA("GuiObject") then
 			return nil
 		end
+		if isDropdownDescendant(frame) then
+			return nil
+		end
 		local stroke = frame:FindFirstChild(name)
+		if not stroke and opts.reuseExisting ~= false then
+			stroke = frame:FindFirstChildOfClass("UIStroke")
+			if stroke and stroke.Name:sub(1, 7) ~= "Alleral" then
+				stroke.Name = name
+			end
+		end
 		if not stroke then
 			stroke = Instance.new("UIStroke")
 			stroke.Name = name
-			stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 			stroke.Parent = frame
 		end
-		stroke.Color = color or ACCENT
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		stroke.BorderStrokePosition = opts.inner == false and Enum.BorderStrokePosition.Center
+			or Enum.BorderStrokePosition.Inner
+		stroke.LineJoinMode = Enum.LineJoinMode.Round
+		stroke.Color = color or palette.line
 		stroke.Thickness = thickness or 1
 		stroke.Transparency = transparency or 0.55
 		return stroke
 	end
 
-	local function addTopGlow(topbarFrame)
-		if not topbarFrame or not topbarFrame:IsA("GuiObject") then
-			return
+	local function ensureCorner(frame, radius)
+		if not frame or not frame:IsA("GuiObject") then
+			return nil
 		end
-		if topbarFrame:FindFirstChild("AlleralTopGlow") then
-			return
+		local corner = frame:FindFirstChildOfClass("UICorner")
+		if not corner then
+			corner = Instance.new("UICorner")
+			corner.CornerRadius = radius or UDim.new(0, 10)
+			corner.Parent = frame
 		end
-
-		local glow = Instance.new("Frame")
-		glow.Name = "AlleralTopGlow"
-		glow.BackgroundColor3 = ACCENT
-		glow.BackgroundTransparency = 0.86
-		glow.BorderSizePixel = 0
-		glow.Size = UDim2.new(1, 0, 0, 2)
-		glow.Position = UDim2.new(0, 0, 1, -1)
-		glow.ZIndex = topbarFrame.ZIndex + 2
-		glow.Parent = topbarFrame
-
-		local grad = Instance.new("UIGradient")
-		grad.Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, ACCENT),
-			ColorSequenceKeypoint.new(0.5, ACCENT_SOFT),
-			ColorSequenceKeypoint.new(1, ACCENT),
-		})
-		grad.Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.35),
-			NumberSequenceKeypoint.new(0.5, 0.12),
-			NumberSequenceKeypoint.new(1, 0.35),
-		})
-		grad.Parent = glow
+		return corner
 	end
 
-	local function addSidebarRail(sidebar)
+	local function polishSectionOutlines(root)
+		if not root then
+			return
+		end
+		for _, desc in ipairs(root:GetDescendants()) do
+			if desc.Name == "Outline" and desc:IsA("ImageLabel") and not isDropdownDescendant(desc) then
+				ensureStroke(desc, "AlleralOutlineStroke", palette.line, 0.78, 1, {
+					inner = true,
+					reuseExisting = false,
+				})
+			end
+		end
+	end
+
+	local function addTopbarLine(topbar)
+		if not topbar or not topbar:IsA("GuiObject") then
+			return
+		end
+		if topbar:FindFirstChild("AlleralTopbarLine") then
+			return
+		end
+		local line = Instance.new("Frame")
+		line.Name = "AlleralTopbarLine"
+		line.BackgroundColor3 = palette.line
+		line.BackgroundTransparency = 0.55
+		line.BorderSizePixel = 0
+		line.Size = UDim2.new(1, -24, 0, 1)
+		line.Position = UDim2.new(0, 12, 1, -1)
+		line.ZIndex = topbar.ZIndex + 2
+		line.Parent = topbar
+	end
+
+	local function syncWindowStroke(main)
+		if not main then
+			return nil
+		end
+		ensureCorner(main, UDim.new(0, WINDOW_DEFAULTS.UICorner))
+		return ensureStroke(main, "AlleralWindowStroke", palette.line, 0.58, 1, { inner = true })
+	end
+
+	local function addSidebarDivider(sidebar)
 		if not sidebar or not sidebar:IsA("GuiObject") then
 			return
 		end
-		if sidebar:FindFirstChild("AlleralSidebarRail") then
+		if sidebar:FindFirstChild("AlleralSidebarDivider") then
 			return
 		end
 
-		local rail = Instance.new("Frame")
-		rail.Name = "AlleralSidebarRail"
-		rail.BackgroundColor3 = ACCENT
-		rail.BackgroundTransparency = 0.25
-		rail.BorderSizePixel = 0
-		rail.Size = UDim2.new(0, 2, 1, -12)
-		rail.Position = UDim2.new(0, 4, 0, 6)
-		rail.ZIndex = sidebar.ZIndex + 3
-		rail.Parent = sidebar
-
-		local grad = Instance.new("UIGradient")
-		grad.Rotation = 90
-		grad.Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, ACCENT_SOFT),
-			ColorSequenceKeypoint.new(0.5, ACCENT),
-			ColorSequenceKeypoint.new(1, ACCENT_SOFT),
-		})
-		grad.Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.55),
-			NumberSequenceKeypoint.new(0.5, 0.1),
-			NumberSequenceKeypoint.new(1, 0.55),
-		})
-		grad.Parent = rail
-	end
-
-	local function addBackdrop(window)
-		if not WindUI.ScreenGui or not window or not window.UIElements or not window.UIElements.Main then
-			return
-		end
-		local main = window.UIElements.Main
-		local host = main.Parent
-		if not host or host:FindFirstChild("AlleralBackdrop") then
-			return
-		end
-
-		local backdrop = Instance.new("Frame")
-		backdrop.Name = "AlleralBackdrop"
-		backdrop.BackgroundColor3 = Color3.new(0, 0, 0)
-		backdrop.BackgroundTransparency = 0.45
-		backdrop.BorderSizePixel = 0
-		backdrop.Size = UDim2.new(1, 0, 1, 0)
-		backdrop.ZIndex = math.max(0, main.ZIndex - 1)
-		backdrop.Visible = main.Visible
-		backdrop.Parent = host
-
-		pcall(function()
-			main:GetPropertyChangedSignal("Visible"):Connect(function()
-				backdrop.Visible = main.Visible
-			end)
-		end)
+		local divider = Instance.new("Frame")
+		divider.Name = "AlleralSidebarDivider"
+		divider.BackgroundColor3 = palette.line
+		divider.BackgroundTransparency = 0.35
+		divider.BorderSizePixel = 0
+		divider.Size = UDim2.new(0, 1, 1, -16)
+		divider.Position = UDim2.new(1, -1, 0, 8)
+		divider.ZIndex = sidebar.ZIndex + 2
+		divider.Parent = sidebar
 	end
 
 	function WindUI.PolishWindow(_self, window)
@@ -366,27 +681,38 @@ return function(WindUI)
 		pcall(function()
 			local main = window.UIElements.Main
 			if main then
-				ensureStroke(main, "AlleralAccentStroke", ACCENT, 0.56, 1)
+				cleanupLegacyPolish(main)
+				syncWindowStroke(main)
 			end
 
 			local topbar = window.UIElements.Topbar
 			if topbar and topbar.Main then
-				addTopGlow(topbar.Main)
-				ensureStroke(topbar.Main, "AlleralTopbarStroke", ACCENT, 0.82, 1)
+				addTopbarLine(topbar.Main)
 			end
 
 			local sidebar = window.UIElements.SideBar
 			if sidebar then
-				addSidebarRail(sidebar)
-				ensureStroke(sidebar, "AlleralSidebarStroke", ACCENT, 0.84, 1)
+				addSidebarDivider(sidebar)
 			end
 
 			if window.SearchBar and window.SearchBar.Frame then
-				ensureStroke(window.SearchBar.Frame, "AlleralSearchStroke", ACCENT, 0.74, 1)
+				local search = window.SearchBar.Frame
+				ensureCorner(search, UDim.new(0, 10))
+				ensureStroke(search, "AlleralSearchStroke", palette.line, 0.64, 1, { inner = true })
+			end
+
+			if window.UIElements.MainBar then
+				polishSectionOutlines(window.UIElements.MainBar)
+			end
+			if main then
+				task.defer(function()
+					if window.UIElements and window.UIElements.Main == main and main.Parent then
+						polishSectionOutlines(main)
+					end
+				end)
 			end
 
 			window.CanDropdown = true
-			addBackdrop(window)
 		end)
 
 		return window
@@ -406,7 +732,7 @@ return function(WindUI)
 
 		settings.OpenButton = type(settings.OpenButton) == "table" and settings.OpenButton or {}
 		if settings.OpenButton.Color == nil then
-			settings.OpenButton.Color = ColorSequence.new(ACCENT, ACCENT_SOFT)
+			settings.OpenButton.Color = ColorSequence.new(accent(), accentSoft())
 		end
 		if settings.OpenButton.Enabled == nil then
 			settings.OpenButton.Enabled = true
@@ -457,7 +783,9 @@ return function(WindUI)
 		rail.ZIndex = card.ZIndex + 4
 		rail.Parent = card
 
-		ensureStroke(card, "AlleralNotifyStroke", style.accent, 0.62, 1)
+		ensureStroke(card, "AlleralNotifyStroke", style.accent, 0.62, 1, { inner = true })
+
+		animateNotificationIn(card, rail)
 
 		if WindUI._AlleralNotifyCompact then
 			for _, label in ipairs(card:GetDescendants()) do
@@ -528,13 +856,14 @@ return function(WindUI)
 					return
 				end
 
-				local stroke = ensureStroke(track, "AlleralToggleStroke", ACCENT, 0.68, 1)
+				ensureCorner(track, UDim.new(1, 0))
+				local stroke = ensureStroke(track, "AlleralToggleStroke", palette.line, 0.62, 1, { inner = true })
 				local glow = track:FindFirstChild("AlleralToggleGlow")
 				if not glow then
 					glow = Instance.new("Frame")
 					glow.Name = "AlleralToggleGlow"
-					glow.BackgroundColor3 = ACCENT
-					glow.BackgroundTransparency = 0.82
+					glow.BackgroundColor3 = accent()
+					glow.BackgroundTransparency = 0.9
 					glow.BorderSizePixel = 0
 					glow.Size = UDim2.new(1, 4, 1, 4)
 					glow.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -548,11 +877,15 @@ return function(WindUI)
 
 				local function syncToggleVisual(on)
 					if stroke then
-						stroke.Color = on and ACCENT or Color3.fromHex("#4a6a42")
-						stroke.Transparency = on and 0.28 or 0.72
+						tween(stroke, ANIM.micro, {
+							Color = on and accent() or palette.line,
+							Transparency = on and 0.35 or 0.68,
+						})
 					end
 					if glow then
-						glow.BackgroundTransparency = on and 0.72 or 0.92
+						tween(glow, ANIM.micro, {
+							BackgroundTransparency = on and 0.82 or 0.96,
+						})
 					end
 				end
 
@@ -654,8 +987,31 @@ return function(WindUI)
 	-- -------------------------------------------------------------------------
 
 	local _CreateWindow = WindUI.CreateWindow
+
+	function WindUI.ReleaseWindow(self, window)
+		window = window or WindUI.Window
+		if not window then
+			return false
+		end
+		WindUI._AlleralWatchdogToken = (WindUI._AlleralWatchdogToken or 0) + 1
+		pcall(function()
+			if type(window.Close) == "function" then
+				window:Close()
+			end
+		end)
+		if WindUI.Window == window then
+			WindUI.Window = nil
+		end
+		return true
+	end
+
 	function WindUI.CreateWindow(self, settings)
 		settings = normalizeWindowSettings(settings)
+
+		if WindUI.Window then
+			WindUI:ReleaseWindow(WindUI.Window)
+			task.wait(0.05)
+		end
 
 		local window
 		for attempt = 1, 2 do
@@ -667,13 +1023,19 @@ return function(WindUI)
 				break
 			end
 			uiWarn("window", result)
+			if WindUI.Window then
+				WindUI:ReleaseWindow(WindUI.Window)
+				task.wait(0.05)
+			end
 			settings.Theme = resolveThemeName(attempt == 1 and "Alleral" or "Dark")
 			task.wait(0.05)
 		end
 
 		if window then
+			wrapWindowElements(window)
+			installWindowAnimations(window)
 			task.defer(function()
-				wrapWindowElements(window)
+				installDropdownAnimations()
 				WindUI:PolishWindow(window)
 				startWatchdog(window)
 			end)
@@ -827,6 +1189,24 @@ return function(WindUI)
 			uiWarn("popup", result)
 			return nil
 		end
+		if result and motionEnabled() then
+			task.defer(function()
+				local main = type(result) == "table" and result.UIElements and result.UIElements.Main
+				if main and main:IsA("GuiObject") then
+					ensureCorner(main, UDim.new(0, 14))
+					local stroke = ensureStroke(main, "AlleralPopupStroke", palette.line, 0.72, 1, { inner = true })
+					if main:IsA("ImageLabel") then
+						local target = main.ImageTransparency
+						main.ImageTransparency = math.clamp(target + 0.2, 0, 1)
+						tween(main, ANIM.open, { ImageTransparency = target })
+					end
+					if stroke then
+						stroke.Transparency = 0.9
+						tween(stroke, ANIM.open, { Transparency = 0.58 })
+					end
+				end
+			end)
+		end
 		return result
 	end
 
@@ -836,6 +1216,21 @@ return function(WindUI)
 
 	function WindUI.GetAlleralVersion(_self)
 		return WindUI.ALLERAL_UI_VERSION
+	end
+
+	function WindUI.SetAccentColor(_self, color)
+		if typeof(color) ~= "Color3" then
+			return false
+		end
+		palette.accent = color
+		palette.accentSoft = color:Lerp(Color3.new(1, 1, 1), 0.28)
+		palette.accentHot = color:Lerp(Color3.new(0, 0, 0), 0.12)
+		NOTIFY_STYLES.success.accent = palette.accent
+		installThemes()
+		if WindUI.Window then
+			WindUI:RepairWindow(WindUI.Window)
+		end
+		return true
 	end
 
 	function WindUI.SafeNotify(self, title, content, duration, notifyType)
@@ -932,19 +1327,21 @@ return function(WindUI)
 		end
 
 		local main = window.UIElements.Main
-		local stroke = main:FindFirstChild("AlleralAccentStroke")
+		local stroke = main:FindFirstChild("AlleralWindowStroke")
 		if not stroke then
-			stroke = ensureStroke(main, "AlleralAccentStroke", ACCENT, 0.2, 2)
+			stroke = syncWindowStroke(main)
 		end
 
 		if stroke then
-			tween(stroke, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-				Transparency = 0.12,
-				Thickness = 2,
+			tween(stroke, ANIM.micro, {
+				Color = accent(),
+				Transparency = 0.28,
+				Thickness = 1.5,
 			})
 			task.delay(0.2, function()
-				tween(stroke, TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-					Transparency = 0.56,
+				tween(stroke, TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+					Color = palette.line,
+					Transparency = 0.62,
 					Thickness = 1,
 				})
 			end)
@@ -955,6 +1352,10 @@ return function(WindUI)
 		WindUI._AlleralReducedMotion = enabled == true
 	end
 
+	function WindUI.SetStartupEffect(_self, enabled)
+		WindUI._AlleralStartupEffect = enabled ~= false
+	end
+
 	function WindUI.RepairWindow(self, window)
 		window = window or WindUI.Window
 		if not window then
@@ -962,7 +1363,9 @@ return function(WindUI)
 		end
 		local ok = pcall(function()
 			installThemes()
+			cleanupLegacyPolish(WindUI.DropdownGui)
 			wrapWindowElements(window)
+			installWindowAnimations(window)
 			WindUI:PolishWindow(window)
 			if type(window.CanDropdown) ~= "boolean" then
 				window.CanDropdown = true
@@ -999,6 +1402,9 @@ return function(WindUI)
 	end)
 
 	ensureNotificationHook()
+	task.defer(function()
+		installDropdownAnimations()
+	end)
 	if WindUI._AlleralNotifyCompact then
 		WindUI:SetNotificationCompact(true)
 	end

@@ -1,4 +1,4 @@
-GENERATED — do not edit files in backend/ directly.
+GENERATED â€” do not edit files in backend/ directly.
 Edit relay/ and cfg/, then run: maint/sync_repo.ps1
-Synced at: 2026-06-11T17:24:37Z
-Commit: fc1bcdd
+Synced at: 2026-06-11T17:39:26Z
+Commit: 3abfa8b

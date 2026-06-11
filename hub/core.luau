@@ -1,7 +1,7 @@
 local Core = {}
 Core.VERSION = "2.7.0"
 Core.UI_LIBRARY = "WindUI"
-Core.WINDUI_VERSION = "1.6.64-fix-aller4"
+Core.WINDUI_VERSION = "1.6.64-fix-aller8"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
@@ -1265,6 +1265,18 @@ function Core.registerUiWindow(window)
 		getgenv().Alleral_UiWindow = window
 	end
 	return window
+end
+
+function Core.releaseUiWindow()
+	local ui = ENV.Alleral_UI or ENV.Alleral_Rayfield
+	local wind = ui and (ui.WindUI or ui.Library)
+	if type(wind) == "table" and type(wind.ReleaseWindow) == "function" then
+		pcall(function()
+			wind:ReleaseWindow(wind.Window)
+		end)
+	end
+	ENV.Alleral_UiWindow = nil
+	getgenv().Alleral_UiWindow = nil
 end
 
 function Core.toggleUiVisibility()
@@ -3724,20 +3736,18 @@ function Core.buildUiWindow(ui, settings)
 	if not lib then
 		return nil
 	end
-	local fileSettings = settings.FileSettings or {}
-	local folder = fileSettings.RootFolder or fileSettings.ConfigFolder or "Alleral_Configs"
-	local rawWindow = lib:CreateWindow({
+	local windowSettings = {
 		Title = settings.Name or "Alleral",
 		Author = settings.Subtitle or "",
-		Folder = folder,
+		Folder = (settings.FileSettings or {}).RootFolder or (settings.FileSettings or {}).ConfigFolder or "Alleral_Configs",
 		Icon = Core.windUiIcon(settings.Icon or "leaf"),
 		Theme = "Alleral",
 		NewElements = true,
 		HideSearchBar = false,
-		UICorner = 16,
-		UIPadding = 14,
-		SideBarWidth = 232,
-		ElementPadding = 10,
+		UICorner = 18,
+		UIPadding = 18,
+		SideBarWidth = 248,
+		ElementPadding = 12,
 		Resizable = true,
 		OpenButton = {
 			Title = "Alleral",
@@ -3746,13 +3756,20 @@ function Core.buildUiWindow(ui, settings)
 			OnlyMobile = false,
 			Color = ColorSequence.new(ALLERAL_ACCENT, ALLERAL_ACCENT_ALT),
 		},
-	})
-	applyAlleralTheme(ui)
-	if rawWindow and type(lib.PolishWindow) == "function" then
+	}
+	local rawWindow = lib:CreateWindow(windowSettings)
+	if not rawWindow and type(lib.ReleaseWindow) == "function" then
 		pcall(function()
-			lib:PolishWindow(rawWindow)
+			lib:ReleaseWindow(lib.Window)
 		end)
+		task.wait(0.05)
+		rawWindow = lib:CreateWindow(windowSettings)
 	end
+	if not rawWindow then
+		Core.logWarn("WindUI window create failed")
+		return nil
+	end
+	applyAlleralTheme(ui)
 	local window = {
 		_rawWindow = rawWindow,
 		_ui = ui,
@@ -3762,6 +3779,10 @@ function Core.buildUiWindow(ui, settings)
 	Core.registerUiWindow(window)
 	Core.flushPendingNotifications()
 	function window:AddTab(name, icon)
+		if not self._rawWindow or type(self._rawWindow.Section) ~= "function" then
+			Core.logWarn("AddTab skipped — window missing")
+			return nil
+		end
 		if not self._windSection then
 			self._windSection = self._rawWindow:Section({
 				Title = "Alleral",
@@ -3787,6 +3808,10 @@ end
 
 function Core.buildUiTab(section, name, icon, columns, id)
 	local window = section._window or section
+	if not window or not window._rawWindow then
+		Core.logWarn("buildUiTab skipped — window missing")
+		return Core.wrapUiTab(nil, section._ui, window)
+	end
 	local iconArg = nil
 	if icon then
 		local numeric = tonumber(Core.uiIcon(icon))

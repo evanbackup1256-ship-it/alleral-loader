@@ -1830,6 +1830,11 @@ end)
 local window = Core.buildUiWindow(ui, {
 	Subtitle = "Build A Ring Farm · v" .. VERSION,
 })
+if not window or not window._rawWindow then
+	getgenv().Alleral_StartupFailed = "UI window failed"
+	Core.logWarn("UI window failed — aborting")
+	return
+end
 local section = Core.buildUiSection(window)
 local farmTab = Core.buildUiTab(section, "Farm", 10723407389, 2, "farm")
 local seedTab = Core.buildUiTab(section, "Seeds", 10734923214, 2, "seeds")
