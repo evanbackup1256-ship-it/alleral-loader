@@ -22,7 +22,7 @@ return function(WindUI)
 	local MAC = {
 		corner = 12,
 		windowPad = 24,
-		sidebarWidth = 280,
+		sidebarWidth = 260,
 		elementGap = 16,
 		sectionGap = 15,
 		sectionInner = 10,
@@ -99,7 +99,7 @@ return function(WindUI)
 		return palette.accentHot
 	end
 
-	WindUI.ARRREL_UI_VERSION = "2.1.3-alleral-v2"
+	WindUI.ARRREL_UI_VERSION = "2.1.4-alleral-v2"
 	WindUI.ARRREL_BRAND = "Alleral"
 	WindUI.ALLERAL_UI_VERSION = WindUI.ARRREL_UI_VERSION
 	WindUI.ALLERAL_BRAND = "Alleral UI V2"
@@ -955,6 +955,9 @@ return function(WindUI)
 		UIPadding = MAC.windowPad,
 		SideBarWidth = MAC.sidebarWidth,
 		ElementPadding = MAC.elementGap,
+		Size = UDim2.fromOffset(868, 650),
+		MinSize = Vector2.new(680, 420),
+		MaxSize = Vector2.new(1200, 900),
 		Resizable = true,
 		HideSearchBar = false,
 		AutoScale = true,
@@ -2765,6 +2768,31 @@ return function(WindUI)
 		end
 	end
 
+	local function polishToggleRows(root)
+		if not root then
+			return
+		end
+		for _, desc in ipairs(root:GetDescendants()) do
+			if desc:IsA("GuiObject") and desc.Name == "Main" and desc:FindFirstChild("Container") then
+				desc.Size = UDim2.new(1, 0, 0, 0)
+				desc.AutomaticSize = Enum.AutomaticSize.Y
+			end
+			if desc:IsA("TextLabel") then
+				local parentName = desc.Parent and desc.Parent.Name or ""
+				if desc.Name == "Title" or desc.Name == "Desc" or parentName == "TitleFrame" then
+					desc.TextWrapped = false
+					desc.TextTruncate = Enum.TextTruncate.None
+					if desc.TextXAlignment == Enum.TextXAlignment.Left then
+						if desc.AutomaticSize == Enum.AutomaticSize.XY then
+							desc.AutomaticSize = Enum.AutomaticSize.Y
+						end
+						desc.Size = UDim2.new(1, 0, 0, 0)
+					end
+				end
+			end
+		end
+	end
+
 	local function polishRowLabels(root)
 		if not root then
 			return
@@ -3106,6 +3134,7 @@ return function(WindUI)
 		local mainBar = window.UIElements and window.UIElements.MainBar
 		if mainBar then
 			polishRowLabels(mainBar)
+			polishToggleRows(mainBar)
 			polishLabelTone(mainBar)
 			polishElementRowHeights(mainBar)
 			if AutoScaleLib and type(AutoScaleLib.fixTextLayout) == "function" then
@@ -3213,6 +3242,7 @@ return function(WindUI)
 						polishSectionSpacing(main, gap)
 						polishElementRowHeights(main)
 						polishRowLabels(main)
+						polishToggleRows(main)
 						polishTabScrolling(window)
 						relayoutAllHStacks(window)
 						local tabMod = window.TabModule

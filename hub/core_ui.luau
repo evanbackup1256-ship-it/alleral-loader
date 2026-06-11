@@ -1006,6 +1006,9 @@ function Core.createStubUiGroup(label)
 	return stub
 end
 
+local COLUMN_GAP = 12
+Core._UiTabRegistry = Core._UiTabRegistry or {}
+
 local function measureTabContentWidth(rawTab, window)
 	if rawTab and rawTab.UIElements and rawTab.UIElements.ContainerFrame then
 		local scroll = rawTab.UIElements.ContainerFrame
@@ -1029,8 +1032,41 @@ local function measureTabContentWidth(rawTab, window)
 			end
 			return math.max(width - 8, 64)
 		end
+		local main = rawWindow.UIElements.Main
+		local sidebar = rawWindow.UIElements.SideBar
+		if main and sidebar and main.AbsoluteSize.X >= 64 then
+			local contentWidth = main.AbsoluteSize.X - sidebar.AbsoluteSize.X
+			if contentWidth >= 64 then
+				return math.max(contentWidth - 40, 64)
+			end
+		end
 	end
 	return 0
+end
+
+local function fixElementRowLayout(root)
+	if not root then
+		return
+	end
+	for _, desc in ipairs(root:GetDescendants()) do
+		if desc:IsA("GuiObject") and desc.Name == "Main" and desc:FindFirstChild("Container") then
+			desc.Size = UDim2.new(1, 0, 0, 0)
+			desc.AutomaticSize = Enum.AutomaticSize.Y
+		end
+		if desc:IsA("TextLabel") then
+			local parentName = desc.Parent and desc.Parent.Name or ""
+			if desc.Name == "Title" or desc.Name == "Desc" or parentName == "TitleFrame" then
+				desc.TextWrapped = false
+				desc.TextTruncate = Enum.TextTruncate.None
+				if desc.TextXAlignment == Enum.TextXAlignment.Left then
+					if desc.AutomaticSize == Enum.AutomaticSize.XY then
+						desc.AutomaticSize = Enum.AutomaticSize.Y
+					end
+					desc.Size = UDim2.new(1, 0, 0, 0)
+				end
+			end
+		end
+	end
 end
 
 local function fixWrappedLabels(root)
@@ -1051,18 +1087,15 @@ local function fixWrappedLabels(root)
 	end
 end
 
-local COLUMN_GAP = 8
-Core._UiTabRegistry = Core._UiTabRegistry or {}
-
 local function relayoutTwoColumnFrames(tab)
 	local layout = tab._layout
 	if not layout or not layout.ready or not layout.row or not layout.left or not layout.right then
 		return false
 	end
 
-	local width = layout.row.AbsoluteSize.X
+	local width = measureTabContentWidth(tab._rawTab, tab._window)
 	if width < 64 then
-		width = measureTabContentWidth(tab._rawTab, tab._window)
+		width = layout.row.AbsoluteSize.X
 	end
 	if width < 64 then
 		return false
@@ -1071,8 +1104,8 @@ local function relayoutTwoColumnFrames(tab)
 	layout.row.Size = UDim2.new(1, 0, 0, 0)
 	layout.row.AutomaticSize = Enum.AutomaticSize.Y
 
-	local colWidth = math.max(160, math.floor((width - COLUMN_GAP) / 2))
-	local colSize = UDim2.new(0, colWidth, 0, 0)
+	local halfGap = math.floor(COLUMN_GAP / 2)
+	local colSize = UDim2.new(0.5, -halfGap, 0, 0)
 
 	layout.left.Size = colSize
 	layout.left.AutomaticSize = Enum.AutomaticSize.Y
@@ -1080,8 +1113,11 @@ local function relayoutTwoColumnFrames(tab)
 	layout.right.AutomaticSize = Enum.AutomaticSize.Y
 
 	fixWrappedLabels(layout.row)
+	fixElementRowLayout(layout.row)
 	fixWrappedLabels(layout.left)
+	fixElementRowLayout(layout.left)
 	fixWrappedLabels(layout.right)
+	fixElementRowLayout(layout.right)
 	return true
 end
 
@@ -1120,7 +1156,7 @@ local function ensureTwoColumnLayout(tab, rawTab)
 		local col = Instance.new("Frame")
 		col.Name = name
 		col.BackgroundTransparency = 1
-		col.Size = UDim2.new(0, 160, 0, 0)
+		col.Size = UDim2.new(0.5, -math.floor(COLUMN_GAP / 2), 0, 0)
 		col.AutomaticSize = Enum.AutomaticSize.Y
 		col.LayoutOrder = order
 		col.Parent = row
@@ -1280,8 +1316,10 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 
 		task.defer(function()
 			scheduleTwoColumnRelayout(tab)
+			fixElementRowLayout(sectionFrame)
 			if rawGroup.UIElements and rawGroup.UIElements.Main then
 				fixWrappedLabels(rawGroup.UIElements.Main)
+				fixElementRowLayout(rawGroup.UIElements.Main)
 			end
 		end)
 		return Core.createWindUiGroupbox(rawGroup, uiBundle)
@@ -2250,10 +2288,13 @@ function Core.buildUiWindow(ui, settings)
 		NewElements = true,
 		HideSearchBar = false,
 		AutoScale = true,
+		Size = UDim2.fromOffset(868, 650),
+		MinSize = Vector2.new(680, 420),
+		MaxSize = Vector2.new(1200, 900),
 		UICorner = 12,
 		UIPadding = 24,
-		SideBarWidth = 280,
-		ElementPadding = 16,
+		SideBarWidth = 260,
+		ElementPadding = 14,
 		Resizable = true,
 		OpenButton = {
 			Title = "Alleral",

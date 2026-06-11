@@ -33,7 +33,7 @@ return function(ctx)
 	WindUI.ALLERAL_V2_FEATURES = WindUI.ALLERAL_V2_FEATURES or {}
 
 	local V2 = WindUI.ALLERAL_V2_FEATURES
-	V2.version = "2.1.3-alleral-v2"
+	V2.version = "2.1.4-alleral-v2"
 
 	-- -------------------------------------------------------------------------
 	-- V2 customization state
