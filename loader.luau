@@ -2,8 +2,9 @@
 	Alleral Hub — single entry point.
 	Detects game.PlaceId, loads core + matching games/*.luau script.
 ]]
-local LOADER_VERSION = "3.8.4"
+local LOADER_VERSION = "3.8.5"
 local REQUIRED_CORE_VERSION = "1.18"
+local MIN_CORE_VERSION = "1.17"
 local REQUIRED_UI_LIBRARY = "Rayfield"
 local GITHUB_REPO = "evanbackup1256-ship-it/kick"
 local REPO_BRANCH = "main"
@@ -16,6 +17,7 @@ local FETCH_RETRIES = 2
 local FETCH_BACKOFF = 0.35
 local MIN_SCRIPT_BYTES = 1000
 local PINNED_COMMITS = {
+	"d9441a1",
 	"df472aa",
 	"55d3f68",
 	"6a1b22c",
@@ -511,6 +513,30 @@ local function telemetrySourceMarker()
 	return 'Telemetry.Version = "' .. TELEMETRY_MODULE_VERSION .. '"'
 end
 
+local function coreVersionParts(version)
+	local major, minor, patch = tostring(version or ""):match("^(%d+)%.(%d+)%.?(%d*)")
+	return tonumber(major), tonumber(minor), tonumber(patch) or 0
+end
+
+local function coreVersionAtLeast(version, minimum)
+	local vMaj, vMin, vPatch = coreVersionParts(version)
+	local mMaj, mMin, mPatch = coreVersionParts(minimum)
+	if not vMaj or not mMaj then
+		return false
+	end
+	if vMaj ~= mMaj then
+		return vMaj > mMaj
+	end
+	if vMin ~= mMin then
+		return vMin > mMin
+	end
+	return vPatch >= mPatch
+end
+
+local function coreVersionCompatible(version)
+	return coreVersionAtLeast(version, MIN_CORE_VERSION)
+end
+
 local function coreBodyValid(body)
 	if type(body) ~= "string" or #body < MIN_SCRIPT_BYTES then
 		return false
@@ -520,7 +546,7 @@ local function coreBodyValid(body)
 	end
 	local version = body:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
 		or body:match("Core%.VERSION%s*=%s*'([%d%.]+)'")
-	return version == REQUIRED_CORE_VERSION
+	return coreVersionCompatible(version)
 end
 
 local function coreSourceMarker()
@@ -783,6 +809,8 @@ local function resolveLocalMarked(files, marker)
 		local source = readLocalFile(file)
 		if source and markerMatches(source, marker) then
 			return source, "local:" .. file
+		elseif source and marker then
+			log("warn", "Local file skipped (version/content mismatch): " .. file)
 		end
 	end
 	for _, hit in ipairs(discoverLocalFiles(files)) do
@@ -835,6 +863,15 @@ local function resolveFromFiles(files, label, urlOrPath, marker)
 	if devMode and CAPABILITIES.readfile then
 		for _, hit in ipairs(discoverLocalFiles(files)) do
 			return hit.source, "discovered:" .. hit.path
+		end
+	end
+
+	if label == "core" and CAPABILITIES.readfile then
+		for _, hit in ipairs(discoverLocalFiles(files)) do
+			if type(hit.source) == "string" and #hit.source >= MIN_SCRIPT_BYTES and hit.source:find("loadRayfield", 1, true) then
+				log("info", "Using local core without strict version pin: " .. hit.path)
+				return hit.source, "discovered:" .. hit.path
+			end
 		end
 	end
 
@@ -983,12 +1020,46 @@ end
 local function coreVersionOk(core)
 	return core
 		and type(core.loadRayfield) == "function"
-		and core.VERSION == REQUIRED_CORE_VERSION
+		and coreVersionCompatible(core.VERSION)
 		and core.UI_LIBRARY == REQUIRED_UI_LIBRARY
+end
+
+local main
+
+local function tryLocalCoreLoad()
+	if not CAPABILITIES.readfile then
+		return false
+	end
+	for _, hit in ipairs(discoverLocalFiles(SHARED_CORE_FILES)) do
+		if coreBodyValid(hit.source) then
+			local ok, err = compileAndRun(hit.source, "Alleral/core-local")
+			if ok and coreVersionOk(ENV.Alleral_Core) then
+				log("info", "Core loaded from " .. hit.path .. " (v" .. tostring(ENV.Alleral_Core.VERSION) .. ")")
+				return true
+			end
+			ENV.Alleral_Core = nil
+			log("warn", "Local core rejected from " .. hit.path .. ": " .. tostring(err or "version mismatch"))
+		end
+	end
+	for _, hit in ipairs(discoverLocalFiles(SHARED_CORE_FILES)) do
+		if type(hit.source) == "string" and #hit.source >= MIN_SCRIPT_BYTES and hit.source:find("loadRayfield", 1, true) then
+			local ok, err = compileAndRun(hit.source, "Alleral/core-local-relaxed")
+			if ok and ENV.Alleral_Core and type(ENV.Alleral_Core.loadRayfield) == "function" then
+				log("info", "Core loaded from " .. hit.path .. " (v" .. tostring(ENV.Alleral_Core.VERSION) .. ", relaxed)")
+				return true
+			end
+			ENV.Alleral_Core = nil
+			log("warn", "Relaxed local core failed from " .. hit.path .. ": " .. tostring(err))
+		end
+	end
+	return false
 end
 
 local function tryDirectCoreLoad()
 	if coreVersionOk(ENV.Alleral_Core) then
+		return true
+	end
+	if tryLocalCoreLoad() then
 		return true
 	end
 	if not CAPABILITIES.http then
@@ -1054,7 +1125,9 @@ local function runAutoRecovery()
 
 	if tryDirectCoreLoad() then
 		ENV.Alleral_LoaderRunning = false
-		main()
+		if type(main) == "function" then
+			main()
+		end
 		return true
 	end
 
@@ -1064,7 +1137,9 @@ local function runAutoRecovery()
 
 	safeWait(1)
 	ENV.Alleral_LoaderRunning = false
-	main()
+	if type(main) == "function" then
+		main()
+	end
 	return true
 end
 
@@ -1076,6 +1151,10 @@ local function preloadCore(required)
 	ENV.Alleral_Core = nil
 	ENV.Alleral_Rayfield = nil
 	ENV.Alleral_UI = nil
+
+	if tryLocalCoreLoad() then
+		return true
+	end
 
 	if tryDirectCoreLoad() then
 		return true
@@ -1505,7 +1584,7 @@ local function resolveScriptGate(profile)
 	return evaluation
 end
 
-local function main()
+main = function()
 	log("info", "Alleral loader " .. LOADER_VERSION)
 	if ENV.Alleral_LoaderRunning then
 		log("warn", "Already running, call getgenv().Alleral_Reload() after unload")
