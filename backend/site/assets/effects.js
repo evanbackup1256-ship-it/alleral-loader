@@ -19,6 +19,20 @@
     requestAnimationFrame(frame);
   }
 
+  function bindTilt(card) {
+    if (prefersReduced || card.dataset.tiltBound) return;
+    card.dataset.tiltBound = "1";
+    card.addEventListener("mousemove", (e) => {
+      const r = card.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      card.style.transform = `perspective(900px) rotateX(${(-y * 6).toFixed(2)}deg) rotateY(${(x * 6).toFixed(2)}deg) translateY(-6px) scale(1.02)`;
+    });
+    card.addEventListener("mouseleave", () => {
+      card.style.transform = "";
+    });
+  }
+
   window.AlleralEffects = {
     observeReveals(root = document) {
       const items = root.querySelectorAll(".reveal:not(.visible)");
@@ -47,6 +61,11 @@
       });
     },
 
+    bindMotion(root = document) {
+      if (prefersReduced) return;
+      root.querySelectorAll(".tilt-card:not([data-tilt-bound])").forEach(bindTilt);
+    },
+
     animateNumber,
   };
 
@@ -58,10 +77,7 @@
       if (aurora) aurora.style.transform = `translateY(${window.scrollY * 0.12}px)`;
     }, { passive: true });
 
-    document.querySelectorAll(".btn, .filter-pill, .game-card, .feature-card").forEach((el) => {
-      el.addEventListener("mouseenter", () => el.classList.add("motion-hover"));
-      el.addEventListener("mouseleave", () => el.classList.remove("motion-hover"));
-    });
+    window.AlleralEffects.bindMotion();
   }
 
   const nav = document.getElementById("siteNav") || document.querySelector(".nav-shell");
@@ -71,13 +87,10 @@
     }, { passive: true });
   }
 
-  document.querySelectorAll(".faq-item").forEach((item) => {
-    item.addEventListener("toggle", () => {
-      if (item.open) {
-        item.classList.add("faq-open");
-      } else {
-        item.classList.remove("faq-open");
-      }
-    });
-  });
+  document.addEventListener("toggle", (e) => {
+    const item = e.target;
+    if (item?.classList?.contains("faq-item")) {
+      item.classList.toggle("faq-open", item.open);
+    }
+  }, true);
 })();

@@ -4,13 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Alleral</title>
-  <meta name="description" content="Alleral — the ultimate Roblox script library. One loadstring, live game status, instant updates." />
+  <meta name="description" content="Alleral — Roblox scripts with live game status and auto-updates from GitHub." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://challenges.cloudflare.com" crossorigin />
   <link rel="dns-prefetch" href="https://challenges.cloudflare.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232997ff'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='18' fill='white' font-family='sans-serif'%3EA%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="./assets/style.css" />
+  <link rel="stylesheet" href="./assets/animations.css" />
   <script src="./assets/config.js"></script>
   <script src="./assets/gate.js" defer></script>
 </head>
@@ -41,9 +42,8 @@
   <main>
     <section id="home" class="hero wrap">
       <div id="announcement" class="announce-banner hidden reveal"></div>
-      <p class="hero-kicker reveal">Welcome to</p>
       <h1 class="hero-brand reveal"><span id="heroBrand">ALLERAL</span></h1>
-      <p id="tagline" class="hero-lead reveal">The ultimate Roblox script library.</p>
+      <p id="tagline" class="hero-lead reveal">Roblox scripts that stay updated.</p>
 
       <div class="script-panel reveal">
         <div class="script-panel-head">
@@ -62,9 +62,9 @@
         <div class="stat-divider"></div>
         <div class="stat"><strong id="workingCount" data-count="0">0</strong><span>Working</span></div>
         <div class="stat-divider"></div>
-        <div class="stat"><strong id="scriptsUpdated">—</strong><span>Last Sync</span></div>
+        <div class="stat"><strong id="scriptsUpdated">—</strong><span>Last sync</span></div>
         <div class="stat-divider"></div>
-        <div class="stat online"><strong>Live</strong><span>Status Feed</span></div>
+        <div class="stat online"><strong>Live</strong><span>Hub status</span></div>
       </div>
     </section>
 
@@ -72,8 +72,8 @@
       <div class="wrap">
         <header class="section-intro reveal">
           <p class="section-label">Features</p>
-          <h2>Built for Players</h2>
-          <p class="section-desc">Everything you need — one loadstring, live updates, and enterprise-grade security.</p>
+          <h2>What you get</h2>
+          <p class="section-desc">One loadstring, live game status, and updates when we push to GitHub.</p>
         </header>
         <div id="featuresGrid" class="features-grid"></div>
       </div>
@@ -82,8 +82,8 @@
     <section id="games" class="section wrap">
       <header class="section-intro reveal">
         <p class="section-label">Games</p>
-        <h2>Featured Titles</h2>
-        <p class="section-desc">Live status from the hub — the same data your loader reads in-game.</p>
+        <h2>Supported games</h2>
+        <p class="section-desc">Same list the loader checks. Status updates from real injects.</p>
       </header>
       <div class="game-filters reveal" id="gameFilters">
         <button class="filter-pill active" data-filter="all" type="button">All</button>
@@ -99,8 +99,8 @@
       <div class="wrap">
         <header class="section-intro reveal">
           <p class="section-label">Changelog</p>
-          <h2>Latest Updates</h2>
-          <p class="section-desc">Releases, fixes, and new game support — tracked in real time.</p>
+          <h2>Recent changes</h2>
+          <p class="section-desc">What shipped lately.</p>
         </header>
         <div id="changelogList" class="changelog-list"></div>
         <div class="section-cta reveal">
@@ -121,8 +121,8 @@
       <div class="wrap">
         <header class="section-intro reveal">
           <p class="section-label">Contact</p>
-          <h2>Report a Bug or Request a Feature</h2>
-          <p class="section-desc">Send details straight to the maintainer — no account required.</p>
+          <h2>Bug report or feature idea</h2>
+          <p class="section-desc">Goes straight to Discord. No account needed.</p>
         </header>
 
         <div class="support-tabs reveal">
@@ -195,7 +195,7 @@
 
   <footer class="site-footer">
     <div class="wrap footer-inner">
-      <p>© <span id="footerYear"></span> Alleral. Built for players who care about quality.</p>
+      <p>© <span id="footerYear"></span> Alleral</p>
       <div class="footer-links">
         <a id="footerSiteLink" href="#">Hub</a>
         <a href="/admin" target="_blank" rel="noopener">Admin</a>
@@ -211,7 +211,7 @@
       <div class="modal-body">
         <div class="modal-head">
           <h3 id="modalTitle">Game</h3>
-          <span id="modalBadge" class="status-chip">Working</span>
+          <span id="modalBadge" class="status-chip status-animated working"><span class="status-ring"></span><span class="status-dot-core"></span>Working</span>
         </div>
         <p id="modalMeta" class="modal-meta"></p>
         <p id="modalDesc" class="modal-desc"></p>
@@ -224,6 +224,7 @@
   </dialog>
 
   <div id="toast" class="toast"></div>
+  <script src="./assets/select-ui.js"></script>
   <script src="./assets/effects.js"></script>
   <script src="./assets/app.js"></script>
 </body>

@@ -132,6 +132,7 @@ EVENT_COLORS = {
     "session_end": 9936031,
     "milestone": 15844367,
     "log": 7506394,
+    "hub_visit": 5793266,
 }
 
 TITLE_MAP = {
@@ -145,6 +146,7 @@ TITLE_MAP = {
     "session_end": "Session ended",
     "milestone": "Milestone",
     "log": "Event log",
+    "hub_visit": "Hub visit",
 }
 
 PRIORITY = {
@@ -199,6 +201,7 @@ def apply_cors(response):
 @app.route("/api/sync/status", methods=["OPTIONS"])
 @app.route("/api/bug-report", methods=["OPTIONS"])
 @app.route("/api/feature-request", methods=["OPTIONS"])
+@app.route("/api/hub/visit", methods=["OPTIONS"])
 @app.route("/api/ban/check", methods=["OPTIONS"])
 @app.route("/gate/check", methods=["OPTIONS"])
 def cors_preflight():
@@ -230,7 +233,9 @@ if AutoSyncEngine is not None:
     AUTO_SYNC.start()
 GATE_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
 BUG_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
+HUB_VISIT_IP_HITS: dict[str, deque[float]] = defaultdict(deque)
 BUG_RATE_PER_MIN = int(os.environ.get("BUG_RATE_PER_MIN", "6"))
+HUB_VISIT_RATE_PER_MIN = int(os.environ.get("HUB_VISIT_RATE_PER_MIN", "30"))
 PUBLIC_RATE_PER_MIN = int(os.environ.get("PUBLIC_RATE_PER_MIN", "120"))
 
 
@@ -1295,6 +1300,55 @@ def public_bug_report():
     )
     if not ok:
         return jsonify({"ok": False, "error": detail}), 503
+    return jsonify({"ok": True, "status": "sent"})
+
+
+@app.post("/api/hub/visit")
+def hub_visit():
+    """Log a website visit to Discord (once per browser session from the client)."""
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, HUB_VISIT_IP_HITS, HUB_VISIT_RATE_PER_MIN):
+        return jsonify({"ok": True, "status": "rate_limited"}), 202
+
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        body = {}
+
+    path = clip(body.get("path") or request.path or "/", 200)
+    referrer = clip(body.get("referrer") or request.headers.get("Referer") or "", 300)
+    ua = clip(body.get("userAgent") or request.headers.get("User-Agent") or "", 220)
+    source = clip(body.get("source") or "direct", 64)
+    host = clip(body.get("host") or request.headers.get("Host") or "", 120)
+
+    if AUTO_SYNC is not None:
+        try:
+            AUTO_SYNC.record_telemetry({
+                "event": "hub_visit",
+                "context": {"gameId": "hub", "source": source, "clientIp": client_ip},
+            })
+        except Exception as exc:
+            print(f"[hub-visit] stats record failed: {exc}", file=sys.stderr)
+
+    if not WEBHOOK_URL:
+        return jsonify({"ok": True, "status": "accepted"}), 202
+
+    fields = [
+        {"name": "Host", "value": host or "—", "inline": True},
+        {"name": "Path", "value": path or "—", "inline": True},
+        {"name": "Source", "value": source, "inline": True},
+        {"name": "Referrer", "value": referrer or "—", "inline": False},
+        {"name": "User agent", "value": ua or "—", "inline": False},
+        {"name": "IP", "value": client_ip or "unknown", "inline": False},
+    ]
+    ok, detail = post_simple_discord_embed(
+        "Someone opened the hub",
+        EVENT_COLORS["hub_visit"],
+        fields,
+        f"{BRAND} · website visit",
+    )
+    if not ok:
+        print(f"[hub-visit] discord failed: {detail}", file=sys.stderr)
+        return jsonify({"ok": True, "status": "queued_offline"}), 202
     return jsonify({"ok": True, "status": "sent"})
 
 

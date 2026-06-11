@@ -17,10 +17,10 @@ Write-Host "release.json -> commit=$commit updatedAt=$updatedAt"
 
 $manifestSrc = Join-Path $root "cfg/scripts_manifest.json"
 $siteSrc = Join-Path $root "cfg/site.json"
-$site = Get-Content $siteSrc -Raw | ConvertFrom-Json
-$site.loaderVersion = $release.loader
-$site.updatedAt = $updatedAt
-Write-Utf8NoBom $siteSrc (($site | ConvertTo-Json -Depth 10) + "`n")
+$siteRaw = Get-Content $siteSrc -Raw -Encoding UTF8
+$siteRaw = [regex]::Replace($siteRaw, '"loaderVersion"\s*:\s*"[^"]*"', ('"loaderVersion": "' + $release.loader + '"'))
+$siteRaw = [regex]::Replace($siteRaw, '"updatedAt"\s*:\s*"[^"]*"', ('"updatedAt": "' + $updatedAt + '"'))
+Write-Utf8NoBom $siteSrc $siteRaw
 Copy-Item $manifestSrc (Join-Path $root "relay/scripts_manifest.json") -Force
 Copy-Item $siteSrc (Join-Path $root "relay/site.json") -Force
 

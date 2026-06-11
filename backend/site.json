@@ -1,139 +1,126 @@
 {
-    "version":  1,
-    "updatedAt":  "2026-06-11T04:23:40Z",
-    "brand":  "Alleral",
-    "tagline":  "The Ultimate Roblox Script Library",
-    "loaderVersion":  "7.4.0",
-    "announcement":  "",
-    "loadstring":  "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=\" .. tick()))()",
-    "repo":  "evanbackup1256-ship-it/kick",
-    "branch":  "main",
-    "features":  [
-                     "Auto-detects the correct game script on inject",
-                     "Obsidian UI with live script status",
-                     "Advanced Roblox ban API with HWID and UserId enforcement",
-                     "100% auto-synced from GitHub Ã¢â‚¬â€ no manual site maintenance",
-                     "Live script status computed from player telemetry",
-                     "Pulls updates from GitHub within ~45 seconds of a push",
-                     "Runs on Volt, Synapse, Wave, and most HTTP-capable executors"
-                 ],
-    "faq":  [
-                {
-                    "q":  "How Do I Visit the Alleral Website?",
-                    "a":  "Open the hub in any normal browser on your phone or PC. Bookmark the main link in the Share section ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â no Roblox account is needed to browse. You only need Roblox and an executor when you run the loadstring."
-                },
-                {
-                    "q":  "How Do I Load Alleral?",
-                    "a":  "Copy the loadstring from the homepage, paste it into your executor, and run it while you are in a supported game. The script downloads from GitHub automatically."
-                },
-                {
-                    "q":  "Which Games Are Supported?",
-                    "a":  "Check the Games section ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â status updates live from the hub. Only games marked Working or Testing will load."
-                },
-                {
-                    "q":  "Why Did the Script Not Load?",
-                    "a":  "Make sure you are in the correct game, your executor supports loadstring and HTTP, and the game status is not Broken or Maintenance. If you see a ban message, your Roblox account or device may be blocked."
-                },
-                {
-                    "q":  "Does It Auto-Update?",
-                    "a":  "Yes. The loader polls GitHub every ~45 seconds and reloads when a new version is pushed."
-                },
-                {
-                    "q":  "How Does the Ban System Work?",
-                    "a":  "Alleral checks your Roblox UserId, username, HWID, fingerprint, IP, and executor against the Ban API before the script loads. Bans are enforced server-side through Railway and cannot be bypassed from the client."
-                },
-                {
-                    "q":  "How Do I Report a Bug?",
-                    "a":  "Use the Support section on this site. Reports are sent directly to the maintainer via Discord."
-                }
-            ],
-    "changelog":  [
-                      {
-                          "date":  "2026-06-11",
-                          "title":  "Advanced Roblox Ban API",
-                          "items":  [
-                                        "Roblox username to UserId resolution for bans",
-                                        "Cascade bans across UserId, username, HWID, and fingerprint",
-                                        "Ban check sends placeId and universeId from Roblox",
-                                        "Apple-style hub redesign"
-                                    ]
-                      },
-                      {
-                          "date":  "2026-06-11",
-                          "title":  "Hub Site + Cloudflare Gate",
-                          "items":  [
-                                        "Cloudflare-style security check on first visit",
-                                        "Share section with copyable hub links",
-                                        "Live relay status in navigation"
-                                    ]
-                      },
-                      {
-                          "date":  "2026-06-10",
-                          "title":  "Obsidian UI Migration",
-                          "items":  [
-                                        "Replaced Rayfield with Obsidian",
-                                        "Live script manifest",
-                                        "Auto-updater v7.2"
-                                    ]
-                      }
-                  ],
-    "bugCategories":  [
-                          "Script Crash",
-                          "UI Bug",
-                          "Game Not Detected",
-                          "Feature Broken",
-                          "Executor Issue",
-                          "Other"
-                      ],
-    "games":  {
-                  "kick_a_lucky_block":  {
-                                             "placeIds":  [
-                                                              89469502395769
-                                                          ],
-                                             "universeIds":  [
-                                                                 10004244222
-                                                             ],
-                                             "robloxUrl":  "https://www.roblox.com/games/89469502395769",
-                                             "description":  "Kick automation, UI controls, and live stats."
-                                         },
-                  "speed_keyboard_escape":  {
-                                                "placeIds":  [
-                                                                 95082159892680
-                                                             ],
-                                                "robloxUrl":  "https://www.roblox.com/games/95082159892680",
-                                                "description":  "Speed controls and keyboard escape helpers."
-                                            },
-                  "slime_rng":  {
-                                    "placeIds":  [
-                                                     92416421522960
-                                                 ],
-                                    "universeIds":  [
-                                                        9792947201
-                                                    ],
-                                    "robloxUrl":  "https://www.roblox.com/games/92416421522960",
-                                    "description":  "Slime RNG automation and rolls."
-                                },
-                  "build_a_ring_farm":  {
-                                            "placeIds":  [
-                                                             107646426076756
-                                                         ],
-                                            "robloxUrl":  "https://www.roblox.com/games/107646426076756",
-                                            "description":  "Ring farm planting and farming loops."
-                                        },
-                  "survive_a_zombie_arena":  {
-                                                 "placeIds":  [
-                                                                  114204398207377
-                                                              ],
-                                                 "robloxUrl":  "https://www.roblox.com/games/114204398207377",
-                                                 "description":  "Zombie arena combat and survival tools."
-                                             }
-              },
-    "links":  {
-                  "website":  "https://alleral-telemetry-production.up.railway.app/",
-                  "mirror":  "https://evanbackup1256-ship-it.github.io/kick/",
-                  "github":  "https://github.com/evanbackup1256-ship-it/kick",
-                  "loaderRaw":  "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau",
-                  "relay":  "https://alleral-telemetry-production.up.railway.app",
-                  "admin":  "https://alleral-telemetry-production.up.railway.app/admin"
-              }
+  "version": 1,
+  "updatedAt": "2026-06-11T04:34:53Z",
+  "brand": "Alleral",
+  "tagline": "Roblox scripts that stay updated without babysitting.",
+  "loaderVersion": "7.4.0",
+  "announcement": "",
+  "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=\" .. tick()))()",
+  "repo": "evanbackup1256-ship-it/kick",
+  "branch": "main",
+  "features": [
+    "Finds the right script when you inject",
+    "Obsidian UI with live status on each game",
+    "Ban checks against Roblox UserId, username, and HWID",
+    "Site and scripts pull from GitHub automatically",
+    "Game status comes from real inject data, not guesses",
+    "Updates land within about a minute of a push",
+    "Runs on Volt, Synapse, Wave, and most HTTP executors"
+  ],
+  "faq": [
+    {
+      "q": "How do I open the site?",
+      "a": "Any browser works - phone or PC. Grab the link from Share and bookmark it if you want. You don't need a Roblox account just to browse. Roblox and an executor only matter when you run the loadstring."
+    },
+    {
+      "q": "How do I load Alleral?",
+      "a": "Copy the loadstring from the homepage, paste it into your executor, and run it in a supported game. It downloads from GitHub on its own."
+    },
+    {
+      "q": "Which games are supported?",
+      "a": "Check the Games tab - status updates live. Scripts only load when a game is marked Working or Testing."
+    },
+    {
+      "q": "Why didn't the script load?",
+      "a": "Usually it's the wrong game, a weak executor, or the game is marked Broken/Maintenance. If you see a ban message, your account or device is blocked on the server."
+    },
+    {
+      "q": "Does it auto-update?",
+      "a": "Yeah. The loader checks GitHub every ~45 seconds and reloads when something new is pushed."
+    },
+    {
+      "q": "How does the ban system work?",
+      "a": "Before the script loads, Alleral checks your Roblox UserId, username, HWID, fingerprint, IP, and executor against the ban list on Railway. Client-side bypass won't work."
+    },
+    {
+      "q": "How do I report a bug?",
+      "a": "Use the Support section below. Reports go straight to Discord."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-06-11",
+      "title": "Ban API rework",
+      "items": [
+        "Ban by Roblox username (resolves to UserId server-side)",
+        "Cascade across UserId, username, HWID, and fingerprint",
+        "Ban check now sends placeId and universeId from the game",
+        "Hub layout refresh + game thumbnails"
+      ]
+    },
+    {
+      "date": "2026-06-11",
+      "title": "Public hub went live",
+      "items": [
+        "Turnstile gate on first visit",
+        "Share section with copyable links",
+        "Live/Offline indicator in the nav",
+        "Bug reports from the site"
+      ]
+    },
+    {
+      "date": "2026-06-10",
+      "title": "Obsidian UI",
+      "items": [
+        "Dropped Rayfield for Obsidian",
+        "Manifest-driven script list",
+        "Loader auto-update bumped to v7.2"
+      ]
+    }
+  ],
+  "bugCategories": [
+    "Script Crash",
+    "UI Bug",
+    "Game Not Detected",
+    "Feature Broken",
+    "Executor Issue",
+    "Other"
+  ],
+  "games": {
+    "kick_a_lucky_block": {
+      "placeIds": [89469502395769],
+      "universeIds": [10004244222],
+      "robloxUrl": "https://www.roblox.com/games/89469502395769",
+      "description": "Kick automation, UI toggles, live stats."
+    },
+    "speed_keyboard_escape": {
+      "placeIds": [95082159892680],
+      "robloxUrl": "https://www.roblox.com/games/95082159892680",
+      "description": "Speed tweaks and keyboard escape helpers."
+    },
+    "slime_rng": {
+      "placeIds": [92416421522960],
+      "universeIds": [9792947201],
+      "robloxUrl": "https://www.roblox.com/games/92416421522960",
+      "description": "Slime RNG rolls and automation."
+    },
+    "build_a_ring_farm": {
+      "placeIds": [107646426076756],
+      "robloxUrl": "https://www.roblox.com/games/107646426076756",
+      "description": "Ring farm planting loops."
+    },
+    "survive_a_zombie_arena": {
+      "placeIds": [114204398207377],
+      "robloxUrl": "https://www.roblox.com/games/114204398207377",
+      "description": "Zombie arena combat tools."
+    }
+  },
+  "links": {
+    "website": "https://alleral-telemetry-production.up.railway.app/",
+    "mirror": "https://evanbackup1256-ship-it.github.io/kick/",
+    "github": "https://github.com/evanbackup1256-ship-it/kick",
+    "loaderRaw": "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau",
+    "relay": "https://alleral-telemetry-production.up.railway.app",
+    "admin": "https://alleral-telemetry-production.up.railway.app/admin"
+  }
 }

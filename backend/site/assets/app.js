@@ -8,15 +8,15 @@
     "linear-gradient(135deg, #3d1a2a 0%, #1a0a10 50%, #ff453a33 100%)",
   ];
 
-  const FEATURE_ICONS = ["⚡", "🛡️", "🔄", "🎮", "📡", "✨"];
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
   const toastEl = $("#toast");
   const modal = $("#gameModal");
-  const state = { site: null, changelogShown: 2, gameFilter: "all", siteSignature: "" };
+  const state = { site: null, changelogShown: 2, gameFilter: "all", siteSignature: "", thumbs: {}, gamesRenderToken: 0 };
   const SITE_POLL_MS = 30000;
+  const VISIT_KEY = "alleral_hub_logged";
 
   function flash(text, isError = false) {
     if (!toastEl) return;
@@ -45,6 +45,37 @@
     return GRADIENTS[hash % GRADIENTS.length];
   }
 
+  function placeIdOf(game) {
+    const ids = game?.placeIds;
+    return Array.isArray(ids) && ids[0] ? String(ids[0]) : null;
+  }
+
+  async function fetchThumbnails(games) {
+    const placeIds = [...new Set(games.map(placeIdOf).filter(Boolean))];
+    if (!placeIds.length) return state.thumbs;
+
+    const missing = placeIds.filter((id) => !state.thumbs[id]);
+    if (!missing.length) return state.thumbs;
+
+    try {
+      const url = `https://thumbnails.roblox.com/v1/places/gameicons?placeIds=${missing.join(",")}&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false`;
+      const res = await fetch(url);
+      const json = await res.json();
+      (json.data || []).forEach((row) => {
+        if (row.state === "Completed" && row.imageUrl) {
+          state.thumbs[String(row.targetId)] = row.imageUrl;
+        }
+      });
+    } catch {
+      /* keep cached thumbs */
+    }
+    return state.thumbs;
+  }
+
+  function statusChipHtml(status, label) {
+    return `<span class="status-chip status-animated ${status}"><span class="status-ring"></span><span class="status-dot-core"></span>${label}</span>`;
+  }
+
   function setActiveNav() {
     const id = location.hash.replace("#", "") || "home";
     $$(".nav-links a[data-section]").forEach((a) => a.classList.toggle("active", a.dataset.section === id));
@@ -55,9 +86,36 @@
     return text.charAt(0).toUpperCase() + text.slice(1);
   }
 
+  function formatChangelogDate(raw) {
+    if (!raw) return "";
+    const d = new Date(`${raw}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return raw;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  function logHubVisit(source = "load") {
+    if (sessionStorage.getItem(VISIT_KEY)) return;
+    sessionStorage.setItem(VISIT_KEY, "1");
+    const base = window.ALLERAL_API || "";
+    fetch(`${base}/api/hub/visit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path: `${location.pathname}${location.hash}`,
+        referrer: document.referrer || "",
+        userAgent: navigator.userAgent,
+        host: location.host,
+        source,
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  }
+
   function afterRender() {
     window.AlleralEffects?.observeReveals?.();
     window.AlleralEffects?.animateCounters?.();
+    window.AlleralEffects?.bindMotion?.();
+    window.AlleralSelect?.enhance?.();
   }
 
   function animateCount(el, target) {
@@ -105,27 +163,35 @@
     }
     items.forEach((text, i) => {
       const card = document.createElement("article");
-      card.className = "feature-card card-enter";
+      card.className = "feature-card card-enter tilt-card";
       card.style.animationDelay = `${i * 0.07}s`;
-      card.innerHTML = `
-        <span class="feature-icon" aria-hidden="true">${FEATURE_ICONS[i % FEATURE_ICONS.length]}</span>
-        <p>${text}</p>
-      `;
+      card.innerHTML = `<p>${text}</p>`;
       root.appendChild(card);
     });
     afterRender();
   }
 
-  function openGameModal(game, gradient) {
+  function setModalArt(thumbUrl, gradient) {
+    const art = $("#modalArt");
+    if (!art) return;
+    art.innerHTML = `
+      ${thumbUrl ? `<img src="${thumbUrl}" alt="" loading="lazy" />` : ""}
+      <div class="modal-art-fallback" style="background:${gradient}"></div>
+    `;
+  }
+
+  function openGameModal(game, gradient, thumbUrl) {
     if (!modal) return;
     $("#modalTitle").textContent = game.name || game.id;
     $("#modalMeta").textContent = `Version ${game.version || "?"} · ${game.id || ""}`;
     $("#modalDesc").textContent = game.description || game.message || "No description available.";
     const status = (game.status || "working").toLowerCase();
     const badge = $("#modalBadge");
-    badge.textContent = titleCaseStatus(status);
-    badge.className = `status-chip ${status}`;
-    $("#modalArt").style.background = gradient;
+    if (badge) {
+      badge.className = `status-chip status-animated modal-badge ${status}`;
+      badge.innerHTML = `<span class="status-ring"></span><span class="status-dot-core"></span>${titleCaseStatus(status)}`;
+    }
+    setModalArt(thumbUrl, gradient);
     const roblox = $("#modalRoblox");
     if (game.robloxUrl) {
       roblox.href = game.robloxUrl;
@@ -139,46 +205,74 @@
     modal.querySelector(".game-modal-inner")?.classList.add("modal-enter");
   }
 
-  function renderGames(site) {
+  async function renderGames(site) {
     const root = $("#gamesGrid");
+    if (!root) return;
+
+    const token = ++state.gamesRenderToken;
+    const filter = state.gameFilter;
+    root.classList.add("is-updating");
     root.innerHTML = "";
+
     let games = Object.values(site.games || {}).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-    if (state.gameFilter !== "all") {
-      games = games.filter((g) => (g.status || "working").toLowerCase() === state.gameFilter);
+    if (filter !== "all") {
+      games = games.filter((g) => (g.status || "working").toLowerCase() === filter);
     }
     if (!games.length) {
+      if (token !== state.gamesRenderToken) return;
       root.innerHTML = '<p class="empty reveal">No games match this filter.</p>';
+      root.classList.remove("is-updating");
       afterRender();
       return;
     }
+
+    await fetchThumbnails(games);
+    if (token !== state.gamesRenderToken) return;
+
     games.forEach((game, i) => {
       const status = (game.status || "working").toLowerCase();
       const statusLabel = titleCaseStatus(status);
       const grad = gradientFor(game.id, i);
+      const pid = placeIdOf(game);
+      const thumb = pid ? state.thumbs[pid] : null;
       const card = document.createElement("article");
-      card.className = "game-card card-enter";
+      card.className = "game-card card-enter tilt-card";
       card.style.animationDelay = `${i * 0.06}s`;
       card.innerHTML = `
-        <div class="game-art" style="background:${grad}"></div>
+        <div class="game-art">
+          ${thumb ? `<img class="game-thumb" src="${thumb}" alt="${game.name || game.id}" loading="lazy" />` : ""}
+          <div class="game-art-fallback" style="background:${grad}"></div>
+          <div class="game-art-shine"></div>
+        </div>
         <div class="game-body">
           <h3>${game.name || game.id}</h3>
           <div class="game-meta">
-            <span class="status-chip ${status}">${statusLabel}</span>
+            ${statusChipHtml(status, statusLabel)}
             <span class="game-version">v${game.version || "?"}</span>
           </div>
           <p class="game-desc">${game.description || game.message || ""}</p>
-          <button class="btn-link" type="button">View Details →</button>
+          <button class="btn-link" type="button">View Details</button>
         </div>
       `;
+      const img = card.querySelector(".game-thumb");
+      if (img) {
+        img.addEventListener("load", () => img.classList.add("loaded"));
+        img.addEventListener("error", () => img.remove());
+      }
       card.addEventListener("click", (e) => {
         if (e.target.closest("a")) return;
-        openGameModal(game, grad);
+        openGameModal(game, grad, thumb);
       });
       root.appendChild(card);
     });
 
+    if (token !== state.gamesRenderToken) return;
+
+    root.classList.remove("is-updating");
+
     const bugGame = $("#bugGame");
-    if (bugGame && !bugGame.dataset.filled) {
+    if (bugGame) {
+      const current = bugGame.value;
       const allGames = Object.values(site.games || {}).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
       bugGame.innerHTML = '<option value="">Select a game</option>';
       allGames.forEach((g) => {
@@ -187,7 +281,8 @@
         opt.textContent = g.name || g.id;
         bugGame.appendChild(opt);
       });
-      bugGame.dataset.filled = "1";
+      if (current) bugGame.value = current;
+      window.AlleralSelect?.refresh?.(bugGame);
     }
     afterRender();
   }
@@ -203,10 +298,10 @@
     slice.forEach((entry, i) => {
       if (root.children[i]) return;
       const node = document.createElement("article");
-      node.className = "changelog-card reveal";
+      node.className = "changelog-card reveal tilt-card";
       node.innerHTML = `
         <h3>${entry.title || "Update"}</h3>
-        <p class="cl-date">${entry.date || ""}</p>
+        <p class="cl-date">${formatChangelogDate(entry.date)}</p>
         <ul>${(entry.items || []).map((item) => `<li>${item}</li>`).join("")}</ul>
       `;
       root.appendChild(node);
@@ -242,6 +337,7 @@
       opt.textContent = cat;
       select.appendChild(opt);
     });
+    window.AlleralSelect?.refresh?.(select);
   }
 
   function renderAccess(site) {
@@ -272,7 +368,7 @@
     ].join("|");
   }
 
-  function applySite(data, { notify = false } = {}) {
+  async function applySite(data, { notify = false } = {}) {
     const prev = state.siteSignature;
     const sig = siteSignature(data);
     const changed = prev && sig !== prev;
@@ -285,17 +381,17 @@
     renderAnnouncement(data);
     renderHero(data);
     renderFeatures(data);
-    renderGames(data);
+    await renderGames(data);
     if (changed) renderChangelog(data, true);
     else renderChangelog(data, false);
     renderFaq(data);
     renderBugCategories(data);
-    if (notify && changed) flash("Hub synced from GitHub");
+    if (notify && changed) flash("Synced from GitHub");
   }
 
   async function loadSite(notify = false) {
     const data = await api("/api/site");
-    applySite(data, { notify });
+    await applySite(data, { notify });
   }
 
   function startSitePolling() {
@@ -386,7 +482,7 @@
 
   function bindTabs() {
     $$(".support-tabs button").forEach((btn) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", (e) => {
         const panel = btn.dataset.panel;
         $$(".support-tabs button").forEach((b) => b.classList.toggle("active", b === btn));
         $$("[data-panel-body]").forEach((body) => {
@@ -398,6 +494,10 @@
             body.classList.add("panel-enter");
           }
         });
+        if (e?.clientX != null) {
+          btn.style.setProperty("--x", `${((e.clientX - btn.getBoundingClientRect().left) / btn.offsetWidth) * 100}%`);
+          btn.style.setProperty("--y", `${((e.clientY - btn.getBoundingClientRect().top) / btn.offsetHeight) * 100}%`);
+        }
       });
     });
   }
@@ -407,7 +507,7 @@
       btn.addEventListener("click", () => {
         state.gameFilter = btn.dataset.filter || "all";
         $$(".filter-pill").forEach((b) => b.classList.toggle("active", b === btn));
-        renderGames(state.site);
+        if (state.site) renderGames(state.site);
       });
     });
   }
@@ -429,6 +529,11 @@
   }
 
   function initWhenReady() {
+    if (isGatePassed()) logHubVisit("return");
+    else {
+      window.addEventListener("alleral:gate-passed", () => logHubVisit("gate"), { once: true });
+    }
+
     $("#copyLoadstring")?.addEventListener("click", copyLoadstring);
     $("#copyPrimaryUrl")?.addEventListener("click", () => {
       copyText($("#primaryUrl")?.textContent || "", "Link copied");
