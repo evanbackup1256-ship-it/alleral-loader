@@ -77,26 +77,9 @@ return function(WindUI)
 		return Vector2.new(width, height)
 	end
 
-	local function fixTextLayout(root)
-		if not root or not root:IsA("GuiObject") then
-			return
-		end
-		for _, desc in ipairs(root:GetDescendants()) do
-			if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then
-				if desc.TextWrapped then
-					desc.TextWrapped = false
-					desc.TextTruncate = Enum.TextTruncate.None
-				end
-				if desc.AutomaticSize == Enum.AutomaticSize.XY then
-					desc.AutomaticSize = Enum.AutomaticSize.Y
-					if desc.Size.X.Scale == 0 and desc.Size.X.Offset <= 0 then
-						desc.Size = UDim2.new(1, 0, 0, 0)
-					end
-				elseif desc:IsA("TextLabel") and desc.Size.X.Scale == 0 and desc.Size.X.Offset == 0 then
-					desc.Size = UDim2.new(1, 0, desc.Size.Y.Scale, desc.Size.Y.Offset)
-				end
-			end
-		end
+	local function fixTextLayout(_root)
+		-- WindUI element rows rely on TextWrapped + TextOffset layout (Fluent-style).
+		-- Global unwrap caused toggle/slider overlap on every tab.
 	end
 
 	local function runLayoutHooks(window)
@@ -245,7 +228,7 @@ return function(WindUI)
 	end
 
 	local api = {
-		VERSION = "1.1.1",
+		VERSION = "1.1.2",
 		DEFAULTS = DEFAULTS,
 		compute = computeScale,
 		apply = applyScale,

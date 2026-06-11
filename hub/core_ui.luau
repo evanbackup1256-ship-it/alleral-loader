@@ -1007,46 +1007,7 @@ function Core.createStubUiGroup(label)
 end
 
 local COLUMN_GAP = 12
-local TOGGLE_ROW_MIN_HEIGHT = 40
-local SLIDER_ROW_MIN_HEIGHT = 58
 Core._UiTabRegistry = Core._UiTabRegistry or {}
-
-local function hasAncestorNamed(node, name)
-	while node do
-		if node.Name == name then
-			return true
-		end
-		node = node.Parent
-	end
-	return false
-end
-
-local function isSliderMain(gui)
-	return gui and gui:IsA("GuiObject") and gui.Name == "Main" and gui:FindFirstChild("SliderContainer") ~= nil
-end
-
-local function isToggleMain(gui)
-	if not gui or not gui:IsA("GuiObject") or gui.Name ~= "Main" then
-		return false
-	end
-	if gui:FindFirstChild("ToggleFrame", true) then
-		return true
-	end
-	return hasAncestorNamed(gui.Parent, "ToggleFrame")
-end
-
-local function ensureRowMainLayout(main, minHeight)
-	if not main or not main:IsA("GuiObject") then
-		return
-	end
-	main.Size = UDim2.new(1, 0, 0, 0)
-	main.AutomaticSize = Enum.AutomaticSize.Y
-	if main.AbsoluteSize.Y > 0 and main.AbsoluteSize.Y < minHeight then
-		main.Size = UDim2.new(1, 0, 0, minHeight)
-	elseif main.Size.Y.Offset > 0 and main.Size.Y.Offset < minHeight then
-		main.Size = UDim2.new(1, 0, 0, minHeight)
-	end
-end
 
 local function refreshTabScrollCanvas(rawTab)
 	if not rawTab or not rawTab.UIElements then
@@ -1061,6 +1022,31 @@ local function refreshTabScrollCanvas(rawTab)
 	if columns and columns:IsA("GuiObject") then
 		columns.Size = UDim2.new(1, 0, 0, 0)
 		columns.AutomaticSize = Enum.AutomaticSize.Y
+	end
+end
+
+local function resyncSectionLayout(rawSection)
+	if type(rawSection) ~= "table" then
+		return
+	end
+	local frame = rawSection.ElementFrame
+	if frame and frame:IsA("GuiObject") then
+		frame.AutomaticSize = Enum.AutomaticSize.None
+		frame.Size = UDim2.new(1, 0, frame.Size.Y.Scale, frame.Size.Y.Offset)
+	end
+	if type(rawSection.Open) == "function" then
+		pcall(function()
+			rawSection:Open(true)
+		end)
+	end
+end
+
+local function resyncTabSections(tab)
+	if type(tab) ~= "table" then
+		return
+	end
+	for _, section in ipairs(tab._sections or {}) do
+		resyncSectionLayout(section)
 	end
 end
 
@@ -1099,50 +1085,6 @@ local function measureTabContentWidth(rawTab, window)
 	return 0
 end
 
-local function fixElementRowLayout(root)
-	if not root then
-		return
-	end
-	for _, desc in ipairs(root:GetDescendants()) do
-		if isSliderMain(desc) then
-			ensureRowMainLayout(desc, SLIDER_ROW_MIN_HEIGHT)
-		elseif isToggleMain(desc) then
-			ensureRowMainLayout(desc, TOGGLE_ROW_MIN_HEIGHT)
-		end
-		if desc:IsA("TextLabel") and not hasAncestorNamed(desc, "SliderFrame") then
-			local parentName = desc.Parent and desc.Parent.Name or ""
-			if desc.Name == "Title" or desc.Name == "Desc" or parentName == "TitleFrame" then
-				desc.TextWrapped = false
-				desc.TextTruncate = Enum.TextTruncate.None
-				if desc.TextXAlignment == Enum.TextXAlignment.Left and hasAncestorNamed(desc, "ToggleFrame") then
-					if desc.AutomaticSize == Enum.AutomaticSize.XY then
-						desc.AutomaticSize = Enum.AutomaticSize.Y
-					end
-					desc.Size = UDim2.new(1, 0, 0, 0)
-				end
-			end
-		end
-	end
-end
-
-local function fixWrappedLabels(root)
-	if not root then
-		return
-	end
-	for _, desc in ipairs(root:GetDescendants()) do
-		if (desc:IsA("TextLabel") or desc:IsA("TextButton")) and desc.TextWrapped then
-			desc.TextWrapped = false
-			desc.TextTruncate = Enum.TextTruncate.None
-			if desc.AutomaticSize == Enum.AutomaticSize.XY then
-				desc.AutomaticSize = Enum.AutomaticSize.Y
-				desc.Size = UDim2.new(1, 0, 0, 0)
-			elseif desc.Size.X.Scale == 0 and desc.Size.X.Offset == 0 then
-				desc.Size = UDim2.new(1, 0, desc.Size.Y.Scale, desc.Size.Y.Offset)
-			end
-		end
-	end
-end
-
 local function relayoutTwoColumnFrames(tab)
 	local layout = tab._layout
 	if not layout or not layout.ready or not layout.row or not layout.left or not layout.right then
@@ -1168,14 +1110,38 @@ local function relayoutTwoColumnFrames(tab)
 	layout.right.Size = colSize
 	layout.right.AutomaticSize = Enum.AutomaticSize.Y
 
-	fixWrappedLabels(layout.row)
-	fixElementRowLayout(layout.row)
-	fixWrappedLabels(layout.left)
-	fixElementRowLayout(layout.left)
-	fixWrappedLabels(layout.right)
-	fixElementRowLayout(layout.right)
+	resyncTabSections(tab)
 	refreshTabScrollCanvas(tab._rawTab)
 	return true
+end
+
+local function bindColumnLayoutSignals(tab, layout, container)
+	if not layout or layout._layoutSignalsBound then
+		return
+	end
+	layout._layoutSignalsBound = true
+
+	local function bump()
+		task.defer(function()
+			relayoutTwoColumnFrames(tab)
+		end)
+	end
+
+	for _, node in ipairs({ layout.row, layout.left, layout.right }) do
+		if node then
+			local list = node:FindFirstChildOfClass("UIListLayout")
+			if list then
+				pcall(function()
+					list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(bump)
+				end)
+			end
+		end
+	end
+	if container then
+		pcall(function()
+			container:GetPropertyChangedSignal("AbsoluteSize"):Connect(bump)
+		end)
+	end
 end
 
 local function ensureTwoColumnLayout(tab, rawTab)
@@ -1201,6 +1167,11 @@ local function ensureTwoColumnLayout(tab, rawTab)
 	row.AutomaticSize = Enum.AutomaticSize.Y
 	row.LayoutOrder = -1000
 	row.Parent = container
+
+	local scrollLayout = container:FindFirstChildOfClass("UIListLayout")
+	if scrollLayout then
+		scrollLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	end
 
 	local rowList = Instance.new("UIListLayout")
 	rowList.FillDirection = Enum.FillDirection.Horizontal
@@ -1253,6 +1224,7 @@ local function ensureTwoColumnLayout(tab, rawTab)
 	end
 
 	relayoutTwoColumnFrames(tab)
+	bindColumnLayoutSignals(tab, layout, container)
 	return true
 end
 
@@ -1283,6 +1255,8 @@ function Core.refreshAllTabColumns()
 	for _, tab in ipairs(Core._UiTabRegistry) do
 		if type(tab) == "table" then
 			relayoutTwoColumnFrames(tab)
+			resyncTabSections(tab)
+			refreshTabScrollCanvas(tab._rawTab)
 		end
 	end
 	return true
@@ -1314,6 +1288,7 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 		_ui = uiBundle,
 		_window = window,
 		_columnCount = 1,
+		_sections = {},
 	}
 	table.insert(Core._UiTabRegistry, tab)
 
@@ -1365,24 +1340,16 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 					sectionFrame.LayoutOrder = layout.leftOrder
 				end
 				sectionFrame.Parent = colFrame
-				sectionFrame.Size = UDim2.new(1, 0, 0, 0)
-				if sectionFrame:IsA("Frame") then
-					sectionFrame.AutomaticSize = Enum.AutomaticSize.Y
-				end
-				fixWrappedLabels(sectionFrame)
+				sectionFrame.AutomaticSize = Enum.AutomaticSize.None
+				sectionFrame.Size = UDim2.new(1, 0, 0, sectionFrame.Size.Y.Offset)
 			end
 		end
 
+		table.insert(tab._sections, rawGroup)
+
 		task.defer(function()
 			scheduleTwoColumnRelayout(tab)
-			if sectionFrame and sectionFrame.Parent then
-				fixWrappedLabels(sectionFrame)
-				fixElementRowLayout(sectionFrame)
-			end
-			if rawGroup.UIElements and rawGroup.UIElements.Main then
-				fixWrappedLabels(rawGroup.UIElements.Main)
-				fixElementRowLayout(rawGroup.UIElements.Main)
-			end
+			resyncSectionLayout(rawGroup)
 			refreshTabScrollCanvas(rawTab)
 		end)
 		return Core.createWindUiGroupbox(rawGroup, uiBundle)

@@ -1126,16 +1126,6 @@ return function(WindUI)
 			if col and col:IsA("GuiObject") then
 				col.Size = UDim2.new(0, colWidth, 0, 0)
 				col.AutomaticSize = Enum.AutomaticSize.Y
-				for _, desc in ipairs(col:GetDescendants()) do
-					if desc:IsA("TextLabel") and desc.TextWrapped then
-						desc.TextWrapped = false
-						desc.TextTruncate = Enum.TextTruncate.None
-						if desc.AutomaticSize == Enum.AutomaticSize.XY then
-							desc.AutomaticSize = Enum.AutomaticSize.Y
-							desc.Size = UDim2.new(1, 0, 0, 0)
-						end
-					end
-				end
 			end
 		end
 		return true
@@ -1335,12 +1325,8 @@ return function(WindUI)
 				end
 			elseif desc:IsA("GuiObject") and desc.Name == "SliderFrame" then
 				local main = desc:FindFirstChild("Main")
-				if main and main:IsA("GuiObject") then
-					local minHeight = 58
-					if main.Size.Y.Offset > 0 and main.Size.Y.Offset < minHeight then
-						main.Size = UDim2.new(1, 0, 0, minHeight)
-					end
-					main.AutomaticSize = Enum.AutomaticSize.Y
+				if main and main:IsA("GuiObject") and main.Size.Y.Offset > 0 and main.Size.Y.Offset < 52 then
+					main.Size = UDim2.new(main.Size.X.Scale, main.Size.X.Offset, 0, 52)
 				end
 			elseif desc:IsA("GuiObject") and (desc.Name == "Button" or desc.Name == "Slider" or desc.Name == "Dropdown") then
 				if desc.Size.Y.Offset > 0 and desc.Size.Y.Offset < MAC.rowHeight then
@@ -2777,88 +2763,10 @@ return function(WindUI)
 		end
 	end
 
-	local function hasAncestorNamed(node, name)
-		while node do
-			if node.Name == name then
-				return true
-			end
-			node = node.Parent
-		end
-		return false
+	local function polishToggleRows(_root)
 	end
 
-	local function isSliderMain(gui)
-		return gui and gui:IsA("GuiObject") and gui.Name == "Main" and gui:FindFirstChild("SliderContainer") ~= nil
-	end
-
-	local function isToggleMain(gui)
-		if not gui or not gui:IsA("GuiObject") or gui.Name ~= "Main" then
-			return false
-		end
-		if gui:FindFirstChild("ToggleFrame", true) then
-			return true
-		end
-		return hasAncestorNamed(gui.Parent, "ToggleFrame")
-	end
-
-	local function ensureRowMainLayout(main, minHeight)
-		if not main or not main:IsA("GuiObject") then
-			return
-		end
-		main.Size = UDim2.new(1, 0, 0, 0)
-		main.AutomaticSize = Enum.AutomaticSize.Y
-		if main.AbsoluteSize.Y > 0 and main.AbsoluteSize.Y < minHeight then
-			main.Size = UDim2.new(1, 0, 0, minHeight)
-		elseif main.Size.Y.Offset > 0 and main.Size.Y.Offset < minHeight then
-			main.Size = UDim2.new(1, 0, 0, minHeight)
-		end
-	end
-
-	local function polishToggleRows(root)
-		if not root then
-			return
-		end
-		for _, desc in ipairs(root:GetDescendants()) do
-			if isSliderMain(desc) then
-				ensureRowMainLayout(desc, 58)
-			elseif isToggleMain(desc) then
-				ensureRowMainLayout(desc, 40)
-			end
-			if desc:IsA("TextLabel") and not hasAncestorNamed(desc, "SliderFrame") then
-				local parentName = desc.Parent and desc.Parent.Name or ""
-				if desc.Name == "Title" or desc.Name == "Desc" or parentName == "TitleFrame" then
-					desc.TextWrapped = false
-					desc.TextTruncate = Enum.TextTruncate.None
-					if desc.TextXAlignment == Enum.TextXAlignment.Left and hasAncestorNamed(desc, "ToggleFrame") then
-						if desc.AutomaticSize == Enum.AutomaticSize.XY then
-							desc.AutomaticSize = Enum.AutomaticSize.Y
-						end
-						desc.Size = UDim2.new(1, 0, 0, 0)
-					end
-				end
-			end
-		end
-	end
-
-	local function polishRowLabels(root)
-		if not root then
-			return
-		end
-		for _, desc in ipairs(root:GetDescendants()) do
-			if desc:IsA("TextLabel") and desc.TextWrapped then
-				local layout = desc.Parent and desc.Parent:FindFirstChildOfClass("UIListLayout")
-				if layout and layout.FillDirection == Enum.FillDirection.Horizontal then
-					desc.TextWrapped = false
-					desc.TextTruncate = Enum.TextTruncate.None
-					if desc.AutomaticSize == Enum.AutomaticSize.XY then
-						desc.AutomaticSize = Enum.AutomaticSize.Y
-						desc.Size = UDim2.new(1, 0, 0, 0)
-					elseif desc.Size.X.Scale == 0 and desc.Size.X.Offset == 0 then
-						desc.Size = UDim2.new(1, 0, desc.Size.Y.Scale, desc.Size.Y.Offset)
-					end
-				end
-			end
-		end
+	local function polishRowLabels(_root)
 	end
 
 	local function polishLabelTone(root)
