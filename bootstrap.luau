@@ -1,4 +1,4 @@
-﻿-- Alleral entry shim — save to autoexec, or fetch this file (not launch.luau) via HttpGet.
+﻿-- Alleral entry — paste in your executor and click Execute (no autoexec required).
 local LAUNCH_URL = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/launch.luau"
 
 local function genv()
@@ -66,24 +66,31 @@ local function httpGet(url)
 	return nil
 end
 
-if type(loadFn) ~= "function" then
-	warn("[Alleral] This executor needs loadstring.")
-	return
+local function Alleral_Load()
+	if type(loadFn) ~= "function" then
+		warn("[Alleral] This executor needs loadstring.")
+		return false
+	end
+
+	local source = httpGet(LAUNCH_URL)
+	if type(source) ~= "string" or source == "" then
+		warn("[Alleral] Could not download Alleral. Check HTTP and try again.")
+		return false
+	end
+
+	local fn, compileErr = loadFn(source, "Alleral/launch")
+	if type(fn) ~= "function" then
+		warn("[Alleral] Launch failed to compile" .. (compileErr and (": " .. tostring(compileErr)) or "."))
+		return false
+	end
+
+	local ok, runErr = pcall(fn)
+	if not ok then
+		warn("[Alleral] " .. tostring(runErr))
+		return false
+	end
+	return true
 end
 
-local source = httpGet(LAUNCH_URL)
-if type(source) ~= "string" or source == "" then
-	warn("[Alleral] Could not download Alleral. Check HTTP and rejoin.")
-	return
-end
-
-local fn, compileErr = loadFn(source, "Alleral/launch")
-if type(fn) ~= "function" then
-	warn("[Alleral] Launch failed to compile" .. (compileErr and (": " .. tostring(compileErr)) or "."))
-	return
-end
-
-local ok, runErr = pcall(fn)
-if not ok then
-	warn("[Alleral] " .. tostring(runErr))
-end
+ENV.Alleral_Load = Alleral_Load
+Alleral_Load()

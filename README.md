@@ -6,21 +6,27 @@ Roblox automation hub — one loader, five games, private owner telemetry.
 
 ## Quick start
 
-Copy **Alleral Hub** into your executor workspace, then from the repo root:
+**No autoexec.** Join a supported game, paste one of the lines below into your executor, and click **Execute**.
 
 ```lua
-loadstring(readfile("loader.luau"))()
+Alleral_Load()
 ```
 
-Remote (recommended — use `bootstrap.luau`, not `launch.luau`):
+First time this session, use the full loader (registers `Alleral_Load` for next time):
 
 ```lua
 (getgenv().loadstring or loadstring or load)(game.HttpGet(game, "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?t=" .. tick(), true))()
 ```
 
-Or save `bootstrap.luau` from the repo into your executor autoexec folder (no one-liner needed).
+Optional: save that second line in your executor's **Scripts / Favorites** tab for one-click load — not in autoexec unless you want it every join.
 
-Reload: `getgenv().Alleral_Reload()` · Debug: `getgenv().Alleral_LoaderInfo()`
+**Dev / local workspace** — copy the repo into your executor workspace, then:
+
+```lua
+loadstring(readfile("loader.luau"))()
+```
+
+Reload (same session): `getgenv().Alleral_Reload()` · Debug: `getgenv().Alleral_LoaderInfo()`
 
 Dev mode (prefer local files): `getgenv().Alleral_DevMode = true` before running.
 
