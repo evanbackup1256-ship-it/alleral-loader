@@ -6,7 +6,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "1.1"
+local VERSION = "1.2"
 local state = getgenv().Alleral_State
 local Core = getgenv().Alleral_Core
 local connections = {}
@@ -770,32 +770,22 @@ Core.makeSupervisor(state, loops, loopControllers, "autoRebirth", 0.5, function(
 	end
 end)
 
-local window = starlight:CreateWindow({
-	Name = "Alleral",
+local window = Core.buildStarlightWindow(starlight, {
 	Subtitle = "Speed Keyboard Escape · v" .. VERSION,
-	Icon = 10723407389,
-	LoadingEnabled = false,
-	NotifyOnCallbackError = true,
 })
-local section = window:CreateTabSection("Alleral", true)
-local mainTab = section:CreateTab({ Name = "Main", Icon = 10723407389, Columns = 2 }, "main")
-local autoTab = section:CreateTab({ Name = "Auto", Icon = 10734923214, Columns = 2 }, "auto")
-local shopTab = section:CreateTab({ Name = "Shop", Icon = 10734952479, Columns = 1 }, "shop")
-local miscTab = section:CreateTab({ Name = "Misc", Icon = 10734950020, Columns = 1 }, "misc")
+local section = Core.buildStarlightSection(window)
+local mainTab = Core.buildStarlightTab(section, "Main", 10723407389, 2, "main")
+local autoTab = Core.buildStarlightTab(section, "Auto", 10734923214, 2, "auto")
+local shopTab = Core.buildStarlightTab(section, "Shop", 10734952479, 1, "shop")
+local miscTab = Core.buildStarlightTab(section, "Misc", 10734950020, 1, "misc")
+local settingsTab = Core.buildStarlightTab(section, "Settings", 10734950309, 1, "settings")
 
-local farmGroup = mainTab:CreateGroupbox({ Name = "Farming", Column = 1 }, "farm")
-local tweenGroup = mainTab:CreateGroupbox({ Name = "Movement", Column = 2 }, "tween")
-local auraGroup = autoTab:CreateGroupbox({ Name = "Auras", Column = 1 }, "aura")
-local equipGroup = autoTab:CreateGroupbox({ Name = "Gear", Column = 2 }, "equip")
-local shopGroup = shopTab:CreateGroupbox({ Name = "Shop", Column = 1 }, "shop_items")
-local utilGroup = miscTab:CreateGroupbox({ Name = "Extras", Column = 1 }, "utils")
-
-local farm = Core.wrapStarlightGroup(farmGroup, function() end)
-local tween = Core.wrapStarlightGroup(tweenGroup, function() end)
-local aura = Core.wrapStarlightGroup(auraGroup, function() end)
-local equip = Core.wrapStarlightGroup(equipGroup, function() end)
-local shop = Core.wrapStarlightGroup(shopGroup, function() end)
-local util = Core.wrapStarlightGroup(utilGroup, function() end)
+local farm = Core.buildStarlightGroup(mainTab, "Farming", 1, nil, nil, "farm")
+local tween = Core.buildStarlightGroup(mainTab, "Movement", 2, nil, nil, "tween")
+local aura = Core.buildStarlightGroup(autoTab, "Auras", 1, nil, nil, "aura")
+local equip = Core.buildStarlightGroup(autoTab, "Gear", 2, nil, nil, "equip")
+local shop = Core.buildStarlightGroup(shopTab, "Shop", 1, nil, nil, "shop_items")
+local util = Core.buildStarlightGroup(miscTab, "Extras", 1, nil, nil, "utils")
 
 local winTargetsW1 = { "Win 1", "Win 3", "Win 10", "Win 20", "Win 50", "Win 100", "Win 150", "Win 300", "Win 500", "Win 1000", "Win 2500" }
 local winTargetsW2 = { "Win 250k", "Win 400k", "Win 600k", "Win 1M", "Win 1.5M", "Win 2.5M" }
@@ -879,8 +869,8 @@ util:CreateToggle("Anti AFK", state.AntiAFK ~= false, "So you don't get kicked f
 	end
 end)
 
-miscTab:BuildThemeGroupbox(1)
-Core.buildScriptStatusGroupbox(miscTab, 1, "speed_keyboard_escape", VERSION)
+settingsTab:BuildThemeGroupbox(1)
+Core.buildScriptStatusGroupbox(settingsTab, 1, "speed_keyboard_escape", VERSION)
 
 notify("Alleral", "Loaded. Tabs on the left.")
 

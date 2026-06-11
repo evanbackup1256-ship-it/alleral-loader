@@ -32,7 +32,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "6.5"
+local VERSION = "6.6"
 
 local state = getgenv().Alleral_State
 local connections = {}
@@ -2883,10 +2883,6 @@ local function totalLoggedErrors()
 end
 
 local function buildInterface()
-local function starlightId(text)
-	return (tostring(text or "Element"):gsub("[^%w_]", "_"))
-end
-
 local function loggedCallback(label, callback)
 	return function(...)
 		if type(callback) ~= "function" then
@@ -2903,37 +2899,23 @@ local function loggedCallback(label, callback)
 	end
 end
 
-local starlightWindow = starlight:CreateWindow({
-	Name = "Alleral",
+local starlightWindow = Core.buildStarlightWindow(starlight, {
 	Subtitle = "Kick a Lucky Block · v" .. VERSION,
-	Icon = 10723407389,
-	LoadingEnabled = false,
-	NotifyOnCallbackError = true,
 	FileSettings = {
 		RootFolder = "Alleral_Configs",
 		ConfigFolder = "Interface",
 	},
 })
-local starlightSection = starlightWindow:CreateTabSection("Alleral", true)
+local starlightSection = Core.buildStarlightSection(starlightWindow)
 
 local function createStarlightTab(name, icon)
-	return starlightSection:CreateTab({
-		Name = name,
-		Icon = Core.starlightIcon(icon),
-		Columns = 2,
-	}, starlightId(name))
+	return Core.buildStarlightTab(starlightSection, name, icon, 2)
 end
 
 local function createStarlightGroup(tab, name, icon, column)
-	local groupbox = tab:CreateGroupbox({
-		Name = name,
-		Icon = Core.starlightIcon(icon),
-		Column = column or 1,
-	}, starlightId(name))
-	Core.waitForStarlightGroupbox(groupbox, 1.5)
-	return Core.wrapStarlightGroup(groupbox, function(label, callback)
+	return Core.buildStarlightGroup(tab, name, column, function(label, callback)
 		return loggedCallback(label, callback)
-	end)
+	end, icon)
 end
 
 local mainTab = createStarlightTab("Kick", "rbxassetid://10723407389")

@@ -6,7 +6,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "1.1"
+local VERSION = "1.2"
 local state = getgenv().Alleral_State
 local Core = getgenv().Alleral_Core
 local connections = {}
@@ -1474,123 +1474,30 @@ Core.makeSupervisor(state, loops, loopControllers, "Freecam", 0.5, function()
 	end
 end)
 
-local window = starlight:CreateWindow({
-	Name = "Alleral",
+local window = Core.buildStarlightWindow(starlight, {
 	Subtitle = "Slime RNG · v" .. VERSION,
-	Icon = 10723407389,
-	LoadingEnabled = false,
-	NotifyOnCallbackError = true,
 })
+local section = Core.buildStarlightSection(window)
+local mainTab = Core.buildStarlightTab(section, "Main", 10723407389, 2, "main")
+local autoTab = Core.buildStarlightTab(section, "Auto", 10734923214, 2, "auto")
+local inventoryTab = Core.buildStarlightTab(section, "Inventory", 10709769841, 2, "inventory")
+local miscTab = Core.buildStarlightTab(section, "Misc", 10734950020, 2, "misc")
+local settingsTab = Core.buildStarlightTab(section, "Settings", 10734950309, 1, "settings")
 
-local section = window:CreateTabSection("Alleral", true)
-local mainTab = section:CreateTab({ Name = "Main", Icon = 10723407389, Columns = 2 }, "main")
-local autoTab = section:CreateTab({ Name = "Auto", Icon = 10734923214, Columns = 2 }, "auto")
-local inventoryTab = section:CreateTab({ Name = "Inventory", Icon = 10709769841, Columns = 2 }, "inventory")
-local miscTab = section:CreateTab({ Name = "Misc", Icon = 10734950020, Columns = 2 }, "misc")
-
-local zoneGroup = mainTab:CreateGroupbox({ Name = "Zones", Column = 1 }, "zone")
-local rollGroup = mainTab:CreateGroupbox({ Name = "Rolling", Column = 2 }, "roll")
-local gunGroup = mainTab:CreateGroupbox({ Name = "Combat", Column = 1 }, "gun")
-local treeGroup = autoTab:CreateGroupbox({ Name = "Skill tree", Column = 1 }, "tree")
-local craftGroup = autoTab:CreateGroupbox({ Name = "Crafting", Column = 2 }, "craft")
-local lootGroup = autoTab:CreateGroupbox({ Name = "Loot & index", Column = 1 }, "loot")
-local petGroup = inventoryTab:CreateGroupbox({ Name = "Feeding", Column = 1 }, "feed")
-local potionGroup = inventoryTab:CreateGroupbox({ Name = "Potions", Column = 2 }, "potions")
-local fruitGroup = inventoryTab:CreateGroupbox({ Name = "Fruit tree", Column = 1 }, "fruit")
-local movementGroup = miscTab:CreateGroupbox({ Name = "Movement", Column = 1 }, "movement")
-local performanceGroup = miscTab:CreateGroupbox({ Name = "Lag fixes", Column = 2 }, "performance")
-local visualsGroup = miscTab:CreateGroupbox({ Name = "Camera", Column = 1 }, "visuals")
-local configGroup = miscTab:CreateGroupbox({ Name = "Save / reset", Column = 2 }, "config")
-
-local zone = Core.wrapStarlightGroup(zoneGroup, function(fn)
-	return function(value)
-		fn(value)
-		saveSettings()
-	end
-end)
-
-local roll = Core.wrapStarlightGroup(rollGroup, function(fn)
-	return function(value)
-		fn(value)
-		saveSettings()
-	end
-end)
-
-local gun = Core.wrapStarlightGroup(gunGroup, function(fn)
-	return function(value)
-		fn(value)
-		saveSettings()
-	end
-end)
-
-local tree = Core.wrapStarlightGroup(treeGroup, function(fn)
-	return function(value)
-		fn(value)
-		saveSettings()
-	end
-end)
-
-local craft = Core.wrapStarlightGroup(craftGroup, function(fn)
-	return function(value)
-		fn(value)
-		saveSettings()
-	end
-end)
-
-local loot = Core.wrapStarlightGroup(lootGroup, function(fn)
-	return function(value)
-		fn(value)
-		saveSettings()
-	end
-end)
-
-local pet = Core.wrapStarlightGroup(petGroup, function(fn)
-	return function(value)
-		fn(value)
-		saveSettings()
-	end
-end)
-
-local potion = Core.wrapStarlightGroup(potionGroup, function(fn)
-	return function(value)
-		fn(value)
-		saveSettings()
-	end
-end)
-
-local fruit = Core.wrapStarlightGroup(fruitGroup, function(fn)
-	return function(value)
-		fn(value)
-		saveSettings()
-	end
-end)
-
-local movement = Core.wrapStarlightGroup(movementGroup, function(fn)
-	return function(value)
-		fn(value)
-		saveSettings()
-	end
-end)
-
-local performance = Core.wrapStarlightGroup(performanceGroup, function(fn)
-	return function(value)
-		fn(value)
-		saveSettings()
-	end
-end)
-
-local visuals = Core.wrapStarlightGroup(visualsGroup, function(fn)
-	return function(value)
-		fn(value)
-		saveSettings()
-	end
-end)
-
-local config = Core.wrapStarlightGroup(configGroup, function(fn)
-	return function(value)
-		fn(value)
-	end
-end)
+local saveWrap = Core.onStarlightSave(saveSettings)
+local zone = Core.buildStarlightGroup(mainTab, "Zones", 1, saveWrap, nil, "zone")
+local roll = Core.buildStarlightGroup(mainTab, "Rolling", 2, saveWrap, nil, "roll")
+local gun = Core.buildStarlightGroup(mainTab, "Combat", 1, saveWrap, nil, "gun")
+local tree = Core.buildStarlightGroup(autoTab, "Skill tree", 1, saveWrap, nil, "tree")
+local craft = Core.buildStarlightGroup(autoTab, "Crafting", 2, saveWrap, nil, "craft")
+local loot = Core.buildStarlightGroup(autoTab, "Loot & index", 1, saveWrap, nil, "loot")
+local pet = Core.buildStarlightGroup(inventoryTab, "Feeding", 1, saveWrap, nil, "feed")
+local potion = Core.buildStarlightGroup(inventoryTab, "Potions", 2, saveWrap, nil, "potions")
+local fruit = Core.buildStarlightGroup(inventoryTab, "Fruit tree", 1, saveWrap, nil, "fruit")
+local movement = Core.buildStarlightGroup(miscTab, "Movement", 1, saveWrap, nil, "movement")
+local performance = Core.buildStarlightGroup(miscTab, "Lag fixes", 2, saveWrap, nil, "performance")
+local visuals = Core.buildStarlightGroup(miscTab, "Camera", 1, saveWrap, nil, "visuals")
+local config = Core.buildStarlightGroup(miscTab, "Save / reset", 2, nil, nil, "config")
 
 local function addMultiDropdown(group, name, label, values, default, callback)
 	group:AddDropdown(name, {
@@ -1750,8 +1657,8 @@ performance:CreateToggle("Anti AFK", state.AntiAFK ~= false, "Stops Roblox from 
 	end
 end)
 
-miscTab:BuildThemeGroupbox(2)
-Core.buildScriptStatusGroupbox(miscTab, 1, "slime_rng", VERSION)
+settingsTab:BuildThemeGroupbox(1)
+Core.buildScriptStatusGroupbox(settingsTab, 1, "slime_rng", VERSION)
 
 state.Alleral_Unload = function()
 	Core.stopAutomation(state, connections, loopControllers, loops, function()

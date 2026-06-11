@@ -6,7 +6,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "1.1"
+local VERSION = "1.2"
 local state = getgenv().Alleral_State
 local Core = getgenv().Alleral_Core
 local connections = {}
@@ -1867,65 +1867,41 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoOptimizePets", 10, funct
 	end
 end)
 
-local window = starlight:CreateWindow({
-	Name = "Alleral",
+local window = Core.buildStarlightWindow(starlight, {
 	Subtitle = "Build A Ring Farm · v" .. VERSION,
-	Icon = 10723407389,
-	LoadingEnabled = false,
-	NotifyOnCallbackError = true,
 })
-local section = window:CreateTabSection("Alleral", true)
-local farmTab = section:CreateTab({ Name = "Farm", Icon = 10723407389, Columns = 2 }, "farm")
-local seedTab = section:CreateTab({ Name = "Seeds", Icon = 10734923214, Columns = 2 }, "seeds")
-local upgradeTab = section:CreateTab({ Name = "Upgrade", Icon = 10747376638, Columns = 2 }, "upgrade")
-local shopTab = section:CreateTab({ Name = "Shop", Icon = 10734952479, Columns = 2 }, "shop")
-local eventTab = section:CreateTab({ Name = "Events", Icon = 10709818534, Columns = 2 }, "events")
-local petTab = section:CreateTab({ Name = "Pets", Icon = 10709769841, Columns = 2 }, "pets")
-local miscTab = section:CreateTab({ Name = "Misc", Icon = 10734950020, Columns = 1 }, "misc")
+local section = Core.buildStarlightSection(window)
+local farmTab = Core.buildStarlightTab(section, "Farm", 10723407389, 2, "farm")
+local seedTab = Core.buildStarlightTab(section, "Seeds", 10734923214, 2, "seeds")
+local upgradeTab = Core.buildStarlightTab(section, "Upgrade", 10747376638, 2, "upgrade")
+local shopTab = Core.buildStarlightTab(section, "Shop", 10734952479, 2, "shop")
+local eventTab = Core.buildStarlightTab(section, "Events", 10709818534, 2, "events")
+local petTab = Core.buildStarlightTab(section, "Pets", 10709769841, 2, "pets")
+local miscTab = Core.buildStarlightTab(section, "Misc", 10734950020, 1, "misc")
+local settingsTab = Core.buildStarlightTab(section, "Settings", 10734950309, 1, "settings")
 
-local plantGroup = farmTab:CreateGroupbox({ Name = "Planting", Column = 1 }, "plant")
-local plotGroup = farmTab:CreateGroupbox({ Name = "Plot", Column = 2 }, "plot")
-local sellGroup = farmTab:CreateGroupbox({ Name = "Selling", Column = 1 }, "sell")
-local careGroup = farmTab:CreateGroupbox({ Name = "Spray & fert", Column = 2 }, "care")
-local rollGroup = seedTab:CreateGroupbox({ Name = "Roll & Buy", Column = 1 }, "roll")
-local discardGroup = seedTab:CreateGroupbox({ Name = "Discard", Column = 2 }, "discard")
-local plantUpGroup = upgradeTab:CreateGroupbox({ Name = "Plants", Column = 1 }, "plant_up")
-local farmUpGroup = upgradeTab:CreateGroupbox({ Name = "Farm & Plot", Column = 2 }, "farm_up")
-local gearUpGroup = upgradeTab:CreateGroupbox({ Name = "Gear Upgrades", Column = 1 }, "gear_up")
-local gearShopGroup = shopTab:CreateGroupbox({ Name = "Gear", Column = 1 }, "gear_shop")
-local eggShopGroup = shopTab:CreateGroupbox({ Name = "Eggs", Column = 2 }, "egg_shop")
-local contractGroup = shopTab:CreateGroupbox({ Name = "Contracts", Column = 1 }, "contracts")
-local eventSeedGroup = eventTab:CreateGroupbox({ Name = "Event Seeds", Column = 1 }, "event_seed")
-local eventShopGroup = eventTab:CreateGroupbox({ Name = "Event Shop", Column = 2 }, "event_shop")
-local eventCombatGroup = eventTab:CreateGroupbox({ Name = "Events & drops", Column = 1 }, "event_combat")
-local honeyGroup = eventTab:CreateGroupbox({ Name = "Honey", Column = 2 }, "honey")
-local petAutoGroup = petTab:CreateGroupbox({ Name = "Pets", Column = 1 }, "pet_auto")
-local petSellGroup = petTab:CreateGroupbox({ Name = "Sell Pets", Column = 2 }, "pet_sell")
-local compGroup = petTab:CreateGroupbox({ Name = "Composter", Column = 1 }, "comp")
-local flyGroup = miscTab:CreateGroupbox({ Name = "Movement", Column = 1 }, "fly")
-local utilGroup = miscTab:CreateGroupbox({ Name = "Utilities", Column = 1 }, "util")
-
-local plant = Core.wrapStarlightGroup(plantGroup, saveSettings)
-local plot = Core.wrapStarlightGroup(plotGroup, saveSettings)
-local sell = Core.wrapStarlightGroup(sellGroup, saveSettings)
-local care = Core.wrapStarlightGroup(careGroup, saveSettings)
-local roll = Core.wrapStarlightGroup(rollGroup, saveSettings)
-local discard = Core.wrapStarlightGroup(discardGroup, saveSettings)
-local plantUp = Core.wrapStarlightGroup(plantUpGroup, saveSettings)
-local farmUp = Core.wrapStarlightGroup(farmUpGroup, saveSettings)
-local gearUp = Core.wrapStarlightGroup(gearUpGroup, saveSettings)
-local gearShop = Core.wrapStarlightGroup(gearShopGroup, saveSettings)
-local eggShop = Core.wrapStarlightGroup(eggShopGroup, saveSettings)
-local contracts = Core.wrapStarlightGroup(contractGroup, saveSettings)
-local eventSeed = Core.wrapStarlightGroup(eventSeedGroup, saveSettings)
-local eventShop = Core.wrapStarlightGroup(eventShopGroup, saveSettings)
-local eventCombat = Core.wrapStarlightGroup(eventCombatGroup, saveSettings)
-local honey = Core.wrapStarlightGroup(honeyGroup, saveSettings)
-local pets = Core.wrapStarlightGroup(petAutoGroup, saveSettings)
-local petSell = Core.wrapStarlightGroup(petSellGroup, saveSettings)
-local comp = Core.wrapStarlightGroup(compGroup, saveSettings)
-local fly = Core.wrapStarlightGroup(flyGroup, saveSettings)
-local util = Core.wrapStarlightGroup(utilGroup, saveSettings)
+local saveWrap = Core.onStarlightSave(saveSettings)
+local plant = Core.buildStarlightGroup(farmTab, "Planting", 1, saveWrap, nil, "plant")
+local plot = Core.buildStarlightGroup(farmTab, "Plot", 2, saveWrap, nil, "plot")
+local sell = Core.buildStarlightGroup(farmTab, "Selling", 1, saveWrap, nil, "sell")
+local care = Core.buildStarlightGroup(farmTab, "Spray & fert", 2, saveWrap, nil, "care")
+local roll = Core.buildStarlightGroup(seedTab, "Roll & Buy", 1, saveWrap, nil, "roll")
+local discard = Core.buildStarlightGroup(seedTab, "Discard", 2, saveWrap, nil, "discard")
+local plantUp = Core.buildStarlightGroup(upgradeTab, "Plants", 1, saveWrap, nil, "plant_up")
+local farmUp = Core.buildStarlightGroup(upgradeTab, "Farm & Plot", 2, saveWrap, nil, "farm_up")
+local gearUp = Core.buildStarlightGroup(upgradeTab, "Gear Upgrades", 1, saveWrap, nil, "gear_up")
+local gearShop = Core.buildStarlightGroup(shopTab, "Gear", 1, saveWrap, nil, "gear_shop")
+local eggShop = Core.buildStarlightGroup(shopTab, "Eggs", 2, saveWrap, nil, "egg_shop")
+local contracts = Core.buildStarlightGroup(shopTab, "Contracts", 1, saveWrap, nil, "contracts")
+local eventSeed = Core.buildStarlightGroup(eventTab, "Event Seeds", 1, saveWrap, nil, "event_seed")
+local eventShop = Core.buildStarlightGroup(eventTab, "Event Shop", 2, saveWrap, nil, "event_shop")
+local eventCombat = Core.buildStarlightGroup(eventTab, "Events & drops", 1, saveWrap, nil, "event_combat")
+local honey = Core.buildStarlightGroup(eventTab, "Honey", 2, saveWrap, nil, "honey")
+local pets = Core.buildStarlightGroup(petTab, "Pets", 1, saveWrap, nil, "pet_auto")
+local petSell = Core.buildStarlightGroup(petTab, "Sell Pets", 2, saveWrap, nil, "pet_sell")
+local comp = Core.buildStarlightGroup(petTab, "Composter", 1, saveWrap, nil, "comp")
+local fly = Core.buildStarlightGroup(miscTab, "Movement", 1, saveWrap, nil, "fly")
+local util = Core.buildStarlightGroup(miscTab, "Utilities", 1, saveWrap, nil, "util")
 
 local function bindToggle(group, label, key, tooltip)
 	group:CreateToggle(label, state[key], tooltip, function(value)
@@ -1992,8 +1968,8 @@ util:CreateToggle("Anti AFK", state.AntiAFK, "So you don't get booted for sittin
 end)
 util:CreateButton("Save now", saveSettings)
 
-miscTab:BuildThemeGroupbox(1)
-Core.buildScriptStatusGroupbox(miscTab, 1, "build_a_ring_farm", VERSION)
+settingsTab:BuildThemeGroupbox(1)
+Core.buildScriptStatusGroupbox(settingsTab, 1, "build_a_ring_farm", VERSION)
 
 notify("Alleral", "Loaded. Hover toggles for tips.")
 

@@ -1,5 +1,5 @@
 local Core = {}
-Core.VERSION = "1.8"
+Core.VERSION = "1.9"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
@@ -981,11 +981,13 @@ function Core.wrapStarlightGroup(groupbox, callbackWrapper)
 		if not callbackWrapper then
 			return callback
 		end
-		local ok, wrapped = pcall(callbackWrapper, label, callback)
-		if ok and type(wrapped) == "function" then
-			return wrapped
+		for _, args in ipairs({ { label, callback }, { callback } }) do
+			local ok, wrapped = pcall(callbackWrapper, table.unpack(args))
+			if ok and type(wrapped) == "function" then
+				return wrapped
+			end
 		end
-		return callbackWrapper(callback)
+		return callback
 	end
 
 	local function normalizeOptions(values)
@@ -1273,6 +1275,59 @@ end
 
 function Core.starlightIcon(icon)
 	return tostring(icon or ""):match("%d+$") or ""
+end
+
+function Core.starlightId(text)
+	return (tostring(text or "Element"):gsub("[^%w_]", "_"))
+end
+
+function Core.buildStarlightWindow(starlight, settings)
+	settings = settings or {}
+	return starlight:CreateWindow({
+		Name = settings.Name or "Alleral",
+		Subtitle = settings.Subtitle or "",
+		Icon = Core.starlightIcon(settings.Icon or 10723407389),
+		LoadingEnabled = false,
+		NotifyOnCallbackError = settings.NotifyOnCallbackError ~= false,
+		FileSettings = settings.FileSettings,
+	})
+end
+
+function Core.buildStarlightSection(window, name, expanded)
+	return window:CreateTabSection(name or "Alleral", expanded ~= false)
+end
+
+function Core.buildStarlightTab(section, name, icon, columns, id)
+	return section:CreateTab({
+		Name = name,
+		Icon = Core.starlightIcon(icon or 10723407389),
+		Columns = columns or 2,
+	}, id or Core.starlightId(name))
+end
+
+function Core.onStarlightSave(saveFn)
+	return function(_, callback)
+		return function(...)
+			local result = callback(...)
+			if type(saveFn) == "function" then
+				saveFn()
+			end
+			return result
+		end
+	end
+end
+
+function Core.buildStarlightGroup(tab, name, column, callbackWrapper, icon, id)
+	local groupbox = tab:CreateGroupbox({
+		Name = name,
+		Column = column or 1,
+		Icon = icon and Core.starlightIcon(icon) or nil,
+	}, id or Core.starlightId(name))
+	Core.waitForStarlightGroupbox(groupbox, 1.5)
+	if callbackWrapper then
+		return Core.wrapStarlightGroup(groupbox, callbackWrapper)
+	end
+	return Core.wrapStarlightGroup(groupbox)
 end
 
 function Core.filterDropdownOptions(values, query)

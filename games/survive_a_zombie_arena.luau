@@ -6,7 +6,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "2.0"
+local VERSION = "2.1"
 local state = getgenv().Alleral_State
 local Core = getgenv().Alleral_Core
 local G = (Core and Core.Game) or getgenv().Alleral_GameHelpers or {}
@@ -644,45 +644,30 @@ track(LocalPlayer.CharacterAdded:Connect(function(character)
 	end
 end))
 
-local window = starlight:CreateWindow({
-	Name = "Alleral",
+local window = Core.buildStarlightWindow(starlight, {
 	Subtitle = "Survive a Zombie Arena · v" .. VERSION,
-	Icon = 10723407389,
-	LoadingEnabled = false,
-	NotifyOnCallbackError = true,
 })
-local section = window:CreateTabSection("Alleral", true)
-local farmTab = section:CreateTab({ Name = "Farm", Icon = 10734923214, Columns = 2 }, "farm")
-local combatTab = section:CreateTab({ Name = "Combat", Icon = 10723407389, Columns = 2 }, "combat")
-local playerTab = section:CreateTab({ Name = "Player", Icon = 10734950020, Columns = 2 }, "player")
-local visualTab = section:CreateTab({ Name = "Visual", Icon = 10709819303, Columns = 1 }, "visual")
-local miscTab = section:CreateTab({ Name = "Misc", Icon = 10747374131, Columns = 1 }, "misc")
+local section = Core.buildStarlightSection(window)
+local farmTab = Core.buildStarlightTab(section, "Farm", 10734923214, 2, "farm")
+local combatTab = Core.buildStarlightTab(section, "Combat", 10723407389, 2, "combat")
+local playerTab = Core.buildStarlightTab(section, "Player", 10734950020, 2, "player")
+local visualTab = Core.buildStarlightTab(section, "Visual", 10709819303, 1, "visual")
+local miscTab = Core.buildStarlightTab(section, "Misc", 10747374131, 1, "misc")
+local settingsTab = Core.buildStarlightTab(section, "Settings", 10734950309, 1, "settings")
 
-local presetGroup = farmTab:CreateGroupbox({ Name = "Auto farm", Column = 1 }, "preset")
-local waveGroup = farmTab:CreateGroupbox({ Name = "Waves", Column = 2 }, "waves")
-local lootGroup = farmTab:CreateGroupbox({ Name = "Loot & shop", Column = 1 }, "loot")
-local mineGroup = farmTab:CreateGroupbox({ Name = "Defense", Column = 2 }, "mine")
-local auraGroup = combatTab:CreateGroupbox({ Name = "Kill aura", Column = 1 }, "aura")
-local shootGroup = combatTab:CreateGroupbox({ Name = "Weapons", Column = 2 }, "shoot")
-local defenseGroup = combatTab:CreateGroupbox({ Name = "Defense", Column = 1 }, "defense")
-local aimGroup = combatTab:CreateGroupbox({ Name = "Aim", Column = 2 }, "aim")
-local moveGroup = playerTab:CreateGroupbox({ Name = "Movement", Column = 1 }, "move")
-local safeGroup = playerTab:CreateGroupbox({ Name = "Safe zone", Column = 2 }, "safe")
-local espGroup = visualTab:CreateGroupbox({ Name = "ESP", Column = 1 }, "esp")
-local utilGroup = miscTab:CreateGroupbox({ Name = "Utilities", Column = 1 }, "util")
-
-local preset = Core.wrapStarlightGroup(presetGroup, saveSettings)
-local wave = Core.wrapStarlightGroup(waveGroup, saveSettings)
-local loot = Core.wrapStarlightGroup(lootGroup, saveSettings)
-local mine = Core.wrapStarlightGroup(mineGroup, saveSettings)
-local aura = Core.wrapStarlightGroup(auraGroup, saveSettings)
-local shoot = Core.wrapStarlightGroup(shootGroup, saveSettings)
-local defense = Core.wrapStarlightGroup(defenseGroup, saveSettings)
-local aim = Core.wrapStarlightGroup(aimGroup, saveSettings)
-local move = Core.wrapStarlightGroup(moveGroup, saveSettings)
-local safe = Core.wrapStarlightGroup(safeGroup, saveSettings)
-local esp = Core.wrapStarlightGroup(espGroup, saveSettings)
-local util = Core.wrapStarlightGroup(utilGroup, saveSettings)
+local saveWrap = Core.onStarlightSave(saveSettings)
+local preset = Core.buildStarlightGroup(farmTab, "Auto farm", 1, saveWrap, nil, "preset")
+local wave = Core.buildStarlightGroup(farmTab, "Waves", 2, saveWrap, nil, "waves")
+local loot = Core.buildStarlightGroup(farmTab, "Loot & shop", 1, saveWrap, nil, "loot")
+local mine = Core.buildStarlightGroup(farmTab, "Defense", 2, saveWrap, nil, "mine")
+local aura = Core.buildStarlightGroup(combatTab, "Kill aura", 1, saveWrap, nil, "aura")
+local shoot = Core.buildStarlightGroup(combatTab, "Weapons", 2, saveWrap, nil, "shoot")
+local defense = Core.buildStarlightGroup(combatTab, "Defense", 1, saveWrap, nil, "defense")
+local aim = Core.buildStarlightGroup(combatTab, "Aim", 2, saveWrap, nil, "aim")
+local move = Core.buildStarlightGroup(playerTab, "Movement", 1, saveWrap, nil, "move")
+local safe = Core.buildStarlightGroup(playerTab, "Safe zone", 2, saveWrap, nil, "safe")
+local esp = Core.buildStarlightGroup(visualTab, "ESP", 1, saveWrap, nil, "esp")
+local util = Core.buildStarlightGroup(miscTab, "Utilities", 1, saveWrap, nil, "util")
 
 local function bindToggle(group, label, key, tooltip)
 	group:CreateToggle(label, state[key], tooltip, function(value)
@@ -802,8 +787,8 @@ Core.makeSupervisor(state, loops, loopControllers, "Stats", 1.5, function()
 	liveStatus:Update("Zombies", tostring(#livingZombies()))
 end)
 
-miscTab:BuildThemeGroupbox(1)
-Core.buildScriptStatusGroupbox(miscTab, 1, "survive_a_zombie_arena", VERSION)
+settingsTab:BuildThemeGroupbox(1)
+Core.buildScriptStatusGroupbox(settingsTab, 1, "survive_a_zombie_arena", VERSION)
 
 notify("Alleral", "Survive a Zombie Arena v" .. VERSION .. " loaded.", 4)
 
