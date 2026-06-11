@@ -133,6 +133,23 @@ local function patchSourceValid(body)
 		and body:find("return function", 1, true) ~= nil
 end
 
+local function extractPatchVersion(body)
+	if type(body) ~= "string" then
+		return nil
+	end
+	return body:match('ARRREL_UI_VERSION%s*=%s*"([^"]+)"')
+		or body:match('ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
+end
+
+local function expectedPatchVersion()
+	return Core.ALLERAL_UI_VERSION or "2.0.4-alleral-v2"
+end
+
+local function patchVersionCurrent(body)
+	local version = extractPatchVersion(body)
+	return version ~= nil and version == expectedPatchVersion()
+end
+
 local function patchApplied(windUi)
 	return type(windUi) == "table" and windUi._AlleralPatchComplete == true
 end
@@ -175,10 +192,7 @@ local function applyAlleralWindUiPatch(windUi)
 		return patchApplied(windUi)
 	end
 
-	local bootstrapSource, bootstrapPath = readWindUiLocal("bootstrap.lua")
-	if runPatchLoader(bootstrapSource, "@Arrrel/bootstrap:" .. tostring(bootstrapPath or "local")) then
-		return windUi
-	end
+	local bootstrapSource, bootstrapPath
 
 	for _, base in ipairs(WINDUI_MIRROR_URLS) do
 		local body = Core.httpGet(base .. "bootstrap.lua")
@@ -187,22 +201,10 @@ local function applyAlleralWindUiPatch(windUi)
 		end
 	end
 
-	local patchSource, patchPath = readWindUiLocal(WINDUI_PATCH_FILE)
-	if not patchSource then
-		patchSource, patchPath = readWindUiLocal(WINDUI_PATCH_FALLBACK)
-	end
-	if patchSource and patchSourceValid(patchSource) then
-		local chunk, compileErr = loadStringFn(patchSource, "@Arrrel/patch:" .. tostring(patchPath))
-		if chunk then
-			local ok, patchFn = pcall(chunk)
-			if ok and type(patchFn) == "function" then
-				pcall(patchFn, windUi)
-				if patchApplied(windUi) then
-					return windUi
-				end
-			end
-		else
-			Core.logWarn("UI patch compile: " .. tostring(compileErr))
+	bootstrapSource, bootstrapPath = readWindUiLocal("bootstrap.lua")
+	if bootstrapSource and patchVersionCurrent(bootstrapSource) then
+		if runPatchLoader(bootstrapSource, "@Arrrel/bootstrap:" .. tostring(bootstrapPath or "local")) then
+			return windUi
 		end
 	end
 
@@ -223,6 +225,25 @@ local function applyAlleralWindUiPatch(windUi)
 					Core.logWarn("UI patch compile: " .. tostring(compileErr))
 				end
 			end
+		end
+	end
+
+	local patchSource, patchPath = readWindUiLocal(WINDUI_PATCH_FILE)
+	if not patchSource then
+		patchSource, patchPath = readWindUiLocal(WINDUI_PATCH_FALLBACK)
+	end
+	if patchSource and patchSourceValid(patchSource) and patchVersionCurrent(patchSource) then
+		local chunk, compileErr = loadStringFn(patchSource, "@Arrrel/patch:" .. tostring(patchPath))
+		if chunk then
+			local ok, patchFn = pcall(chunk)
+			if ok and type(patchFn) == "function" then
+				pcall(patchFn, windUi)
+				if patchApplied(windUi) then
+					return windUi
+				end
+			end
+		else
+			Core.logWarn("UI patch compile: " .. tostring(compileErr))
 		end
 	end
 

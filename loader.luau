@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.6.6"
+local LOADER_VERSION = "7.6.7"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 60
@@ -19,9 +19,10 @@ local CORE_UI_PATH = HUB .. "/core_ui.luau"
 local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.6.6",
+	loader = "7.6.7",
 	core = "2.7.7",
 	ui = "Alleral",
+	windui = "2.0.4-alleral-v2",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",
@@ -1900,6 +1901,7 @@ local VERSION_PATTERNS = {
 	security = 'Security%.VERSION%s*=%s*"([%d%.]+)"',
 	access = 'Access%.VERSION%s*=%s*"([%d%.]+)"',
 	loader = 'LOADER_VERSION%s*=%s*"([%d%.]+)"',
+	windui = 'ARRREL_UI_VERSION%s*=%s*"([^"]+)"',
 	game = 'local VERSION%s*=%s*"([%d%.]+)"',
 }
 
@@ -1958,6 +1960,7 @@ local function fetchExpectedVersions(forceRefresh)
 		telemetry = RELEASE_FALLBACK.telemetry,
 		helpers = RELEASE_FALLBACK.helpers,
 		weao = RELEASE_FALLBACK.weao,
+		windui = RELEASE_FALLBACK.windui,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
@@ -1978,6 +1981,7 @@ local function fetchExpectedVersions(forceRefresh)
 		expected.telemetry = release.telemetry or expected.telemetry
 		expected.helpers = release.helpers or expected.helpers
 		expected.weao = release.weao or expected.weao
+		expected.windui = release.windui or expected.windui
 		expected.commit = release.commit or expected.commit
 		expected.updatedAt = release.updatedAt or expected.updatedAt
 		expected.minLoader = release.minLoader or expected.minLoader
@@ -2187,9 +2191,10 @@ local function buildManagedFiles()
 				UI .. "/windui/aller.luau",
 				UI .. "/windui/bootstrap.lua",
 				UI .. "/windui/v2/boost.luau",
+				UI .. "/windui/VERSION",
 			},
-			expectedKey = "loader",
-			purgeOnLoaderChange = true,
+			expectedKey = "windui",
+			extract = "windui",
 		},
 		{
 			paths = { CFG .. "/weao.json", "config/weao.json" },
@@ -2292,7 +2297,7 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 	end
 
 	if foundVersion ~= expectedVersion then
-		if entry.expectedKey == "core" and entry.isValid and entry.isValid(src) then
+		if entry.expectedKey == "core" and entry.isValid and entry.isValid(src) and not foundVersion then
 			return false
 		end
 		if entry.expectedKey == "helpers" and type(src) == "string" and #src > 500 and src:find("return", 1, true) then

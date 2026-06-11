@@ -91,6 +91,14 @@ return function(WindUI)
 	end
 
 	local function loadModule(fileName, marker)
+		for _, url in ipairs(PATCH_URLS) do
+			if url:find(fileName, 1, true) then
+				local body = httpFetch(url)
+				if body and body:find(marker, 1, true) then
+					return body, url
+				end
+			end
+		end
 		local readFn = readfile or (syn and syn.readfile) or (fluxus and fluxus.readfile)
 		local isFileFn = isfile or (syn and syn.isfile)
 		if type(readFn) == "function" and type(isFileFn) == "function" then
@@ -101,14 +109,6 @@ return function(WindUI)
 					if ok and type(body) == "string" and body:find(marker, 1, true) then
 						return body, path
 					end
-				end
-			end
-		end
-		for _, url in ipairs(PATCH_URLS) do
-			if url:find(fileName, 1, true) then
-				local body = httpFetch(url)
-				if body then
-					return body, url
 				end
 			end
 		end
@@ -129,9 +129,9 @@ return function(WindUI)
 		end
 	end
 
-	local source, label = readLocalPatch()
+	local source, label = fetchRemotePatch()
 	if not source then
-		source, label = fetchRemotePatch()
+		source, label = readLocalPatch()
 	end
 	if not source then
 		warn("[Arrrel] arrrel.luau missing — UI patch skipped")
