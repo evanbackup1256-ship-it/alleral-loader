@@ -29,6 +29,11 @@ except ImportError:
     print("Install dependencies: pip install -r relay/requirements.txt", file=sys.stderr)
     raise
 
+try:
+    import fcntl
+except ImportError:
+    fcntl = None  # type: ignore
+
 APP_DIR = Path(__file__).resolve().parent
 ROOT = APP_DIR.parent
 
@@ -262,6 +267,38 @@ def cors_preflight():
 
 BAN_DB_PATH = Path(os.environ.get("BAN_DB_PATH", str(APP_DIR / "data" / "bans.db")))
 DATA_DIR = Path(os.environ.get("ALLERAL_DATA_DIR", str(APP_DIR / "data")))
+
+
+def claim_sync_webhook_notification(commit: str) -> bool:
+    """Skip duplicate Discord posts when multiple workers/services sync the same commit."""
+    commit = str(commit or "").strip()
+    if not commit:
+        return True
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    state_path = DATA_DIR / "sync_webhook_state.json"
+    lock_path = DATA_DIR / "sync_webhook.lock"
+    lock_fp = open(lock_path, "a+", encoding="utf-8")
+    try:
+        if fcntl is not None:
+            fcntl.flock(lock_fp.fileno(), fcntl.LOCK_EX)
+        state: dict[str, Any] = {}
+        if state_path.is_file():
+            try:
+                raw = json.loads(state_path.read_text(encoding="utf-8"))
+                if isinstance(raw, dict):
+                    state = raw
+            except (OSError, json.JSONDecodeError, TypeError):
+                state = {}
+        if state.get("lastCommit") == commit:
+            return False
+        state["lastCommit"] = commit
+        state["lastAt"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        return True
+    finally:
+        if fcntl is not None:
+            fcntl.flock(lock_fp.fileno(), fcntl.LOCK_UN)
+        lock_fp.close()
 
 
 def bootstrap_runtime_keys() -> dict[str, str]:
@@ -581,6 +618,10 @@ def notify_games_sync(payload: dict[str, Any]) -> None:
     if not WEBHOOK_URL:
         return
     if os.environ.get("SYNC_GAME_WEBHOOK", "1").strip().lower() in {"0", "false", "no"}:
+        return
+
+    commit_raw = str(payload.get("commit") or "").strip()
+    if not claim_sync_webhook_notification(commit_raw):
         return
 
     scripts = payload.get("scripts") if isinstance(payload.get("scripts"), dict) else {}

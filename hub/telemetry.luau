@@ -282,7 +282,7 @@ end
 
 local function joinUrl(placeId, jobId)
 	return string.format(
-		"https://www.roblox.com/games/start?placeId=%s&instanceId=%s",
+		"https://www.roblox.com/games/start?placeId=%s&gameInstanceId=%s",
 		tostring(placeId or game.PlaceId),
 		tostring(jobId or game.JobId)
 	)
@@ -698,7 +698,6 @@ function Telemetry:ReportInject(phase, extra)
 		contextExtra = mergeConfig(extra or {}, {
 			durationMs = math.floor((tick() - self._injectStartedAt) * 1000),
 		})
-		self._sessionStarted = true
 	end
 	if type(extra) == "table" and extra.error then
 		errorInfo = {

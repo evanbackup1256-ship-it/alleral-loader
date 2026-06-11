@@ -17,6 +17,11 @@ try:
 except ImportError:
     requests = None  # type: ignore
 
+try:
+    import fcntl
+except ImportError:
+    fcntl = None  # type: ignore
+
 SyncNotifyFn = Callable[[dict[str, Any]], None]
 
 VALID_STATUSES = frozenset({"working", "detected", "broken", "maintenance", "testing"})
@@ -235,6 +240,27 @@ class AutoSyncEngine:
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         self._started = False
+        self._leader_handle = None
+
+    def _try_become_sync_leader(self) -> bool:
+        """Only one gunicorn worker should run the sync loop (shared data dir)."""
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        path = self.data_dir / "auto_sync.leader.lock"
+        handle = open(path, "a+", encoding="utf-8")
+        if fcntl is None:
+            self._leader_handle = handle
+            return True
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            handle.close()
+            return False
+        handle.seek(0)
+        handle.truncate()
+        handle.write(str(os.getpid()))
+        handle.flush()
+        self._leader_handle = handle
+        return True
 
     def _load_state(self) -> dict[str, Any]:
         if not self._state_path.is_file():
@@ -280,6 +306,8 @@ class AutoSyncEngine:
 
     def start(self) -> None:
         if not self.enabled or self._started:
+            return
+        if not self._try_become_sync_leader():
             return
         self._started = True
 

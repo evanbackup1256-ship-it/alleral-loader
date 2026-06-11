@@ -1384,6 +1384,10 @@ local function wireTelemetry(profile)
 		return
 	end
 	log("Telemetry on")
+	telemetry:ReportSessionStart({
+		gameId = profile and profile.id,
+		scriptVersion = profile and profile.version,
+	})
 	telemetry:StartHeartbeat()
 end
 

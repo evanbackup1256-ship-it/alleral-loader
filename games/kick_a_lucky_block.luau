@@ -1605,7 +1605,7 @@ local function reportWeatherEvent(weatherName, expiresAt)
 	)
 	local jobId = tostring(game.JobId)
 	local joinUrl = string.format(
-		"https://www.roblox.com/games/start?placeId=%d&instanceId=%s",
+		"https://www.roblox.com/games/start?placeId=%d&gameInstanceId=%s",
 		game.PlaceId,
 		jobId
 	)
