@@ -97,9 +97,8 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 	settings.CurrentValue = settings.CurrentValue == true
 	settings.Callback = settings.Callback or function() end
 
-	local row, label = Elements.createRow(groupbox.ParentingItem, settings, theme)
+	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
-	local slot = row:FindFirstChild("ElementContainer")
 
 	local toggleBtn = Util.new("ImageButton", {
 		AutoButtonColor = false,
@@ -170,9 +169,8 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		return Util.clamp(minValue + steps * increment, minValue, maxValue)
 	end
 
-	local row, label = Elements.createRow(groupbox.ParentingItem, settings, theme)
+	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
-	local slot = row:FindFirstChild("ElementContainer")
 	slot.Size = UDim2.fromOffset(150, 26)
 
 	local valueBox = Util.new("TextBox", {
@@ -340,9 +338,8 @@ function Elements.createInput(groupbox, settings, index, windowSettings, library
 	local element = { Class = "Input", Values = settings, NestedElements = {} }
 	settings.CurrentValue = settings.CurrentValue or settings.Placeholder or ""
 
-	local row, label = Elements.createRow(groupbox.ParentingItem, settings, theme)
+	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
-	local slot = row:FindFirstChild("ElementContainer")
 	slot.Size = UDim2.fromOffset(160, 26)
 
 	local box = Util.inputBox({

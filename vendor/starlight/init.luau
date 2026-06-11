@@ -10,7 +10,7 @@ local WindowBuilder = require(script.Parent.lib.window)
 local Util = require(script.Parent.lib.util)
 
 local Starlight = {
-	InterfaceBuild = "Alleral-3",
+	InterfaceBuild = "Alleral-4",
 	WindowKeybind = "K",
 	Minimized = false,
 	Maximized = false,

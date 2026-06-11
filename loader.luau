@@ -1,6 +1,6 @@
-local LOADER_VERSION = "3.5.5"
+local LOADER_VERSION = "3.5.6"
 local REQUIRED_CORE_VERSION = "1.12"
-local REQUIRED_STARLIGHT_BUILD = "Alleral-3"
+local REQUIRED_STARLIGHT_BUILD = "Alleral-4"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local SCRIPT_MANIFEST_URL = REPO_BASE .. "/config/scripts_manifest.json"
 local FETCH_RETRIES = 3
@@ -473,7 +473,7 @@ do
 		local g = getgenv()
 		if type(g) == "table" then
 			if bridge.Alleral_Starlight
-				and bridge.Alleral_Starlight.InterfaceBuild == "Alleral-3"
+				and bridge.Alleral_Starlight.InterfaceBuild == "Alleral-4"
 				and type(bridge.Alleral_Starlight.CreateWindow) == "function" then
 				g.Alleral_Starlight = bridge.Alleral_Starlight
 			end

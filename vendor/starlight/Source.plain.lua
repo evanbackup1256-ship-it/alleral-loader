@@ -61,20 +61,29 @@ function Util.merge(base, overrides)
 	return merged
 end
 
-function Util.new(className, props, children)
+function Util.new(className, props, parentOrChildren)
 	local instance = Instance.new(className)
 	for key, value in pairs(props or {}) do
 		if key ~= "Parent" then
 			instance[key] = value
 		end
 	end
-	for _, child in ipairs(children or {}) do
-		if typeof(child) == "Instance" then
-			child.Parent = instance
-		end
-	end
 	if props and props.Parent then
 		instance.Parent = props.Parent
+	elseif parentOrChildren then
+		if typeof(parentOrChildren) == "Instance" then
+			instance.Parent = parentOrChildren
+		elseif type(parentOrChildren) == "table" then
+			if #parentOrChildren == 1 and typeof(parentOrChildren[1]) == "Instance" then
+				instance.Parent = parentOrChildren[1]
+			else
+				for _, child in ipairs(parentOrChildren) do
+					if typeof(child) == "Instance" then
+						child.Parent = instance
+					end
+				end
+			end
+		end
 	end
 	return instance
 end
@@ -936,9 +945,8 @@ function Elements.createToggle(groupbox, settings, index, windowSettings, librar
 	settings.CurrentValue = settings.CurrentValue == true
 	settings.Callback = settings.Callback or function() end
 
-	local row, label = Elements.createRow(groupbox.ParentingItem, settings, theme)
+	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
-	local slot = row:FindFirstChild("ElementContainer")
 
 	local toggleBtn = Util.new("ImageButton", {
 		AutoButtonColor = false,
@@ -1009,9 +1017,8 @@ function Elements.createSlider(groupbox, settings, index, windowSettings, librar
 		return Util.clamp(minValue + steps * increment, minValue, maxValue)
 	end
 
-	local row, label = Elements.createRow(groupbox.ParentingItem, settings, theme)
+	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
-	local slot = row:FindFirstChild("ElementContainer")
 	slot.Size = UDim2.fromOffset(150, 26)
 
 	local valueBox = Util.new("TextBox", {
@@ -1179,9 +1186,8 @@ function Elements.createInput(groupbox, settings, index, windowSettings, library
 	local element = { Class = "Input", Values = settings, NestedElements = {} }
 	settings.CurrentValue = settings.CurrentValue or settings.Placeholder or ""
 
-	local row, label = Elements.createRow(groupbox.ParentingItem, settings, theme)
+	local row, label, slot = Elements.createRow(groupbox.ParentingItem, settings, theme)
 	element.Instance = row
-	local slot = row:FindFirstChild("ElementContainer")
 	slot.Size = UDim2.fromOffset(160, 26)
 
 	local box = Util.inputBox({
@@ -2464,7 +2470,7 @@ local WindowBuilder = requireModule('window')
 local Util = requireModule('util')
 
 local Starlight = {
-	InterfaceBuild = "Alleral-3",
+	InterfaceBuild = "Alleral-4",
 	WindowKeybind = "K",
 	Minimized = false,
 	Maximized = false,

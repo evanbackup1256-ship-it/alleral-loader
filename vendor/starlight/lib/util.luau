@@ -51,20 +51,29 @@ function Util.merge(base, overrides)
 	return merged
 end
 
-function Util.new(className, props, children)
+function Util.new(className, props, parentOrChildren)
 	local instance = Instance.new(className)
 	for key, value in pairs(props or {}) do
 		if key ~= "Parent" then
 			instance[key] = value
 		end
 	end
-	for _, child in ipairs(children or {}) do
-		if typeof(child) == "Instance" then
-			child.Parent = instance
-		end
-	end
 	if props and props.Parent then
 		instance.Parent = props.Parent
+	elseif parentOrChildren then
+		if typeof(parentOrChildren) == "Instance" then
+			instance.Parent = parentOrChildren
+		elseif type(parentOrChildren) == "table" then
+			if #parentOrChildren == 1 and typeof(parentOrChildren[1]) == "Instance" then
+				instance.Parent = parentOrChildren[1]
+			else
+				for _, child in ipairs(parentOrChildren) do
+					if typeof(child) == "Instance" then
+						child.Parent = instance
+					end
+				end
+			end
+		end
 	end
 	return instance
 end
