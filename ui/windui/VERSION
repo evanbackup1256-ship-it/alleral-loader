@@ -1,4 +1,4 @@
-1.6.64-fix-aller8
+1.6.64-fix-aller10
 Base: https://github.com/Footagesus/WindUI/releases/tag/1.6.64-fix
 Patch: ui/windui/aller.luau
 Loader: ui/windui/bootstrap.lua

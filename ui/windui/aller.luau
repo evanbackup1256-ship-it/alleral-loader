@@ -1,6 +1,7 @@
 --[[
-	Alleral WindUI revamp (Footagesus 1.6.64-fix base)
-	Exe 6-inspired bento layout + motion: neutral dark canvas, solid section cards, Quint page transitions.
+	Alleral UI — opinionated WindUI layer (Footagesus 1.6.64-fix base)
+	Profiles (desktop/mobile/compact/performance), fluid motion, touch feedback,
+	tab rails, deduped notifications, accessibility toggles, mobile open button.
 	Loaded by ui/windui/main.lua after upstream WindUI initializes.
 ]]
 
@@ -14,19 +15,24 @@ return function(WindUI)
 	-- -------------------------------------------------------------------------
 
 	local TweenService = game:GetService("TweenService")
+	local UserInputService = game:GetService("UserInputService")
+	local Workspace = game:GetService("Workspace")
 
-	-- Exe 6-inspired tokens: neutral dark canvas, accent used sparingly (see devforum Exe 6 bento layout).
+	-- Alleral signature palette — charcoal base, mint accent used as signal not wallpaper.
 	local palette = {
 		accent = Color3.fromHex("#53fc18"),
 		accentSoft = Color3.fromHex("#7dff35"),
 		accentHot = Color3.fromHex("#30ff6a"),
-		canvas = Color3.fromHex("#0b0b0d"),
-		surface = Color3.fromHex("#141418"),
-		card = Color3.fromHex("#1c1c22"),
-		cardHover = Color3.fromHex("#22222a"),
-		line = Color3.fromHex("#2a2a32"),
-		text = Color3.fromHex("#f2f2f7"),
-		muted = Color3.fromHex("#8e8e93"),
+		canvas = Color3.fromHex("#09090b"),
+		surface = Color3.fromHex("#121216"),
+		card = Color3.fromHex("#18181f"),
+		cardHover = Color3.fromHex("#1f1f28"),
+		line = Color3.fromHex("#2e2e38"),
+		text = Color3.fromHex("#f4f4f8"),
+		muted = Color3.fromHex("#9393a0"),
+		trackOff = Color3.fromHex("#2a2a34"),
+		trackOn = Color3.fromHex("#1a3a12"),
+		knob = Color3.fromHex("#f8f8fc"),
 	}
 
 	local function accent()
@@ -39,7 +45,8 @@ return function(WindUI)
 		return palette.accentHot
 	end
 
-	WindUI.ALLERAL_UI_VERSION = "1.6.64-fix-aller8"
+	WindUI.ALLERAL_UI_VERSION = "1.6.64-fix-aller10"
+	WindUI.ALLERAL_BRAND = "Alleral UI"
 	WindUI._AlleralNotifyCount = 0
 	WindUI._AlleralMaxNotify = 8
 	WindUI._AlleralWatchdogToken = 0
@@ -47,6 +54,12 @@ return function(WindUI)
 	WindUI._AlleralNotifyCompact = WindUI._AlleralNotifyCompact == true
 	WindUI._AlleralNotifyHolder = WindUI._AlleralNotifyHolder
 	WindUI._AlleralPendingNotifyStyle = nil
+	WindUI._AlleralProfile = WindUI._AlleralProfile or "auto"
+	WindUI._AlleralUiScale = tonumber(WindUI._AlleralUiScale) or 1
+	WindUI._AlleralTouchFeedback = WindUI._AlleralTouchFeedback ~= false
+	WindUI._AlleralHaptics = WindUI._AlleralHaptics == true
+	WindUI._AlleralNotifyDedupe = WindUI._AlleralNotifyDedupe ~= false
+	WindUI._AlleralLastNotify = WindUI._AlleralLastNotify or {}
 
 	local NOTIFY_STYLES = {
 		info = {
@@ -103,16 +116,19 @@ return function(WindUI)
 		end)
 	end
 
-	-- Exe 6-style motion (Quint/Quart/Exponential — matches Flare page + menu easing).
+	-- Snappy motion — shorter durations + Sine/Quint so UI feels instant, not sluggish.
 	local ANIM = {
-		open = TweenInfo.new(0.42, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-		close = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In),
-		page = TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-		pageOut = TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
-		micro = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-		notify = TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-		dropdown = TweenInfo.new(0.26, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-		sweep = TweenInfo.new(0.52, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+		open = TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+		close = TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.In),
+		page = TweenInfo.new(0.22, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+		pageOut = TweenInfo.new(0.12, Enum.EasingStyle.Sine, Enum.EasingDirection.In),
+		micro = TweenInfo.new(0.14, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+		notify = TweenInfo.new(0.26, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+		dropdown = TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+		sweep = TweenInfo.new(0.44, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+		toggle = TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+		tab = TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+		press = TweenInfo.new(0.08, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
 	}
 
 	WindUI._AlleralStartupEffect = WindUI._AlleralStartupEffect ~= false
@@ -124,6 +140,10 @@ return function(WindUI)
 		AlleralToggleGlow = true,
 		AlleralNotifyRail = true,
 		AlleralTopbarLine = true,
+		AlleralCardShell = true,
+		AlleralTabPill = true,
+		AlleralSearchHook = true,
+		AlleralBtnScale = true,
 		MenuCanvas = true,
 		Menu = true,
 	}
@@ -195,7 +215,7 @@ return function(WindUI)
 
 		local scale = ensureUiScale(main, "AlleralStartupScale")
 		if scale then
-			scale.Scale = 0.968
+			scale.Scale = 0.975
 			tween(scale, ANIM.open, { Scale = 1 })
 		end
 
@@ -402,13 +422,141 @@ return function(WindUI)
 	local WINDOW_DEFAULTS = {
 		Theme = "Alleral",
 		NewElements = true,
-		UICorner = 18,
-		UIPadding = 18,
-		SideBarWidth = 248,
-		ElementPadding = 12,
+		UICorner = 20,
+		UIPadding = 20,
+		SideBarWidth = 256,
+		ElementPadding = 14,
 		Resizable = true,
 		HideSearchBar = false,
 	}
+
+	local PROFILE_PRESETS = {
+		desktop = {
+			label = "Desktop",
+			uiScale = 1,
+			corner = 20,
+			padding = 20,
+			sidebar = 256,
+			elementPad = 14,
+			startup = true,
+			touchFeedback = true,
+			haptics = false,
+		},
+		mobile = {
+			label = "Mobile",
+			uiScale = 0.9,
+			corner = 16,
+			padding = 14,
+			sidebar = 208,
+			elementPad = 12,
+			startup = false,
+			touchFeedback = true,
+			haptics = true,
+			notifyCompact = true,
+			openButton = {
+				Enabled = true,
+				OnlyMobile = false,
+				Draggable = true,
+			},
+		},
+		compact = {
+			label = "Compact",
+			uiScale = 0.94,
+			corner = 18,
+			padding = 16,
+			sidebar = 232,
+			elementPad = 12,
+			notifyCompact = true,
+			touchFeedback = true,
+		},
+		performance = {
+			label = "Performance",
+			uiScale = 1,
+			corner = 16,
+			padding = 14,
+			sidebar = 240,
+			elementPad = 10,
+			startup = false,
+			reducedMotion = true,
+			touchFeedback = false,
+			haptics = false,
+		},
+	}
+
+	local function viewportShortSide()
+		local camera = Workspace.CurrentCamera
+		if not camera then
+			return 1080
+		end
+		local size = camera.ViewportSize
+		return math.min(size.X, size.Y)
+	end
+
+	local function detectDeviceKind()
+		local touch = UserInputService.TouchEnabled
+		local keyboard = UserInputService.KeyboardEnabled
+		local mouse = UserInputService.MouseEnabled
+		local shortSide = viewportShortSide()
+		if touch and not keyboard and not mouse then
+			return "mobile"
+		end
+		if touch and shortSide <= 900 then
+			return "mobile"
+		end
+		if shortSide <= 820 then
+			return "compact"
+		end
+		return "desktop"
+	end
+
+	local function resolveProfileName(name)
+		name = name or WindUI._AlleralProfile or "auto"
+		if name == "auto" then
+			return detectDeviceKind()
+		end
+		if PROFILE_PRESETS[name] then
+			return name
+		end
+		return "desktop"
+	end
+
+	local function applyPresetToDefaults(preset)
+		if not preset then
+			return
+		end
+		WINDOW_DEFAULTS.UICorner = preset.corner or WINDOW_DEFAULTS.UICorner
+		WINDOW_DEFAULTS.UIPadding = preset.padding or WINDOW_DEFAULTS.UIPadding
+		WINDOW_DEFAULTS.SideBarWidth = preset.sidebar or WINDOW_DEFAULTS.SideBarWidth
+		WINDOW_DEFAULTS.ElementPadding = preset.elementPad or WINDOW_DEFAULTS.ElementPadding
+		WindUI._AlleralUiScale = preset.uiScale or WindUI._AlleralUiScale or 1
+		WindUI._AlleralTouchFeedback = preset.touchFeedback ~= false
+		WindUI._AlleralHaptics = preset.haptics == true
+		if preset.reducedMotion then
+			WindUI._AlleralReducedMotion = true
+		end
+		if preset.notifyCompact then
+			WindUI._AlleralNotifyCompact = true
+		end
+		if preset.startup == false then
+			WindUI._AlleralStartupEffect = false
+		end
+	end
+
+	local function hapticPulse()
+		if WindUI._AlleralHaptics ~= true then
+			return
+		end
+		pcall(function()
+			local HapticService = game:GetService("HapticService")
+			local inputType = UserInputService.TouchEnabled and Enum.UserInputType.Touch or Enum.UserInputType.Gamepad1
+			HapticService:SetMotor(inputType, Enum.VibrationMotor.Small, 0.35)
+			task.delay(0.06, function()
+				pcall(function()
+					HapticService:SetMotor(inputType, Enum.VibrationMotor.Small, 0)
+				end)
+			end)
+		end)
+	end
 
 	local function getSharedChrome()
 		return {
@@ -478,7 +626,7 @@ return function(WindUI)
 			NotificationTitle = text,
 			NotificationContent = muted,
 			NotificationBorder = palette.line,
-			NotificationBorderTransparency = 0.45,
+			NotificationBorderTransparency = 1,
 			PopupBackground = palette.card,
 			DialogBackground = palette.card,
 			ToggleBar = accentCol,
@@ -620,10 +768,39 @@ return function(WindUI)
 		end
 		for _, desc in ipairs(root:GetDescendants()) do
 			if desc.Name == "Outline" and desc:IsA("ImageLabel") and not isDropdownDescendant(desc) then
-				ensureStroke(desc, "AlleralOutlineStroke", palette.line, 0.78, 1, {
-					inner = true,
-					reuseExisting = false,
-				})
+				desc.Visible = false
+				local box = desc.Parent
+				if box and box:IsA("GuiObject") and not box:FindFirstChild("AlleralCardShell") then
+					ensureCorner(box, UDim.new(0, 14))
+					local shell = Instance.new("Frame")
+					shell.Name = "AlleralCardShell"
+					shell.BackgroundTransparency = 1
+					shell.Size = UDim2.fromScale(1, 1)
+					shell.ZIndex = box.ZIndex + 1
+					shell.Active = false
+					shell.Parent = box
+					ensureStroke(shell, "AlleralCardStroke", palette.line, 0.72, 1, {
+						inner = true,
+						reuseExisting = false,
+					})
+				end
+			end
+		end
+	end
+
+	local function polishSidebarSpacing(sidebar)
+		if not sidebar then
+			return
+		end
+		local frame = sidebar:FindFirstChild("Frame") or sidebar
+		local layout = frame:FindFirstChildWhichIsA("UIListLayout", true)
+		if layout then
+			layout.Padding = UDim.new(0, 7)
+		end
+		for _, pad in ipairs(frame:GetDescendants()) do
+			if pad:IsA("UIPadding") and pad.Parent and pad.Parent.Name == "Frame" then
+				pad.PaddingTop = UDim.new(0, 10)
+				pad.PaddingBottom = UDim.new(0, 10)
 			end
 		end
 	end
@@ -673,6 +850,106 @@ return function(WindUI)
 		divider.Parent = sidebar
 	end
 
+	local function polishSearchBar(searchBar)
+		if not searchBar or not searchBar.Frame then
+			return
+		end
+		local search = searchBar.Frame
+		ensureCorner(search, UDim.new(0, 10))
+		local stroke = ensureStroke(search, "AlleralSearchStroke", palette.line, 0.64, 1, { inner = true })
+		local box = search:FindFirstChildWhichIsA("TextBox", true)
+		if not box or box:FindFirstChild("AlleralSearchHook") then
+			return
+		end
+		local hook = Instance.new("BoolValue")
+		hook.Name = "AlleralSearchHook"
+		hook.Parent = box
+		box.Focused:Connect(function()
+			if stroke then
+				tween(stroke, ANIM.micro, {
+					Color = accent(),
+					Transparency = 0.36,
+				})
+			end
+		end)
+		box.FocusLost:Connect(function()
+			if stroke then
+				tween(stroke, ANIM.micro, {
+					Color = palette.line,
+					Transparency = 0.64,
+				})
+			end
+		end)
+	end
+
+	local function installTabRail(window)
+		if not window or window._AlleralTabRail then
+			return
+		end
+		local tabMod = window.TabModule
+		if not tabMod or type(tabMod.OnChange) ~= "function" then
+			return
+		end
+		window._AlleralTabRail = true
+
+		local function syncPill(index)
+			if not tabMod.Tabs then
+				return
+			end
+			for tabIndex, tab in pairs(tabMod.Tabs) do
+				local main = tab.UIElements and tab.UIElements.Main
+				if main and main:IsA("GuiObject") then
+					local pill = main:FindFirstChild("AlleralTabPill")
+					if tabIndex == index then
+						if not pill then
+							pill = Instance.new("Frame")
+							pill.Name = "AlleralTabPill"
+							pill.BackgroundColor3 = accent()
+							pill.BackgroundTransparency = 0.1
+							pill.BorderSizePixel = 0
+							pill.Size = UDim2.new(0, 3, 0.64, 0)
+							pill.Position = UDim2.new(0, 5, 0.18, 0)
+							pill.ZIndex = main.ZIndex + 3
+							pill.Parent = main
+							local corner = Instance.new("UICorner")
+							corner.CornerRadius = UDim.new(1, 0)
+							corner.Parent = pill
+						end
+						tween(pill, ANIM.tab, {
+							BackgroundTransparency = 0.06,
+							Size = UDim2.new(0, 3, 0.7, 0),
+						})
+					elseif pill then
+						tween(pill, ANIM.micro, { BackgroundTransparency = 1 })
+					end
+				end
+			end
+		end
+
+		tabMod:OnChange(function(index)
+			syncPill(index)
+		end)
+
+		local active = tabMod.SelectedTab or window.CurrentTab
+		if active then
+			task.defer(function()
+				syncPill(active)
+			end)
+		end
+	end
+
+	local function applyWindowScale(window)
+		if not window or type(window.SetUIScale) ~= "function" then
+			return
+		end
+		local scale = tonumber(WindUI._AlleralUiScale) or 1
+		if scale > 0 and scale ~= 1 then
+			pcall(function()
+				window:SetUIScale(scale)
+			end)
+		end
+	end
+
 	function WindUI.PolishWindow(_self, window)
 		if type(window) ~= "table" or type(window.UIElements) ~= "table" then
 			return window
@@ -693,12 +970,11 @@ return function(WindUI)
 			local sidebar = window.UIElements.SideBar
 			if sidebar then
 				addSidebarDivider(sidebar)
+				polishSidebarSpacing(sidebar)
 			end
 
 			if window.SearchBar and window.SearchBar.Frame then
-				local search = window.SearchBar.Frame
-				ensureCorner(search, UDim.new(0, 10))
-				ensureStroke(search, "AlleralSearchStroke", palette.line, 0.64, 1, { inner = true })
+				polishSearchBar(window.SearchBar)
 			end
 
 			if window.UIElements.MainBar then
@@ -713,6 +989,7 @@ return function(WindUI)
 			end
 
 			window.CanDropdown = true
+			installTabRail(window)
 		end)
 
 		return window
@@ -744,6 +1021,22 @@ return function(WindUI)
 			settings.OpenButton.OnlyMobile = false
 		end
 
+		local presetName = resolveProfileName(WindUI._AlleralProfile)
+		local preset = PROFILE_PRESETS[presetName]
+		if preset then
+			settings.UICorner = preset.corner or settings.UICorner
+			settings.UIPadding = preset.padding or settings.UIPadding
+			settings.SideBarWidth = preset.sidebar or settings.SideBarWidth
+			settings.ElementPadding = preset.elementPad or settings.ElementPadding
+			if preset.openButton then
+				for key, value in pairs(preset.openButton) do
+					if settings.OpenButton[key] == nil then
+						settings.OpenButton[key] = value
+					end
+				end
+			end
+		end
+
 		return settings
 	end
 
@@ -763,6 +1056,31 @@ return function(WindUI)
 		return wrapper:FindFirstChildWhichIsA("Frame", true)
 	end
 
+	local function stripNotificationChrome(card)
+		if not card then
+			return nil
+		end
+		for _, child in ipairs(card:GetChildren()) do
+			if child:IsA("ImageLabel") and child.Name ~= "Background" and child.Size == UDim2.new(1, 0, 1, 0) then
+				child.Visible = false
+			end
+		end
+		local bg = card:FindFirstChild("Background")
+		if bg then
+			ensureCorner(bg, UDim.new(0, 13))
+		end
+		ensureCorner(card, UDim.new(0, 13))
+		local oldStroke = card:FindFirstChild("AlleralNotifyStroke")
+		if oldStroke then
+			oldStroke:Destroy()
+		end
+		local strokeTarget = bg or card
+		return ensureStroke(strokeTarget, "AlleralNotifyStroke", palette.line, 0.48, 1, {
+			inner = true,
+			reuseExisting = false,
+		})
+	end
+
 	local function polishNotificationWrapper(wrapper, style)
 		if not wrapper or wrapper:FindFirstChild("AlleralNotifyRail") then
 			return
@@ -773,17 +1091,28 @@ return function(WindUI)
 			return
 		end
 
+		stripNotificationChrome(card)
+
 		local rail = Instance.new("Frame")
 		rail.Name = "AlleralNotifyRail"
 		rail.BackgroundColor3 = style.accent
-		rail.BackgroundTransparency = 0.12
+		rail.BackgroundTransparency = 0.08
 		rail.BorderSizePixel = 0
-		rail.Size = UDim2.new(0, 3, 1, -10)
-		rail.Position = UDim2.new(0, 6, 0, 5)
+		rail.Size = UDim2.new(0, 3, 1, -12)
+		rail.Position = UDim2.new(0, 8, 0, 6)
 		rail.ZIndex = card.ZIndex + 4
 		rail.Parent = card
+		local railCorner = Instance.new("UICorner")
+		railCorner.CornerRadius = UDim.new(1, 0)
+		railCorner.Parent = rail
 
-		ensureStroke(card, "AlleralNotifyStroke", style.accent, 0.62, 1, { inner = true })
+		local stroke = card:FindFirstChild("AlleralNotifyStroke", true)
+		if stroke then
+			tween(stroke, ANIM.micro, {
+				Color = style.accent,
+				Transparency = 0.52,
+			})
+		end
 
 		animateNotificationIn(card, rail)
 
@@ -819,6 +1148,10 @@ return function(WindUI)
 		end
 
 		WindUI._AlleralNotifyHook = true
+		local layout = holder:FindFirstChildWhichIsA("UIListLayout")
+		if layout then
+			layout.Padding = UDim.new(0, WindUI._AlleralNotifyCompact and 6 or 10)
+		end
 		holder.ChildAdded:Connect(function(wrapper)
 			local style = WindUI._AlleralPendingNotifyStyle or NOTIFY_STYLES.info
 			task.defer(function()
@@ -833,6 +1166,35 @@ return function(WindUI)
 		end
 		window._AlleralWrapped = true
 
+		local function findToggleSwitch(row)
+			for _, child in ipairs(row:GetChildren()) do
+				if child:FindFirstChild("Hitbox", true) then
+					return child
+				end
+			end
+			return nil
+		end
+
+		local function findToggleParts(switch)
+			if not switch then
+				return nil
+			end
+			local knob = switch:FindFirstChild("Frame")
+			local bar = knob and knob:FindFirstChild("Bar")
+			local highlight = bar and bar:FindFirstChild("Highlight")
+			if not highlight then
+				return nil
+			end
+			return {
+				switch = switch,
+				knob = knob,
+				overlay = highlight:FindFirstChild("BarOverlay"),
+				glass = highlight:FindFirstChild("Glass"),
+				glassBg = highlight:FindFirstChild("GlassBackground"),
+				layer = switch:FindFirstChild("Layer"),
+			}
+		end
+
 		local function polishToggleElement(elem)
 			if type(elem) ~= "table" or elem._AlleralToggleDone then
 				return elem
@@ -845,47 +1207,69 @@ return function(WindUI)
 					return
 				end
 
-				local track
-				for _, child in ipairs(row:GetChildren()) do
-					if child:FindFirstChild("Frame", true) then
-						track = child
-						break
-					end
-				end
-				if not track then
+				local parts = findToggleParts(findToggleSwitch(row))
+				if not parts then
 					return
 				end
 
-				ensureCorner(track, UDim.new(1, 0))
-				local stroke = ensureStroke(track, "AlleralToggleStroke", palette.line, 0.62, 1, { inner = true })
-				local glow = track:FindFirstChild("AlleralToggleGlow")
-				if not glow then
-					glow = Instance.new("Frame")
-					glow.Name = "AlleralToggleGlow"
-					glow.BackgroundColor3 = accent()
-					glow.BackgroundTransparency = 0.9
-					glow.BorderSizePixel = 0
-					glow.Size = UDim2.new(1, 4, 1, 4)
-					glow.Position = UDim2.new(0.5, 0, 0.5, 0)
-					glow.AnchorPoint = Vector2.new(0.5, 0.5)
-					glow.ZIndex = track.ZIndex - 1
-					glow.Parent = track
-					local corner = Instance.new("UICorner")
-					corner.CornerRadius = UDim.new(1, 0)
-					corner.Parent = glow
+				local oldGlow = row:FindFirstChild("AlleralToggleGlow", true)
+				if oldGlow then
+					oldGlow:Destroy()
+				end
+				local oldStroke = row:FindFirstChild("AlleralToggleStroke", true)
+				if oldStroke then
+					oldStroke:Destroy()
+				end
+
+				if parts.switch then
+					ensureCorner(parts.switch, UDim.new(1, 0))
+					ensureStroke(parts.switch, "AlleralToggleStroke", palette.line, 0.55, 1, {
+						inner = true,
+						reuseExisting = false,
+					})
+				end
+				if parts.glass then
+					local glassCorner = parts.glass:FindFirstChildOfClass("UICorner")
+					if not glassCorner then
+						glassCorner = Instance.new("UICorner")
+						glassCorner.CornerRadius = UDim.new(1, 0)
+						glassCorner.Parent = parts.glass
+					end
 				end
 
 				local function syncToggleVisual(on)
+					local stroke = parts.switch and parts.switch:FindFirstChild("AlleralToggleStroke")
+					if parts.overlay then
+						tween(parts.overlay, ANIM.toggle, {
+							ImageColor3 = on and accent() or palette.trackOff,
+							ImageTransparency = on and 0.18 or 1,
+						})
+					end
+					if parts.glassBg then
+						tween(parts.glassBg, ANIM.toggle, {
+							ImageColor3 = on and palette.trackOn or palette.trackOff,
+							ImageTransparency = on and 0.08 or 0.22,
+						})
+					end
+					if parts.glass then
+						tween(parts.glass, ANIM.toggle, {
+							ImageColor3 = on and palette.knob or palette.muted,
+							ImageTransparency = on and 0.04 or 0.12,
+						})
+					end
+					if parts.layer then
+						tween(parts.layer, ANIM.micro, {
+							ImageTransparency = on and 0.35 or 1,
+						})
+					end
 					if stroke then
 						tween(stroke, ANIM.micro, {
 							Color = on and accent() or palette.line,
-							Transparency = on and 0.35 or 0.68,
+							Transparency = on and 0.42 or 0.62,
 						})
 					end
-					if glow then
-						tween(glow, ANIM.micro, {
-							BackgroundTransparency = on and 0.82 or 0.96,
-						})
+					if on then
+						hapticPulse()
 					end
 				end
 
@@ -896,12 +1280,52 @@ return function(WindUI)
 					local origSet = elem.Set
 					function elem:Set(value, ...)
 						local result = origSet(self, value, ...)
-						syncToggleVisual(value == true)
+						task.defer(function()
+							syncToggleVisual(value == true)
+						end)
 						return result
 					end
 				end
 			end)
 
+			return elem
+		end
+
+		local function polishButtonElement(elem)
+			if type(elem) ~= "table" or elem._AlleralButtonDone then
+				return elem
+			end
+			elem._AlleralButtonDone = true
+			task.defer(function()
+				local row = elem.UIElements and (elem.UIElements.Main or elem.UIElements.Container)
+				if not row then
+					return
+				end
+				local btn = row:FindFirstChildWhichIsA("TextButton", true)
+					or row:FindFirstChildWhichIsA("ImageButton", true)
+				if not btn then
+					return
+				end
+				local scale = ensureUiScale(btn, "AlleralBtnScale")
+				if not scale then
+					return
+				end
+				scale.Scale = 1
+				btn.MouseButton1Down:Connect(function()
+					if WindUI._AlleralTouchFeedback == false then
+						return
+					end
+					tween(scale, ANIM.press, { Scale = 0.96 })
+				end)
+				local function release()
+					if WindUI._AlleralTouchFeedback == false then
+						return
+					end
+					tween(scale, ANIM.micro, { Scale = 1 })
+				end
+				btn.MouseButton1Up:Connect(release)
+				btn.MouseLeave:Connect(release)
+			end)
 			return elem
 		end
 
@@ -919,6 +1343,8 @@ return function(WindUI)
 						local elem = original(self, opts, ...)
 						if methodName == "Toggle" or methodName == "Checkbox" then
 							polishToggleElement(elem)
+						elseif methodName == "Button" then
+							polishButtonElement(elem)
 						end
 						return elem
 					end
@@ -1034,6 +1460,7 @@ return function(WindUI)
 		if window then
 			wrapWindowElements(window)
 			installWindowAnimations(window)
+			applyWindowScale(window)
 			task.defer(function()
 				installDropdownAnimations()
 				WindUI:PolishWindow(window)
@@ -1057,6 +1484,16 @@ return function(WindUI)
 		if not payload.Icon and style.icon then
 			payload.Icon = style.icon
 			payload.IconThemed = false
+		end
+
+		if WindUI._AlleralNotifyDedupe ~= false then
+			local key = tostring(payload.Title) .. "\0" .. tostring(payload.Content)
+			local now = tick()
+			local last = WindUI._AlleralLastNotify[key]
+			if last and now - last.at < 2.5 then
+				last.at = now
+				return last.result
+			end
 		end
 
 		ensureNotificationHook()
@@ -1092,6 +1529,14 @@ return function(WindUI)
 		if not ok then
 			uiWarn("notify", result)
 			return nil
+		end
+
+		if WindUI._AlleralNotifyDedupe ~= false then
+			local key = tostring(payload.Title) .. "\0" .. tostring(payload.Content)
+			WindUI._AlleralLastNotify[key] = {
+				at = tick(),
+				result = result,
+			}
 		end
 		return result
 	end
@@ -1356,6 +1801,85 @@ return function(WindUI)
 		WindUI._AlleralStartupEffect = enabled ~= false
 	end
 
+	function WindUI.GetDeviceProfile(_self)
+		return detectDeviceKind(), viewportShortSide()
+	end
+
+	function WindUI.ListProfiles(_self)
+		local names = {}
+		for name, preset in pairs(PROFILE_PRESETS) do
+			table.insert(names, {
+				id = name,
+				label = preset.label or name,
+			})
+		end
+		table.sort(names, function(a, b)
+			return a.id < b.id
+		end)
+		table.insert(names, 1, { id = "auto", label = "Auto (detect device)" })
+		return names
+	end
+
+	function WindUI.ApplyProfile(_self, profileName)
+		local resolved = resolveProfileName(profileName)
+		local preset = PROFILE_PRESETS[resolved]
+		if not preset and profileName ~= "auto" then
+			return false
+		end
+		WindUI._AlleralProfile = profileName or resolved
+		if preset then
+			applyPresetToDefaults(preset)
+		end
+		if type(WindUI.SetNotificationCompact) == "function" and WindUI._AlleralNotifyCompact then
+			WindUI:SetNotificationCompact(true)
+		end
+		if WindUI.Window then
+			applyWindowScale(WindUI.Window)
+			WindUI:RepairWindow(WindUI.Window)
+		end
+		return resolved, preset
+	end
+
+	function WindUI.SetUiScale(_self, scale)
+		scale = tonumber(scale) or 1
+		scale = math.clamp(scale, 0.75, 1.25)
+		WindUI._AlleralUiScale = scale
+		if WindUI.Window then
+			applyWindowScale(WindUI.Window)
+		end
+		return scale
+	end
+
+	function WindUI.SetTouchFeedback(_self, enabled)
+		WindUI._AlleralTouchFeedback = enabled ~= false
+		return WindUI._AlleralTouchFeedback
+	end
+
+	function WindUI.SetHaptics(_self, enabled)
+		WindUI._AlleralHaptics = enabled == true
+		return WindUI._AlleralHaptics
+	end
+
+	function WindUI.SetNotifyDedupe(_self, enabled)
+		WindUI._AlleralNotifyDedupe = enabled ~= false
+		return WindUI._AlleralNotifyDedupe
+	end
+
+	function WindUI.GetFeatures(_self)
+		return {
+			brand = WindUI.ALLERAL_BRAND,
+			version = WindUI.ALLERAL_UI_VERSION,
+			profiles = true,
+			mobile = true,
+			tabRail = true,
+			touchFeedback = true,
+			haptics = true,
+			notifyDedupe = true,
+			reducedMotion = true,
+			themes = WindUI.Themes ~= nil,
+		}
+	end
+
 	function WindUI.RepairWindow(self, window)
 		window = window or WindUI.Window
 		if not window then
@@ -1366,6 +1890,7 @@ return function(WindUI)
 			cleanupLegacyPolish(WindUI.DropdownGui)
 			wrapWindowElements(window)
 			installWindowAnimations(window)
+			applyWindowScale(window)
 			WindUI:PolishWindow(window)
 			if type(window.CanDropdown) ~= "boolean" then
 				window.CanDropdown = true
@@ -1382,8 +1907,10 @@ return function(WindUI)
 			patch = WindUI.ALLERAL_UI_VERSION ~= nil,
 			notify = type(WindUI.Notify) == "function",
 			clear = type(WindUI.ClearNotifications) == "function",
+			profiles = type(WindUI.ApplyProfile) == "function",
+			mobile = type(WindUI.GetDeviceProfile) == "function",
 		}
-		local ok = checks.create and checks.theme and checks.patch and checks.notify
+		local ok = checks.create and checks.theme and checks.patch and checks.notify and checks.profiles
 		return ok, checks
 	end
 
@@ -1408,6 +1935,10 @@ return function(WindUI)
 	if WindUI._AlleralNotifyCompact then
 		WindUI:SetNotificationCompact(true)
 	end
+
+	pcall(function()
+		WindUI:ApplyProfile(WindUI._AlleralProfile or "auto")
+	end)
 
 	local passed = WindUI:SelfTest()
 	if not passed then

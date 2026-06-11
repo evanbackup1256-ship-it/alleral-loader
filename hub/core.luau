@@ -1,7 +1,7 @@
 local Core = {}
 Core.VERSION = "2.7.0"
 Core.UI_LIBRARY = "WindUI"
-Core.WINDUI_VERSION = "1.6.64-fix-aller8"
+Core.WINDUI_VERSION = "1.6.64-fix-aller10"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
@@ -2582,6 +2582,21 @@ function Core.loadUi()
 	if ENV.Alleral_UiReducedMotion == true and type(WindUI.SetReducedMotion) == "function" then
 		WindUI:SetReducedMotion(true)
 	end
+	if ENV.Alleral_UiStartup == false and type(WindUI.SetStartupEffect) == "function" then
+		pcall(function()
+			WindUI:SetStartupEffect(false)
+		end)
+	end
+	if ENV.Alleral_UiTouchFeedback == false and type(WindUI.SetTouchFeedback) == "function" then
+		pcall(function()
+			WindUI:SetTouchFeedback(false)
+		end)
+	end
+	if ENV.Alleral_NotifyDedupe == false and type(WindUI.SetNotifyDedupe) == "function" then
+		pcall(function()
+			WindUI:SetNotifyDedupe(false)
+		end)
+	end
 	if ENV.Alleral_NotifyLower == true and type(WindUI.SetNotificationLower) == "function" then
 		pcall(function()
 			WindUI:SetNotificationLower(true)
@@ -2590,6 +2605,21 @@ function Core.loadUi()
 	if ENV.Alleral_NotifyCompact == true and type(WindUI.SetNotificationCompact) == "function" then
 		pcall(function()
 			WindUI:SetNotificationCompact(true)
+		end)
+	end
+	if type(WindUI.ApplyProfile) == "function" then
+		pcall(function()
+			WindUI:ApplyProfile(ENV.Alleral_UiProfile or "auto")
+		end)
+	end
+	if ENV.Alleral_UiScale and type(WindUI.SetUiScale) == "function" then
+		pcall(function()
+			WindUI:SetUiScale(ENV.Alleral_UiScale)
+		end)
+	end
+	if ENV.Alleral_UiHaptics == true and type(WindUI.SetHaptics) == "function" then
+		pcall(function()
+			WindUI:SetHaptics(true)
 		end)
 	end
 	Core.say("WindUI " .. tostring(WindUI.GetAlleralVersion and WindUI:GetAlleralVersion() or Core.WINDUI_VERSION) .. " loaded")
@@ -3025,7 +3055,7 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 				end)
 			end
 			Core.notify("Theme", "theme: " .. tostring(selected), 2, "success")
-		end, "Alleral, AlleralNeon, AlleralMidnight, Dark, etc.")
+		end, "Choose a color preset.")
 		group:CreateButton("Next theme", function()
 			if windUi and type(windUi.CycleTheme) == "function" then
 				local ok, nextTheme = pcall(function()
@@ -3036,6 +3066,89 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 				end
 			end
 		end, "Cycles through available presets.")
+
+		local profileNames = { "auto", "desktop", "mobile", "compact", "performance" }
+		local profileLabels = {
+			auto = "Auto",
+			desktop = "Desktop",
+			mobile = "Mobile",
+			compact = "Compact",
+			performance = "Performance",
+		}
+		local currentProfile = ENV.Alleral_UiProfile or "auto"
+		group:CreateDropdown("Layout profile", profileNames, currentProfile, function(selected)
+			ENV.Alleral_UiProfile = selected
+			if windUi and type(windUi.ApplyProfile) == "function" then
+				pcall(function()
+					windUi:ApplyProfile(selected)
+				end)
+			end
+			Core.notify("UI", "Profile: " .. tostring(profileLabels[selected] or selected), 2, "info")
+		end, "Auto picks mobile or desktop from your device.")
+
+		group:CreateSlider("UI scale", 0.85, 1.1, tonumber(ENV.Alleral_UiScale) or 1, function(value)
+			ENV.Alleral_UiScale = value
+			if windUi and type(windUi.SetUiScale) == "function" then
+				pcall(function()
+					windUi:SetUiScale(value)
+				end)
+			end
+		end, "Shrink or enlarge the whole menu.")
+
+		group:CreateToggle("Reduced motion", ENV.Alleral_UiReducedMotion == true, "Disables animations.", function(value)
+			ENV.Alleral_UiReducedMotion = value == true
+			if windUi and type(windUi.SetReducedMotion) == "function" then
+				pcall(function()
+					windUi:SetReducedMotion(value == true)
+				end)
+			end
+		end)
+
+		group:CreateToggle("Startup animation", ENV.Alleral_UiStartup ~= false, "Opening sweep when the menu loads.", function(value)
+			ENV.Alleral_UiStartup = value ~= false
+			if windUi and type(windUi.SetStartupEffect) == "function" then
+				pcall(function()
+					windUi:SetStartupEffect(value ~= false)
+				end)
+			end
+		end)
+
+		group:CreateToggle("Compact notifications", ENV.Alleral_NotifyCompact == true, "Tighter toast stack.", function(value)
+			ENV.Alleral_NotifyCompact = value == true
+			if windUi and type(windUi.SetNotificationCompact) == "function" then
+				pcall(function()
+					windUi:SetNotificationCompact(value == true)
+				end)
+			end
+		end)
+
+		group:CreateToggle("Touch feedback", ENV.Alleral_UiTouchFeedback ~= false, "Button press scale on click.", function(value)
+			ENV.Alleral_UiTouchFeedback = value ~= false
+			if windUi and type(windUi.SetTouchFeedback) == "function" then
+				pcall(function()
+					windUi:SetTouchFeedback(value ~= false)
+				end)
+			end
+		end)
+
+		group:CreateToggle("Haptics", ENV.Alleral_UiHaptics == true, "Light vibration on toggles (mobile).", function(value)
+			ENV.Alleral_UiHaptics = value == true
+			if windUi and type(windUi.SetHaptics) == "function" then
+				pcall(function()
+					windUi:SetHaptics(value == true)
+				end)
+			end
+		end)
+
+		group:CreateToggle("Dedupe notifications", ENV.Alleral_NotifyDedupe ~= false, "Skip identical toasts within 2s.", function(value)
+			ENV.Alleral_NotifyDedupe = value ~= false
+			if windUi and type(windUi.SetNotifyDedupe) == "function" then
+				pcall(function()
+					windUi:SetNotifyDedupe(value ~= false)
+				end)
+			end
+		end)
+
 		return group
 	end
 
@@ -3744,10 +3857,10 @@ function Core.buildUiWindow(ui, settings)
 		Theme = "Alleral",
 		NewElements = true,
 		HideSearchBar = false,
-		UICorner = 18,
-		UIPadding = 18,
-		SideBarWidth = 248,
-		ElementPadding = 12,
+		UICorner = 20,
+		UIPadding = 20,
+		SideBarWidth = 256,
+		ElementPadding = 14,
 		Resizable = true,
 		OpenButton = {
 			Title = "Alleral",
