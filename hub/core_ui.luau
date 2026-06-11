@@ -8,6 +8,7 @@ return function(Core)
 		"https://raw.githubusercontent.com/Footagesus/WindUI/1.6.64-fix/dist/",
 	}
 	local WINDUI_LOCAL_ROOTS = {
+		".alleral/cache/ui/windui/",
 		"ui/windui/",
 		"kick/ui/windui/",
 		"kick/kick/ui/windui/",
@@ -192,7 +193,10 @@ local function applyAlleralWindUiPatch(windUi)
 		return patchApplied(windUi)
 	end
 
-	local bootstrapSource, bootstrapPath
+	local bootstrapSource, bootstrapPath = readWindUiLocal("bootstrap.lua")
+	if bootstrapSource and bootstrapSourceValid(bootstrapSource) and runPatchLoader(bootstrapSource, "@Arrrel/bootstrap:" .. tostring(bootstrapPath or "local")) then
+		return windUi
+	end
 
 	for _, base in ipairs(WINDUI_MIRROR_URLS) do
 		local body = Core.httpGet(base .. "bootstrap.lua")
@@ -201,10 +205,22 @@ local function applyAlleralWindUiPatch(windUi)
 		end
 	end
 
-	bootstrapSource, bootstrapPath = readWindUiLocal("bootstrap.lua")
-	if bootstrapSource and patchVersionCurrent(bootstrapSource) then
-		if runPatchLoader(bootstrapSource, "@Arrrel/bootstrap:" .. tostring(bootstrapPath or "local")) then
-			return windUi
+	local patchSource, patchPath = readWindUiLocal(WINDUI_PATCH_FILE)
+	if not patchSource then
+		patchSource, patchPath = readWindUiLocal(WINDUI_PATCH_FALLBACK)
+	end
+	if patchSource and patchSourceValid(patchSource) and patchVersionCurrent(patchSource) then
+		local chunk, compileErr = loadStringFn(patchSource, "@Arrrel/patch:" .. tostring(patchPath))
+		if chunk then
+			local ok, patchFn = pcall(chunk)
+			if ok and type(patchFn) == "function" then
+				pcall(patchFn, windUi)
+				if patchApplied(windUi) then
+					return windUi
+				end
+			end
+		else
+			Core.logWarn("UI patch compile: " .. tostring(compileErr))
 		end
 	end
 
@@ -225,25 +241,6 @@ local function applyAlleralWindUiPatch(windUi)
 					Core.logWarn("UI patch compile: " .. tostring(compileErr))
 				end
 			end
-		end
-	end
-
-	local patchSource, patchPath = readWindUiLocal(WINDUI_PATCH_FILE)
-	if not patchSource then
-		patchSource, patchPath = readWindUiLocal(WINDUI_PATCH_FALLBACK)
-	end
-	if patchSource and patchSourceValid(patchSource) and patchVersionCurrent(patchSource) then
-		local chunk, compileErr = loadStringFn(patchSource, "@Arrrel/patch:" .. tostring(patchPath))
-		if chunk then
-			local ok, patchFn = pcall(chunk)
-			if ok and type(patchFn) == "function" then
-				pcall(patchFn, windUi)
-				if patchApplied(windUi) then
-					return windUi
-				end
-			end
-		else
-			Core.logWarn("UI patch compile: " .. tostring(compileErr))
 		end
 	end
 
@@ -556,44 +553,48 @@ function Core.httpGet(url)
 		return nil
 	end
 
-	local bestBody, bestLen = nil, 0
-	local function consider(body)
-		if type(body) == "string" and accept(body) and #body > bestLen then
-			bestBody, bestLen = body, #body
-		end
-	end
-
-	for _, fetchUrl in ipairs(urls) do
+	local function fetchOnce(fetchUrl)
 		if type(game.HttpGet) == "function" then
 			local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
-			consider(body)
+			if ok and accept(body) then
+				return body
+			end
 			ok, body = pcall(game.HttpGet, game, fetchUrl)
-			consider(body)
+			if ok and accept(body) then
+				return body
+			end
 		end
 		local ok, body = pcall(function()
 			return game:HttpGet(fetchUrl, true)
 		end)
-		if ok then
-			consider(body)
+		if ok and accept(body) then
+			return body
 		end
 		ok, body = pcall(function()
 			return game:HttpGet(fetchUrl)
 		end)
-		if ok then
-			consider(body)
+		if ok and accept(body) then
+			return body
 		end
 		if type(HttpService.GetAsync) == "function" then
 			ok, body = pcall(function()
 				return HttpService:GetAsync(fetchUrl, true)
 			end)
-			if ok then
-				consider(body)
+			if ok and accept(body) then
+				return body
 			end
 		end
-		consider(tryRequest(Core.requestFunction(), fetchUrl))
+		return tryRequest(Core.requestFunction(), fetchUrl)
 	end
 
-	return bestBody
+	for _, fetchUrl in ipairs(urls) do
+		local body = fetchOnce(fetchUrl)
+		if body then
+			return body
+		end
+	end
+
+	return nil
 end
 
 function Core.httpGetJson(url)

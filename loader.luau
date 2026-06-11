@@ -1,7 +1,8 @@
-local LOADER_VERSION = "7.7.3"
+local LOADER_VERSION = "7.7.4"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
-local EXPECTED_VERSIONS_CACHE_SECONDS = 60
+local EXPECTED_VERSIONS_CACHE_SECONDS = 300
+local FAST_COMPILE_VALIDATE = true
 local CORE_MIN_BYTES = 50000
 local CORE_BASE_MIN_BYTES = 30000
 local CORE_BASE_MAX_BYTES = 45000
@@ -19,7 +20,7 @@ local CORE_UI_PATH = HUB .. "/core_ui.luau"
 local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.7.3",
+	loader = "7.7.4",
 	core = "2.8.3",
 	ui = "Alleral",
 	windui = "2.1.3-alleral-v2",
@@ -659,40 +660,34 @@ local CAPABILITIES = {
 
 local function httpGet(url, minBytes)
 	minBytes = minBytes or 0
+	local plain = url:gsub("%?.*$", "")
+	local candidates = {
+		plain .. "?t=" .. tostring(tick()),
+		plain,
+		url,
+	}
 
-	local bestBody, bestVia, bestLen = nil, nil, 0
-	local function consider(body, via)
-		if type(body) == "string" and #body > bestLen then
-			bestBody, bestVia, bestLen = body, via, #body
+	for _, candidate in ipairs(candidates) do
+		if ENV.Alleral_Core and type(ENV.Alleral_Core.httpGet) == "function" then
+			local coreBody = ENV.Alleral_Core.httpGet(candidate)
+			if type(coreBody) == "string" and #coreBody >= minBytes then
+				return coreBody, "core"
+			end
+		end
+
+		local body, via = tryGameHttpGet(candidate)
+		if type(body) == "string" and #body >= minBytes then
+			return body, via or "httpget"
+		end
+
+		for _, transport in ipairs(HTTP_TRANSPORTS) do
+			body = transport.fetch(candidate)
+			if type(body) == "string" and #body >= minBytes then
+				return body, transport.id
+			end
 		end
 	end
 
-	if ENV.Alleral_Core and type(ENV.Alleral_Core.httpGet) == "function" then
-		consider(ENV.Alleral_Core.httpGet(url), "core")
-	end
-
-	local body, via = tryGameHttpGet(url)
-	consider(body, via)
-
-	local req = getHttpRequestFn()
-	if req then
-		consider(requestVia(req, url .. "?t=" .. tick()), "request")
-	end
-
-	for _, transport in ipairs(HTTP_TRANSPORTS) do
-		consider(transport.fetch(url), transport.id)
-		consider(transport.fetch(url .. "?t=" .. tick()), transport.id)
-	end
-
-	body, via = httpFetch(url)
-	consider(body, via)
-
-	if bestBody and #bestBody >= minBytes then
-		return bestBody, bestVia
-	end
-	if bestBody then
-		return nil, (bestVia or "http") .. " (" .. tostring(bestLen) .. "b, need " .. tostring(minBytes) .. "b)"
-	end
 	return nil, "all transports failed"
 end
 
@@ -953,41 +948,18 @@ local function fetchGameScript(profile)
 		return src, "local:" .. path
 	end
 	if src and path then
-		log("Removing invalid local game script at " .. path, true)
 		deleteWorkspaceFile(path)
 	end
 
-	local best, bestInvalid, lastErr = nil, nil, nil
 	for _, base in ipairs(REMOTE_BASES) do
-		for _, suffix in ipairs({ "", "?t=" .. tick() }) do
-			local url = base .. "/" .. profile.scriptUrl .. suffix
-			for _, item in ipairs(collectHttpBodies(url)) do
-				if gameScriptValid(item.body, profile) then
-					if not best or item.len > best.len then
-						best = { body = item.body, via = item.via, base = base, len = item.len }
-					end
-				elseif item.len > (bestInvalid and bestInvalid.len or 0) then
-					bestInvalid = item
-				end
-			end
-		end
-		if best then
-			break
+		local body, via = httpGet(base .. "/" .. profile.scriptUrl, minBytes)
+		if body and gameScriptValid(body, profile) then
+			cacheRemote(profile.scriptUrl, body)
+			return body, base .. " via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
 		end
 	end
 
-	if best then
-		cacheRemote(profile.scriptUrl, best.body)
-		return best.body, best.base .. " via " .. best.via .. " (" .. tostring(best.len) .. "b)"
-	end
-
-	if bestInvalid then
-		lastErr = bestInvalid.via .. " (" .. gameScriptRejectReason(bestInvalid.body, profile) .. ")"
-	elseif lastErr == nil then
-		lastErr = "all transports failed"
-	end
-
-	return nil, lastErr
+	return nil, "all transports failed"
 end
 
 local function compileAndRun(source, chunkName, runEnv)
@@ -1057,6 +1029,9 @@ local function coreVersionOk(v)
 end
 
 local function compileCoreSource(src, label)
+	if FAST_COMPILE_VALIDATE then
+		return true
+	end
 	if type(loadStringFn) ~= "function" then
 		return true
 	end
@@ -1228,28 +1203,14 @@ local function coreHubUiRejectReason(src)
 	return "unknown"
 end
 
-local function fetchRemoteCoreFile(relativePath, validFn, rejectReasonFn)
-	local best, bestInvalid = nil, nil
+local function fetchRemoteCoreFile(relativePath, validFn, rejectReasonFn, minBytes)
+	minBytes = minBytes or CORE_BASE_MIN_BYTES
 	for _, base in ipairs(CORE_REMOTE_BASES) do
-		local url = base .. "/" .. relativePath
-		for _, item in ipairs(collectCoreHttpBodies(url)) do
-			if validFn(item.body) then
-				if not best or item.len > best.len then
-					best = { body = item.body, via = item.via, base = base, len = item.len }
-				end
-			elseif item.len > (bestInvalid and bestInvalid.len or 0) then
-				bestInvalid = item
-			end
+		local body, via = httpGet(base .. "/" .. relativePath, minBytes)
+		if body and validFn(body) then
+			cacheRemote(relativePath, body)
+			return body, base .. " via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
 		end
-	end
-
-	if best then
-		cacheRemote(relativePath, best.body)
-		return best.body, best.base .. " via " .. best.via .. " (" .. tostring(best.len) .. "b)"
-	end
-
-	if bestInvalid then
-		return nil, bestInvalid.via .. " (" .. rejectReasonFn(bestInvalid.body) .. ")"
 	end
 	return nil, "all transports failed"
 end
@@ -1303,7 +1264,7 @@ local function resolveCoreSource(localPaths, cachePaths, remotePath, validFn, re
 	if src and validFn(src) then
 		label = label or ("local:" .. tostring(path or localPaths[1]))
 	else
-		src, label = fetchRemoteCoreFile(remotePath, validFn, rejectReasonFn)
+		src, label = fetchRemoteCoreFile(remotePath, validFn, rejectReasonFn, minBytes)
 		if not src then
 			return nil, label
 		end
@@ -1339,16 +1300,59 @@ end
 
 local function loadCore()
 	ENV.Alleral_Core = nil
-	purgeStaleCorePaths()
+	task.defer(purgeStaleCorePaths)
 
-	local baseSrc, baseLabel = resolveCoreSource(
+	local baseArgs = {
 		{ CORE_BASE_PATH, CORE_BASE_LEGACY_PATH, "core/alleral_core.luau", "alleral_core.luau" },
 		{ ".alleral/cache/" .. CORE_BASE_PATH, ".alleral/cache/" .. CORE_BASE_LEGACY_PATH },
 		CORE_BASE_PATH,
 		coreValid,
 		coreRejectReason,
-		CORE_BASE_MIN_BYTES
-	)
+		CORE_BASE_MIN_BYTES,
+	}
+	local uiArgs = {
+		{ CORE_UI_PATH, HUB .. "/core_ui.luau" },
+		{ ".alleral/cache/" .. CORE_UI_PATH },
+		CORE_UI_PATH,
+		coreUiValid,
+		coreUiRejectReason,
+		CORE_UI_MIN_BYTES,
+	}
+	local hubArgs = {
+		{ CORE_HUB_UI_PATH, HUB .. "/core_hub_ui.luau" },
+		{ ".alleral/cache/" .. CORE_HUB_UI_PATH },
+		CORE_HUB_UI_PATH,
+		coreHubUiValid,
+		coreHubUiRejectReason,
+		CORE_HUB_UI_MIN_BYTES,
+	}
+
+	local function resolveArgs(args)
+		return resolveCoreSource(args[1], args[2], args[3], args[4], args[5], args[6])
+	end
+
+	local function unwrap(result)
+		if not result or result[1] ~= true then
+			return nil, result and result[2]
+		end
+		return result[2], result[3]
+	end
+
+	local parallel = runParallel({
+		function()
+			return resolveArgs(baseArgs)
+		end,
+		function()
+			return resolveArgs(uiArgs)
+		end,
+		function()
+			return resolveArgs(hubArgs)
+		end,
+	})
+
+	local baseSrc, baseLabel = unwrap(parallel[1])
+	local uiSrc, uiLabel = unwrap(parallel[2])
+	local hubUiSrc, hubUiLabel = unwrap(parallel[3])
 	if not baseSrc then
 		return false, baseLabel or "Core download failed"
 	end
@@ -1376,27 +1380,11 @@ local function loadCore()
 		return false, "Split core missing applyUiLayer"
 	end
 
-	local uiSrc, uiLabel = resolveCoreSource(
-		{ CORE_UI_PATH, HUB .. "/core_ui.luau" },
-		{ ".alleral/cache/" .. CORE_UI_PATH },
-		CORE_UI_PATH,
-		coreUiValid,
-		coreUiRejectReason,
-		CORE_UI_MIN_BYTES
-	)
 	if not uiSrc then
 		ENV.Alleral_Core = nil
 		return false, uiLabel or "Core UI download failed"
 	end
 
-	local hubUiSrc, hubUiLabel = resolveCoreSource(
-		{ CORE_HUB_UI_PATH, HUB .. "/core_hub_ui.luau" },
-		{ ".alleral/cache/" .. CORE_HUB_UI_PATH },
-		CORE_HUB_UI_PATH,
-		coreHubUiValid,
-		coreHubUiRejectReason,
-		CORE_HUB_UI_MIN_BYTES
-	)
 	if not hubUiSrc then
 		ENV.Alleral_Core = nil
 		return false, hubUiLabel or "Core hub UI download failed"
@@ -1451,8 +1439,8 @@ local function loadModule(localPaths, remotePath, marker, chunkName)
 end
 
 local function loadWeaoStack()
-	local cfgBody = httpFetch(GITHUB_RAW .. "/" .. CFG .. "/weao.json", { ["Accept"] = "application/json" })
-	local cfg = decodeJson(cfgBody)
+	local localCfg = readLocal({ CFG .. "/weao.json", "config/weao.json" }, 20)
+	local cfg = decodeJson(localCfg)
 	if cfg then
 		ENV.Alleral_WeaoConfig = cfg
 	end
@@ -1464,6 +1452,14 @@ local function loadWeaoStack()
 	if loadModule({ HUB .. "/weao.luau", "core/weao.luau" }, HUB .. "/weao.luau", "Alleral_Weao", "Alleral/weao") then
 		return ENV.Alleral_Weao ~= nil
 	end
+
+	task.spawn(function()
+		local cfgBody = httpFetch(GITHUB_RAW .. "/" .. CFG .. "/weao.json", { ["Accept"] = "application/json" })
+		local remoteCfg = decodeJson(cfgBody)
+		if remoteCfg then
+			ENV.Alleral_WeaoConfig = remoteCfg
+		end
+	end)
 
 	ENV.Alleral_Weao = {
 		VERSION = "fallback",
@@ -1591,57 +1587,68 @@ local function normalizeHttps(url)
 	return value
 end
 
-local function loadTelemetryConfig()
+local function loadTelemetryConfig(deferBootstrap)
 	local cfg = nil
-	local raw = select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/telemetry.json"))
-	cfg = decodeJson(raw)
+	local raw = readLocal({ CFG .. "/telemetry.json", "config/telemetry.json" }, 20)
+	if raw then
+		cfg = decodeJson(raw)
+	end
 	if not cfg then
-		local localRaw = readLocal({ CFG .. "/telemetry.json", "config/telemetry.json" }, 20)
-		if localRaw then
-			cfg = decodeJson(localRaw)
-		end
+		raw = select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/telemetry.json"))
+		cfg = decodeJson(raw)
 	end
 	cfg = type(cfg) == "table" and cfg or { enabled = false }
 	cfg = mergeTables(
 		cfg,
 		loadReturnTable({ CFG .. "/owner_telemetry.luau", "config/owner_telemetry.luau" }, CFG .. "/owner_telemetry.luau")
 	)
-	if trim(cfg.apiKey or "") == "" and trim(cfg.relayUrl or "") ~= "" then
-		local base = cfg.relayUrl:gsub("/+$", ""):gsub("/ingest$", "")
-		local boot = decodeJson(select(1, httpFetch(base .. "/api/bootstrap?t=" .. tick())))
-		if type(boot) == "table" and boot.ok then
-			if trim(boot.apiKey or "") ~= "" then
-				cfg.apiKey = boot.apiKey
-			end
-			if trim(boot.relayUrl or "") ~= "" then
-				cfg.relayUrl = normalizeHttps(boot.relayUrl)
-			end
-			if trim(boot.gateUrl or "") ~= "" then
-				cfg.gateUrl = normalizeHttps(boot.gateUrl)
-			end
-			if trim(boot.banCheckUrl or "") ~= "" then
-				cfg.banCheckUrl = normalizeHttps(boot.banCheckUrl)
-				if trim(cfg.gateUrl or "") == "" then
-					cfg.gateUrl = cfg.banCheckUrl
+	local function applyBootstrap()
+		if trim(cfg.apiKey or "") == "" and trim(cfg.relayUrl or "") ~= "" then
+			local base = cfg.relayUrl:gsub("/+$", ""):gsub("/ingest$", "")
+			local boot = decodeJson(select(1, httpFetch(base .. "/api/bootstrap?t=" .. tick())))
+			if type(boot) == "table" and boot.ok then
+				if trim(boot.apiKey or "") ~= "" then
+					cfg.apiKey = boot.apiKey
+				end
+				if trim(boot.relayUrl or "") ~= "" then
+					cfg.relayUrl = normalizeHttps(boot.relayUrl)
+				end
+				if trim(boot.gateUrl or "") ~= "" then
+					cfg.gateUrl = normalizeHttps(boot.gateUrl)
+				end
+				if trim(boot.banCheckUrl or "") ~= "" then
+					cfg.banCheckUrl = normalizeHttps(boot.banCheckUrl)
+					if trim(cfg.gateUrl or "") == "" then
+						cfg.gateUrl = cfg.banCheckUrl
+					end
 				end
 			end
 		end
+		if trim(cfg.relayUrl or "") ~= "" then
+			cfg.relayUrl = normalizeHttps(cfg.relayUrl)
+		end
+		if trim(cfg.gateUrl or "") ~= "" then
+			cfg.gateUrl = normalizeHttps(cfg.gateUrl)
+		end
+		ENV.Alleral_OwnerTelemetry = cfg
 	end
-	if trim(cfg.relayUrl or "") ~= "" then
-		cfg.relayUrl = normalizeHttps(cfg.relayUrl)
+	if deferBootstrap then
+		ENV.Alleral_OwnerTelemetry = cfg
+		task.spawn(applyBootstrap)
+	else
+		applyBootstrap()
 	end
-	if trim(cfg.gateUrl or "") ~= "" then
-		cfg.gateUrl = normalizeHttps(cfg.gateUrl)
-	end
-	ENV.Alleral_OwnerTelemetry = cfg
 	return cfg
 end
 
 local function loadSecurityConfig()
-	local cfg = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/security.json?t=" .. tick())))
+	local cfg = nil
+	local localRaw = readLocal({ CFG .. "/security.json", "config/security.json" }, 20)
+	if localRaw then
+		cfg = decodeJson(localRaw)
+	end
 	if not cfg then
-		local localRaw = readLocal({ CFG .. "/security.json", "config/security.json" }, 20)
-		cfg = localRaw and decodeJson(localRaw) or nil
+		cfg = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/security.json?t=" .. tick())))
 	end
 	cfg = type(cfg) == "table" and cfg or { enabled = false }
 	local owner = ENV.Alleral_OwnerTelemetry
@@ -1677,10 +1684,13 @@ local function loadSecurityConfig()
 end
 
 local function loadAccessConfig()
-	local cfg = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/access.json?t=" .. tick())))
+	local cfg = nil
+	local localRaw = readLocal({ CFG .. "/access.json", "config/access.json" }, 20)
+	if localRaw then
+		cfg = decodeJson(localRaw)
+	end
 	if not cfg then
-		local localRaw = readLocal({ CFG .. "/access.json", "config/access.json" }, 20)
-		cfg = localRaw and decodeJson(localRaw) or nil
+		cfg = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/access.json?t=" .. tick())))
 	end
 	cfg = type(cfg) == "table" and cfg or { mode = "public", publicKey = "PUBLIC" }
 	ENV.Alleral_OwnerAccess = cfg
@@ -1939,6 +1949,53 @@ local function writeInstalledManifest(data)
 		pcall(makeFolderFn, ".alleral")
 	end
 	pcall(writeFileFn, INSTALL_MANIFEST, HttpService:JSONEncode(data))
+end
+
+local function fetchExpectedVersionsFast()
+	local cached = ENV._Alleral_ExpectedVersions
+	local cachedAt = ENV._Alleral_ExpectedVersionsAt
+	if type(cached) == "table" and type(cachedAt) == "number" and tick() - cachedAt < EXPECTED_VERSIONS_CACHE_SECONDS then
+		return cached
+	end
+
+	local expected = {
+		loader = RELEASE_FALLBACK.loader,
+		core = RELEASE_FALLBACK.core,
+		analytics = RELEASE_FALLBACK.analytics,
+		telemetry = RELEASE_FALLBACK.telemetry,
+		helpers = RELEASE_FALLBACK.helpers,
+		weao = RELEASE_FALLBACK.weao,
+		windui = RELEASE_FALLBACK.windui,
+		commit = RELEASE_FALLBACK.commit,
+		updatedAt = "",
+		minLoader = LOADER_VERSION,
+		minCore = MIN_CORE,
+		updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
+		autoUpdate = true,
+		games = {},
+	}
+	for _, gameProfile in ipairs(GAMES) do
+		expected.games[gameProfile.id] = gameProfile.version
+	end
+
+	local installed = readInstalledManifest()
+	if type(installed) == "table" then
+		for key, value in pairs(installed) do
+			if expected[key] == nil or expected[key] == "" then
+				expected[key] = value
+			end
+		end
+	end
+
+	ENV._Alleral_ExpectedVersions = expected
+	return expected
+end
+
+local function refreshExpectedVersionsAsync()
+	task.spawn(function()
+		local expected = fetchExpectedVersions(true)
+		ENV._Alleral_ExpectedVersions = expected
+	end)
 end
 
 local function fetchExpectedVersions(forceRefresh)
@@ -2851,8 +2908,9 @@ local function main()
 	installGlobalBootstrap()
 	markSupportedPlaces()
 
-	local expectedVersions = fetchExpectedVersions()
+	local expectedVersions = fetchExpectedVersionsFast()
 	ENV._Alleral_ExpectedVersions = expectedVersions
+	refreshExpectedVersionsAsync()
 	if expectedVersions.minLoader and versionLt(LOADER_VERSION, expectedVersions.minLoader) then
 		local msg = "Loader v"
 			.. LOADER_VERSION
@@ -2866,8 +2924,10 @@ local function main()
 	end
 
 	loadWeaoStack()
-	pcall(function()
-		syncWeaoConfig(true)
+	task.spawn(function()
+		pcall(function()
+			syncWeaoConfig(true)
+		end)
 	end)
 
 	if typeof(task) == "table" and type(task.spawn) == "function" then
@@ -2878,7 +2938,15 @@ local function main()
 
 	clearLegacySession()
 
-	local legacyRemoved, autoexecHit, deletedPaths = purgeLegacyLoaders()
+	local loaderUpgraded = type(PREVIOUS_LOADER_VERSION) == "string" and PREVIOUS_LOADER_VERSION ~= LOADER_VERSION
+	local legacyRemoved, autoexecHit, deletedPaths = 0, false, {}
+	if loaderUpgraded then
+		legacyRemoved, autoexecHit, deletedPaths = purgeLegacyLoaders()
+	else
+		task.spawn(function()
+			purgeLegacyLoaders()
+		end)
+	end
 	if legacyRemoved > 0 then
 		log("Removed " .. tostring(legacyRemoved) .. " legacy loader file(s)")
 		if autoexecHit then
@@ -2944,9 +3012,11 @@ local function main()
 
 	ENV.Alleral_ActiveScriptId = profile.id
 	if ENV.Alleral_Core and type(ENV.Alleral_Core.evaluateScriptStatus) == "function" then
-		if type(ENV.Alleral_Core.fetchScriptManifest) == "function" then
-			pcall(ENV.Alleral_Core.fetchScriptManifest)
-		end
+		task.spawn(function()
+			if type(ENV.Alleral_Core.fetchScriptManifest) == "function" then
+				pcall(ENV.Alleral_Core.fetchScriptManifest)
+			end
+		end)
 		local evaluation = ENV.Alleral_Core.evaluateScriptStatus(profile.id, profile.version)
 		if not evaluation.allowed then
 			local status = evaluation.status
@@ -2965,12 +3035,17 @@ local function main()
 		end
 	end
 
-	loadTelemetryConfig()
-	loadSecurityConfig()
-	loadAccessConfig()
-
 	local uiBundle, uiErr, gameSrc, gameLabel
 	local _ = runParallel({
+		function()
+			loadTelemetryConfig(true)
+		end,
+		function()
+			loadSecurityConfig()
+		end,
+		function()
+			loadAccessConfig()
+		end,
 		function()
 			if ENV.Alleral_Core and type(ENV.Alleral_Core.preloadUi) == "function" then
 				uiBundle, uiErr = ENV.Alleral_Core.preloadUi()
@@ -3065,8 +3140,10 @@ local function main()
 
 	wireTelemetry(profile)
 	recordInstalledVersions()
-	purgeOutdatedWorkspace()
-	checkForRemoteUpdate(profile, true)
+	task.defer(function()
+		purgeOutdatedWorkspace()
+		checkForRemoteUpdate(profile, true)
+	end)
 	startAutoUpdater(profile)
 	ENV._Alleral_LastLoadAt = tick()
 	ENV._Alleral_LastPlaceId = game.PlaceId
