@@ -52,7 +52,6 @@
         <p class="cf-captcha-label">Verify you are human</p>
         <div id="cfTurnstile" class="cf-turnstile"></div>
         <p id="cfGateError" class="cf-gate-error hidden"></p>
-        <button id="cfGateSkip" class="btn btn-outline hidden" type="button">Continue to Site</button>
       </div>
       <p class="cf-ray">Ray ID: <code id="cfRay">${randomRay()}</code></p>
       <p class="cf-powered">Performance &amp; security by <strong>Cloudflare</strong></p>
@@ -64,7 +63,6 @@
   const steps = gate.querySelectorAll(".cf-steps li");
   const bar = gate.querySelector("#cfBar");
   const errorEl = gate.querySelector("#cfGateError");
-  const skipBtn = gate.querySelector("#cfGateSkip");
   let stepIndex = 0;
   let stepTimer = null;
   let verified = false;
@@ -90,10 +88,7 @@
     if (!errorEl) return;
     errorEl.textContent = msg;
     errorEl.classList.remove("hidden");
-    skipBtn?.classList.remove("hidden");
   }
-
-  skipBtn?.addEventListener("click", () => finish(gate));
 
   async function resolveSiteKey() {
     const local = (cfg.turnstileSiteKey || "").trim();
@@ -104,13 +99,13 @@
       const data = await res.json();
       if (data.ok && data.siteKey) return data.siteKey;
     } catch {
-      /* use fallback */
+      /* use interactive default */
     }
     return INTERACTIVE_SITE_KEY;
   }
 
   async function verifyToken(token) {
-    if (!token) return true;
+    if (!token) return false;
     const base = window.ALLERAL_API || "";
     try {
       const res = await fetch(`${base}/api/gate/verify`, {
@@ -121,7 +116,7 @@
       const data = await res.json();
       return data.ok === true;
     } catch {
-      return true;
+      return false;
     }
   }
 
@@ -137,7 +132,10 @@
     verifyToken(token).then((ok) => {
       if (!ok) {
         verified = false;
-        showError("Verification failed. Click Continue or try again.");
+        showError("Verification failed. Please complete the captcha again.");
+        if (window.turnstile && gate.querySelector("#cfTurnstile")) {
+          window.turnstile.reset(gate.querySelector("#cfTurnstile"));
+        }
         return;
       }
       setTimeout(() => finish(gate), 350);
@@ -147,7 +145,7 @@
   function renderTurnstile(siteKey) {
     const mount = gate.querySelector("#cfTurnstile");
     if (!mount || !window.turnstile) {
-      showError("Captcha unavailable. Click Continue to enter.");
+      showError("Captcha failed to load. Refresh the page to try again.");
       return;
     }
     mount.innerHTML = "";
@@ -162,11 +160,11 @@
           renderTurnstile(FALLBACK_SITE_KEY);
           return;
         }
-        showError("Captcha error. Click Continue to enter.");
+        showError("Captcha error. Refresh the page to try again.");
       },
       "expired-callback": () => {
         verified = false;
-        showError("Captcha expired. Complete it again or click Continue.");
+        showError("Captcha expired. Complete it again.");
       },
     });
   }
@@ -176,12 +174,7 @@
     script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
     script.async = true;
     script.onload = () => renderTurnstile(siteKey);
-    script.onerror = () => showError("Could not load captcha. Click Continue to enter.");
+    script.onerror = () => showError("Could not load captcha. Refresh the page.");
     document.head.appendChild(script);
-    setTimeout(() => {
-      if (!verified && !sessionStorage.getItem(STORAGE_KEY)) {
-        showError("Security check is taking longer than expected.");
-      }
-    }, 12000);
   });
 })();
