@@ -1098,20 +1098,15 @@ local function relayoutTabColumns(tab)
 	return true
 end
 
-local function scheduleTabColumnRelayout(tab)
-	if tab._columnRelayoutScheduled then
+local function ensureTabColumnRelayoutHooks(tab)
+	if tab._columnRelayoutHooked then
 		return
 	end
-	tab._columnRelayoutScheduled = true
+	tab._columnRelayoutHooked = true
 
 	local function tryRelayout()
 		relayoutTabColumns(tab)
 	end
-
-	task.defer(tryRelayout)
-	task.delay(0.05, tryRelayout)
-	task.delay(0.15, tryRelayout)
-	task.delay(0.35, tryRelayout)
 
 	local layout = tab._layout
 	local hframe = layout and layout.hstack and layout.hstack.ElementFrame
@@ -1135,6 +1130,22 @@ local function scheduleTabColumnRelayout(tab)
 			end)
 		end)
 	end
+end
+
+local function scheduleTabColumnRelayout(tab)
+	if type(tab) ~= "table" then
+		return
+	end
+	ensureTabColumnRelayoutHooks(tab)
+
+	local function tryRelayout()
+		relayoutTabColumns(tab)
+	end
+
+	task.defer(tryRelayout)
+	task.delay(0.05, tryRelayout)
+	task.delay(0.15, tryRelayout)
+	task.delay(0.35, tryRelayout)
 end
 
 function Core.wrapUiTab(rawTab, uiBundle, window)

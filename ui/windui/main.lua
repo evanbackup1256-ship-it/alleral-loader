@@ -13073,7 +13073,10 @@ au.CanDropdown=true
 au.UIElements.Main.Visible=true
 task.spawn(function()
 task.wait(0.05)
-au.UIElements.Main:WaitForChild"Main".Visible=true
+local innerMain=au.UIElements.Main and au.UIElements.Main:FindFirstChild("Main")
+if innerMain then
+innerMain.Visible=true
+end
 
 at.WindUI:ToggleAcrylic(true)
 end)
@@ -13090,8 +13093,11 @@ end
 
 at.WindUI:ToggleAcrylic(false)
 
-if au.UIElements.Main and au.UIElements.Main:WaitForChild"Main"then
-au.UIElements.Main.Main.Visible=false
+if au.UIElements.Main then
+local innerMain=au.UIElements.Main:FindFirstChild("Main")
+if innerMain then
+innerMain.Visible=false
+end
 end
 
 au.CanDropdown=false

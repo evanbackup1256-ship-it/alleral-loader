@@ -99,7 +99,7 @@ return function(WindUI)
 		return palette.accentHot
 	end
 
-	WindUI.ARRREL_UI_VERSION = "2.0.4-alleral-v2"
+	WindUI.ARRREL_UI_VERSION = "2.0.5-alleral-v2"
 	WindUI.ARRREL_BRAND = "Alleral"
 	WindUI.ALLERAL_UI_VERSION = WindUI.ARRREL_UI_VERSION
 	WindUI.ALLERAL_BRAND = "Alleral UI V2"
@@ -914,17 +914,26 @@ return function(WindUI)
 			window._AlleralCloseWrapped = true
 			local origClose = window.Close
 			function window:Close(...)
+				local main = self.UIElements and self.UIElements.Main
+				local innerMain = main and main:FindFirstChild("Main")
+				if not innerMain then
+					self.Closed = true
+					self.CanDropdown = false
+					if main and main:IsA("GuiObject") then
+						main.Visible = false
+					end
+					return
+				end
 				if motionEnabled() then
-					local main = self.UIElements and self.UIElements.Main
-					local scale = main and main:FindFirstChild("AlleralStartupScale")
+					local scale = main:FindFirstChild("AlleralStartupScale")
 					if scale then
 						tween(scale, ANIM.close, { Scale = 0.988 })
 					end
 				end
 				local result = origClose(self, ...)
 				task.delay(0.45, function()
-					local main = self.UIElements and self.UIElements.Main
-					local scale = main and main:FindFirstChild("AlleralStartupScale")
+					local liveMain = self.UIElements and self.UIElements.Main
+					local scale = liveMain and liveMain:FindFirstChild("AlleralStartupScale")
 					if scale then
 						scale.Scale = 1
 					end
@@ -3977,8 +3986,14 @@ return function(WindUI)
 		end
 		WindUI._AlleralWatchdogToken = (WindUI._AlleralWatchdogToken or 0) + 1
 		pcall(function()
-			if type(window.Close) == "function" then
+			local main = window.UIElements and window.UIElements.Main
+			local innerMain = main and main:FindFirstChild("Main")
+			if type(window.Close) == "function" and innerMain and not window.Closed then
 				window:Close()
+			elseif main and main:IsA("GuiObject") then
+				window.Closed = true
+				window.CanDropdown = false
+				main.Visible = false
 			end
 		end)
 		if WindUI.Window == window then
