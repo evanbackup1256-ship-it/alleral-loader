@@ -1,5 +1,5 @@
-local LOADER_VERSION = "7.4.0"
-local MIN_CORE = "2.5.1"
+local LOADER_VERSION = "7.6.0"
+local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 45
 local CORE_MIN_BYTES = 50000
 local HUB = "hub"
@@ -7,8 +7,8 @@ local CFG = "cfg"
 local UI = "ui"
 
 local RELEASE_FALLBACK = {
-	loader = "7.4.0",
-	core = "2.5.1",
+	loader = "7.6.0",
+	core = "2.7.0",
 	ui = "WindUI",
 	analytics = "1.0",
 	telemetry = "3.0",
@@ -32,6 +32,12 @@ local WORKSPACE_ROOTS = {
 	"AutoExecute/",
 }
 local INSTALL_MANIFEST = ".alleral/versions.json"
+local LOADER_LOCAL_PATHS = {
+	"loader.luau",
+	"kick/loader.luau",
+	"kick/kick/loader.luau",
+	"Alleral/loader.luau",
+}
 local LEGACY_LOADER_MARKERS = {
 	"[Alleral Loader v",
 	"Alleral loader 3.",
@@ -413,18 +419,25 @@ local function refreshWeaoProfile(profile)
 		return profile
 	end
 
-	local exploits, weaoSource = Weao.fetchExploits({
-		httpFetch = weaoHttpFetch,
-		requestFn = getHttpRequestFn(),
-		config = ENV.Alleral_WeaoConfig,
-		executorSlug = profile.slug,
-	})
-	if not exploits then
-		return profile
+	local exploits, weaoSource
+	local fetchOk = pcall(function()
+		exploits, weaoSource = Weao.fetchExploits({
+			httpFetch = weaoHttpFetch,
+			requestFn = getHttpRequestFn(),
+			config = ENV.Alleral_WeaoConfig,
+			executorSlug = profile.slug,
+		})
+	end)
+	if not fetchOk or type(exploits) ~= "table" then
+		exploits = ENV.Alleral_WeaoLastGood and ENV.Alleral_WeaoLastGood.data
+		weaoSource = "cache"
 	end
 
-	local weaoEntry, weaoScore = Weao.matchExploit(profile, exploits)
-	local weao = Weao.formatEntry(weaoEntry)
+	local weaoEntry, weaoScore
+	pcall(function()
+		weaoEntry, weaoScore = Weao.matchExploit(profile, exploits)
+	end)
+	local weao = Weao.formatEntry and Weao.formatEntry(weaoEntry) or weaoEntry
 	if weao and weao.title then
 		profile.slug = normalizeSlug(weao.title)
 		if profile.slug == "synapse" and profile.rawName:lower():find("z", 1, true) then
@@ -437,9 +450,51 @@ local function refreshWeaoProfile(profile)
 		profile.weao = weao
 		profile.weaoSource = weaoSource
 		profile.weaoVerified = true
-		log(string.format("WEAO: %s (match %d%%)", profile.name, weaoScore))
+		log(string.format("WEAO: %s (match %d%%)", profile.name, weaoScore or 0))
+	else
+		profile.weaoVerified = false
+		profile.weao = {
+			title = profile.displayName or profile.name,
+			updateStatus = true,
+			detected = false,
+			offline = true,
+		}
 	end
+	EXECUTOR = profile
 	return profile
+end
+
+local function syncWeaoConfig(quiet)
+	local Weao = ENV.Alleral_Weao
+	if not Weao or type(Weao.refreshConfig) ~= "function" then
+		return false
+	end
+	local ok, _, version, changed = pcall(function()
+		return Weao.refreshConfig({
+			httpFetch = function(url)
+				return httpFetch(url, { ["Accept"] = "application/json", ["User-Agent"] = "WEAO-3PService" })
+			end,
+			urls = {
+				GITHUB_RAW .. "/" .. CFG .. "/weao.json?t=" .. tick(),
+				GITHUB_WEB .. "/" .. CFG .. "/weao.json?t=" .. tick(),
+			},
+		})
+	end)
+	if not ok then
+		return false
+	end
+	if changed then
+		if not quiet then
+			log("WEAO config synced to v" .. tostring(version))
+		end
+		pcall(function()
+			refreshWeaoProfile(EXECUTOR)
+		end)
+		if ENV.Alleral_Core and ENV.Alleral_Core.refreshLoaderCapabilities then
+			pcall(ENV.Alleral_Core.refreshLoaderCapabilities)
+		end
+	end
+	return changed == true
 end
 
 local EXECUTOR = resolveExecutorProfile()
@@ -1070,8 +1125,77 @@ local function loadWeaoStack()
 		return ENV.Alleral_Weao ~= nil
 	end
 
-	log("WEAO module unavailable", true)
-	return false
+	ENV.Alleral_Weao = {
+		VERSION = "fallback",
+		requestHeaders = function()
+			return { ["User-Agent"] = "WEAO-3PService", ["Accept"] = "application/json" }
+		end,
+		mergeConfig = function(remote)
+			if type(remote) == "table" then
+				for key, value in pairs(remote) do
+					ENV.Alleral_WeaoConfig = ENV.Alleral_WeaoConfig or {}
+					ENV.Alleral_WeaoConfig[key] = value
+				end
+			end
+			return ENV.Alleral_WeaoConfig or {}
+		end,
+		refreshConfig = function(opts)
+			opts = type(opts) == "table" and opts or {}
+			if type(opts.httpFetch) == "function" and type(opts.urls) == "table" then
+				for _, url in ipairs(opts.urls) do
+					local body = opts.httpFetch(url)
+					if type(body) == "string" and body ~= "" then
+						local ok, decoded = pcall(function()
+							return HttpService and HttpService:JSONDecode(body)
+						end)
+						if ok and type(decoded) == "table" then
+							opts.config = decoded
+							break
+						end
+					end
+				end
+			end
+			if type(opts.config) == "table" then
+				for key, value in pairs(opts.config) do
+					ENV.Alleral_WeaoConfig = ENV.Alleral_WeaoConfig or {}
+					if key == "bases" and type(value) == "table" and #value > 0 then
+						ENV.Alleral_WeaoConfig.bases = value
+					elseif value ~= nil then
+						ENV.Alleral_WeaoConfig[key] = value
+					end
+				end
+			end
+			return ENV.Alleral_WeaoConfig, (ENV.Alleral_WeaoConfig or {}).version, false
+		end,
+		fetchExploits = function()
+			if ENV.Alleral_WeaoLastGood then
+				return ENV.Alleral_WeaoLastGood.data, "last-good-cache"
+			end
+			return nil, "WEAO offline"
+		end,
+		matchExploit = function()
+			return nil, 0
+		end,
+		formatEntry = function(entry)
+			return entry
+		end,
+		statusLabel = function(weao)
+			if type(weao) == "table" and weao.offline then
+				return "Offline mode"
+			end
+			return "WEAO unavailable"
+		end,
+		executorStatus = function(profile)
+			return {
+				title = profile and (profile.name or profile.slug) or "Unknown",
+				updateStatus = true,
+				detected = false,
+				offline = true,
+			}, "fallback", 0
+		end,
+	}
+	log("WEAO module unavailable — running in offline compatibility mode", true)
+	return true
 end
 
 local function loadReturnTable(localPaths, remotePath)
@@ -1554,6 +1678,7 @@ local function buildUpdateFingerprint(expected, profile)
 		"analytics=" .. tostring(expected.analytics or ""),
 		"helpers=" .. tostring(expected.helpers or ""),
 		"weao=" .. tostring(expected.weao or ""),
+		"weaoCfg=" .. tostring((ENV.Alleral_WeaoConfig or {}).version or ""),
 	}
 	if profile and profile.id then
 		table.insert(parts, "game=" .. tostring(profile.id) .. "@" .. tostring(expected.games and expected.games[profile.id] or profile.version or ""))
@@ -1636,6 +1761,9 @@ local function startAutoUpdater(profile)
 			pcall(function()
 				checkForRemoteUpdate(profile, true)
 			end)
+			pcall(function()
+				syncWeaoConfig(true)
+			end)
 		end
 	end)
 	log("Auto-update polling every " .. tostring(pollSeconds) .. "s")
@@ -1683,12 +1811,8 @@ local function buildManagedFiles()
 			paths = {
 				UI .. "/windui/main.lua",
 				"vendor/windui/main.lua",
-				"ui/Library.lua",
 				UI .. "/addons/ThemeManager.lua",
 				UI .. "/addons/SaveManager.lua",
-				"vendor/obsidian/Library.lua",
-				"vendor/obsidian/addons/ThemeManager.lua",
-				"vendor/obsidian/addons/SaveManager.lua",
 			},
 			expectedKey = "loader",
 			purgeOnLoaderChange = true,
@@ -1940,16 +2064,23 @@ local function installAutoexecRedirect()
 	if type(writeFileFn) ~= "function" then
 		return
 	end
-	local stub = 'loadstring(game:HttpGet("'
-		.. GITHUB_RAW
-		.. '/loader.luau?t=" .. tick()))()\n'
+	local stub = table.concat({
+		"local g = getgenv()",
+		"if g.Alleral_AutoRelaunch == false then return end",
+		"if not g._Alleral_SessionWasActive and not g._Alleral_PendingRelaunch then return end",
+		"local placeOk = g._Alleral_LastPlaceId == game.PlaceId",
+		"if type(g._Alleral_SupportedPlaces) == 'table' and g._Alleral_SupportedPlaces[game.PlaceId] then placeOk = true end",
+		"if not placeOk and not g._Alleral_PendingRelaunch then return end",
+		"if type(g._Alleral_RunLoader) == 'function' then g._Alleral_RunLoader('autoexec') end",
+		"",
+	}, "\n")
 	for _, dir in ipairs({ "autoexec", "Autoexec" }) do
 		if makeFolderFn then
 			pcall(makeFolderFn, dir)
 		end
 		pcall(writeFileFn, dir .. "/alleral.luau", stub)
 	end
-	log("Wrote autoexec/alleral.luau → current loader")
+	log("Wrote autoexec/alleral.luau (local-first relaunch)")
 end
 
 local function purgeLegacyLoaders()
@@ -2036,7 +2167,116 @@ local function recordInstalledVersions()
 	end
 end
 
-local TELEPORT_RELAUNCH_COOLDOWN = 8
+local TELEPORT_RELAUNCH_COOLDOWN = 5
+
+local function markSupportedPlaces()
+	local places = {}
+	for _, profile in ipairs(GAMES) do
+		for _, placeId in ipairs(profile.placeIds or {}) do
+			places[placeId] = true
+		end
+	end
+	ENV._Alleral_SupportedPlaces = places
+end
+
+local function installGlobalBootstrap()
+	if ENV._Alleral_BootstrapInstalled then
+		return
+	end
+	ENV._Alleral_BootstrapInstalled = true
+
+	ENV._Alleral_RunLoader = function(reason)
+		local g = getgenv()
+		if g.Alleral_AutoRelaunch == false then
+			return
+		end
+		if g.Alleral_LoaderRunning then
+			return
+		end
+
+		if g.Alleral_State and type(g.Alleral_State.Alleral_Unload) == "function" then
+			pcall(g.Alleral_State.Alleral_Unload)
+		end
+		g.Alleral_LoaderRunning = false
+		g._Alleral_TeleportWatchConnected = nil
+		g._Alleral_RelaunchScheduledAt = nil
+		g._Alleral_AutoUpdateRunning = false
+		g._Alleral_AutoUpdateToken = nil
+		if reason then
+			g._Alleral_PendingRelaunch = true
+		end
+
+		local function pick(names)
+			for _, name in ipairs(names) do
+				local fn = g[name]
+				if type(fn) ~= "function" and _G then
+					fn = _G[name]
+				end
+				if type(fn) == "function" then
+					return fn
+				end
+			end
+			return nil
+		end
+
+		local readFileFn = pick({ "readfile", "ReadFile", "read_file" })
+		local isFileFn = pick({ "isfile", "IsFile", "is_file" })
+		local loadStringFn = pick({ "loadstring", "LoadString", "load" })
+
+		for _, path in ipairs(LOADER_LOCAL_PATHS) do
+			if isFileFn and readFileFn and isFileFn(path) then
+				local ok, src = pcall(readFileFn, path)
+				if ok and type(src) == "string" and #src > 500 and loadStringFn then
+					local compiled, compileErr = loadStringFn(src, "Alleral/loader")
+					if compiled then
+						task.defer(compiled)
+						return
+					end
+					warn("[Alleral] Local loader compile failed: " .. tostring(compileErr))
+				end
+			end
+		end
+
+		local url = GITHUB_RAW .. "/loader.luau?t=" .. tostring(tick())
+		local src
+		pcall(function()
+			src = game:HttpGet(url, true)
+		end)
+		if type(src) ~= "string" or #src < 500 then
+			pcall(function()
+				src = game:HttpGet(url)
+			end)
+		end
+		if type(src) == "string" and #src > 500 and loadStringFn then
+			local compiled, compileErr = loadStringFn(src, "Alleral/loader")
+			if compiled then
+				local writeFileFn = pick({ "writefile", "WriteFile", "write_file" })
+				local makeFolderFn = pick({ "makefolder", "MakeFolder", "make_folder" })
+				if writeFileFn and makeFolderFn then
+					pcall(makeFolderFn, "kick")
+					pcall(writeFileFn, "loader.luau", src)
+				end
+				task.defer(compiled)
+				return
+			end
+			warn("[Alleral] Remote loader compile failed: " .. tostring(compileErr))
+		end
+		warn("[Alleral] Could not relaunch loader after teleport")
+	end
+
+	pcall(function()
+		local TeleportService = game:GetService("TeleportService")
+		TeleportService.LocalPlayerArrivedFromTeleport:Connect(function()
+			local g = getgenv()
+			g._Alleral_PendingRelaunch = true
+			task.delay(2.5, function()
+				if type(g._Alleral_RunLoader) == "function" then
+					g._Alleral_RunLoader("arrived-from-teleport")
+				end
+			end)
+		end)
+	end)
+end
 
 local function scheduleHubRelaunch(reason, delaySeconds)
 	if ENV.Alleral_AutoRelaunch == false then
@@ -2048,25 +2288,22 @@ local function scheduleHubRelaunch(reason, delaySeconds)
 		return
 	end
 	if ENV._Alleral_LastLoadAt and (now - ENV._Alleral_LastLoadAt) < TELEPORT_RELAUNCH_COOLDOWN then
-		log(
-			"Skipping relaunch ("
-				.. tostring(reason)
-				.. ") — hub loaded "
-				.. string.format("%.1f", now - ENV._Alleral_LastLoadAt)
-				.. "s ago"
-		)
-		return
+		if ENV._Alleral_LastJobId and tostring(ENV._Alleral_LastJobId) == tostring(game.JobId) then
+			return
+		end
 	end
 	ENV._Alleral_RelaunchScheduledAt = now
 	task.delay(delaySeconds, function()
 		ENV._Alleral_RelaunchScheduledAt = nil
-		if type(ENV.Alleral_Reload) ~= "function" then
+		if type(ENV._Alleral_RunLoader) == "function" then
+			log("Teleport relaunch: " .. tostring(reason))
+			notify("Alleral", "Server changed — reloading hub...", 3)
+			ENV._Alleral_RunLoader(reason)
+		elseif type(ENV.Alleral_Reload) == "function" then
+			ENV.Alleral_Reload()
+		else
 			log("Relaunch unavailable after teleport — re-run the loader", true)
-			return
 		end
-		log("Teleport relaunch: " .. tostring(reason))
-		notify("Alleral", "Server changed — reloading hub...", 3)
-		ENV.Alleral_Reload()
 	end)
 end
 
@@ -2085,6 +2322,7 @@ local function wireTeleportRelaunch()
 	if ENV.Alleral_AutoRelaunch == nil then
 		ENV.Alleral_AutoRelaunch = true
 	end
+	installGlobalBootstrap()
 	if ENV._Alleral_TeleportWatchConnected then
 		return
 	end
@@ -2092,10 +2330,10 @@ local function wireTeleportRelaunch()
 	ENV._Alleral_SessionWasActive = true
 	ENV._Alleral_LastPlaceId = game.PlaceId
 	ENV._Alleral_LastJobId = game.JobId
+	markSupportedPlaces()
 
 	pcall(function()
 		local Players = game:GetService("Players")
-		local TeleportService = game:GetService("TeleportService")
 		local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
 		LocalPlayer.OnTeleport:Connect(function(_teleportState, placeId)
@@ -2107,32 +2345,12 @@ local function wireTeleportRelaunch()
 
 		LocalPlayer.CharacterAdded:Connect(function()
 			local teleAt = ENV._Alleral_TeleportAt
-			if type(teleAt) ~= "number" or (tick() - teleAt) > 45 then
+			if type(teleAt) ~= "number" or (tick() - teleAt) > 60 then
 				return
 			end
 			ENV._Alleral_TeleportAt = nil
-			scheduleHubRelaunch("spawn-after-teleport", 2.5)
+			scheduleHubRelaunch("spawn-after-teleport", 2)
 		end)
-
-		pcall(function()
-			TeleportService.LocalPlayerArrivedFromTeleport:Connect(function()
-				ENV._Alleral_PendingRelaunch = nil
-				scheduleHubRelaunch("arrived-from-teleport", 3)
-			end)
-		end)
-	end)
-
-	task.spawn(function()
-		local lastJobId = game.JobId
-		while ENV._Alleral_SessionWasActive and ENV.Alleral_AutoRelaunch ~= false do
-			task.wait(2)
-			local currentJobId = game.JobId
-			if currentJobId ~= lastJobId then
-				lastJobId = currentJobId
-				ENV._Alleral_LastJobId = currentJobId
-				scheduleHubRelaunch("job-id-change", 2)
-			end
-		end
 	end)
 end
 
@@ -2215,6 +2433,9 @@ local function main()
 		ENV.Alleral_AutoRelaunch = true
 	end
 
+	installGlobalBootstrap()
+	markSupportedPlaces()
+
 	purgeOutdatedWorkspace()
 	local expectedVersions = ENV._Alleral_ExpectedVersions or fetchExpectedVersions()
 	if expectedVersions.minLoader and versionLt(LOADER_VERSION, expectedVersions.minLoader) then
@@ -2230,6 +2451,9 @@ local function main()
 	end
 
 	loadWeaoStack()
+	pcall(function()
+		syncWeaoConfig(true)
+	end)
 
 	if typeof(task) == "table" and type(task.spawn) == "function" then
 		task.spawn(function()
@@ -2402,6 +2626,9 @@ local function main()
 	checkForRemoteUpdate(profile, true)
 	startAutoUpdater(profile)
 	ENV._Alleral_LastLoadAt = tick()
+	ENV._Alleral_LastPlaceId = game.PlaceId
+	ENV._Alleral_LastJobId = game.JobId
+	ENV._Alleral_PendingRelaunch = nil
 	ensureAutoexecLoader()
 	wireTeleportRelaunch()
 	notify("Alleral", profile.name .. " loaded.", 4)
@@ -2410,9 +2637,14 @@ end
 
 ENV.Alleral_Reload = function()
 	stopAutoUpdater()
+	if type(ENV._Alleral_RunLoader) == "function" then
+		ENV._Alleral_RunLoader("manual-reload")
+		return
+	end
 	if ENV.Alleral_State and type(ENV.Alleral_State.Alleral_Unload) == "function" then
 		pcall(ENV.Alleral_State.Alleral_Unload)
 	end
+	ENV._Alleral_TeleportWatchConnected = nil
 	if typeof(task) == "table" and task.defer then
 		task.defer(main)
 	else
@@ -2456,6 +2688,9 @@ ENV.Alleral_CheckUpdate = function()
 	print("[Alleral v" .. LOADER_VERSION .. "] Already up to date")
 	return false
 end
+
+ENV.Alleral_SyncWeao = syncWeaoConfig
+getgenv().Alleral_SyncWeao = syncWeaoConfig
 
 print("=== Alleral " .. LOADER_VERSION .. " active ===")
 print("[Alleral] v" .. LOADER_VERSION .. " | PlaceId " .. tostring(game.PlaceId) .. " | executor=" .. EXECUTOR.slug)

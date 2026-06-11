@@ -1953,6 +1953,14 @@ Core.buildConfigProfileGroup(settingsTab, {
 	version = VERSION,
 	column = 2,
 })
+Core.buildStandardSettingsExtras(settingsTab, {
+	state = state,
+	savedKeys = savedKeys,
+	saveFn = saveSettings,
+	settingsFile = SETTINGS_FILE,
+	version = VERSION,
+	window = window,
+})
 
 notify("Alleral", "Loaded. Hover toggles for tips.")
 

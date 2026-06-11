@@ -5,7 +5,7 @@
 ]]
 
 local Weao = {}
-Weao.VERSION = "1.0"
+Weao.VERSION = "1.1"
 Weao.DOCS_URL = "https://docs.weao.xyz"
 Weao.USER_AGENT = "WEAO-3PService"
 
@@ -95,22 +95,49 @@ function Weao.normalizeExploitList(data)
 	if Weao.isRateLimitPayload(data) then
 		return nil
 	end
-	if type(data.title) == "string" and data.version ~= nil then
+	if type(data.title) == "string" or type(data.name) == "string" then
+		data.title = data.title or data.name or data.Name
 		return { data }
 	end
 	if type(data.exploits) == "table" then
 		data = data.exploits
 	end
-	if type(data) ~= "table" or #data == 0 then
-		return nil
+	if type(data.data) == "table" then
+		data = data.data
 	end
 	local list = {}
-	for _, entry in ipairs(data) do
-		if type(entry) == "table" and type(entry.title) == "string" and entry.hidden ~= true then
-			table.insert(list, entry)
+	local function push(entry)
+		if type(entry) ~= "table" then
+			return
+		end
+		entry.title = entry.title or entry.name or entry.Name or entry.id or entry.slug
+		if type(entry.title) ~= "string" or entry.title == "" then
+			return
+		end
+		if entry.hidden == true then
+			return
+		end
+		table.insert(list, entry)
+	end
+	if type(data) == "table" then
+		if #data > 0 then
+			for _, entry in ipairs(data) do
+				push(entry)
+			end
+		else
+			for _, entry in pairs(data) do
+				push(entry)
+			end
 		end
 	end
-	return #list > 0 and list or nil
+	if #list > 0 then
+		ENV.Alleral_WeaoLastGood = { fetchedAt = tick(), data = list }
+		return list
+	end
+	if type(ENV.Alleral_WeaoLastGood) == "table" and type(ENV.Alleral_WeaoLastGood.data) == "table" then
+		return ENV.Alleral_WeaoLastGood.data
+	end
+	return nil
 end
 
 function Weao.decodeJson(body)
@@ -268,7 +295,35 @@ function Weao.fetchExploits(opts)
 		return cache.data, cache.source
 	end
 
+	if type(ENV.Alleral_WeaoLastGood) == "table" and Weao.normalizeExploitList(ENV.Alleral_WeaoLastGood.data) then
+		return ENV.Alleral_WeaoLastGood.data, "last-good-cache"
+	end
+
 	return nil, lastErr
+end
+
+function Weao.refreshConfig(opts)
+	opts = type(opts) == "table" and opts or {}
+	local previousVersion = (ENV.Alleral_WeaoConfig or {}).version
+	local remote = opts.config
+	if type(remote) ~= "table" and type(opts.httpFetch) == "function" then
+		for _, url in ipairs(opts.urls or {}) do
+			local body = opts.httpFetch(url)
+			remote = Weao.decodeJson(body)
+			if type(remote) == "table" then
+				break
+			end
+		end
+	end
+	if type(remote) == "table" then
+		ENV._Alleral_WeaoConfigRemote = remote
+		ENV.Alleral_WeaoConfig = Weao.mergeConfig(remote)
+		if previousVersion ~= remote.version then
+			ENV.Alleral_WeaoCache = nil
+		end
+		return ENV.Alleral_WeaoConfig, remote.version, previousVersion ~= remote.version
+	end
+	return ENV.Alleral_WeaoConfig, previousVersion, false
 end
 
 function Weao.normalizeExecutorKey(text)
@@ -344,12 +399,15 @@ function Weao.matchExploit(profile, exploits)
 		end
 	end
 
-	return bestScore >= 70 and best or nil, bestScore
+	return bestScore >= 55 and best or nil, bestScore
 end
 
 function Weao.statusLabel(weao)
 	if type(weao) ~= "table" then
 		return "Unknown (see docs.weao.xyz)"
+	end
+	if weao.offline then
+		return "Offline mode · " .. tostring(weao.title or "executor")
 	end
 	local parts = {}
 	table.insert(parts, weao.updateStatus and "Updated" or "Outdated")
@@ -374,7 +432,22 @@ function Weao.executorStatus(profile, opts)
 	if entry then
 		return Weao.formatEntry(entry), nil, score
 	end
-	return nil, err, 0
+	if type(exploits) == "table" and #exploits > 0 then
+		return {
+			title = profile.name or profile.slug or "Unknown",
+			version = profile.version,
+			updateStatus = true,
+			detected = false,
+			offline = true,
+		}, err, 0
+	end
+	return {
+		title = profile.name or profile.slug or "Unknown",
+		version = profile.version,
+		updateStatus = true,
+		detected = false,
+		offline = true,
+	}, err or "WEAO offline — using cached executor profile", 0
 end
 
 ENV.Alleral_Weao = Weao

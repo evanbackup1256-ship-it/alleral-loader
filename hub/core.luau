@@ -1,14 +1,15 @@
 local Core = {}
-Core.VERSION = "2.5.1"
+Core.VERSION = "2.7.0"
 Core.UI_LIBRARY = "WindUI"
+Core.WINDUI_VERSION = "1.6.64-fix-aller2"
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
 local WINDUI_MIRROR_URLS = {
 	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/windui/",
 	"https://github.com/evanbackup1256-ship-it/kick/raw/main/ui/windui/",
-	"https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/",
-	"https://github.com/Footagesus/WindUI/raw/main/dist/",
+	"https://github.com/Footagesus/WindUI/releases/download/1.6.64-fix/",
+	"https://raw.githubusercontent.com/Footagesus/WindUI/1.6.64-fix/dist/",
 }
 local WINDUI_LOCAL_ROOTS = {
 	"ui/windui/",
@@ -28,6 +29,124 @@ local function genv()
 end
 
 local ENV = genv()
+
+function Core.safeCall(scope, fn, ...)
+	if type(fn) ~= "function" then
+		return nil
+	end
+	local packed = table.pack(pcall(fn, ...))
+	if packed[1] then
+		return table.unpack(packed, 2, packed.n)
+	end
+	local err = packed[2]
+	if Core.pushErrorLog then
+		Core.pushErrorLog(tostring(scope or "Core"), err)
+	else
+		ENV.Alleral_ErrorLog = ENV.Alleral_ErrorLog or {}
+		table.insert(ENV.Alleral_ErrorLog, 1, {
+			at = os.date("%H:%M:%S"),
+			scope = tostring(scope or "Core"),
+			message = tostring(err or "?"),
+		})
+	end
+	Core.reportError(tostring(scope or "Core"), err)
+	warn("[Alleral:" .. tostring(scope or "Core") .. "] " .. tostring(err))
+	return nil
+end
+
+function Core.guard(scope, fn)
+	scope = tostring(scope or "Core")
+	return function(...)
+		return Core.safeCall(scope, fn, ...)
+	end
+end
+
+function Core.coerceSettingsTable(decoded, keys, defaults)
+	if type(decoded) ~= "table" then
+		return nil
+	end
+	local output = {}
+	for _, key in ipairs(keys or {}) do
+		if decoded[key] ~= nil then
+			output[key] = decoded[key]
+		elseif type(defaults) == "table" and defaults[key] ~= nil then
+			output[key] = Core.copyValue(defaults[key])
+		end
+	end
+	return output
+end
+
+function Core.restoreSettingsFromBackup(filename, state, keys, defaults)
+	local listFiles = Core.execFunction("listfiles")
+	local readFile = Core.execFunction("readfile")
+	local isFile = Core.execFunction("isfile")
+	if type(listFiles) ~= "function" or type(readFile) ~= "function" or type(isFile) ~= "function" then
+		return false
+	end
+	local base = tostring(filename or "settings.json"):gsub("%.json$", ""):gsub("[^%w%-_]", "_")
+	local matches = {}
+	for _, filePath in ipairs(listFiles("Alleral_Configs/backups")) do
+		local name = tostring(filePath):match("([^/\\]+)$")
+		if name and name:find("^" .. base .. "_", 1, true) then
+			table.insert(matches, tostring(filePath))
+		end
+	end
+	table.sort(matches, function(a, b)
+		return a > b
+	end)
+	for _, backupPath in ipairs(matches) do
+		if isFile(backupPath) then
+			local raw = readFile(backupPath)
+			local ok, decoded = pcall(function()
+				return HttpService:JSONDecode(raw)
+			end)
+			local coerced = Core.coerceSettingsTable(decoded, keys, defaults)
+			if coerced then
+				for _, key in ipairs(keys) do
+					if coerced[key] ~= nil then
+						state[key] = Core.copyValue(coerced[key])
+					end
+				end
+				return true
+			end
+		end
+	end
+	return false
+end
+
+function Core.installResilience()
+	if ENV._Alleral_CoreResilience then
+		return
+	end
+	ENV._Alleral_CoreResilience = true
+	local guarded = {
+		"prepareGame",
+		"loadUi",
+		"buildUiWindow",
+		"buildUiTab",
+		"buildUiGroup",
+		"saveSettings",
+		"loadSettings",
+		"initSettings",
+		"makeSupervisor",
+		"fetchScriptManifest",
+		"fetchWeaoExploits",
+		"fetchWeaoExecutorStatus",
+		"buildHubActionsGroup",
+		"buildStandardSettingsExtras",
+		"buildConfigProfileGroup",
+		"buildScriptStatusGroupbox",
+		"postWebhook",
+		"writeFile",
+	}
+	for _, name in ipairs(guarded) do
+		local fn = Core[name]
+		if type(fn) == "function" and Core["_raw_" .. name] == nil then
+			Core["_raw_" .. name] = fn
+			Core[name] = Core.guard(name, fn)
+		end
+	end
+end
 
 function Core.notify(title, text, duration)
 	pcall(function()
@@ -952,7 +1071,481 @@ function Core.buildHubActionsGroup(tab, column)
 		end
 	end, "Clears cached hub files and reloads fresh.")
 
+	group:CreateButton("Sync WEAO config", function()
+		Core.syncWeaoConfigNow()
+	end, "Pulls the latest WEAO API endpoints without reloading.")
+
+	group:CreateButton("Copy JobId", function()
+		Core.copyJobId()
+	end, "Copies this server's JobId to clipboard.")
+
+	group:CreateButton("Copy join link", function()
+		Core.copyPlaceJoinLink()
+	end, "Copies a roblox:// link for this server.")
+
+	group:CreateButton("Rejoin server", function()
+		Core.rejoinServer()
+	end, "Teleports you back into this same server instance.")
+
 	return group
+end
+
+local ERROR_LOG_MAX = 40
+ENV.Alleral_ErrorLog = ENV.Alleral_ErrorLog or {}
+
+function Core.pushErrorLog(scope, err, details)
+	local entry = {
+		at = os.date("%H:%M:%S"),
+		scope = tostring(scope or "Runtime"),
+		message = tostring(err or "?"),
+		details = details and tostring(details) or nil,
+	}
+	local log = ENV.Alleral_ErrorLog
+	table.insert(log, 1, entry)
+	while #log > ERROR_LOG_MAX do
+		table.remove(log)
+	end
+	if Core._errorLogStatus then
+		pcall(function()
+			Core._errorLogStatus:Update("Latest", entry.scope .. ": " .. entry.message:sub(1, 80))
+			Core._errorLogStatus:Update("Count", tostring(#log))
+		end)
+	end
+end
+
+function Core.installErrorLogHook()
+	if ENV._Alleral_ErrorLogHooked then
+		return
+	end
+	ENV._Alleral_ErrorLogHooked = true
+	local previous = ENV.Alleral_ReportError
+	ENV.Alleral_ReportError = function(scope, err, details)
+		Core.pushErrorLog(scope, err, details)
+		if type(previous) == "function" then
+			pcall(previous, scope, err, details)
+		end
+	end
+	getgenv().Alleral_ReportError = ENV.Alleral_ReportError
+end
+
+function Core.getErrorLogText(limit)
+	limit = limit or 20
+	local lines = {}
+	for index, entry in ipairs(ENV.Alleral_ErrorLog or {}) do
+		if index > limit then
+			break
+		end
+		table.insert(lines, string.format("[%s] %s: %s", entry.at, entry.scope, entry.message))
+	end
+	return #lines > 0 and table.concat(lines, "\n") or "No errors logged this session."
+end
+
+function Core.registerUiWindow(window)
+	if type(window) == "table" and window._rawWindow then
+		ENV.Alleral_UiWindow = window
+		getgenv().Alleral_UiWindow = window
+	end
+	return window
+end
+
+function Core.toggleUiVisibility()
+	local window = ENV.Alleral_UiWindow
+	if not window or not window._rawWindow then
+		return false
+	end
+	local raw = window._rawWindow
+	if type(raw.Toggle) == "function" then
+		pcall(raw.Toggle, raw)
+		return true
+	end
+	return false
+end
+
+function Core.setGlobalMusicMuted(muted)
+	local SoundService = game:GetService("SoundService")
+	if muted then
+		if ENV.Alleral_MusicMuted ~= true then
+			ENV._Alleral_PrevMasterVolume = SoundService.Volume
+		end
+		SoundService.Volume = 0
+	else
+		SoundService.Volume = ENV._Alleral_PrevMasterVolume or 0.5
+	end
+	ENV.Alleral_MusicMuted = muted == true
+end
+
+function Core.setLowGraphics(enabled)
+	local Lighting = game:GetService("Lighting")
+	local ok, gameSettings = pcall(function()
+		return game:GetService("UserSettings"):GetService("UserGameSettings")
+	end)
+	if enabled then
+		ENV._Alleral_PrevShadows = Lighting.GlobalShadows
+		Lighting.GlobalShadows = false
+		if ok and gameSettings then
+			ENV._Alleral_PrevQuality = gameSettings.SavedQualityLevel
+			pcall(function()
+				gameSettings.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1
+			end)
+		end
+	else
+		if ENV._Alleral_PrevShadows ~= nil then
+			Lighting.GlobalShadows = ENV._Alleral_PrevShadows
+		else
+			Lighting.GlobalShadows = true
+		end
+		if ok and gameSettings and ENV._Alleral_PrevQuality then
+			pcall(function()
+				gameSettings.SavedQualityLevel = ENV._Alleral_PrevQuality
+			end)
+		end
+	end
+	ENV.Alleral_LowGraphics = enabled == true
+end
+
+function Core.copyJobId()
+	local clip = Core.execFunction("setclipboard") or Core.execFunction("setclipboard", true)
+	if type(clip) == "function" then
+		pcall(clip, game.JobId)
+		Core.notify("Alleral", "JobId copied.", 3)
+		return true
+	end
+	Core.notify("Alleral", game.JobId, 8)
+	return false
+end
+
+function Core.copyPlaceJoinLink()
+	local link = string.format(
+		"roblox://experiences/start?placeId=%d&gameInstanceId=%s",
+		game.PlaceId,
+		game.JobId
+	)
+	local clip = Core.execFunction("setclipboard") or Core.execFunction("setclipboard", true)
+	if type(clip) == "function" then
+		pcall(clip, link)
+		Core.notify("Alleral", "Join link copied.", 3)
+		return true
+	end
+	Core.notify("Alleral", link, 8)
+	return false
+end
+
+function Core.rejoinServer()
+	local TeleportService = game:GetService("TeleportService")
+	local Players = game:GetService("Players")
+	pcall(function()
+		TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Players.LocalPlayer)
+	end)
+end
+
+function Core.syncWeaoConfigNow()
+	local sync = getgenv().Alleral_SyncWeao
+	if type(sync) == "function" then
+		local ok = sync(false)
+		Core.notify(
+			"Alleral",
+			ok and "WEAO config synced — executor profile refreshed." or "WEAO config unchanged or offline.",
+			4
+		)
+		return ok
+	end
+	Core.notify("Alleral", "WEAO sync unavailable — reload the loader.", 5)
+	return false
+end
+
+function Core.backupSettings(filename, jsonBody)
+	local writeFile = Core.execFunction("writefile")
+	local makeFolder = Core.execFunction("makefolder")
+	local listFiles = Core.execFunction("listfiles")
+	local deleteFile = Core.execFunction("delfile")
+	if type(writeFile) ~= "function" then
+		return false
+	end
+	pcall(makeFolder, "Alleral_Configs")
+	pcall(makeFolder, "Alleral_Configs/backups")
+	local base = tostring(filename or "settings.json"):gsub("%.json$", ""):gsub("[^%w%-_]", "_")
+	local stamp = os.date("!%Y%m%d-%H%M%S")
+	local path = "Alleral_Configs/backups/" .. base .. "_" .. stamp .. ".json"
+	pcall(writeFile, path, jsonBody)
+	if type(listFiles) == "function" and type(deleteFile) == "function" then
+		local matches = {}
+		for _, filePath in ipairs(listFiles("Alleral_Configs/backups")) do
+			if tostring(filePath):find(base .. "_", 1, true) then
+				table.insert(matches, tostring(filePath))
+			end
+		end
+		table.sort(matches)
+		while #matches > 8 do
+			pcall(deleteFile, matches[1])
+			table.remove(matches, 1)
+		end
+	end
+	return true
+end
+
+function Core.settingsFilePath(options)
+	options = type(options) == "table" and options or {}
+	if type(options.settingsPath) == "string" and options.settingsPath ~= "" then
+		return options.settingsPath
+	end
+	local file = options.settingsFile or "settings.json"
+	if file:find("/", 1, true) or file:find("\\", 1, true) then
+		return file
+	end
+	return "Alleral_Configs/" .. file
+end
+
+function Core.buildSessionStatsGroup(tab, column)
+	local RunService = game:GetService("RunService")
+	local Stats = game:GetService("Stats")
+	local Players = game:GetService("Players")
+	local startedAt = tick()
+	local frameCount = 0
+	local frameConn = RunService.RenderStepped:Connect(function()
+		frameCount += 1
+	end)
+	local group = Core.buildUiGroup(tab, "Session stats", column or 1, nil, nil, "SessionStats")
+	local status = group:CreateStatus("Live", {
+		FPS = "--",
+		Ping = "--",
+		Players = "--",
+		Uptime = "0s",
+		Memory = "--",
+	})
+	task.spawn(function()
+		local lastTick = tick()
+		while ENV.Alleral_State and ENV.Alleral_State.HubRunning ~= false do
+			local now = tick()
+			local elapsed = math.max(now - lastTick, 0.001)
+			local fps = math.floor(frameCount / elapsed)
+			frameCount = 0
+			lastTick = now
+			local ping = "--"
+			pcall(function()
+				local item = Stats.Network.ServerStatsItem["Data Ping"]
+				if item then
+					ping = item:GetValueString()
+				end
+			end)
+			local memory = "--"
+			pcall(function()
+				memory = string.format("%.0f MB", Stats:GetTotalMemoryUsageMb())
+			end)
+			local uptime = math.floor(tick() - startedAt)
+			status:Update("FPS", tostring(fps))
+			status:Update("Ping", ping)
+			status:Update("Players", tostring(#Players:GetPlayers()))
+			status:Update("Uptime", uptime .. "s")
+			status:Update("Memory", memory)
+			task.wait(2)
+		end
+		if frameConn then
+			frameConn:Disconnect()
+		end
+	end)
+	return group, status
+end
+
+function Core.buildQuickTogglesGroup(tab, options)
+	options = type(options) == "table" and options or {}
+	local state = options.state or ENV.Alleral_State or {}
+	local saveFn = options.saveFn
+	local column = options.column or 2
+	local group = Core.buildUiGroup(tab, "Quick toggles", column, nil, nil, "QuickToggles")
+
+	group:CreateToggle("Mute all audio", ENV.Alleral_MusicMuted == true, "Sets SoundService volume to 0.", function(value)
+		Core.setGlobalMusicMuted(value)
+		if type(saveFn) == "function" then
+			saveFn()
+		end
+	end)
+
+	group:CreateToggle("Low graphics", ENV.Alleral_LowGraphics == true, "Lowest quality + no shadows.", function(value)
+		Core.setLowGraphics(value)
+		if type(saveFn) == "function" then
+			saveFn()
+		end
+	end)
+
+	group:CreateToggle(
+		"Auto relaunch on teleport",
+		getgenv().Alleral_AutoRelaunch ~= false,
+		"Reload the hub after server hops (loader setting).",
+		function(value)
+			getgenv().Alleral_AutoRelaunch = value == true
+			ENV.Alleral_AutoRelaunch = value == true
+		end
+	)
+
+	if state.AntiAFK ~= nil then
+		group:CreateToggle("Anti AFK", state.AntiAFK ~= false, "Prevents idle kick.", function(value)
+			state.AntiAFK = value
+			if value then
+				Core.setupAntiAfk(game:GetService("Players").LocalPlayer)
+			end
+			if type(saveFn) == "function" then
+				saveFn()
+			end
+		end)
+	end
+
+	return group
+end
+
+function Core.buildServerToolsGroup(tab, column)
+	local group = Core.buildUiGroup(tab, "Server tools", column or 1, nil, nil, "ServerTools")
+	group:CreateButton("Copy JobId", Core.copyJobId, "Copy this server's instance id.")
+	group:CreateButton("Copy join link", Core.copyPlaceJoinLink, "Share a direct join link.")
+	group:CreateButton("Rejoin server", Core.rejoinServer, "Reconnect to this exact server.")
+	group:CreateButton("Copy PlaceId", function()
+		local clip = Core.execFunction("setclipboard") or Core.execFunction("setclipboard", true)
+		if type(clip) == "function" then
+			pcall(clip, tostring(game.PlaceId))
+			Core.notify("Alleral", "PlaceId copied.", 3)
+		else
+			Core.notify("Alleral", tostring(game.PlaceId), 5)
+		end
+	end, "Copy the experience PlaceId.")
+	return group
+end
+
+function Core.buildErrorLogGroup(tab, column)
+	local group = Core.buildUiGroup(tab, "Error log", column or 2, nil, nil, "ErrorLog")
+	Core.installErrorLogHook()
+	local status = group:CreateStatus("Errors", {
+		Count = tostring(#(ENV.Alleral_ErrorLog or {})),
+		Latest = "None",
+	})
+	Core._errorLogStatus = status
+	if #(ENV.Alleral_ErrorLog or {}) > 0 then
+		local latest = ENV.Alleral_ErrorLog[1]
+		status:Update("Latest", latest.scope .. ": " .. latest.message:sub(1, 80))
+	end
+	group:CreateButton("Copy log", function()
+		local clip = Core.execFunction("setclipboard") or Core.execFunction("setclipboard", true)
+		if type(clip) ~= "function" then
+			Core.notify("Alleral", "Clipboard not supported.", 4)
+			return
+		end
+		pcall(clip, Core.getErrorLogText(25))
+		Core.notify("Alleral", "Error log copied.", 3)
+	end, "Copy the last 25 errors.")
+	group:CreateButton("Clear log", function()
+		table.clear(ENV.Alleral_ErrorLog)
+		status:Update("Count", "0")
+		status:Update("Latest", "None")
+		Core.notify("Alleral", "Error log cleared.", 3)
+	end)
+	return group, status
+end
+
+function Core.buildSettingsBackupGroup(tab, options)
+	options = type(options) == "table" and options or {}
+	local column = options.column or 2
+	local settingsPath = Core.settingsFilePath(options)
+	local readFile = Core.execFunction("readfile")
+	local writeFile = Core.execFunction("writefile")
+	local isFile = Core.execFunction("isfile")
+	local listFiles = Core.execFunction("listfiles")
+	local group = Core.buildUiGroup(tab, "Settings backup", column, nil, nil, "SettingsBackup")
+
+	local function listBackups()
+		local names = {}
+		if type(listFiles) == "function" then
+			local base = (options.settingsFile or "settings"):gsub("%.json$", ""):gsub("[^%w%-_]", "_")
+			for _, path in ipairs(listFiles("Alleral_Configs/backups")) do
+				local name = tostring(path):match("([^/\\]+)$")
+				if name and name:find("^" .. base .. "_", 1, true) then
+					table.insert(names, name)
+				end
+			end
+		end
+		table.sort(names, function(a, b)
+			return a > b
+		end)
+		if #names == 0 then
+			table.insert(names, "(none yet)")
+		end
+		return names
+	end
+
+	local selected = listBackups()[1]
+	group:CreateDropdown("Backups", listBackups(), selected, function(value)
+		selected = value
+	end, "Rolling backups created whenever settings save.")
+
+	group:CreateButton("Restore backup", function()
+		if selected == "(none yet)" then
+			Core.notify("Alleral", "No backups found yet.", 4)
+			return
+		end
+		if type(readFile) ~= "function" or type(writeFile) ~= "function" or type(isFile) ~= "function" then
+			Core.notify("Alleral", "Filesystem not supported.", 5)
+			return
+		end
+		local backupPath = "Alleral_Configs/backups/" .. selected
+		if not isFile(backupPath) then
+			Core.notify("Alleral", "Backup missing.", 4)
+			return
+		end
+		local raw = readFile(backupPath)
+		pcall(writeFile, settingsPath, raw)
+		Core.notify("Alleral", "Backup restored — reload the script.", 5)
+	end, "Overwrites your current settings file.")
+
+	group:CreateButton("Backup now", function()
+		if type(readFile) ~= "function" or not isFile or not isFile(settingsPath) then
+			Core.notify("Alleral", "Nothing to backup yet.", 4)
+			return
+		end
+		local raw = readFile(settingsPath)
+		Core.backupSettings(options.settingsFile or settingsPath, raw)
+		Core.notify("Alleral", "Manual backup saved.", 3)
+	end)
+
+	return group
+end
+
+function Core.setupHubKeybinds(options)
+	options = type(options) == "table" and options or {}
+	if ENV._Alleral_KeybindConn then
+		pcall(function()
+			ENV._Alleral_KeybindConn:Disconnect()
+		end)
+		ENV._Alleral_KeybindConn = nil
+	end
+	local UserInputService = game:GetService("UserInputService")
+	local panicKey = options.panicKey or Enum.KeyCode.Delete
+	local uiKey = options.uiKey or Enum.KeyCode.RightControl
+	ENV._Alleral_KeybindConn = UserInputService.InputBegan:Connect(function(input, processed)
+		if processed or input.UserInputType ~= Enum.UserInputType.Keyboard then
+			return
+		end
+		if input.KeyCode == panicKey then
+			Core.stateHubStop()
+			Core.notify("Alleral", "Panic — automation stopped.", 4)
+		elseif input.KeyCode == uiKey then
+			if Core.toggleUiVisibility() then
+				Core.notify("Alleral", "UI toggled.", 2)
+			end
+		end
+	end)
+end
+
+function Core.buildStandardSettingsExtras(tab, options)
+	options = type(options) == "table" and options or {}
+	Core.installErrorLogHook()
+	if type(options.window) == "table" then
+		Core.registerUiWindow(options.window)
+	end
+	Core.buildSessionStatsGroup(tab, options.sessionColumn or 1)
+	Core.buildServerToolsGroup(tab, options.serverColumn or 1)
+	Core.buildQuickTogglesGroup(tab, options)
+	Core.buildErrorLogGroup(tab, options.errorColumn or 2)
+	Core.buildSettingsBackupGroup(tab, options)
+	if options.setupKeybinds ~= false then
+		Core.setupHubKeybinds(options)
+	end
 end
 
 function stateHubStop()
@@ -1303,10 +1896,15 @@ local function compileWindUiModule(source, label)
 	end
 	local ok, result = pcall(compiled)
 	if ok and type(result) == "table" and type(result.CreateWindow) == "function" then
+		ENV.Alleral_WindUiLastGood = result
 		return result
 	end
 	if not ok then
 		warn("[Alleral] WindUI module error: " .. tostring(result))
+	end
+	if ENV.Alleral_WindUiLastGood and type(ENV.Alleral_WindUiLastGood.CreateWindow) == "function" then
+		warn("[Alleral] WindUI compile failed; using last-good module")
+		return ENV.Alleral_WindUiLastGood
 	end
 	return nil, ok and "Invalid WindUI module" or tostring(result)
 end
@@ -1375,7 +1973,7 @@ local function listUiThemes(windUi)
 		end
 	end
 	if #names == 0 then
-		return { "Dark", "Light" }
+		return { "Alleral", "AlleralNeon", "Dark", "Light" }
 	end
 	return names
 end
@@ -1389,7 +1987,7 @@ local function applyAlleralTheme(bundle)
 		return
 	end
 	pcall(function()
-		windUi:SetTheme("Dark")
+		windUi:SetTheme("Alleral")
 	end)
 end
 
@@ -1414,35 +2012,46 @@ function Core.loadUi()
 	end
 
 	local WindUI, libErr = loadWindUiModule()
+	if not WindUI and ENV.Alleral_WindUiLastGood then
+		WindUI = ENV.Alleral_WindUiLastGood
+		libErr = nil
+		warn("[Alleral] Using cached WindUI module")
+	end
 	if not WindUI then
 		return nil, libErr or "WindUI missing"
 	end
+
+	ENV.Alleral_WindUiLastGood = WindUI
 
 	local bundle = {
 		WindUI = WindUI,
 		Library = WindUI,
 		CreateWindow = function(_, settings)
-			return WindUI:CreateWindow(settings)
+			return Core.safeCall("UI:CreateWindow", function()
+				return WindUI:CreateWindow(settings)
+			end)
 		end,
 		Notify = function(_, info)
-			if type(info) == "table" then
-				WindUI:Notify({
-					Title = info.Title,
-					Content = info.Content or info.Description or info.Text or "",
-					Duration = info.Duration or info.Time or 4,
-				})
-			else
-				WindUI:Notify({
-					Title = "Alleral",
-					Content = tostring(info or ""),
-					Duration = 4,
-				})
-			end
+			Core.safeCall("UI:Notify", function()
+				if type(info) == "table" then
+					WindUI:Notify({
+						Title = info.Title,
+						Content = info.Content or info.Description or info.Text or "",
+						Duration = info.Duration or info.Time or 4,
+					})
+				else
+					WindUI:Notify({
+						Title = "Alleral",
+						Content = tostring(info or ""),
+						Duration = 4,
+					})
+				end
+			end)
 		end,
 	}
 	applyAlleralTheme(bundle)
 	bundle.ThemeNames = listUiThemes(WindUI)
-	warn("[Alleral] WindUI ready")
+	warn("[Alleral] WindUI " .. tostring(WindUI.GetAlleralVersion and WindUI:GetAlleralVersion() or Core.WINDUI_VERSION) .. " ready")
 	return cacheUi(bundle)
 end
 
@@ -1847,8 +2456,16 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 	function tab:BuildThemeGroupbox(column)
 		local group = Core.buildUiGroup(tab, "Appearance", column or 1)
 		local windUi = uiBundle and (uiBundle.WindUI or uiBundle.Library)
-		local themes = (uiBundle and uiBundle.ThemeNames) or { "Dark", "Light" }
-		local current = "Dark"
+		local themes = (uiBundle and uiBundle.ThemeNames) or { "Alleral", "AlleralNeon", "Dark", "Light" }
+		if windUi and type(windUi.ListThemeNames) == "function" then
+			local ok, listed = pcall(function()
+				return windUi:ListThemeNames()
+			end)
+			if ok and type(listed) == "table" and #listed > 0 then
+				themes = listed
+			end
+		end
+		local current = "Alleral"
 		if windUi and type(windUi.GetCurrentTheme) == "function" then
 			local ok, theme = pcall(function()
 				return windUi:GetCurrentTheme()
@@ -1861,10 +2478,23 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 			if windUi and type(windUi.SetTheme) == "function" then
 				pcall(function()
 					windUi:SetTheme(selected)
+					if type(windUi.FlashAccent) == "function" then
+						windUi:FlashAccent()
+					end
 				end)
 			end
 			Core.notify("Theme", "Applied " .. tostring(selected), 2)
-		end)
+		end, "Alleral, AlleralNeon, Dark, and more.")
+		group:CreateButton("Next theme", function()
+			if windUi and type(windUi.CycleTheme) == "function" then
+				local ok, nextTheme = pcall(function()
+					return windUi:CycleTheme(1)
+				end)
+				if ok and nextTheme and nextTheme.Name then
+					Core.notify("Theme", "Applied " .. tostring(nextTheme.Name), 2)
+				end
+			end
+		end, "Cycles through available presets.")
 		return group
 	end
 
@@ -1935,6 +2565,7 @@ function Core.prepareGame(state)
 	end
 	state.HubRunning = true
 	core.initAnalytics()
+	core.installErrorLogHook()
 	if state.AntiAFK ~= false then
 		core.setupAntiAfk(game:GetService("Players").LocalPlayer)
 	end
@@ -1942,6 +2573,10 @@ function Core.prepareGame(state)
 	local uiLibrary = type(cachedUi) == "table" and type(cachedUi.Library) == "table" and cachedUi or nil
 	local err
 	if not uiLibrary then
+		uiLibrary, err = core.loadUi()
+	end
+	if not uiLibrary then
+		task.wait(0.2)
 		uiLibrary, err = core.loadUi()
 	end
 	if not uiLibrary then
@@ -2042,7 +2677,7 @@ end
 function Core.initSettings(state, defaults, filename, exclude)
 	Core.mergeDefaults(state, defaults)
 	local savedKeys = Core.buildSavedKeys(defaults, exclude)
-	Core.loadSettings(state, savedKeys, filename)
+	Core.loadSettings(state, savedKeys, filename, defaults)
 	local function saveSettings()
 		return Core.saveSettings(state, savedKeys, filename)
 	end
@@ -2054,29 +2689,52 @@ function Core.saveSettings(state, keys, filename)
 	for _, key in ipairs(keys) do
 		payload[key] = state[key]
 	end
-	local ok = Core.writeFile("Alleral_Configs/" .. filename, HttpService:JSONEncode(payload))
+	local encodeOk, json = pcall(function()
+		return HttpService:JSONEncode(payload)
+	end)
+	if not encodeOk or type(json) ~= "string" or json == "" then
+		Core.notify("Alleral", "Couldn't encode settings — nothing saved.", 5)
+		return false
+	end
+	Core.backupSettings(filename, json)
+	local target = "Alleral_Configs/" .. filename
+	local previous = Core.readFile(target)
+	local ok = Core.writeFile(target, json)
+	if not ok and previous then
+		pcall(function()
+			Core.writeFile(target, previous)
+		end)
+		Core.notify("Alleral", "Save failed — restored previous settings file.", 5)
+		return false
+	end
 	if not ok then
 		Core.notify("Alleral", "Couldn't save settings. Your executor may not support writefile.", 5)
 	end
 	return ok
 end
 
-function Core.loadSettings(state, keys, filename)
-	local raw = Core.readFile("Alleral_Configs/" .. filename)
+function Core.loadSettings(state, keys, filename, defaults)
+	local target = "Alleral_Configs/" .. filename
+	local raw = Core.readFile(target)
 	if not raw then
-		return
+		return false
 	end
 	local ok, decoded = pcall(function()
 		return HttpService:JSONDecode(raw)
 	end)
 	if not ok or type(decoded) ~= "table" then
-		return
+		if Core.restoreSettingsFromBackup(filename, state, keys, defaults) then
+			Core.notify("Alleral", "Settings file was corrupt — restored from backup.", 5)
+			return true
+		end
+		return false
 	end
 	for _, key in ipairs(keys) do
 		if decoded[key] ~= nil then
-			state[key] = decoded[key]
+			state[key] = Core.copyValue(decoded[key])
 		end
 	end
+	return true
 end
 
 function Core.wrapUiGroup(groupbox, callbackWrapper)
@@ -2091,16 +2749,30 @@ function Core.wrapUiGroup(groupbox, callbackWrapper)
 
 	local function wrap(label, callback)
 		callback = callback or function() end
-		if not callbackWrapper then
-			return callback
-		end
-		for _, args in ipairs({ { label, callback }, { callback } }) do
-			local ok, wrapped = pcall(callbackWrapper, table.unpack(args))
-			if ok and type(wrapped) == "function" then
-				return wrapped
+		local function guarded(...)
+			local ok, err = pcall(callback, ...)
+			if not ok then
+				Core.pushErrorLog("UI:" .. tostring(label), err)
+				Core.reportError("UI:" .. tostring(label), err)
+				warn("[Alleral UI:" .. tostring(label) .. "] " .. tostring(err))
 			end
 		end
-		return callback
+		if not callbackWrapper then
+			return guarded
+		end
+		for _, args in ipairs({ { label, guarded }, { guarded } }) do
+			local ok, wrapped = pcall(callbackWrapper, table.unpack(args))
+			if ok and type(wrapped) == "function" then
+				return function(...)
+					local innerOk, innerErr = pcall(wrapped, ...)
+					if not innerOk then
+						Core.pushErrorLog("UI:" .. tostring(label), innerErr)
+						Core.reportError("UI:" .. tostring(label), innerErr)
+					end
+				end
+			end
+		end
+		return guarded
 	end
 
 	local function normalizeOptions(values)
@@ -2530,9 +3202,14 @@ function Core.buildUiWindow(ui, settings)
 		Author = settings.Subtitle or "",
 		Folder = folder,
 		Icon = Core.windUiIcon(settings.Icon or "leaf"),
-		Theme = "Dark",
+		Theme = "Alleral",
 		NewElements = true,
 		HideSearchBar = false,
+		UICorner = 14,
+		UIPadding = 12,
+		SideBarWidth = 218,
+		ElementPadding = 8,
+		Resizable = true,
 		OpenButton = {
 			Title = "Alleral",
 			Enabled = true,
@@ -2548,6 +3225,7 @@ function Core.buildUiWindow(ui, settings)
 		_library = lib,
 		_windSection = nil,
 	}
+	Core.registerUiWindow(window)
 	function window:AddTab(name, icon)
 		if not self._windSection then
 			self._windSection = self._rawWindow:Section({
@@ -2714,6 +3392,8 @@ function Core.logEvent(category, message, data)
 		pcall(logger, category, message, data)
 	end
 end
+
+Core.installResilience()
 
 ENV.Alleral_Core = Core
 return Core

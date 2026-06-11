@@ -2965,6 +2965,15 @@ local profileGroup = createUiGroup(configTab, "Save slots", "rbxassetid://107349
 configTab:BuildThemeGroupbox(2)
 Core.buildScriptStatusGroupbox(configTab, 1, "kick_a_lucky_block", VERSION)
 Core.buildHubActionsGroup(configTab, 2)
+Core.buildStandardSettingsExtras(configTab, {
+	state = state,
+	savedKeys = savedKeys,
+	saveFn = saveSettings,
+	settingsPath = settingsFile,
+	settingsFile = "KickBlox_v4_" .. tostring(LocalPlayer.UserId) .. ".json",
+	version = VERSION,
+	window = uiWindow,
+})
 local protectedDropdown
 local upgradeDropdown
 

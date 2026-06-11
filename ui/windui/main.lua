@@ -4,7 +4,7 @@
     | |/ |/ / / _ \/ _  / /_/ // /  
     |__/|__/_/_//_/\_,_/\____/___/
     
-    v1.6.65  |  2026-06-05  |  Roblox UI Library for scripts
+    v1.6.64-fix-aller2  |  2026-06-11  |  Alleral-hardened WindUI
     
     To view the source code, see the `src/` folder on the official GitHub repository.
     
@@ -14,19 +14,7 @@
     License: MIT
 ]]
 
-type ConfigType__DARKLUA_TYPE_a={
-Object:Instance,
-Camera:Instance?,
-Interactive:boolean?,
-Height:number?,
-Focused:boolean,
-
-Window:any,
-Tab:any,
-Parent:Instance,
-}local a a={cache={}, load=function(b)if not a.cache[b]then a.cache[b]={c=a[b]()}end return a.cache[b].c end}do function a.a()
-
-local b=(cloneref or clonereference or function(b)return b end)
+local a a={cache={}, load=function(b)if not a.cache[b]then a.cache[b]={c=a[b]()}end return a.cache[b].c end}do function a.a()local b=(cloneref or clonereference or function(b)return b end)
 
 local d=b(game:GetService"ReplicatedStorage":WaitForChild("GetIcons",99999):InvokeServer())
 
@@ -266,7 +254,7 @@ BackgroundTransparency=0,
 Hover="Text",
 
 PanelBackground="White",
-PanelBackgroundTransparency=0.95,
+PanelBackgroundTransparency=.95,
 
 WindowBackground="Background",
 
@@ -282,7 +270,7 @@ WindowSearchBarBackground="Background",
 
 TabBackground="Hover",
 TabBackgroundHover="Hover",
-TabBackgroundHoverTransparency=0.97,
+TabBackgroundHoverTransparency=.97,
 TabBackgroundActive="Hover",
 TabBackgroundActiveTransparency=0.93,
 TabText="Text",
@@ -296,8 +284,9 @@ TabBorderTransparency=1,
 TabBorderTransparencyActive=0.75,
 TabBorder="White",
 
+
 ElementBackground="Text",
-ElementBackgroundTransparency=0.93,
+ElementBackgroundTransparency=.93,
 ElementBackgroundHover=b:AddColor("ElementBackground","#ffffff",0.1),
 ElementTitle="Text",
 ElementDesc="Text",
@@ -321,7 +310,7 @@ ToggleBar="White",
 Checkbox="Primary",
 CheckboxIcon="White",
 CheckboxBorder="White",
-CheckboxBorderTransparency=0.75,
+CheckboxBorderTransparency=.75,
 
 SliderIcon="Icon",
 
@@ -340,37 +329,34 @@ TabSectionIcon="Icon",
 SectionIcon="Icon",
 
 SectionExpandIcon="White",
-SectionExpandIconTransparency=0.4,
+SectionExpandIconTransparency=.4,
 SectionBox="White",
-SectionBoxTransparency=0.95,
+SectionBoxTransparency=.95,
 SectionBoxBorder="White",
-SectionBoxBorderTransparency=0.75,
+SectionBoxBorderTransparency=.75,
 SectionBoxBackground="White",
-SectionBoxBackgroundTransparency=0.95,
+SectionBoxBackgroundTransparency=.95,
 
 SearchBarBorder="White",
-SearchBarBorderTransparency=0.75,
+SearchBarBorderTransparency=.75,
 
 Notification="Background",
 NotificationTitle="Text",
 NotificationTitleTransparency=0,
 NotificationContent="Text",
-NotificationContentTransparency=0.4,
+NotificationContentTransparency=.4,
 NotificationDuration="White",
-NotificationDurationTransparency=0.95,
+NotificationDurationTransparency=.95,
 NotificationBorder="White",
-NotificationBorderTransparency=0.75,
+NotificationBorderTransparency=.75,
 
 DropdownTabBorder="White",
 
 LabelBackground="White",
-LabelBackgroundTransparency=0.95,
-
-ViewportBackground="ElementBackground",
-ViewportBackgroundTransparency="ElementBackgroundTransparency",
+LabelBackgroundTransparency=.95,
 }
-end end function a.c()
 
+end end function a.c()
 local b=(cloneref or clonereference or function(b)
 return b
 end)
@@ -1912,7 +1898,7 @@ end
 local af,ag=request or http_request or syn_request,setclipboard or toclipboard
 
 function ValidateKey(ah)
-local ai="https://pandauth.com/api/v1/keys/validate"
+local ai="https://new.pandadevelopment.net/api/v1/keys/validate"
 
 local aj={
 ServiceID=ad,
@@ -2132,7 +2118,7 @@ New=a.load'i'.New
 return[[
 {
     "name": "windui",
-    "version": "1.6.65",
+    "version": "1.6.64-fix-aller2",
     "main": "./dist/main.lua",
     "repository": "https://github.com/Footagesus/WindUI",
     "discord": "https://discord.gg/ftgs-development-hub-1300692552005189632",
@@ -3152,15 +3138,16 @@ return{viewportPointToWorld,getOffset}end function a.q()
 
 
 
-local aa=(cloneref or clonereference or function(aa)
-return aa
-end)
+local aa=(cloneref or clonereference or function(aa)return aa end)
+
 
 local ab=a.load'c'
 local ac=ab.New
 
+
 local ad,ae=unpack(a.load'p')
 local af=Instance.new("Folder",aa(game:GetService"Workspace").CurrentCamera)
+
 
 local function createAcrylic()
 local ag=ac("Part",{
@@ -3182,6 +3169,7 @@ Offset=Vector3.new(0,0,-1E-6),
 
 return ag
 end
+
 
 local function createAcrylicBlur(ag)
 local ah={}
@@ -3223,11 +3211,9 @@ local as=ad(ap,ag)
 local at=(ar-aq).Magnitude
 local au=(ar-as).Magnitude
 
-if aj and aj.Parent and aj:FindFirstChild"Mesh"and aj.Mesh.Parent and aj.Mesh.Scale then
 aj.CFrame=
 CFrame.fromMatrix((aq+as)/2,am.XVector,am.YVector,am.ZVector)
 aj.Mesh.Scale=Vector3.new(at,au,0)
-end
 end
 
 local function onChange(ak)
@@ -3296,7 +3282,6 @@ ah.Model=aj
 
 return ah
 end end function a.r()
-
 
 
 local aa=a.load'c'
@@ -3677,30 +3662,225 @@ return{
 Dark={
 Name="Dark",
 
-Accent=Color3.fromHex"#18181b",
-Dialog=Color3.fromHex"#161616",
-Outline=Color3.fromHex"#FFFFFF",
-Text=Color3.fromHex"#FFFFFF",
-Placeholder=Color3.fromHex"#7a7a7a",
-Background=Color3.fromHex"#101010",
-Button=Color3.fromHex"#52525b",
-Icon=Color3.fromHex"#a1a1aa",
-Toggle=Color3.fromHex"#33C759",
-Slider=Color3.fromHex"#0091FF",
-Checkbox=Color3.fromHex"#0091FF",
+Accent=Color3.fromHex"#53fc18",
+Dialog=Color3.fromHex"#121612",
+Outline=Color3.fromHex"#53fc18",
+Text=Color3.fromHex"#f4fff0",
+Placeholder=Color3.fromHex"#7a9a72",
+Background=Color3.fromHex"#080a08",
+Button=Color3.fromHex"#30ff6a",
+Icon=Color3.fromHex"#53fc18",
+Toggle=Color3.fromHex"#53fc18",
+Slider=Color3.fromHex"#30ff6a",
+Checkbox=Color3.fromHex"#53fc18",
 
-PanelBackground=Color3.fromHex"#FFFFFF",
-PanelBackgroundTransparency=0.95,
+PanelBackground=Color3.fromHex"#101810",
+PanelBackgroundTransparency=0.9,
 
-SliderIcon=Color3.fromHex"#908F95",
-Primary=Color3.fromHex"#0091FF",
+SliderIcon=Color3.fromHex"#30ff6a",
+Primary=Color3.fromHex"#53fc18",
 
 
 LabelBackground=Color3.fromHex"#000000",
 LabelBackgroundTransparency=0.83,
 
-ElementBackground=Color3.fromHex"#2A2A2C",
-ElementBackgroundTransparency=0,
+ElementBackground=Color3.fromHex"#141c12",
+ElementBackgroundTransparency=0.12,
+
+TabBackground=Color3.fromHex"#101810",
+TabBackgroundHover=Color3.fromHex"#142010",
+TabBackgroundHoverTransparency=0.82,
+TabBackgroundActive=Color3.fromHex"#1a2814",
+TabBackgroundActiveTransparency=0.72,
+TabText=Color3.fromHex"#d8ffd0",
+TabTextTransparency=0.35,
+TabTextTransparencyActive=0,
+TabIcon=Color3.fromHex"#53fc18",
+TabIconTransparency=0.4,
+TabIconTransparencyActive=0.05,
+TabBorder=Color3.fromHex"#53fc18",
+TabBorderTransparency=0.9,
+TabBorderTransparencyActive=0.5,
+
+WindowBackground=Color3.fromHex"#080a08",
+WindowShadow=Color3.fromHex"#000000",
+WindowTopbarTitle=Color3.fromHex"#f4fff0",
+WindowTopbarAuthor=Color3.fromHex"#7a9a72",
+WindowTopbarIcon=Color3.fromHex"#53fc18",
+WindowTopbarButtonIcon=Color3.fromHex"#53fc18",
+WindowSearchBarBackground=Color3.fromHex"#0c100c",
+
+SearchBarBorder=Color3.fromHex"#53fc18",
+SearchBarBorderTransparency=0.72,
+
+SectionBoxBackground=Color3.fromHex"#101810",
+SectionBoxBackgroundTransparency=0.88,
+SectionBoxBorder=Color3.fromHex"#53fc18",
+SectionBoxBorderTransparency=0.78,
+SectionExpandIcon=Color3.fromHex"#53fc18",
+SectionExpandIconTransparency=0.35,
+
+Notification=Color3.fromHex"#0a1208",
+NotificationTitle=Color3.fromHex"#f0fff0",
+NotificationContent=Color3.fromHex"#9fd98f",
+NotificationBorder=Color3.fromHex"#53fc18",
+NotificationBorderTransparency=0.68,
+
+DropdownTabBorder=Color3.fromHex"#53fc18",
+
+PopupBackground=Color3.fromHex"#0a1208",
+DialogBackground=Color3.fromHex"#0a1208",
+ElementTitle=Color3.fromHex"#f0fff0",
+ElementDesc=Color3.fromHex"#7aad6a",
+ElementIcon=Color3.fromHex"#53fc18",
+ToggleBar=Color3.fromHex"#1a2814",
+CheckboxBorder=Color3.fromHex"#53fc18",
+CheckboxBorderTransparency=0.58,
+SliderThumb=Color3.fromHex"#ffffff",
+Tooltip=Color3.fromHex"#0f1a0c",
+TooltipText=Color3.fromHex"#f0fff0",
+Hover=Color3.fromHex"#53fc18",
+BackgroundTransparency=0,
+},
+
+Alleral={
+Name="Alleral",
+
+Accent=Color3.fromHex"#53fc18",
+Dialog=Color3.fromHex"#0a1208",
+Outline=Color3.fromHex"#53fc18",
+Text=Color3.fromHex"#f0fff0",
+Placeholder=Color3.fromHex"#6b9e5a",
+Background=Color3.fromHex"#050805",
+Button=Color3.fromHex"#30ff6a",
+Icon=Color3.fromHex"#53fc18",
+Toggle=Color3.fromHex"#53fc18",
+Slider=Color3.fromHex"#30ff6a",
+Checkbox=Color3.fromHex"#53fc18",
+
+PanelBackground=Color3.fromHex"#0f1a0c",
+PanelBackgroundTransparency=0.88,
+
+SliderIcon=Color3.fromHex"#30ff6a",
+Primary=Color3.fromHex"#53fc18",
+
+LabelBackground=Color3.fromHex"#000000",
+LabelBackgroundTransparency=0.85,
+
+ElementBackground=Color3.fromHex"#142010",
+ElementBackgroundTransparency=0.1,
+
+TabBackground=Color3.fromHex"#0a1208",
+TabBackgroundHover=Color3.fromHex"#122010",
+TabBackgroundHoverTransparency=0.78,
+TabBackgroundActive=Color3.fromHex"#183018",
+TabBackgroundActiveTransparency=0.65,
+TabText=Color3.fromHex"#e8ffe0",
+TabTextTransparency=0.3,
+TabTextTransparencyActive=0,
+TabIcon=Color3.fromHex"#53fc18",
+TabIconTransparency=0.35,
+TabIconTransparencyActive=0,
+TabBorder=Color3.fromHex"#53fc18",
+TabBorderTransparency=0.88,
+TabBorderTransparencyActive=0.42,
+
+WindowBackground=Color3.fromHex"#050805",
+WindowShadow=Color3.fromHex"#000000",
+WindowTopbarTitle=Color3.fromHex"#f0fff0",
+WindowTopbarAuthor=Color3.fromHex"#6b9e5a",
+WindowTopbarIcon=Color3.fromHex"#53fc18",
+WindowTopbarButtonIcon=Color3.fromHex"#53fc18",
+WindowSearchBarBackground=Color3.fromHex"#080c08",
+
+SearchBarBorder=Color3.fromHex"#53fc18",
+SearchBarBorderTransparency=0.65,
+
+SectionBoxBackground=Color3.fromHex"#0f1a0c",
+SectionBoxBackgroundTransparency=0.85,
+SectionBoxBorder=Color3.fromHex"#53fc18",
+SectionBoxBorderTransparency=0.72,
+SectionExpandIcon=Color3.fromHex"#53fc18",
+SectionExpandIconTransparency=0.3,
+
+Notification=Color3.fromHex"#070a07",
+NotificationTitle=Color3.fromHex"#f0fff0",
+NotificationContent=Color3.fromHex"#a8e898",
+NotificationBorder=Color3.fromHex"#53fc18",
+NotificationBorderTransparency=0.55,
+
+DropdownTabBorder=Color3.fromHex"#53fc18",
+
+PopupBackground=Color3.fromHex"#070a07",
+DialogBackground=Color3.fromHex"#070a07",
+ElementTitle=Color3.fromHex"#f0fff0",
+ElementDesc=Color3.fromHex"#78b868",
+ElementIcon=Color3.fromHex"#53fc18",
+ToggleBar=Color3.fromHex"#142810",
+CheckboxBorder=Color3.fromHex"#53fc18",
+CheckboxBorderTransparency=0.5,
+SliderThumb=Color3.fromHex"#ffffff",
+Tooltip=Color3.fromHex"#0a1208",
+TooltipText=Color3.fromHex"#f0fff0",
+Hover=Color3.fromHex"#53fc18",
+BackgroundTransparency=0,
+},
+
+AlleralNeon={
+Name="AlleralNeon",
+
+Accent=Color3.fromHex"#7dff35",
+Dialog=Color3.fromHex"#061008",
+Outline=Color3.fromHex"#7dff35",
+Text=Color3.fromHex"#f6fff0",
+Placeholder=Color3.fromHex"#5ecf45",
+Background=Color3.fromHex"#020402",
+Button=Color3.fromHex"#53fc18",
+Icon=Color3.fromHex"#7dff35",
+Toggle=Color3.fromHex"#7dff35",
+Slider=Color3.fromHex"#53fc18",
+Checkbox=Color3.fromHex"#7dff35",
+
+PanelBackground=Color3.fromHex"#0a1808",
+PanelBackgroundTransparency=0.86,
+
+SliderIcon=Color3.fromHex"#53fc18",
+Primary=Color3.fromHex"#7dff35",
+
+LabelBackground=Color3.fromHex"#000000",
+LabelBackgroundTransparency=0.82,
+
+ElementBackground=Color3.fromHex"#102010",
+ElementBackgroundTransparency=0.08,
+
+TabBackground=Color3.fromHex"#061008",
+TabBackgroundHover=Color3.fromHex"#0f2010",
+TabBackgroundHoverTransparency=0.75,
+TabBackgroundActive=Color3.fromHex"#183820",
+TabBackgroundActiveTransparency=0.6,
+TabText=Color3.fromHex"#f0fff0",
+TabTextTransparency=0.25,
+TabTextTransparencyActive=0,
+TabIcon=Color3.fromHex"#7dff35",
+TabIconTransparency=0.25,
+TabIconTransparencyActive=0,
+TabBorder=Color3.fromHex"#7dff35",
+TabBorderTransparency=0.85,
+TabBorderTransparencyActive=0.35,
+
+WindowBackground=Color3.fromHex"#020402",
+WindowTopbarTitle=Color3.fromHex"#f6fff0",
+WindowTopbarAuthor=Color3.fromHex"#5ecf45",
+WindowTopbarIcon=Color3.fromHex"#7dff35",
+WindowSearchBarBackground=Color3.fromHex"#061008",
+SearchBarBorder=Color3.fromHex"#7dff35",
+SearchBarBorderTransparency=0.6,
+SectionBoxBorder=Color3.fromHex"#7dff35",
+NotificationBorder=Color3.fromHex"#7dff35",
+DropdownTabBorder=Color3.fromHex"#7dff35",
+ToggleBar=Color3.fromHex"#183820",
+Hover=Color3.fromHex"#7dff35",
+BackgroundTransparency=0,
 },
 
 Light={
@@ -4106,7 +4286,7 @@ ThemeTag={
 ImageColor3="Outline",
 },
 Size=UDim2.new(1,0,1,0),
-ImageTransparency=0.67,
+ImageTransparency=0.48,
 },{
 
 
@@ -6083,35 +6263,27 @@ local ai=ab("Frame",{
 Size=UDim2.new(1,0,0,38),
 BackgroundTransparency=1,
 AutomaticSize="Y",
-Parent=ah.UIElements.Container,
+Parent=ah.UIElements.Container
 },{
 ab("UIListLayout",{
 Padding=UDim.new(0,10),
 FillDirection="Vertical",
-}),
+})
 })
 
+
 for aj,ak in next,af.Buttons do
-local al=ad(
-ak.Title,
-ak.Icon,
-ak.Callback,
-ak.Variant or"White",
-ai,
-nil,
-nil,
-af.Window.NewElements and 999 or 10
-)
+local al=ad(ak.Title,ak.Icon,ak.Callback,"White",ai,nil,nil,af.Window.NewElements and 999 or 10)
 al.Size=UDim2.new(1,0,0,38)
 
 end
 end
 
 return ag.__type,ag
+
 end
 
 return ac end function a.D()
-
 local aa=a.load'c'local ab=
 aa.New
 
@@ -6124,14 +6296,13 @@ Title=ae.Title or"Button",
 Desc=ae.Desc or nil,
 Icon=ae.Icon or"mouse-pointer-click",
 IconThemed=ae.IconThemed or false,
-IconColor=ae.IconColor or nil,
 Color=ae.Color,
 Justify=ae.Justify or"Between",
 IconAlign=ae.IconAlign or"Right",
 Locked=ae.Locked or false,
 LockedTitle=ae.LockedTitle,
 Callback=ae.Callback or function()end,
-UIElements={},
+UIElements={}
 }
 
 local ag=true
@@ -6176,17 +6347,12 @@ af.Icon,
 0,
 ae.Window.Folder,
 "Button",
-not(af.Color or af.IconColor)and true or nil,
+not af.Color and true or nil,
 af.IconThemed
 )
 
-if af.IconColor then
-af.UIElements.ButtonIcon.ImageLabel.ImageColor3=af.IconColor
-end
-
 af.UIElements.ButtonIcon.Size=UDim2.new(0,20,0,20)
-af.UIElements.ButtonIcon.Parent=af.Justify=="Between"and af.ButtonFrame.UIElements.Main
-or af.ButtonFrame.UIElements.Container.TitleFrame
+af.UIElements.ButtonIcon.Parent=af.Justify=="Between"and af.ButtonFrame.UIElements.Main or af.ButtonFrame.UIElements.Container.TitleFrame
 af.UIElements.ButtonIcon.LayoutOrder=af.IconAlign=="Left"and-99999 or 99999
 af.UIElements.ButtonIcon.AnchorPoint=Vector2.new(1,0.5)
 af.UIElements.ButtonIcon.Position=UDim2.new(1,0,0.5,0)
@@ -6219,7 +6385,6 @@ return af.__type,af
 end
 
 return ac end function a.E()
-
 local aa={}
 
 local ab=a.load'c'
@@ -7130,9 +7295,7 @@ return al.__type,al
 end
 
 return ah end function a.I()
-local aa=(cloneref or clonereference or function(aa)
-return aa
-end)
+local aa=(cloneref or clonereference or function(aa)return aa end)
 
 local ac=aa(game:GetService"UserInputService")
 
@@ -7166,20 +7329,12 @@ Locked=aj.Locked or false,
 LockedTitle=aj.LockedTitle,
 Value=NormalizeKeyCode(aj.Value)or"F",
 Callback=aj.Callback or function()end,
-CanChange=aj.CanChange~=false,
-Blacklist=aj.Blacklist or{},
+CanChange=aj.CanChange or true,
 Picking=false,
 UIElements={},
 }
 
-local al={}
-
-for am,an in next,ak.Blacklist do
-table.insert(al,Enum.KeyCode[NormalizeKeyCode(an)])
-end
-table.insert(al,Enum.KeyCode[NormalizeKeyCode"Escape"])
-
-local am=true
+local al=true
 
 ak.KeybindFrame=a.load'B'{
 Title=ak.Title,
@@ -7194,107 +7349,82 @@ ElementTable=ak,
 ParentConfig=aj,
 }
 
-ak.UIElements.Keybind=ah(
-ak.Value,
-nil,
-ak.KeybindFrame.UIElements.Main,
-nil,
-aj.Window.NewElements and 12 or 10
-)
+ak.UIElements.Keybind=ah(ak.Value,nil,ak.KeybindFrame.UIElements.Main,nil,aj.Window.NewElements and 12 or 10)
 
-ak.UIElements.Keybind.Size=
-UDim2.new(0,24+ak.UIElements.Keybind.Frame.Frame.TextLabel.TextBounds.X,0,42)
+ak.UIElements.Keybind.Size=UDim2.new(
+0,24
++ak.UIElements.Keybind.Frame.Frame.TextLabel.TextBounds.X,
+0,
+42
+)
 ak.UIElements.Keybind.AnchorPoint=Vector2.new(1,0.5)
 ak.UIElements.Keybind.Position=UDim2.new(1,0,0.5,0)
-ak.UIElements.Keybind.Interactable=false
 
 ae("UIScale",{
 Parent=ak.UIElements.Keybind,
-Scale=0.85,
+Scale=.85,
 })
 
-ad.AddSignal(
-ak.UIElements.Keybind.Frame.Frame.TextLabel:GetPropertyChangedSignal"TextBounds",
-function()
-ak.UIElements.Keybind.Size=
-UDim2.new(0,24+ak.UIElements.Keybind.Frame.Frame.TextLabel.TextBounds.X,0,42)
-end
+ad.AddSignal(ak.UIElements.Keybind.Frame.Frame.TextLabel:GetPropertyChangedSignal"TextBounds",function()
+ak.UIElements.Keybind.Size=UDim2.new(
+0,24
++ak.UIElements.Keybind.Frame.Frame.TextLabel.TextBounds.X,
+0,
+42
 )
+end)
 
-function ak.Lock(an)
+function ak.Lock(am)
 ak.Locked=true
-am=false
+al=false
 return ak.KeybindFrame:Lock(ak.LockedTitle)
 end
-function ak.Unlock(an)
+function ak.Unlock(am)
 ak.Locked=false
-am=true
+al=true
 return ak.KeybindFrame:Unlock()
 end
 
-function ak.Set(an,ao)
-local ap=NormalizeKeyCode(ao)
-ak.Value=ap
-ak.UIElements.Keybind.Frame.Frame.TextLabel.Text=ap
+function ak.Set(am,an)
+local ao=NormalizeKeyCode(an)
+ak.Value=ao
+ak.UIElements.Keybind.Frame.Frame.TextLabel.Text=ao
 end
 
 if ak.Locked then
 ak:Lock()
 end
 
-local an
-
 ad.AddSignal(ak.KeybindFrame.UIElements.Main.MouseButton1Click,function()
-if am then
+if al then
 if ak.CanChange then
 ak.Picking=true
 ak.UIElements.Keybind.Frame.Frame.TextLabel.Text="..."
 
+task.wait(0.2)
 
-
+local am
+am=ac.InputBegan:Connect(function(an)
 local ao
-ao=ac.InputBegan:Connect(function(ap)
-local aq
 
-if ap.UserInputType==Enum.UserInputType.Keyboard then
-if table.find(al,ap.KeyCode)then
-aq=nil
-return
-else
-aq=ap.KeyCode.Name
-end
-elseif
-ap.UserInputType==Enum.UserInputType.MouseButton1
-and not table.find(al,"MouseLeftButton")
-then
-aq="MouseLeftButton"
-elseif
-ap.UserInputType==Enum.UserInputType.MouseButton2
-and not table.find(al,"MouseRightButton")
-then
-aq="MouseRightButton"
+if an.UserInputType==Enum.UserInputType.Keyboard then
+ao=an.KeyCode.Name
+elseif an.UserInputType==Enum.UserInputType.MouseButton1 then
+ao="MouseLeft"
+elseif an.UserInputType==Enum.UserInputType.MouseButton2 then
+ao="MouseRight"
 end
 
-if an then
-an:Disconnect()
-end
-
-an=ac.InputEnded:Connect(function(ar)
-if
-aq
-and(
-ar.KeyCode.Name==aq
-or aq=="MouseLeft"and ar.UserInputType==Enum.UserInputType.MouseButton1
-or aq=="MouseRight"and ar.UserInputType==Enum.UserInputType.MouseButton2
-)
-then
+local ap
+ap=ac.InputEnded:Connect(function(aq)
+if aq.KeyCode.Name==ao or ao=="MouseLeft"and aq.UserInputType==Enum.UserInputType.MouseButton1 or ao=="MouseRight"and aq.UserInputType==Enum.UserInputType.MouseButton2 then
 ak.Picking=false
 
-ak.UIElements.Keybind.Frame.Frame.TextLabel.Text=aq
-ak.Value=aq
+ak.UIElements.Keybind.Frame.Frame.TextLabel.Text=ao
+ak.Value=ao
 
-ao:Disconnect()
-an:Disconnect()
+am:Disconnect()
+ap:Disconnect()
 end
 end)
 end)
@@ -7302,24 +7432,22 @@ end
 end
 end)
 
-ad.AddSignal(ac.InputBegan,function(ao,ap)
+ad.AddSignal(ac.InputBegan,function(am,an)
 if ac:GetFocusedTextBox()then
 return
 end
-if not am then
-return
-end
-if ak.Picking then
+
+if not al then
 return
 end
 
-if ao.UserInputType==Enum.UserInputType.Keyboard then
-if ao.KeyCode.Name==ak.Value then
-ad.SafeCallback(ak.Callback,ao.KeyCode.Name)
+if am.UserInputType==Enum.UserInputType.Keyboard then
+if am.KeyCode.Name==ak.Value then
+ad.SafeCallback(ak.Callback,am.KeyCode.Name)
 end
-elseif ao.UserInputType==Enum.UserInputType.MouseButton1 and ak.Value=="MouseLeft"then
+elseif am.UserInputType==Enum.UserInputType.MouseButton1 and ak.Value=="MouseLeft"then
 ad.SafeCallback(ak.Callback,"MouseLeft")
-elseif ao.UserInputType==Enum.UserInputType.MouseButton2 and ak.Value=="MouseRight"then
+elseif am.UserInputType==Enum.UserInputType.MouseButton2 and ak.Value=="MouseRight"then
 ad.SafeCallback(ak.Callback,"MouseRight")
 end
 end)
@@ -7328,7 +7456,6 @@ return ak.__type,ak
 end
 
 return ag end function a.J()
-
 local aa=a.load'c'
 local ac=aa.New local ad=
 aa.Tween
@@ -7629,9 +7756,7 @@ if#av>0 then
 av=av:sub(1,#av-2)
 end
 else
-av=typeof(an.Value)=="table"and(an.Value.Title or an.Value[1])
-or an.Value
-or""
+av=typeof(an.Value)=="table"and(an.Value.Title or an.Value[1])or an.Value or""
 end
 
 if an.UIElements.Dropdown then
@@ -7712,10 +7837,6 @@ end
 end
 
 function ar.Refresh(at,au)
-if am.Window.Destroyed then
-return
-end
-
 for av,aw in next,an.UIElements.Menu.Frame.ScrollingFrame:GetChildren()do
 if not aw:IsA"UIListLayout"then
 aw:Destroy()
@@ -8208,7 +8329,7 @@ ao.UIElements.Dropdown.Frame.Frame.TextLabel.TextTruncate="AtEnd"
 ao.UIElements.Dropdown.Frame.Frame.TextLabel.Size=
 UDim2.new(1,ao.UIElements.Dropdown.Frame.Frame.TextLabel.Size.X.Offset-18-12-12,0,0)
 
-ao.UIElements.Dropdown.Size=UDim2.new(0,ao.Width,0,36)
+ao.UIElements.Dropdown.Size=UDim2.new(0,math.max(tonumber(ao.Width)or 0,160),0,36)
 ao.UIElements.Dropdown.Position=UDim2.new(1,0,an.Window.NewElements and 0 or 0.5,0)
 ao.UIElements.Dropdown.AnchorPoint=Vector2.new(1,an.Window.NewElements and 0 or 0.5)
 
@@ -10113,213 +10234,6 @@ return ak.__type,ak
 end
 
 return af end function a.X()
-local aa=(cloneref or clonereference or function(aa)
-return aa
-end)
-
-local ae=aa(game:GetService"UserInputService")
-
-local af=a.load'c'
-local ah=af.New
-
-local aj={}
-
-
-
-
-
-
-
-
-
-
-
-
-
-function aj.New(ak,al:ConfigType__DARKLUA_TYPE_a)
-local am={
-__type="Viewport",
-Object=al.Object,
-Camera=al.Camera or Instance.new"Camera",
-Interactive=al.Interactive or false,
-Height=al.Height or 200,
-Focused=al.Focused~=false,
-}
-
-local an=false
-local ao=false
-local ap,aq=0
-
-local ar=af.NewRoundFrame(al.Window.ElementConfig.UICorner,"Squircle",{
-Size=UDim2.new(1,0,0,am.Height),
-Parent=al.Parent,
-ThemeTag={
-ImageColor3="ViewportBackground",
-ImageTransparency="ViewportBackgroundTransparency",
-},
-},{
-ah("CanvasGroup",{
-Size=UDim2.new(1,0,1,0),
-BackgroundTransparency=1,
-},{
-ah("UICorner",{
-CornerRadius=UDim.new(0,al.Window.ElementConfig.UICorner),
-}),
-ah("ViewportFrame",{
-Name="Viewport",
-Size=UDim2.new(1,0,1,0),
-BackgroundTransparency=1,
-CurrentCamera=am.Camera,
-Active=am.Interactive,
-},{
-am.Object,
-}),
-}),
-})
-
-af.AddSignal(ar.CanvasGroup.Viewport.MouseEnter,function()
-if am.Interactive then
-al.Tab.UIElements.ContainerFrame.ScrollingEnabled=false
-end
-end)
-
-af.AddSignal(ar.CanvasGroup.Viewport.InputEnded,function(as)
-if
-as.UserInputType==Enum.UserInputType.MouseMovement
-or as.UserInputType==Enum.UserInputType.Touch
-then
-al.Tab.UIElements.ContainerFrame.ScrollingEnabled=true
-end
-end)
-
-af.AddSignal(ar.CanvasGroup.Viewport.InputBegan,function(as)
-if am.Interactive then
-if
-(as.UserInputType==Enum.UserInputType.MouseButton1)
-or(as.UserInputType==Enum.UserInputType.Touch and not ao)
-then
-an=true
-aq=as.Position
-end
-end
-end)
-
-af.AddSignal(ae.InputEnded,function(as)
-if am.Interactive then
-if
-as.UserInputType==Enum.UserInputType.MouseButton1
-or as.UserInputType==Enum.UserInputType.Touch
-then
-an=false
-end
-end
-end)
-
-af.AddSignal(ae.InputChanged,function(as)
-if am.Interactive and an and not ao then
-if
-as.UserInputType==Enum.UserInputType.MouseMovement
-or as.UserInputType==Enum.UserInputType.Touch
-then
-local at=as.Position-aq
-aq=as.Position
-
-local au=am.Object:GetPivot().Position
-local av=am.Camera
-
-local aw=CFrame.fromAxisAngle(Vector3.new(0,1,0),-at.X*0.02)
-av.CFrame=CFrame.new(au)*aw*CFrame.new(-au)*av.CFrame
-
-local ax=CFrame.fromAxisAngle(av.CFrame.RightVector,-at.Y*0.02)
-local ay=CFrame.new(au)*ax*CFrame.new(-au)*av.CFrame
-
-if ay.UpVector.Y>0.1 then
-av.CFrame=ay
-end
-end
-end
-end)
-
-af.AddSignal(ar.CanvasGroup.Viewport.InputChanged,function(as)
-if am.Interactive then
-if as.UserInputType==Enum.UserInputType.MouseWheel then
-local at=as.Position.Z*2
-am.Camera.CFrame+=am.Camera.CFrame.LookVector*at
-end
-end
-end)
-
-af.AddSignal(ae.TouchPinch,function(as,at,au,av)
-if am.Interactive then
-if av==Enum.UserInputState.Begin then
-ao=true
-an=false
-ap=(as[1]-as[2]).Magnitude
-elseif av==Enum.UserInputState.Change then
-local aw=(as[1]-as[2]).Magnitude
-local ax=(aw-ap)*0.03
-ap=aw
-am.Camera.CFrame+=am.Camera.CFrame.LookVector*ax
-elseif av==Enum.UserInputState.End or av==Enum.UserInputState.Cancel then
-ao=false
-end
-end
-end)
-
-local function FocusCamera()
-local as=am.Object:IsA"BasePart"and am.Object.Size
-or select(2,am.Object:GetBoundingBox(0))
-local at=math.max(as.X,as.Y,as.Z)
-local au=at*2
-local av=am.Object:GetPivot().Position
-
-am.Camera.CFrame=
-CFrame.new(av+Vector3.new(0,at/2,au),av)
-end
-
-if am.Focused then
-FocusCamera()
-end
-
-function am.SetObject(as,at,au)
-if au then
-at=at:Clone()
-end
-if am.Object then
-am.Object:Destroy()
-end
-
-am.Object=at
-am.Object.Parent=ar.CanvasGroup.Viewport
-end
-
-function am.SetHeight(as,at)
-ar.Size=UDim2.new(1,0,0,at)
-end
-
-function am.Focus(as)
-if am.Object then
-FocusCamera()
-end
-end
-
-function am.SetCamera(as,at)
-am.Camera=at
-ar.CanvasGroup.Viewport.CurrentCamera=at
-end
-
-function am.SetInteractive(as,at)
-am.Interactive=at
-ar.CanvasGroup.Viewport.Active=at
-end
-
-am.Main=ar
-
-return am.__type,am
-end
-
-return aj end function a.Y()
-
 return{
 Elements={
 Paragraph=a.load'C',
@@ -10338,7 +10252,6 @@ Image=a.load'T',
 Group=a.load'U',
 HStack=a.load'V',
 VStack=a.load'W',
-Viewport=a.load'X',
 
 },
 Load=function(aa,ae,af,ah,aj,ak,al,am,an)
@@ -10463,7 +10376,7 @@ end
 end
 end
 end,
-}end function a.Z()
+}end function a.Y()
 
 local aa=(cloneref or clonereference or function(aa)
 return aa
@@ -10902,7 +10815,7 @@ end
 
 
 
-local ay=a.load'Y'
+local ay=a.load'X'
 
 ay.Load(
 ap,
@@ -11099,7 +11012,7 @@ am.OnChangeFunc(ao)
 end
 end
 
-return am end function a._()
+return am end function a.Z()
 
 local aa={}
 
@@ -11108,7 +11021,7 @@ local ae=a.load'c'
 local af=ae.New
 local ah=ae.Tween
 
-local aj=a.load'Z'
+local aj=a.load'Y'
 
 function aa.New(ak,al,am,an,ao)
 local ap={
@@ -11277,7 +11190,7 @@ return ap
 end
 
 
-return aa end function a.aa()
+return aa end function a._()
 return{
 Tab="table-of-contents",
 Paragraph="type",
@@ -11289,7 +11202,7 @@ Input="text-cursor-input",
 Dropdown="chevrons-up-down",
 Code="terminal",
 Colorpicker="palette",
-}end function a.ab()
+}end function a.aa()
 local aa=(cloneref or clonereference or function(aa)
 return aa
 end)
@@ -11313,7 +11226,7 @@ Radius=22,
 Width=400,
 MaxHeight=380,
 
-Icons=a.load'aa',
+Icons=a.load'_',
 }
 
 local ao=ah("TextBox",{
@@ -11824,7 +11737,7 @@ end)
 return an
 end
 
-return ae end function a.ac()
+return ae end function a.ab()
 
 
 
@@ -11935,7 +11848,7 @@ au.TopBarButtonIconSize=au.TopBarButtonIconSize or(au.Topbar.ButtonsType=="Mac"a
 
 au.ElementConfig={
 UIPadding=(au.NewElements and 10 or 13),
-UICorner=au.ElementsRadius or(au.NewElements and 23 or 16),
+UICorner=au.ElementsRadius or(au.NewElements and 23 or 12),
 }
 
 local av=au.Size or UDim2.new(0,580,0,460)
@@ -12334,31 +12247,25 @@ local g
 local h=typeof(au.Background)=="string"and string.match(au.Background,"^video:(.+)")or nil
 local j=typeof(au.Background)=="string"
 and not h
-and(string.match(au.Background,"^https?://.+")or string.match(au.Background,"^rbx%w+://.+"))
+and string.match(au.Background,"^(https?://.+|rbx%w+://.+)")
 or nil
 
 local function GetImageExtension(l)
-if not l or typeof(l)~="string"then
-return".png"
-end
-local m=l:match"^([^?#]+)"or l
-local p=m:match"%.(%w+)$"
-if p then
-p=p:lower()
-if p=="jpg"or p=="jpeg"or p=="png"or p=="webp"then
-return"."..p
+local m=l:match"%.(%w+)$"or l:match"%.(%w+)%?"
+if m then
+m=m:lower()
+if m=="jpg"or m=="jpeg"or m=="png"or m=="webp"then
+return"."..m
 end
 end
 return".png"
 end
-
-
 
 if typeof(au.Background)=="string"and h then
 f=true
 
 if string.find(h,"http")then
-local l=(au.Folder or"Temp").."/assets/."..al.SanitizeFilename(h)..".webm"
+local l=au.Folder.."/assets/."..al.SanitizeFilename(h)..".webm"
 if not isfile(l)then
 local m,p=pcall(function()
 
@@ -12367,13 +12274,7 @@ local m,p=pcall(function()
 
 
 local m=game.HttpGet and game:HttpGet(h)
-or al.Request{
-Url=h,
-Method="GET",
-Headers={["User-Agent"]="Roblox/Exploit"},
-}.Body
-
-writefile(l,m)
+writefile(l,m.Body)
 end)
 if not m then
 warn("[ WindUI.Window.Background ] Failed to download video: "..tostring(p))
@@ -12405,7 +12306,7 @@ CornerRadius=UDim.new(0,au.UICorner),
 })
 g:Play()
 elseif j then
-local l=(au.Folder or"Temp")
+local l=au.Folder
 .."/assets/."
 ..al.SanitizeFilename(j)
 ..GetImageExtension(j)
@@ -12417,13 +12318,7 @@ local m,p=pcall(function()
 
 
 local m=game.HttpGet and game:HttpGet(j)
-or al.Request{
-Url=h,
-Method="GET",
-Headers={["User-Agent"]="Roblox/Exploit"},
-}.Body
-
-writefile(l,m)
+writefile(l,m.Body)
 end)
 if not m then
 warn("[ Window.Background ] Failed to download image: "..tostring(p))
@@ -12545,10 +12440,10 @@ ImageColor3="WindowBackground",
 g,
 l,
 ax,
+
+
+
 }),
-
-
-
 
 aw,
 ay,
@@ -13137,14 +13032,7 @@ if au.OpenButtonMain and au.IsOpenButtonEnabled then
 au.OpenButtonMain:Visible(false)
 end
 
-at.WindUI.UIScaleObj.Scale-=0.15000000000000002
-an(
-at.WindUI.UIScaleObj,
-0.33,
-{Scale=at.WindUI.UIScale},
-Enum.EasingStyle.Back,
-Enum.EasingDirection.Out
-):Play()
+
 an(
 aA,
 0.25,
@@ -13220,13 +13108,7 @@ an(au.UIElements.Main.Background,0.4,{
 Size=UDim2.new(1,0,1,-240),
 },Enum.EasingStyle.Exponential,Enum.EasingDirection.InOut):Play()
 
-an(
-at.WindUI.UIScaleObj,
-0.28,
-{Scale=at.WindUI.UIScale-(0.15000000000000002)},
-Enum.EasingStyle.Quint,
-Enum.EasingDirection.Out
-):Play()
+
 if g then
 if g:IsA"VideoFrame"then
 g.Visible=false
@@ -13436,8 +13318,8 @@ if au.OpenButton and typeof(au.OpenButton)=="table"then
 au:EditOpenButton(au.OpenButton)
 end
 
-local z=a.load'Z'
-local A=a.load'_'
+local z=a.load'Y'
+local A=a.load'Z'
 local B=z.Init(au,at.WindUI,at.WindUI.TooltipGui)
 B:OnChange(function(C)
 au.CurrentTab=C
@@ -13875,7 +13757,7 @@ end)
 
 
 if not au.HideSearchBar then
-local M=a.load'ab'
+local M=a.load'aa'
 local N=false
 
 
@@ -14132,6 +14014,9 @@ end
 
 return aa.Themes[aw]
 end
+if aa.Themes.Alleral then
+return aa:SetTheme("Alleral")
+end
 return nil
 end
 
@@ -14226,21 +14111,31 @@ aa.Themes=a.load'u'(aa,ao)
 
 ao.Themes=aa.Themes
 
-aa:SetTheme"Dark"
+aa:SetTheme(aa.Themes.Alleral and"Alleral"or"Dark")
 aa:SetLanguage(ao.Language)
 
 function aa.CreateWindow(av,aw)
-local ax=a.load'ac'
+local ax=a.load'ab'
 
 if not ak:IsStudio()and writefile then
+pcall(function()
 if not isfolder"WindUI"then
 makefolder"WindUI"
 end
 if aw.Folder then
+if not isfolder(aw.Folder)then
 makefolder(aw.Folder)
-else
-makefolder(aw.Title)
 end
+else
+local folderName=tostring(aw.Title or"WindUI"):gsub("[^%w%-_]", "_")
+if folderName==""then
+folderName="WindUI"
+end
+if not isfolder(folderName)then
+makefolder(folderName)
+end
+end
+end)
 end
 
 aw.WindUI=aa
@@ -14361,6 +14256,373 @@ end
 
 
 return b
+end
+
+--[[ Alleral WindUI hardening layer — polish, retries, self-heal, safe APIs ]]
+do
+local WindUI=aa
+local TweenService=game:GetService("TweenService")
+local RunService=game:GetService("RunService")
+local ACCENT=Color3.fromHex("#53fc18")
+local ACCENT_ALT=Color3.fromHex("#30ff6a")
+WindUI.ALLERAL_UI_VERSION="1.6.64-fix-aller2"
+WindUI._AlleralNotifyCount=0
+WindUI._AlleralMaxNotify=6
+WindUI._AlleralWatchdogToken=0
+
+local function log(scope, err)
+warn("[Alleral WindUI:"..tostring(scope).."] "..tostring(err))
+end
+
+local function safeCall(scope, fn, ...)
+local ok, result=pcall(fn, ...)
+if ok then
+return true, result
+end
+log(scope, result)
+return false, result
+end
+
+local function tween(instance, info, props)
+if WindUI._AlleralReducedMotion or not instance or not instance.Parent then
+return
+end
+pcall(function()
+TweenService:Create(instance, info, props):Play()
+end)
+end
+
+local function resolveThemeName(requested)
+local themes=WindUI.Themes or {}
+if type(requested)=="string" and themes[requested] then
+return requested
+end
+if themes.Alleral then
+return "Alleral"
+end
+if themes.Dark then
+return "Dark"
+end
+for name in pairs(themes) do
+return name
+end
+return "Dark"
+end
+
+local function addAccentStroke(frame, transparency, thickness)
+if not frame or not frame:IsA("GuiObject") then
+return
+end
+local stroke=frame:FindFirstChild("AlleralAccentStroke")
+if not stroke then
+stroke=Instance.new("UIStroke")
+stroke.Name="AlleralAccentStroke"
+stroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+stroke.Parent=frame
+end
+stroke.Color=ACCENT
+stroke.Thickness=thickness or 1
+stroke.Transparency=transparency or 0.55
+end
+
+local function addTopGlow(topbarFrame)
+if not topbarFrame or not topbarFrame:IsA("GuiObject") then
+return
+end
+if topbarFrame:FindFirstChild("AlleralTopGlow") then
+return
+end
+local glow=Instance.new("Frame")
+glow.Name="AlleralTopGlow"
+glow.BackgroundColor3=ACCENT
+glow.BackgroundTransparency=0.88
+glow.BorderSizePixel=0
+glow.Size=UDim2.new(1,0,0,2)
+glow.Position=UDim2.new(0,0,1,-1)
+glow.ZIndex=topbarFrame.ZIndex+2
+glow.Parent=topbarFrame
+local grad=Instance.new("UIGradient")
+grad.Color=ColorSequence.new({
+ColorSequenceKeypoint.new(0, ACCENT),
+ColorSequenceKeypoint.new(0.5, ACCENT_ALT),
+ColorSequenceKeypoint.new(1, ACCENT),
+})
+grad.Transparency=NumberSequence.new({
+NumberSequenceKeypoint.new(0, 0.35),
+NumberSequenceKeypoint.new(0.5, 0.15),
+NumberSequenceKeypoint.new(1, 0.35),
+})
+grad.Parent=glow
+end
+
+function WindUI.PolishWindow(self, window)
+if type(window)~="table" or type(window.UIElements)~="table" then
+return window
+end
+pcall(function()
+local main=window.UIElements.Main
+if main then
+addAccentStroke(main, 0.58, 1)
+end
+local topbar=window.UIElements.Topbar
+if topbar and topbar.Main then
+addTopGlow(topbar.Main)
+end
+local sidebar=window.UIElements.SideBar
+if sidebar then
+addAccentStroke(sidebar, 0.82, 1)
+end
+window.CanDropdown=true
+if window.SearchBar and window.SearchBar.Frame then
+addAccentStroke(window.SearchBar.Frame, 0.78, 1)
+end
+end)
+return window
+end
+
+local function startWatchdog(window)
+WindUI._AlleralWatchdogToken+=1
+local token=WindUI._AlleralWatchdogToken
+task.spawn(function()
+while WindUI._AlleralWatchdogToken==token and WindUI.Window==window do
+task.wait(20)
+if WindUI._AlleralWatchdogToken~=token or WindUI.Window~=window then
+break
+end
+pcall(function()
+if window and window.UIElements and window.UIElements.Main and window.UIElements.Main.Parent then
+WindUI:PolishWindow(window)
+else
+WindUI._AlleralWatchdogToken+=1
+end
+end)
+end
+end)
+end
+
+local _CreateWindow=WindUI.CreateWindow
+function WindUI.CreateWindow(self, settings)
+settings=type(settings)=="table" and settings or {}
+settings.Theme=resolveThemeName(settings.Theme)
+settings.NewElements=settings.NewElements~=false
+settings.UICorner=settings.UICorner or 14
+settings.UIPadding=settings.UIPadding or 12
+settings.SideBarWidth=settings.SideBarWidth or 218
+settings.ElementPadding=settings.ElementPadding or 8
+settings.Resizable=settings.Resizable~=false
+settings.HideSearchBar=settings.HideSearchBar==true
+
+local window
+for attempt=1,2 do
+local ok, result=pcall(function()
+return _CreateWindow(self, settings)
+end)
+if ok and result then
+window=result
+break
+end
+log("CreateWindow", result)
+settings.Theme=resolveThemeName(attempt==1 and "Alleral" or "Dark")
+task.wait(0.05)
+end
+
+if window then
+task.defer(function()
+WindUI:PolishWindow(window)
+startWatchdog(window)
+end)
+end
+return window
+end
+
+local _Notify=WindUI.Notify
+function WindUI.Notify(self, payload)
+if type(payload)~="table" then
+payload={Content=tostring(payload or "")}
+end
+payload.Title=payload.Title or payload.Name or "Alleral"
+payload.Content=payload.Content or payload.Text or payload.Description or ""
+payload.Duration=math.clamp(tonumber(payload.Duration or payload.Time) or 4, 1, 30)
+
+local waited=0
+while WindUI._AlleralNotifyCount>=WindUI._AlleralMaxNotify and waited<3 do
+task.wait(0.12)
+waited+=0.12
+end
+WindUI._AlleralNotifyCount+=1
+
+local ok, result=pcall(function()
+return _Notify(self, payload)
+end)
+task.delay(payload.Duration+0.35, function()
+WindUI._AlleralNotifyCount=math.max(0, WindUI._AlleralNotifyCount-1)
+end)
+if not ok then
+log("Notify", result)
+return nil
+end
+return result
+end
+
+local _SetTheme=WindUI.SetTheme
+function WindUI.SetTheme(self, themeName)
+themeName=resolveThemeName(themeName)
+local theme
+local ok, err=pcall(function()
+theme=_SetTheme(self, themeName)
+end)
+if not ok or not theme then
+ok, err=pcall(function()
+theme=_SetTheme(self, "Alleral")
+end)
+if not ok or not theme then
+pcall(function()
+theme=_SetTheme(self, "Dark")
+end)
+end
+end
+if theme and WindUI.Window then
+task.defer(function()
+WindUI:PolishWindow(WindUI.Window)
+end)
+end
+return theme
+end
+
+local _AddTheme=WindUI.AddTheme
+function WindUI.AddTheme(self, themeTable)
+if type(themeTable)~="table" or type(themeTable.Name)~="string" then
+return nil
+end
+local ok, result=pcall(function()
+return _AddTheme(self, themeTable)
+end)
+if not ok then
+log("AddTheme", result)
+return nil
+end
+return result
+end
+
+local _Popup=WindUI.Popup
+function WindUI.Popup(self, payload)
+payload=type(payload)=="table" and payload or {}
+local ok, result=pcall(function()
+return _Popup(self, payload)
+end)
+if not ok then
+log("Popup", result)
+return nil
+end
+return result
+end
+
+function WindUI.GetAlleralVersion(self)
+return WindUI.ALLERAL_UI_VERSION
+end
+
+function WindUI.SafeNotify(self, title, content, duration)
+return WindUI:Notify({
+Title=title,
+Content=content,
+Duration=duration or 4,
+})
+end
+
+function WindUI.ListThemeNames(self)
+local names={}
+for name in pairs(WindUI.Themes or {}) do
+table.insert(names, name)
+end
+table.sort(names)
+return names
+end
+
+function WindUI.CycleTheme(self, delta)
+delta=tonumber(delta) or 1
+local names=WindUI:ListThemeNames()
+if #names==0 then
+return nil
+end
+local current="Alleral"
+if WindUI.GetCurrentTheme then
+local ok, value=pcall(function()
+return WindUI:GetCurrentTheme()
+end)
+if ok and value then
+current=value
+end
+end
+local index=1
+for i, name in ipairs(names) do
+if name==current then
+index=i
+break
+end
+end
+index=((index-1+delta)%#names)+1
+return WindUI:SetTheme(names[index])
+end
+
+function WindUI.FlashAccent(self, window)
+if WindUI._AlleralReducedMotion then
+return
+end
+window=window or WindUI.Window
+if not window or not window.UIElements or not window.UIElements.Main then
+return
+end
+local main=window.UIElements.Main
+local stroke=main:FindFirstChild("AlleralAccentStroke")
+if not stroke then
+addAccentStroke(main, 0.2, 2)
+stroke=main:FindFirstChild("AlleralAccentStroke")
+end
+if stroke then
+tween(stroke, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+Transparency=0.15,
+Thickness=2,
+})
+task.delay(0.22, function()
+tween(stroke, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+Transparency=0.58,
+Thickness=1,
+})
+end)
+end
+end
+
+function WindUI.SetReducedMotion(self, enabled)
+WindUI._AlleralReducedMotion=enabled==true
+end
+
+function WindUI.RepairWindow(self, window)
+window=window or WindUI.Window
+if not window then
+return false
+end
+local ok=pcall(function()
+WindUI:PolishWindow(window)
+if type(window.CanDropdown)~="boolean" then
+window.CanDropdown=true
+end
+end)
+return ok==true
+end
+
+WindUI:OnThemeChange(function()
+if WindUI.Window then
+task.defer(function()
+WindUI:PolishWindow(WindUI.Window)
+end)
+end
+end)
+
+pcall(function()
+if WindUI.Themes and WindUI.Themes.Alleral then
+WindUI:SetTheme("Alleral")
+end
+end)
 end
 
 return aa
