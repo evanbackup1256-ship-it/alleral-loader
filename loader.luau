@@ -1,4 +1,4 @@
-local LOADER_VERSION = "3.7.4"
+local LOADER_VERSION = "3.7.5"
 local REQUIRED_CORE_VERSION = "1.17"
 local REQUIRED_UI_LIBRARY = "Rayfield"
 local GITHUB_REPO = "evanbackup1256-ship-it/kick"
