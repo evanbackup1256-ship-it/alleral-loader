@@ -3,7 +3,7 @@
 	Detects game, fetches core + game script, runs.
 ]]
 
-local LOADER_VERSION = "5.2.0"
+local LOADER_VERSION = "5.2.1"
 local MIN_CORE = "1.18"
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
@@ -123,9 +123,10 @@ local function inferSlugFromText(text)
 end
 
 local WEAO_API_URLS = {
-	"https://api.weao.xyz/api/status/exploits",
-	"https://api.whatexpsare.online/api/status/exploits",
 	"https://whatexpsare.online/api/status/exploits",
+	"https://api.whatexpsare.online/api/status/exploits",
+	"https://weao.xyz/api/status/exploits",
+	"https://api.weao.xyz/api/status/exploits",
 	"https://api.whatexploitsaretra.sh/api/status/exploits",
 	"http://api.weao.xyz/api/status/exploits",
 }
@@ -145,12 +146,24 @@ local function requestVia(fn, url, headers)
 		return nil
 	end
 	headers = headers or { ["Cache-Control"] = "no-cache" }
+
+	local ok, direct = pcall(fn, url)
+	if ok and type(direct) == "string" and #direct > 0 then
+		return direct
+	end
+	if ok and type(direct) == "table" then
+		local body = extractResponseBody(direct)
+		if type(body) == "string" and #body > 0 then
+			return body
+		end
+	end
+
 	for _, spec in ipairs({
 		{ Url = url, Method = "GET", Headers = headers },
 		{ url = url, method = "GET", headers = headers },
 	}) do
-		local ok, res = pcall(fn, spec)
-		if ok then
+		local rok, res = pcall(fn, spec)
+		if rok then
 			local body = extractResponseBody(res)
 			if type(body) == "string" and #body > 0 then
 				return body
@@ -406,12 +419,14 @@ local function resolveExecutorProfile()
 			weaoScore,
 			tostring(weaoSource or "cache")
 		))
+	elseif localProfile.rawName ~= "" or localProfile.slug ~= "unknown" then
+		log("Executor: " .. profile.name .. (exploits and "" or " (WEAO unavailable)"))
 	elseif #localProfile.envSlugs > 0 then
 		profile.slug = localProfile.envSlugs[1]
 		profile.name = profile.slug:sub(1, 1):upper() .. profile.slug:sub(2)
-		log("Executor: " .. profile.name .. " (env fingerprint, WEAO unavailable)", true)
+		log("Executor: " .. profile.name .. " (env fingerprint)", true)
 	else
-		log("Executor: " .. profile.name .. " (local detect, WEAO unavailable)", true)
+		log("Executor: " .. profile.name .. " (unknown)", true)
 	end
 
 	return profile
@@ -560,24 +575,43 @@ local CAPABILITIES = {
 
 local function httpGet(url, minBytes)
 	minBytes = minBytes or 0
-	local bust = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(tick())
 
-	local core = ENV.Alleral_Core
-	if core and type(core.httpGet) == "function" then
-		local body = core.httpGet(bust)
+	if ENV.Alleral_Core and type(ENV.Alleral_Core.httpGet) == "function" then
+		local body = ENV.Alleral_Core.httpGet(url)
 		if type(body) == "string" and #body >= minBytes then
 			return body, "core"
 		end
 	end
 
+	local plain = url:gsub("%?.*$", "")
+	local candidates = {
+		plain .. "?t=" .. tostring(tick()),
+		plain,
+		url,
+	}
+
 	local bestBody, bestVia, bestLen = nil, nil, 0
-	for _, transport in ipairs(HTTP_TRANSPORTS) do
-		local body = transport.fetch(bust)
-		if type(body) == "string" and #body >= minBytes and #body > bestLen then
-			bestBody, bestVia, bestLen = body, transport.id, #body
+	local function consider(body, via)
+		if type(body) == "string" and #body > bestLen then
+			bestBody, bestVia, bestLen = body, via, #body
 		end
 	end
-	return bestBody, bestVia
+
+	for _, fetchUrl in ipairs(candidates) do
+		for _, transport in ipairs(HTTP_TRANSPORTS) do
+			consider(transport.fetch(fetchUrl), transport.id)
+		end
+		local body, via = bootstrapHttpGet(fetchUrl)
+		consider(body, via)
+	end
+
+	if bestBody and #bestBody >= minBytes then
+		return bestBody, bestVia
+	end
+	if bestBody then
+		return nil, (bestVia or "http") .. " (" .. tostring(bestLen) .. " bytes, need " .. tostring(minBytes) .. ")"
+	end
+	return nil, "all transports failed"
 end
 
 local function looksLikeLua(body)
@@ -614,7 +648,7 @@ end
 
 local function fetchRemote(relativePath, minBytes)
 	minBytes = minBytes or 0
-	for _, base in ipairs({ RAW, GH_WEB, CDN }) do
+	for _, base in ipairs({ CDN, RAW, GH_WEB }) do
 		local body, via = httpGet(base .. "/" .. relativePath, minBytes)
 		if body and looksLikeLua(body) and not body:find("404: Not Found", 1, true) then
 			local label = base
@@ -624,7 +658,7 @@ local function fetchRemote(relativePath, minBytes)
 			return body, label
 		end
 	end
-	return nil
+	return nil, "fetch failed for " .. relativePath
 end
 
 local function cacheRemote(relativePath, src)
@@ -663,7 +697,7 @@ local function getSource(localPaths, remotePath, opts)
 		return src, "remote" .. (path and (" (" .. path .. ")") or "")
 	end
 
-	return nil, "Could not load " .. remotePath
+	return nil, path or ("Could not load " .. remotePath)
 end
 
 local function compileAndRun(source, chunkName, runEnv)
