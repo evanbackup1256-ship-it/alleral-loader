@@ -1669,6 +1669,9 @@ def public_feature_request():
     if MANAGE is not None:
         MANAGE.push_hub_event("feature.request", {"game": clip(body.get("game") or "Any", 120)})
     return jsonify({"ok": True, "status": "sent"})
+
+
+@app.post("/api/support")
 def public_support_question():
     if not WEBHOOK_URL:
         return jsonify({"ok": False, "error": "unavailable"}), 503
@@ -1702,6 +1705,9 @@ def public_support_question():
     if MANAGE is not None:
         MANAGE.push_hub_event("support.question", {"topic": clip(body.get("topic") or "General", 64)})
     return jsonify({"ok": True, "status": "sent"})
+
+
+@app.post("/api/faq-feedback")
 def public_faq_feedback():
     if not WEBHOOK_URL:
         return jsonify({"ok": False, "error": "unavailable"}), 503
@@ -1741,6 +1747,9 @@ def public_faq_feedback():
     if MANAGE is not None:
         MANAGE.push_hub_event("faq.feedback", {"helpful": is_helpful, "question": question[:120]})
     return jsonify({"ok": True, "status": "sent"})
+
+
+@app.get("/admin")
 def admin_panel():
     rendered = serve_html("admin.html")
     if rendered:

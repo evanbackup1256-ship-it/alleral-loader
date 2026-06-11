@@ -91,10 +91,6 @@
 
   window.AlleralEffects = {
     observeReveals(root = document) {
-      if (hasViewTimeline) {
-        root.querySelectorAll(".reveal").forEach((el) => el.classList.add("visible"));
-        return;
-      }
       const items = root.querySelectorAll(".reveal:not(.visible)");
       if (!items.length) return;
 
@@ -111,7 +107,7 @@
             io.unobserve(el);
           });
         },
-        { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
+        { threshold: 0.08, rootMargin: "0px 0px -5% 0px" }
       );
 
       items.forEach((el) => {
@@ -137,9 +133,18 @@
     animateNumber,
   };
 
-  if (!prefersReduced) {
-    initHeroSequence();
-    window.AlleralEffects.observeReveals();
+  document.addEventListener("toggle", (e) => {
+    const item = e.target;
+    if (item?.classList?.contains("faq-item")) {
+      item.classList.toggle("faq-open", item.open);
+    }
+  }, true);
+
+  let ambientStarted = false;
+
+  function startAmbientMotion() {
+    if (prefersReduced || ambientStarted) return;
+    ambientStarted = true;
 
     document.body.classList.add("has-cursor-glow");
     const cursorGlow = document.querySelector(".cursor-glow");
@@ -187,22 +192,31 @@
     }
     requestAnimationFrame(parallaxFrame);
 
-    window.AlleralEffects.bindMotion();
-  } else {
-    document.querySelectorAll(".reveal").forEach((el) => el.classList.add("visible"));
-  }
-
-  const nav = document.getElementById("siteNav") || document.querySelector(".nav-shell");
-  if (nav) {
-    window.addEventListener("scroll", () => {
-      nav.classList.toggle("nav-scrolled", window.scrollY > 16);
-    }, { passive: true });
-  }
-
-  document.addEventListener("toggle", (e) => {
-    const item = e.target;
-    if (item?.classList?.contains("faq-item")) {
-      item.classList.toggle("faq-open", item.open);
+    const nav = document.getElementById("siteNav") || document.querySelector(".nav-shell");
+    if (nav) {
+      window.addEventListener("scroll", () => {
+        nav.classList.toggle("nav-scrolled", window.scrollY > 16);
+      }, { passive: true });
     }
-  }, true);
+  }
+
+  function bootMotion() {
+    if (prefersReduced) {
+      document.querySelectorAll(".reveal").forEach((el) => el.classList.add("visible"));
+      return;
+    }
+    initHeroSequence();
+    window.AlleralEffects?.observeReveals?.();
+    window.AlleralEffects?.bindMotion?.();
+    startAmbientMotion();
+  }
+
+  window.addEventListener("alleral:gate-passed", () => {
+    document.body?.classList.remove("cf-gate-active");
+    bootMotion();
+  }, { once: true });
+
+  if (!document.body?.classList.contains("cf-gate-active")) {
+    bootMotion();
+  }
 })();

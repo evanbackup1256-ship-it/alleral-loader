@@ -613,7 +613,7 @@
         "alleral:gate-passed",
         () => {
           document.documentElement.classList.remove("cf-gate-lock");
-          document.body.classList.remove("cf-gate-lock");
+          document.body.classList.remove("cf-gate-lock", "cf-gate-active");
         },
         { once: true }
       );
