@@ -14,12 +14,14 @@
 </head>
 <body>
   <div class="aurora" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
 
-  <header class="nav-shell">
+  <header class="nav-shell" id="siteNav">
     <nav class="nav-bar wrap">
       <a class="nav-logo" href="#home" id="brandName">Alleral</a>
       <div class="nav-links" id="mainNav">
         <a href="#home" data-section="home">Home</a>
+        <a href="#features" data-section="features">Features</a>
         <a href="#games" data-section="games">Games</a>
         <a href="#changelog" data-section="changelog">Updates</a>
         <a href="#faq" data-section="faq">FAQ</a>
@@ -54,11 +56,24 @@
       </div>
 
       <div class="hero-stats reveal">
-        <div class="stat"><strong id="gameCount">0</strong><span>Games</span></div>
+        <div class="stat"><strong id="gameCount" data-count="0">0</strong><span>Games</span></div>
+        <div class="stat-divider"></div>
+        <div class="stat"><strong id="workingCount" data-count="0">0</strong><span>Working</span></div>
         <div class="stat-divider"></div>
         <div class="stat"><strong id="scriptsUpdated">—</strong><span>Last Sync</span></div>
         <div class="stat-divider"></div>
         <div class="stat online"><strong>Live</strong><span>Status Feed</span></div>
+      </div>
+    </section>
+
+    <section id="features" class="section section-alt">
+      <div class="wrap">
+        <header class="section-intro reveal">
+          <p class="section-label">Features</p>
+          <h2>Built for Players</h2>
+          <p class="section-desc">Everything you need — one loadstring, live updates, and enterprise-grade security.</p>
+        </header>
+        <div id="featuresGrid" class="features-grid"></div>
       </div>
     </section>
 
@@ -68,6 +83,13 @@
         <h2>Featured Titles</h2>
         <p class="section-desc">Live status from the hub — the same data your loader reads in-game.</p>
       </header>
+      <div class="game-filters reveal" id="gameFilters">
+        <button class="filter-pill active" data-filter="all" type="button">All</button>
+        <button class="filter-pill" data-filter="working" type="button">Working</button>
+        <button class="filter-pill" data-filter="testing" type="button">Testing</button>
+        <button class="filter-pill" data-filter="maintenance" type="button">Maintenance</button>
+        <button class="filter-pill" data-filter="broken" type="button">Broken</button>
+      </div>
       <div id="gamesGrid" class="games-grid"></div>
     </section>
 
@@ -78,9 +100,9 @@
           <h2>Latest Updates</h2>
           <p class="section-desc">Releases, fixes, and new game support — tracked in real time.</p>
         </header>
-        <div id="changelog" class="changelog-list"></div>
+        <div id="changelogList" class="changelog-list"></div>
         <div class="section-cta reveal">
-          <button id="loadMoreChangelog" class="btn btn-outline hidden" type="button">Load more</button>
+          <button id="loadMoreChangelog" class="btn btn-outline hidden" type="button">Load More</button>
         </div>
       </div>
     </section>
@@ -90,7 +112,7 @@
         <p class="section-label">Support</p>
         <h2>Frequently Asked Questions</h2>
       </header>
-      <div id="faq" class="faq-list"></div>
+      <div id="faqList" class="faq-list"></div>
     </section>
 
     <section id="support" class="section section-alt">
@@ -107,37 +129,47 @@
         </div>
 
         <div class="support-grid">
-          <div class="panel reveal" data-panel-body="bug">
+          <div class="panel reveal panel-enter" data-panel-body="bug">
             <form id="bugForm" class="form">
               <div class="form-row">
-                <label>Category<select id="bugCategory"></select></label>
+                <label>Category
+                  <div class="select-wrap">
+                    <select id="bugCategory" class="field-select"></select>
+                  </div>
+                </label>
                 <label>Severity
-                  <select id="bugSeverity">
-                    <option value="low">Low</option>
-                    <option value="normal" selected>Normal</option>
-                    <option value="high">High</option>
-                    <option value="critical">Critical</option>
-                  </select>
+                  <div class="select-wrap">
+                    <select id="bugSeverity" class="field-select">
+                      <option value="low">Low</option>
+                      <option value="normal" selected>Normal</option>
+                      <option value="high">High</option>
+                      <option value="critical">Critical</option>
+                    </select>
+                  </div>
                 </label>
               </div>
-              <label>Game<select id="bugGame"><option value="">Select a game</option></select></label>
+              <label>Game
+                <div class="select-wrap">
+                  <select id="bugGame" class="field-select"><option value="">Select a game</option></select>
+                </div>
+              </label>
               <div class="form-row">
-                <label>Roblox username<input id="bugUser" placeholder="Your username" /></label>
-                <label>Executor<input id="bugExecutor" placeholder="Volt, Wave, Synapse…" /></label>
+                <label>Roblox Username<input id="bugUser" class="field-input" placeholder="Your username" /></label>
+                <label>Executor<input id="bugExecutor" class="field-input" placeholder="Volt, Wave, Synapse…" /></label>
               </div>
-              <label>Contact <span class="muted-inline">optional</span><input id="bugContact" placeholder="Discord or email" /></label>
-              <label>Description<textarea id="bugDescription" required placeholder="What happened?"></textarea></label>
-              <label>Steps to reproduce<textarea id="bugSteps" placeholder="1. Join game…"></textarea></label>
+              <label>Contact <span class="muted-inline">optional</span><input id="bugContact" class="field-input" placeholder="Discord or email" /></label>
+              <label>Description<textarea id="bugDescription" class="field-textarea" required placeholder="What happened?"></textarea></label>
+              <label>Steps to Reproduce<textarea id="bugSteps" class="field-textarea" placeholder="1. Join game…"></textarea></label>
               <div id="bugError" class="form-error"></div>
               <button class="btn btn-fill" type="submit">Submit Report</button>
             </form>
           </div>
 
-          <div class="panel hidden reveal" data-panel-body="feature">
+          <div class="panel hidden reveal panel-enter" data-panel-body="feature">
             <form id="featureForm" class="form">
-              <label>Roblox username<input id="featureUser" placeholder="Your username" /></label>
-              <label>Game <span class="muted-inline">optional</span><input id="featureGame" placeholder="Which game?" /></label>
-              <label>Your idea<textarea id="featureIdea" required placeholder="Describe the feature…"></textarea></label>
+              <label>Roblox Username<input id="featureUser" class="field-input" placeholder="Your username" /></label>
+              <label>Game <span class="muted-inline">optional</span><input id="featureGame" class="field-input" placeholder="Which game?" /></label>
+              <label>Your Idea<textarea id="featureIdea" class="field-textarea" required placeholder="Describe the feature…"></textarea></label>
               <div id="featureError" class="form-error"></div>
               <button class="btn btn-fill" type="submit">Submit Idea</button>
             </form>
@@ -164,20 +196,20 @@
       <p>© <span id="footerYear"></span> Alleral. Built for players who care about quality.</p>
       <div class="footer-links">
         <a id="footerSiteLink" href="#">Hub</a>
-        <a href="https://alleral-telemetry-production.up.railway.app/admin" target="_blank" rel="noopener">Admin</a>
+        <a href="/admin" target="_blank" rel="noopener">Admin</a>
         <a href="https://github.com/evanbackup1256-ship-it/kick" target="_blank" rel="noopener">GitHub</a>
       </div>
     </div>
   </footer>
 
   <dialog id="gameModal" class="game-modal">
-    <div class="game-modal-inner">
+    <div class="game-modal-inner modal-enter">
       <button class="modal-close" type="button" aria-label="Close">&times;</button>
       <div id="modalArt" class="modal-art"></div>
       <div class="modal-body">
         <div class="modal-head">
           <h3 id="modalTitle">Game</h3>
-          <span id="modalBadge" class="status-chip">working</span>
+          <span id="modalBadge" class="status-chip">Working</span>
         </div>
         <p id="modalMeta" class="modal-meta"></p>
         <p id="modalDesc" class="modal-desc"></p>

@@ -8,12 +8,14 @@
     "linear-gradient(135deg, #3d1a2a 0%, #1a0a10 50%, #ff453a33 100%)",
   ];
 
+  const FEATURE_ICONS = ["⚡", "🛡️", "🔄", "🎮", "📡", "✨"];
+
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
   const toastEl = $("#toast");
   const modal = $("#gameModal");
-  const state = { site: null, changelogShown: 2 };
+  const state = { site: null, changelogShown: 2, gameFilter: "all" };
 
   function flash(text, isError = false) {
     if (!toastEl) return;
@@ -54,6 +56,15 @@
 
   function afterRender() {
     window.AlleralEffects?.observeReveals?.();
+    window.AlleralEffects?.animateCounters?.();
+  }
+
+  function animateCount(el, target) {
+    if (!el || !window.AlleralEffects?.animateNumber) {
+      if (el) el.textContent = String(target);
+      return;
+    }
+    window.AlleralEffects.animateNumber(el, target);
   }
 
   function renderAnnouncement(site) {
@@ -71,7 +82,37 @@
     $("#loaderVersion").textContent = site.loaderVersion || "—";
     $("#scriptsUpdated").textContent = site.scriptsUpdatedAt || "—";
     $("#loadstringCode").textContent = site.loadstring || "";
-    $("#gameCount").textContent = String(Object.keys(site.games || {}).length);
+    const games = Object.values(site.games || {});
+    const working = games.filter((g) => (g.status || "working").toLowerCase() === "working").length;
+    const gc = $("#gameCount");
+    const wc = $("#workingCount");
+    if (gc) gc.dataset.count = String(games.length);
+    if (wc) wc.dataset.count = String(working);
+    animateCount(gc, games.length);
+    animateCount(wc, working);
+  }
+
+  function renderFeatures(site) {
+    const root = $("#featuresGrid");
+    if (!root) return;
+    root.innerHTML = "";
+    const items = site.features || [];
+    if (!items.length) {
+      root.innerHTML = '<p class="empty reveal">Features coming soon.</p>';
+      afterRender();
+      return;
+    }
+    items.forEach((text, i) => {
+      const card = document.createElement("article");
+      card.className = "feature-card card-enter";
+      card.style.animationDelay = `${i * 0.07}s`;
+      card.innerHTML = `
+        <span class="feature-icon" aria-hidden="true">${FEATURE_ICONS[i % FEATURE_ICONS.length]}</span>
+        <p>${text}</p>
+      `;
+      root.appendChild(card);
+    });
+    afterRender();
   }
 
   function openGameModal(game, gradient) {
@@ -92,14 +133,20 @@
       roblox.classList.add("hidden");
     }
     modal.showModal();
+    modal.querySelector(".game-modal-inner")?.classList.remove("modal-enter");
+    void modal.querySelector(".game-modal-inner")?.offsetWidth;
+    modal.querySelector(".game-modal-inner")?.classList.add("modal-enter");
   }
 
   function renderGames(site) {
     const root = $("#gamesGrid");
     root.innerHTML = "";
-    const games = Object.values(site.games || {}).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    let games = Object.values(site.games || {}).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    if (state.gameFilter !== "all") {
+      games = games.filter((g) => (g.status || "working").toLowerCase() === state.gameFilter);
+    }
     if (!games.length) {
-      root.innerHTML = '<p class="empty reveal">No games listed yet.</p>';
+      root.innerHTML = '<p class="empty reveal">No games match this filter.</p>';
       afterRender();
       return;
     }
@@ -130,22 +177,22 @@
     });
 
     const bugGame = $("#bugGame");
-    if (bugGame) {
-      const current = bugGame.value;
+    if (bugGame && !bugGame.dataset.filled) {
+      const allGames = Object.values(site.games || {}).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
       bugGame.innerHTML = '<option value="">Select a game</option>';
-      games.forEach((g) => {
+      allGames.forEach((g) => {
         const opt = document.createElement("option");
         opt.value = g.name || g.id;
         opt.textContent = g.name || g.id;
         bugGame.appendChild(opt);
       });
-      if (current) bugGame.value = current;
+      bugGame.dataset.filled = "1";
     }
     afterRender();
   }
 
   function renderChangelog(site, reset = true) {
-    const root = $("#changelog");
+    const root = $("#changelogList");
     const entries = site.changelog || [];
     if (reset) {
       root.innerHTML = "";
@@ -172,12 +219,13 @@
   }
 
   function renderFaq(site) {
-    const root = $("#faq");
+    const root = $("#faqList");
     root.innerHTML = "";
-    (site.faq || []).forEach((item) => {
+    (site.faq || []).forEach((item, i) => {
       const node = document.createElement("details");
-      node.className = "reveal";
-      node.innerHTML = `<summary>${item.q || "Question"}</summary><p>${item.a || ""}</p>`;
+      node.className = "reveal faq-item";
+      node.style.transitionDelay = `${Math.min(i * 0.04, 0.24)}s`;
+      node.innerHTML = `<summary>${item.q || "Question"}</summary><div class="faq-answer"><p>${item.a || ""}</p></div>`;
       root.appendChild(node);
     });
     afterRender();
@@ -207,7 +255,7 @@
     const footerEl = $("#footerSiteLink");
 
     if (primaryEl) primaryEl.textContent = primary;
-    if (mirrorEl) mirrorEl.textContent = mirror || "not available";
+    if (mirrorEl) mirrorEl.textContent = mirror || "Not available";
     if (mirrorLink && mirror) mirrorLink.href = mirror;
     if (footerEl) footerEl.href = primary;
   }
@@ -221,6 +269,7 @@
     renderAccess(data);
     renderAnnouncement(data);
     renderHero(data);
+    renderFeatures(data);
     renderGames(data);
     renderChangelog(data, true);
     renderFaq(data);
@@ -246,7 +295,7 @@
       if (data.ok) {
         el.className = "status-pill online";
         el.innerHTML = '<span class="status-dot"></span>Online';
-        el.title = `Relay v${data.version || "?"}`;
+        el.title = `Relay v${data.version || "?"} · ${data.bans ?? 0} bans`;
       } else throw new Error();
     } catch {
       el.className = "status-pill offline";
@@ -311,7 +360,25 @@
       btn.addEventListener("click", () => {
         const panel = btn.dataset.panel;
         $$(".support-tabs button").forEach((b) => b.classList.toggle("active", b === btn));
-        $$("[data-panel-body]").forEach((body) => body.classList.toggle("hidden", body.dataset.panelBody !== panel));
+        $$("[data-panel-body]").forEach((body) => {
+          const show = body.dataset.panelBody === panel;
+          body.classList.toggle("hidden", !show);
+          if (show) {
+            body.classList.remove("panel-enter");
+            void body.offsetWidth;
+            body.classList.add("panel-enter");
+          }
+        });
+      });
+    });
+  }
+
+  function bindGameFilters() {
+    $$(".filter-pill").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.gameFilter = btn.dataset.filter || "all";
+        $$(".filter-pill").forEach((b) => b.classList.toggle("active", b === btn));
+        renderGames(state.site);
       });
     });
   }
@@ -332,25 +399,32 @@
     $$(".nav-links a").forEach((a) => a.addEventListener("click", () => nav?.classList.remove("open")));
   }
 
-  $("#copyLoadstring")?.addEventListener("click", copyLoadstring);
-  $("#copyPrimaryUrl")?.addEventListener("click", () => {
-    copyText($("#primaryUrl")?.textContent || "", "Link copied");
-  });
-  $("#loadMoreChangelog")?.addEventListener("click", () => {
-    state.changelogShown += 3;
-    renderChangelog(state.site, false);
-  });
-  $("#bugForm")?.addEventListener("submit", submitBug);
-  $("#featureForm")?.addEventListener("submit", submitFeature);
-  window.addEventListener("hashchange", setActiveNav);
+  function initWhenReady() {
+    $("#copyLoadstring")?.addEventListener("click", copyLoadstring);
+    $("#copyPrimaryUrl")?.addEventListener("click", () => {
+      copyText($("#primaryUrl")?.textContent || "", "Link copied");
+    });
+    $("#loadMoreChangelog")?.addEventListener("click", () => {
+      state.changelogShown += 3;
+      renderChangelog(state.site, false);
+    });
+    $("#bugForm")?.addEventListener("submit", submitBug);
+    $("#featureForm")?.addEventListener("submit", submitFeature);
+    window.addEventListener("hashchange", setActiveNav);
+    $("#footerYear").textContent = String(new Date().getFullYear());
+    bindTabs();
+    bindGameFilters();
+    bindModal();
+    bindMobileNav();
+    setActiveNav();
+    checkLiveStatus();
+    setInterval(checkLiveStatus, 60000);
+    loadSite().catch((e) => flash(e.message, true));
+  }
 
-  $("#footerYear").textContent = String(new Date().getFullYear());
-
-  bindTabs();
-  bindModal();
-  bindMobileNav();
-  setActiveNav();
-  checkLiveStatus();
-  setInterval(checkLiveStatus, 60000);
-  loadSite().catch((e) => flash(e.message, true));
+  if (sessionStorage.getItem("alleral_gate_ok")) {
+    initWhenReady();
+  } else {
+    window.addEventListener("alleral:gate-passed", initWhenReady, { once: true });
+  }
 })();

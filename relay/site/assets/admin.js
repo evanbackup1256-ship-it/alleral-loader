@@ -11,6 +11,11 @@
     adminKey.value = localStorage.getItem("alleral_admin_key");
   }
 
+  function titleCase(value) {
+    const text = String(value || "").toLowerCase();
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
   function flash(text, isError = false) {
     toast.textContent = text;
     toast.classList.toggle("error", isError);
@@ -30,53 +35,82 @@
       errorEl.textContent = "Enter your admin API key first.";
       return false;
     }
+    errorEl.textContent = "";
     return true;
+  }
+
+  function animatePanel(panel) {
+    if (!panel) return;
+    panel.classList.remove("tab-panel-enter");
+    void panel.offsetWidth;
+    panel.classList.add("tab-panel-enter");
   }
 
   function setTab(name) {
     activeTab = name;
     $$(".admin-tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
-    $$("[data-tab-panel]").forEach((p) => p.classList.toggle("hidden", p.dataset.tabPanel !== name));
+    $$("[data-tab-panel]").forEach((p) => {
+      const show = p.dataset.tabPanel === name;
+      p.classList.toggle("hidden", !show);
+      if (show) animatePanel(p);
+    });
     errorEl.textContent = "";
     if (name === "scripts") loadScripts();
     if (name === "bans") loadBans();
+    if (name === "stats") loadStats();
     if (name === "site") loadSiteEditor();
   }
 
   async function loadScripts() {
-    $("#scriptsGrid").innerHTML = "Loading…";
-    const res = await fetch("/scripts");
-    const data = await res.json();
-    if (!data.ok) {
-      errorEl.textContent = data.error || "Failed to load scripts";
-      $("#scriptsGrid").innerHTML = "";
-      return;
-    }
     const root = $("#scriptsGrid");
-    root.innerHTML = "";
-    Object.keys(data.scripts || {}).sort().forEach((id) => renderScriptCard(id, data.scripts[id], root));
+    root.innerHTML = '<p class="empty">Loading scripts…</p>';
+    try {
+      const res = await fetch("/scripts");
+      const data = await res.json();
+      if (!data.ok) {
+        errorEl.textContent = data.error || "Failed to load scripts";
+        root.innerHTML = "";
+        return;
+      }
+      root.innerHTML = "";
+      const ids = Object.keys(data.scripts || {}).sort();
+      if (!ids.length) {
+        root.innerHTML = '<p class="empty">No scripts found.</p>';
+        return;
+      }
+      ids.forEach((id, i) => renderScriptCard(id, data.scripts[id], root, i));
+    } catch (e) {
+      errorEl.textContent = e.message;
+      root.innerHTML = "";
+    }
   }
 
-  function renderScriptCard(id, entry, root) {
+  function renderScriptCard(id, entry, root, index) {
     const status = (entry.status || "working").toLowerCase();
-    const card = document.createElement("div");
-    card.className = "panel-card";
+    const card = document.createElement("article");
+    card.className = "panel admin-card card-enter";
+    card.style.animationDelay = `${index * 0.05}s`;
     card.innerHTML = `
       <div class="modal-head">
         <div>
-          <div class="title" style="font-weight:600;">${entry.name || id}</div>
-          <div class="modal-meta">${id} · v${entry.version || "?"} · ${entry.updatedAt || "?"}</div>
+          <h3>${entry.name || id}</h3>
+          <p class="modal-meta">${id} · v${entry.version || "?"} · ${entry.updatedAt || "?"}</p>
         </div>
-        <span class="status-chip ${status}">${status}</span>
+        <span class="status-chip ${status}">${titleCase(status)}</span>
       </div>
-      <div class="modal-desc">${entry.message || ""}</div>
-      <div class="editor" style="margin-top:12px;display:grid;gap:10px;">
-        <label>Status <select data-f="status">${STATUSES.map((s) => `<option ${s===status?"selected":""}>${s}</option>`).join("")}</select></label>
-        <label>Version <input data-f="version" value="${entry.version || ""}" /></label>
-        <label>Message <textarea data-f="message">${entry.message || ""}</textarea></label>
-        <button class="btn btn-fill" type="button">Save Script</button>
-      </div>`;
-    card.querySelector("button").onclick = async () => {
+      <p class="modal-desc">${entry.message || "No status message."}</p>
+      <form class="form admin-script-form">
+        <label>Status
+          <div class="select-wrap">
+            <select data-f="status" class="field-select">${STATUSES.map((s) => `<option value="${s}" ${s === status ? "selected" : ""}>${titleCase(s)}</option>`).join("")}</select>
+          </div>
+        </label>
+        <label>Version<input data-f="version" class="field-input" value="${entry.version || ""}" /></label>
+        <label>Message<textarea data-f="message" class="field-textarea">${entry.message || ""}</textarea></label>
+        <button class="btn btn-fill" type="submit">Save Script</button>
+      </form>`;
+    card.querySelector("form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
       if (!requireKey()) return;
       const payload = {};
       card.querySelectorAll("[data-f]").forEach((el) => { payload[el.dataset.f] = el.value; });
@@ -85,49 +119,79 @@
       if (!res.ok || !out.ok) { errorEl.textContent = out.error || "Save failed"; return; }
       flash(`Updated ${id}`);
       loadScripts();
-    };
+    });
     root.appendChild(card);
   }
 
   async function loadBans() {
-    if (!requireKey()) { $("#bansGrid").innerHTML = ""; return; }
-    $("#bansGrid").innerHTML = "Loading…";
-    const q = encodeURIComponent($("#banSearch")?.value?.trim() || "");
-    const res = await fetch(`/admin/bans?q=${q}`, { headers: headers() });
-    const data = await res.json();
-    if (!res.ok || !data.ok) {
-      errorEl.textContent = data.error || "Failed to load bans";
-      $("#bansGrid").innerHTML = "";
-      return;
-    }
     const root = $("#bansGrid");
-    root.innerHTML = "";
-    if (!(data.bans || []).length) {
-      root.innerHTML = '<div class="empty">No active bans.</div>';
-      return;
-    }
-    data.bans.forEach((ban) => {
-      const card = document.createElement("div");
-      card.className = "panel-card";
-      card.innerHTML = `
-        <div class="modal-head">
-          <div>
-            <div class="title" style="font-weight:600;">${ban.player_name || ban.value}</div>
-            <div class="modal-meta">#${ban.id} · ${ban.ban_type} · ${ban.value}${ban.roblox_user_id ? ` · Roblox ${ban.roblox_user_id}` : ""}</div>
+    if (!requireKey()) { root.innerHTML = ""; return; }
+    root.innerHTML = '<p class="empty">Loading bans…</p>';
+    try {
+      const q = encodeURIComponent($("#banSearch")?.value?.trim() || "");
+      const res = await fetch(`/admin/bans?q=${q}`, { headers: headers() });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        errorEl.textContent = data.error || "Failed to load bans";
+        root.innerHTML = "";
+        return;
+      }
+      root.innerHTML = "";
+      if (!(data.bans || []).length) {
+        root.innerHTML = '<p class="empty">No active bans.</p>';
+        return;
+      }
+      data.bans.forEach((ban, i) => {
+        const card = document.createElement("article");
+        card.className = "panel admin-card card-enter";
+        card.style.animationDelay = `${i * 0.04}s`;
+        card.innerHTML = `
+          <div class="modal-head">
+            <div>
+              <h3>${ban.player_name || ban.value}</h3>
+              <p class="modal-meta">#${ban.id} · ${titleCase(ban.ban_type)} · ${ban.value}${ban.roblox_user_id ? ` · Roblox ${ban.roblox_user_id}` : ""}</p>
+            </div>
+            <span class="status-chip broken">${titleCase(ban.ban_type)}</span>
           </div>
-          <span class="status-chip broken">${ban.ban_type}</span>
-        </div>
-        <div class="modal-desc">${ban.reason || "No reason provided."}</div>
-        <button class="btn btn-outline" type="button" style="margin-top:10px;">Remove Ban</button>`;
-      card.querySelector("button").onclick = async () => {
-        const res = await fetch(`/admin/bans/${ban.id}`, { method: "DELETE", headers: headers() });
-        const out = await res.json();
-        if (!res.ok || !out.ok) { errorEl.textContent = out.error || "Remove failed"; return; }
-        flash(`Removed ban #${ban.id}`);
-        loadBans();
-      };
-      root.appendChild(card);
-    });
+          <p class="modal-desc">${ban.reason || "No reason provided."}</p>
+          <button class="btn btn-outline" type="button">Remove Ban</button>`;
+        card.querySelector("button").onclick = async () => {
+          const res = await fetch(`/admin/bans/${ban.id}`, { method: "DELETE", headers: headers() });
+          const out = await res.json();
+          if (!res.ok || !out.ok) { errorEl.textContent = out.error || "Remove failed"; return; }
+          flash(`Removed ban #${ban.id}`);
+          loadBans();
+        };
+        root.appendChild(card);
+      });
+    } catch (e) {
+      errorEl.textContent = e.message;
+      root.innerHTML = "";
+    }
+  }
+
+  async function loadStats() {
+    const root = $("#statsGrid");
+    root.innerHTML = '<p class="empty">Loading stats…</p>';
+    try {
+      const [health, banStatus, site] = await Promise.all([
+        fetch("/health").then((r) => r.json()),
+        fetch("/api/ban/status").then((r) => r.json()),
+        fetch("/api/site").then((r) => r.json()),
+      ]);
+      const games = Object.values(site.games || {});
+      const working = games.filter((g) => (g.status || "").toLowerCase() === "working").length;
+      root.innerHTML = `
+        <article class="stat-card card-enter"><span class="stat-card-label">Relay Version</span><strong>v${health.version || "?"}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.05s"><span class="stat-card-label">Active Bans</span><strong>${banStatus.activeBans ?? health.bans ?? 0}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.1s"><span class="stat-card-label">Games Listed</span><strong>${games.length}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.15s"><span class="stat-card-label">Working Scripts</span><strong>${working}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.2s"><span class="stat-card-label">Ban Types</span><strong>${(banStatus.banTypes || []).length}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.25s"><span class="stat-card-label">Gate API</span><strong>${health.gate ? "Online" : "Offline"}</strong></article>
+      `;
+    } catch (e) {
+      root.innerHTML = `<p class="empty">${e.message}</p>`;
+    }
   }
 
   async function addBan() {
@@ -215,6 +279,10 @@
     window._banSearchTimer = setTimeout(loadBans, 250);
   });
   $("#saveSite").onclick = saveSite;
+
+  window.addEventListener("scroll", () => {
+    $("#siteNav")?.classList.toggle("nav-scrolled", window.scrollY > 8);
+  }, { passive: true });
 
   setTab("scripts");
 })();

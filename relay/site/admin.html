@@ -4,107 +4,128 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Alleral Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/style.css" />
-  <style>
-    .editor label { display: grid; gap: 6px; color: var(--text-secondary); font-size: 0.88rem; }
-    .ban-form { display: grid; gap: 12px; margin-bottom: 16px; }
-    .ban-tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-    .ban-tabs button { font: inherit; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer; }
-    .ban-tabs button.active { background: var(--text); color: var(--bg); border-color: var(--text); }
-    .panel-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
-  </style>
 </head>
-<body>
-  <header class="nav-shell">
+<body class="admin-page">
+  <div class="aurora" aria-hidden="true"></div>
+
+  <header class="nav-shell admin-nav">
     <nav class="nav-bar wrap">
-      <a class="nav-logo" href="/">Alleral Admin</a>
+      <a class="nav-logo" href="/admin">Alleral Admin</a>
       <div class="nav-links">
         <a href="/">Public Site</a>
-        <a href="/health">Health</a>
+        <a href="/health" target="_blank" rel="noopener">Health</a>
+        <a href="/api/ban/status" target="_blank" rel="noopener">Ban API</a>
+      </div>
+      <div class="nav-actions">
+        <span id="adminStatus" class="status-pill"><span class="status-dot"></span>Ready</span>
       </div>
     </nav>
   </header>
 
-  <main class="wrap section">
-    <div class="section-intro" style="text-align:left;margin-bottom:24px;">
-      <h2 style="margin:0;">Control Panel</h2>
-      <p class="section-desc" style="margin-top:8px;text-align:left;">Script status, Roblox ban API, and public site content.</p>
-    </div>
+  <main class="admin-main wrap">
+    <header class="admin-hero reveal visible">
+      <p class="section-label">Control Panel</p>
+      <h1>Hub Administration</h1>
+      <p class="section-desc admin-desc">Manage scripts, Roblox bans, and public site content.</p>
+    </header>
 
-    <div class="panel-card">
-      <div class="form-row" style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;">
+    <div class="panel admin-key-panel reveal visible">
+      <form class="form admin-key-form" onsubmit="return false">
         <label>Admin API Key
-          <input id="adminKey" type="password" placeholder="ADMIN_API_KEY from Railway" />
+          <input id="adminKey" class="field-input" type="password" placeholder="ADMIN_API_KEY from Railway" autocomplete="off" />
         </label>
-        <div style="display:flex;gap:8px;">
+        <div class="admin-key-actions">
           <button id="saveKey" class="btn btn-outline" type="button">Remember Key</button>
           <button id="reload" class="btn btn-fill" type="button">Reload Tab</button>
         </div>
-      </div>
-      <div id="error" class="form-error" style="margin-top:10px;"></div>
+      </form>
+      <div id="error" class="form-error"></div>
     </div>
 
-    <div class="support-tabs admin-tabs">
+    <div class="support-tabs admin-tabs reveal visible">
       <button class="active" data-tab="scripts" type="button">Scripts</button>
       <button data-tab="bans" type="button">Ban API</button>
+      <button data-tab="stats" type="button">Stats</button>
       <button data-tab="site" type="button">Site Content</button>
     </div>
 
-    <section data-tab-panel="scripts">
-      <div id="scriptsGrid" class="games-grid"></div>
+    <section data-tab-panel="scripts" class="admin-panel tab-panel-enter">
+      <div id="scriptsGrid" class="admin-grid"></div>
     </section>
 
-    <section data-tab-panel="bans" class="hidden">
-      <div class="panel-card ban-form">
-        <div class="title" style="margin-bottom:8px;font-weight:600;">Ban Roblox Player</div>
-        <p style="color:var(--text-secondary);font-size:0.88rem;margin:0 0 12px;">Resolves Roblox username to UserId and can cascade HWID, fingerprint, IP, and executor bans.</p>
-        <label>Roblox Username<input id="robloxUsername" placeholder="Player username" /></label>
-        <label>Roblox UserId <span class="muted-inline">optional if username set</span><input id="robloxUserId" placeholder="123456789" /></label>
-        <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <label>HWID<input id="robloxHwid" placeholder="Optional HWID" /></label>
-          <label>Fingerprint<input id="robloxFingerprint" placeholder="Optional fingerprint" /></label>
+    <section data-tab-panel="bans" class="admin-panel hidden">
+      <div class="admin-split">
+        <div class="panel admin-card">
+          <h3>Ban Roblox Player</h3>
+          <p class="admin-card-lead">Resolves username to UserId and can cascade HWID, fingerprint, IP, and executor bans.</p>
+          <form class="form" onsubmit="return false">
+            <label>Roblox Username<input id="robloxUsername" class="field-input" placeholder="Player username" /></label>
+            <label>Roblox UserId <span class="muted-inline">optional</span><input id="robloxUserId" class="field-input" placeholder="123456789" /></label>
+            <div class="form-row">
+              <label>HWID<input id="robloxHwid" class="field-input" placeholder="Optional HWID" /></label>
+              <label>Fingerprint<input id="robloxFingerprint" class="field-input" placeholder="Optional fingerprint" /></label>
+            </div>
+            <label>Reason<textarea id="robloxReason" class="field-textarea" placeholder="Why is this player banned?"></textarea></label>
+            <label class="checkbox-label"><input id="robloxCascade" type="checkbox" checked /> Cascade ban across UserId, username, and hardware identifiers</label>
+            <button id="banRobloxPlayer" class="btn btn-fill" type="button">Ban Player</button>
+          </form>
         </div>
-        <label>Reason<textarea id="robloxReason" placeholder="Why is this player banned?"></textarea></label>
-        <label><input id="robloxCascade" type="checkbox" checked /> Cascade ban (UserId + username + hardware identifiers)</label>
-        <button id="banRobloxPlayer" class="btn btn-fill" type="button">Ban Player</button>
+
+        <div class="panel admin-card">
+          <h3>Manual Ban Entry</h3>
+          <form class="form" onsubmit="return false">
+            <label>Type
+              <div class="select-wrap">
+                <select id="banType" class="field-select">
+                  <option value="userid">Roblox UserId</option>
+                  <option value="username">Roblox Username</option>
+                  <option value="hwid">HWID</option>
+                  <option value="fingerprint">Fingerprint</option>
+                  <option value="ip">IP Address</option>
+                  <option value="executor">Executor</option>
+                </select>
+              </div>
+            </label>
+            <label>Value<input id="banValue" class="field-input" placeholder="UserId, username, HWID, IP…" /></label>
+            <label>Player Label<input id="banPlayer" class="field-input" placeholder="Display name for admin list" /></label>
+            <label>Reason<textarea id="banReason" class="field-textarea" placeholder="Ban reason"></textarea></label>
+            <button id="addBan" class="btn btn-outline" type="button">Add Ban</button>
+          </form>
+        </div>
       </div>
 
-      <div class="panel-card ban-form">
-        <div class="title" style="margin-bottom:8px;font-weight:600;">Manual Ban Entry</div>
-        <label>Type
-          <select id="banType">
-            <option value="userid">Roblox UserId</option>
-            <option value="username">Roblox Username</option>
-            <option value="hwid">HWID</option>
-            <option value="fingerprint">Fingerprint</option>
-            <option value="ip">IP</option>
-            <option value="executor">Executor</option>
-          </select>
-        </label>
-        <label>Value<input id="banValue" placeholder="UserId, username, HWID, IP…" /></label>
-        <label>Player Label<input id="banPlayer" placeholder="Display name for admin list" /></label>
-        <label>Reason<textarea id="banReason" placeholder="Ban reason"></textarea></label>
-        <button id="addBan" class="btn btn-outline" type="button">Add Ban</button>
+      <div class="panel admin-card admin-search-card">
+        <label>Search Bans<input id="banSearch" class="field-input" placeholder="Search by value, username, reason…" /></label>
       </div>
-
-      <label>Search Bans<input id="banSearch" placeholder="Search by value, username, reason…" /></label>
-      <div id="bansGrid" class="games-grid" style="margin-top:12px;"></div>
+      <div id="bansGrid" class="admin-grid"></div>
     </section>
 
-    <section data-tab-panel="site" class="hidden">
-      <div class="panel-card editor">
-        <label>Tagline<input id="siteTagline" /></label>
-        <label>Announcement Banner<input id="siteAnnouncement" placeholder="Shown on public homepage" /></label>
-        <label>Loader Version Label<input id="siteLoaderVersion" /></label>
-        <label>Loadstring<textarea id="siteLoadstring" style="min-height:100px;font-family:var(--mono);"></textarea></label>
-        <label>Features (one per line)<textarea id="siteFeatures"></textarea></label>
-        <label>FAQ JSON<textarea id="siteFaq" style="min-height:180px;font-family:var(--mono);"></textarea></label>
-        <button id="saveSite" class="btn btn-fill" type="button">Save Site Content</button>
+    <section data-tab-panel="stats" class="admin-panel hidden">
+      <div id="statsGrid" class="stats-grid"></div>
+    </section>
+
+    <section data-tab-panel="site" class="admin-panel hidden">
+      <div class="panel admin-card">
+        <h3>Public Site Content</h3>
+        <form class="form" onsubmit="return false">
+          <label>Tagline<input id="siteTagline" class="field-input" /></label>
+          <label>Announcement Banner<input id="siteAnnouncement" class="field-input" placeholder="Shown on public homepage" /></label>
+          <label>Loader Version Label<input id="siteLoaderVersion" class="field-input" /></label>
+          <label>Loadstring<textarea id="siteLoadstring" class="field-textarea field-mono" style="min-height:100px;"></textarea></label>
+          <label>Features <span class="muted-inline">one per line</span><textarea id="siteFeatures" class="field-textarea"></textarea></label>
+          <label>FAQ JSON<textarea id="siteFaq" class="field-textarea field-mono" style="min-height:180px;"></textarea></label>
+          <button id="saveSite" class="btn btn-fill" type="button">Save Site Content</button>
+        </form>
       </div>
     </section>
   </main>
 
   <div id="toast" class="toast"></div>
+  <script src="/assets/effects.js"></script>
   <script src="/assets/admin.js"></script>
 </body>
 </html>

@@ -116,6 +116,8 @@ MAX_BODY_BYTES = int(os.environ.get("TELEMETRY_MAX_BODY_BYTES", "32768"))
 REPLAY_CACHE_SEC = int(os.environ.get("TELEMETRY_REPLAY_CACHE_SEC", "300"))
 MAX_EVENT_AGE_SEC = int(os.environ.get("TELEMETRY_MAX_EVENT_AGE_SEC", "600"))
 ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", API_KEY).strip()
+TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY", "3x00000000000000000000FF").strip()
+TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "").strip()
 SCRIPTS_MANIFEST_PATH = resolve_manifest_path()
 MIN_API_KEY_LEN = 24
 
@@ -187,6 +189,8 @@ def apply_cors(response):
 
 @app.route("/api/bootstrap", methods=["OPTIONS"])
 @app.route("/api/site", methods=["OPTIONS"])
+@app.route("/api/gate/config", methods=["OPTIONS"])
+@app.route("/api/gate/verify", methods=["OPTIONS"])
 @app.route("/api/bug-report", methods=["OPTIONS"])
 @app.route("/api/feature-request", methods=["OPTIONS"])
 @app.route("/api/ban/check", methods=["OPTIONS"])
@@ -835,7 +839,7 @@ ENGINE = RelayEngine()
 def health():
     return jsonify({
         "ok": True,
-        "version": "3.5",
+        "version": "3.6",
         "gate": True,
         "banApi": True,
         "site": True,
@@ -1117,6 +1121,47 @@ def client_bootstrap():
         "apiKey": API_KEY,
         "brand": BRAND,
     })
+
+
+@app.get("/api/gate/config")
+def gate_config():
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    return jsonify({
+        "ok": True,
+        "siteKey": TURNSTILE_SITE_KEY,
+        "provider": "cloudflare-turnstile",
+        "required": True,
+    })
+
+
+@app.post("/api/gate/verify")
+def gate_verify():
+    client_ip = resolve_client_ip(request)
+    if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    token = str(body.get("token") or "").strip()
+    if not token:
+        return jsonify({"ok": False, "error": "missing_token"}), 400
+    if not TURNSTILE_SECRET_KEY:
+        return jsonify({"ok": True, "verified": True, "mode": "client_only"})
+    try:
+        resp = requests.post(
+            "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+            data={"secret": TURNSTILE_SECRET_KEY, "response": token, "remoteip": client_ip},
+            timeout=8,
+        )
+        data = resp.json()
+        if data.get("success"):
+            return jsonify({"ok": True, "verified": True, "mode": "server"})
+        return jsonify({"ok": False, "error": "verification_failed", "codes": data.get("error-codes") or []}), 403
+    except requests.RequestException as exc:
+        print(f"[gate] turnstile verify failed: {exc}", file=sys.stderr)
+        return jsonify({"ok": True, "verified": True, "mode": "degraded"})
 
 
 @app.get("/api/site")
