@@ -40,7 +40,11 @@ $close
 
 "@
 
-$launch = $template.Replace("--EMBED_LOADER_HERE--", $embedded)
+if ($template -notmatch '--EMBED_LOADER_HERE--') {
+    Write-Error "launch.template.luau is missing --EMBED_LOADER_HERE-- placeholder"
+}
+
+$launch = $template.Replace("--EMBED_LOADER_HERE--", $embedded.TrimEnd())
 Set-Content -Path $launchPath -Value $launch -Encoding UTF8 -NoNewline
 Copy-Item -Path $launchPath -Destination (Join-Path $root "bootstrap.luau") -Force
 Write-Host "[ok] Bundled loader v$version into launch.luau ($($launch.Length) bytes)"

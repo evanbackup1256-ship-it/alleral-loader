@@ -1,6 +1,6 @@
 --[[
 	Alleral bootstrap - single entry point for players.
-	Remote mirrors are tried first; bundled loader is the guaranteed fallback.
+	Bundled loader is always available; remote mirrors may upgrade when newer.
 ]]
 local GITHUB_REPO = "evanbackup1256-ship-it/kick"
 local REPO_BRANCH = "main"
@@ -8,7 +8,9 @@ local REPO = "https://raw.githubusercontent.com/" .. GITHUB_REPO .. "/" .. REPO_
 local JSdelivr = "https://cdn.jsdelivr.net/gh/" .. GITHUB_REPO .. "@" .. REPO_BRANCH
 local GITHUB_WEB_RAW = "https://github.com/" .. GITHUB_REPO .. "/raw/" .. REPO_BRANCH
 local DEFAULT_TELEMETRY_RELAY = "https://alleral-telemetry-production.up.railway.app/ingest"
-local MIN_LOADER_PARTS = { 3, 7, 0 }
+
+--EMBED_LOADER_HERE--
+
 local PINNED_COMMITS = {
 	"6a1b22c",
 	"fb2b2ae",
@@ -40,17 +42,27 @@ pcall(function()
 	HttpService = game:GetService("HttpService")
 end)
 
-local function cacheBust(url)
-	local sep = url:find("?") and "&" or "?"
-	return url
-		.. sep
-		.. "t="
-		.. tostring(tick())
-		.. "&r="
-		.. tostring(math.random(100000, 999999))
-		.. "&nocache="
-		.. tostring(os.time())
+local function genv()
+	local ok, env = pcall(function()
+		return typeof(getgenv) == "function" and getgenv() or getfenv()
+	end)
+	return ok and env or {}
 end
+
+local ENV = genv()
+
+local function firstExecFunc(...)
+	for _, name in ipairs({ ... }) do
+		local fn = ENV[name] or (getfenv and getfenv()[name])
+		if type(fn) == "function" then
+			return fn
+		end
+	end
+	return nil
+end
+
+local httpRequest = firstExecFunc("http_request", "request") or (ENV.syn and ENV.syn.request)
+local loadStringFn = firstExecFunc("loadstring", "LoadString") or loadstring
 
 local function trim(s)
 	return type(s) == "string" and s:match("^%s*(.-)%s*$") or ""
@@ -62,6 +74,11 @@ local function parseVersionParts(version)
 		table.insert(parts, tonumber(piece) or 0)
 	end
 	return parts
+end
+
+local MIN_LOADER_PARTS = parseVersionParts(EMBEDDED_LOADER_VERSION)
+if #MIN_LOADER_PARTS == 0 then
+	MIN_LOADER_PARTS = { 3, 7, 0 }
 end
 
 local function versionAtLeast(version, minimumParts)
@@ -76,6 +93,40 @@ local function versionAtLeast(version, minimumParts)
 		end
 	end
 	return true
+end
+
+local function versionCompare(a, b)
+	local aParts = parseVersionParts(a)
+	local bParts = parseVersionParts(b)
+	local maxLen = math.max(#aParts, #bParts)
+	for index = 1, maxLen do
+		local aValue = aParts[index] or 0
+		local bValue = bParts[index] or 0
+		if aValue > bValue then
+			return 1
+		end
+		if aValue < bValue then
+			return -1
+		end
+	end
+	return 0
+end
+
+local function cacheBust(url)
+	local sep = url:find("?") and "&" or "?"
+	local nonce = typeof(tick) == "function" and tick() or math.random()
+	local stamp = tostring(nonce)
+	if type(os) == "table" and type(os.time) == "function" then
+		stamp = stamp .. tostring(os.time())
+	end
+	return url
+		.. sep
+		.. "t="
+		.. stamp
+		.. "&r="
+		.. tostring(math.random(100000, 999999))
+		.. "&nocache="
+		.. tostring(math.random(100000, 999999))
 end
 
 local function loaderBodyValid(body)
@@ -156,7 +207,11 @@ local function preloadOwnerTelemetry(g)
 	end
 	for _, path in ipairs(TELEMETRY_CONFIG_PATHS) do
 		if isfile(path) then
-			local ok, fn = pcall(loadstring, readfile(path), "Alleral/owner_telemetry@" .. path)
+			local compile = loadStringFn or loadstring
+			if type(compile) ~= "function" then
+				return
+			end
+			local ok, fn = pcall(compile, readfile(path), "Alleral/owner_telemetry@" .. path)
 			if ok and type(fn) == "function" then
 				local ok2, cfg = pcall(fn)
 				if ok2 and ownerTelemetryValid(cfg) then
@@ -181,8 +236,8 @@ end
 
 local function fetchRemote(url)
 	url = cacheBust(url)
-	if typeof(request) == "function" then
-		local ok, res = pcall(request, {
+	if httpRequest then
+		local ok, res = pcall(httpRequest, {
 			Url = url,
 			Method = "GET",
 			Headers = {
@@ -192,14 +247,19 @@ local function fetchRemote(url)
 			},
 		})
 		if ok and res then
+			local status = res.StatusCode or res.status or 200
 			local body = res.Body or res.body
-			if type(body) == "string" and body ~= "" then
+			if status >= 200 and status < 300 and type(body) == "string" and body ~= "" then
 				return body
 			end
 		end
 	end
-	if typeof(game.HttpGet) == "function" then
+	if type(game.HttpGet) == "function" then
 		local ok, body = pcall(game.HttpGet, game, url, true)
+		if ok and type(body) == "string" and body ~= "" then
+			return body
+		end
+		ok, body = pcall(game.HttpGet, game, url)
 		if ok and type(body) == "string" and body ~= "" then
 			return body
 		end
@@ -321,10 +381,26 @@ local function tryLoaderBody(body, label)
 	return nil, nil, nil, reason
 end
 
+local function considerLoaderCandidate(bestBody, bestLabel, bestVersion, body, label)
+	local okBody, okLabel, okVersion = tryLoaderBody(body, label)
+	if not okBody then
+		return bestBody, bestLabel, bestVersion
+	end
+	if not bestVersion or versionCompare(okVersion, bestVersion) > 0 then
+		return okBody, okLabel, okVersion
+	end
+	return bestBody, bestLabel, bestVersion
+end
+
 local function fetchLoaderBody()
 	local localBody, localLabel, localVersion = readLocalLoader()
 	if localBody then
 		return localBody, localLabel, localVersion
+	end
+
+	local bestBody, bestLabel, bestVersion = nil, nil, nil
+	if type(EMBEDDED_LOADER) == "string" then
+		bestBody, bestLabel, bestVersion = considerLoaderCandidate(nil, nil, nil, EMBEDDED_LOADER, "bundled")
 	end
 
 	local lastReason = "download failed"
@@ -346,9 +422,8 @@ local function fetchLoaderBody()
 				end
 				local okBody, okLabel, okVersion, reason = tryLoaderBody(body, label)
 				if okBody then
-					return okBody, okLabel, okVersion
-				end
-				if reason then
+					bestBody, bestLabel, bestVersion = considerLoaderCandidate(bestBody, bestLabel, bestVersion, okBody, okLabel)
+				elseif reason then
 					lastReason = reason
 				end
 				if typeof(task) == "table" and type(task.wait) == "function" then
@@ -362,21 +437,44 @@ local function fetchLoaderBody()
 		end
 	end
 
-	if EMBEDDED_LOADER then
-		local okBody, okLabel, okVersion = tryLoaderBody(EMBEDDED_LOADER, "bundled")
-		if okBody then
-			print("[Alleral Bootstrap] Remote mirrors unavailable; using bundled loader v" .. okVersion)
-			return okBody, okLabel, okVersion
+	if bestBody then
+		if bestLabel == "bundled" then
+			print("[Alleral Bootstrap] Using bundled loader v" .. tostring(bestVersion))
 		end
+		return bestBody, bestLabel, bestVersion
+	end
+
+	if type(EMBEDDED_LOADER) == "string" and #EMBEDDED_LOADER > 1000 then
+		warn("[Alleral Bootstrap] Remote mirrors failed; forcing bundled loader v" .. tostring(EMBEDDED_LOADER_VERSION))
+		return EMBEDDED_LOADER, "bundled", EMBEDDED_LOADER_VERSION or "unknown"
 	end
 
 	error("[Alleral Bootstrap] Could not load Alleral (" .. tostring(lastReason) .. "). Please rejoin and try again.")
 end
 
---EMBED_LOADER_HERE--
--- Embedded loader must be defined before fetchLoaderBody runs.
+local function runLoader(body, version, sourceLabel)
+	if type(loadStringFn) ~= "function" then
+		error("[Alleral Bootstrap] This executor needs loadstring to run Alleral.")
+	end
+	local fn, compileErr = loadStringFn(body, "Alleral/loader@" .. tostring(version))
+	if type(fn) ~= "function" then
+		if type(EMBEDDED_LOADER) == "string" and body ~= EMBEDDED_LOADER then
+			warn("[Alleral Bootstrap] Remote loader v" .. tostring(version) .. " failed to compile; using bundled loader.")
+			return runLoader(EMBEDDED_LOADER, EMBEDDED_LOADER_VERSION or version, "bundled")
+		end
+		error("[Alleral Bootstrap] Loader failed to compile" .. (compileErr and (": " .. tostring(compileErr)) or "."))
+	end
+	local ok, runErr = pcall(fn)
+	if not ok then
+		if type(EMBEDDED_LOADER) == "string" and body ~= EMBEDDED_LOADER then
+			warn("[Alleral Bootstrap] Remote loader v" .. tostring(version) .. " crashed; using bundled loader.")
+			return runLoader(EMBEDDED_LOADER, EMBEDDED_LOADER_VERSION or version, "bundled")
+		end
+		error(tostring(runErr))
+	end
+end
 
-local g = typeof(getgenv) == "function" and getgenv() or {}
+local g = ENV
 if type(g) == "table" then
 	g.Alleral_Core = nil
 	g.Alleral_Rayfield = nil
@@ -389,9 +487,4 @@ end
 
 local body, sourceLabel, version = fetchLoaderBody()
 print("[Alleral Bootstrap] Using loader v" .. version .. " from " .. sourceLabel)
-
-local fn = loadstring(body, "Alleral/loader@" .. version)
-if not fn then
-	error("[Alleral] Loader failed to compile.")
-end
-fn()
+runLoader(body, version, sourceLabel)
