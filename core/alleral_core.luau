@@ -1,5 +1,5 @@
 local Core = {}
-Core.VERSION = "1.21"
+Core.VERSION = "1.22"
 Core.UI_LIBRARY = "Rayfield"
 
 local HttpService = game:GetService("HttpService")
@@ -1146,7 +1146,7 @@ function Core.httpGet(url)
 		if type(body) ~= "string" or body == "" then
 			return false
 		end
-		if body:find("404: Not Found", 1, true) then
+		if #body <= 8192 and body:find("404: Not Found", 1, true) then
 			return false
 		end
 		if body:find("<!DOCTYPE html>", 1, true) or body:find("<html", 1, true) then

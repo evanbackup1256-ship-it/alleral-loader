@@ -3,11 +3,11 @@
 	Fetch from GitHub; do not use launch/load/bootstrap/run scripts.
 ]]
 
-local LOADER_VERSION = "5.4.9"
+local LOADER_VERSION = "5.4.10"
 local MIN_CORE = "1.18"
 local CORE_MIN_BYTES = 50000
 local RELEASE_FALLBACK = {
-	core = "1.21",
+	core = "1.22",
 	analytics = "1.0",
 	telemetry = "2.2",
 	helpers = "1.0",
@@ -629,6 +629,16 @@ local function looksLikeLua(body)
 	return true
 end
 
+local function isRobloxHttp404(body)
+	if type(body) ~= "string" then
+		return false
+	end
+	if #body > 8192 then
+		return false
+	end
+	return body:find("404: Not Found", 1, true) ~= nil
+end
+
 local function readLocal(paths, minBytes)
 	minBytes = minBytes or 0
 	if not readFile or not isFile then
@@ -655,7 +665,7 @@ local function fetchRemote(relativePath, minBytes)
 	local lastErr = nil
 	for _, base in ipairs(REMOTE_BASES) do
 		local body, via = httpGet(base .. "/" .. relativePath, minBytes)
-		if body and looksLikeLua(body) and not body:find("404: Not Found", 1, true) then
+		if body and looksLikeLua(body) and not isRobloxHttp404(body) then
 			local label = base .. (via and (" via " .. via) or "")
 			return body, label
 		end
@@ -729,7 +739,7 @@ local function gameScriptValid(body, profile)
 	if #body < minBytes then
 		return false
 	end
-	if body:find("404: Not Found", 1, true) then
+	if isRobloxHttp404(body) then
 		return false
 	end
 	if not looksLikeLua(body) then
@@ -742,6 +752,29 @@ local function gameScriptValid(body, profile)
 		return false
 	end
 	return true
+end
+
+local function gameScriptRejectReason(body, profile)
+	if type(body) ~= "string" or body == "" then
+		return "empty response"
+	end
+	local minBytes = profile.minBytes or 40000
+	if #body < minBytes then
+		return tostring(#body) .. "b, need " .. tostring(minBytes) .. "b+"
+	end
+	if isRobloxHttp404(body) then
+		return "404 response"
+	end
+	if not looksLikeLua(body) then
+		return "invalid lua"
+	end
+	if profile.sourceMarker and not body:find(profile.sourceMarker, 1, true) then
+		return "missing " .. profile.sourceMarker
+	end
+	if profile.version and not body:find('local VERSION = "' .. profile.version .. '"', 1, true) then
+		return "missing VERSION " .. profile.version
+	end
+	return "unknown"
 end
 
 local function collectHttpBodies(url)
@@ -812,16 +845,7 @@ local function fetchGameScript(profile)
 	end
 
 	if bestInvalid then
-		if gameScriptValid(bestInvalid.body, { minBytes = minBytes }) then
-			lastErr = bestInvalid.via .. " (missing marker or version)"
-		else
-			lastErr = bestInvalid.via
-				.. " ("
-				.. tostring(bestInvalid.len)
-				.. "b, need "
-				.. tostring(minBytes)
-				.. "b+)"
-		end
+		lastErr = bestInvalid.via .. " (" .. gameScriptRejectReason(bestInvalid.body, profile) .. ")"
 	elseif lastErr == nil then
 		lastErr = "all transports failed"
 	end
