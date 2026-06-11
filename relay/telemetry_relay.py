@@ -613,8 +613,22 @@ def notify_games_sync(payload: dict[str, Any]) -> None:
     for item in meta_diff[:6]:
         lines.append(f"• `{item.get('id')}` {item.get('field')}: {item.get('from')} → {item.get('to')}")
 
+    if payload.get("coreVersion") or payload.get("telemetryVersion"):
+        hub_bits = []
+        if payload.get("coreVersion"):
+            hub_bits.append(f"core {payload.get('coreVersion')}")
+        if payload.get("telemetryVersion"):
+            hub_bits.append(f"telemetry {payload.get('telemetryVersion')}")
+        if payload.get("analyticsVersion"):
+            hub_bits.append(f"analytics {payload.get('analyticsVersion')}")
+        if hub_bits:
+            lines.append("**Hub:** " + ", ".join(hub_bits))
+
     if not lines:
-        return
+        if payload.get("commitChanged"):
+            lines.append(f"Hub synced · `{commit}`" + (f" — {commit_msg}" if commit_msg else ""))
+        else:
+            lines.append("Registry refreshed.")
 
     fields = [
         {"name": "Commit", "value": f"`{commit}` — {commit_msg or 'sync'}", "inline": False},
@@ -622,7 +636,7 @@ def notify_games_sync(payload: dict[str, Any]) -> None:
         {"name": "Changes", "value": "\n".join(lines)[:1024], "inline": False},
     ]
     post_simple_discord_embed(
-        "Supported games updated",
+        "Hub updated" if payload.get("commitChanged") else "Games registry updated",
         EVENT_COLORS["games_sync"],
         fields,
         f"{BRAND} · auto-sync",

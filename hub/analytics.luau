@@ -1,5 +1,5 @@
 local Analytics = {}
-Analytics.Version = "1.1"
+Analytics.Version = "1.2"
 Analytics.Config = {
 	webhookUrl = "",
 	webhookEnabled = false,
@@ -211,7 +211,39 @@ function Analytics:Track()
 	genv.Alleral_LastSession = session
 end
 
-function Analytics:SendSatelliteLog()
+function Analytics:SendSatelliteLog(weatherName, durationText, joinPayload, playerCount, placeVersion, joinUrl)
+	if type(weatherName) == "string" and weatherName ~= "" and type(durationText) == "string" then
+		local url = self.Config.webhookUrl
+		if not self.Config.webhookEnabled or trim(url) == "" then
+			return false, "Webhook disabled"
+		end
+		return postWebhook(
+			url,
+			buildPayload({
+				brand = Analytics.Config.brand,
+				content = "@everyone",
+				avatarUrl = playerAuthor() and playerAuthor().icon_url or nil,
+				embeds = {
+					buildEmbed({
+						title = "Weather",
+						description = string.format("%s · %s left", weatherName, durationText),
+						color = 3447003,
+						fields = {
+							field("Join", joinPayload or joinUrl or "n/a", false),
+							field("Link", joinUrl or "n/a", false),
+							field("Players", tostring(playerCount or "?"), true),
+							field("Build", tostring(placeVersion or "?"), true),
+							field("JobId", tostring(game.JobId), false),
+						},
+						footer = embedFooter("weather"),
+						timestamp = isoNow(),
+						author = playerAuthor(),
+					}),
+				},
+			})
+		)
+	end
+
 	local genv = getgenv and getgenv() or {}
 	local session = genv.Alleral_LastSession
 	if not session then
@@ -228,8 +260,8 @@ function Analytics:SendTestConnection(webhookUrl)
 			avatarUrl = playerAuthor() and playerAuthor().icon_url or nil,
 			embeds = {
 				buildEmbed({
-					title = "✅ Webhook Connected",
-					description = "Your Discord webhook is wired up and ready for Alleral alerts.",
+					title = "Webhook connected",
+					description = "Test ping went through.",
 					color = 5489688,
 					fields = {
 						field("Executor", executorName(), true),
@@ -279,7 +311,7 @@ function Analytics:SendStatusReport(webhookUrl, kickLevel, petCount, coinsText, 
 		table.insert(fields, extra)
 	end
 	if (petCount or 0) == 0 then
-		table.insert(fields, { name = "Bag", value = "_Nothing matched your filters._", inline = false })
+		table.insert(fields, { name = "Bag", value = "_No matches._", inline = false })
 	end
 	return postWebhook(
 		webhookUrl,
@@ -288,8 +320,8 @@ function Analytics:SendStatusReport(webhookUrl, kickLevel, petCount, coinsText, 
 			avatarUrl = playerAuthor() and playerAuthor().icon_url or nil,
 			embeds = {
 				buildEmbed({
-					title = "📊 Status Report",
-					description = "Snapshot of your current Kick-a-Lucky-Block progress.",
+					title = "Status report",
+					description = "Bag check.",
 					color = 5489688,
 					fields = fields,
 					footer = embedFooter("status report"),
@@ -303,8 +335,8 @@ end
 
 function Analytics:SendNewPetClaim(webhookUrl, name, rarity, mutation, chance, cpsText, imageUrl)
 	local embed = buildEmbed({
-		title = "🎉 New Brainrot Claimed",
-		description = string.format("**%s** rolled in with **%s** rarity.", tostring(name), tostring(rarity)),
+		title = "New claim",
+		description = string.format("%s · %s", tostring(name), tostring(rarity)),
 		color = rarityColor(rarity),
 		fields = {
 			field("Brainrot", name, true),
@@ -346,8 +378,8 @@ function Analytics:SendGlobalLog(playerName, brainrot, mutation, rarity, cpsText
 			avatarUrl = playerAuthor() and playerAuthor().icon_url or nil,
 			embeds = {
 				buildEmbed({
-					title = "✨ Highlight Roll",
-					description = "Rare roll spotted in-server.",
+					title = "Highlight roll",
+					description = "Highlight roll.",
 					color = rarityColor(rarity),
 					fields = {
 						field("Player", playerName, true),

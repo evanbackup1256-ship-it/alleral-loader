@@ -1033,7 +1033,7 @@ function Core.getScriptStatus(scriptId, profileVersion)
 			status = "working",
 			label = "Working",
 			icon = "✅",
-			message = "No remote status entry — running local build.",
+			message = "No remote status; local build.",
 			version = profileVersion or "?",
 		}
 	end
@@ -1104,7 +1104,7 @@ function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
 		groupbox:CreateToggle({
 			Name = "Force load anyway",
 			Value = ENV.Alleral_ForceLoad == true,
-			Tooltip = "Bypass broken/maintenance blocks for this session.",
+			Tooltip = "Skip maintenance gate this session.",
 			Callback = function(value)
 				ENV.Alleral_ForceLoad = value == true
 				getgenv().Alleral_ForceLoad = value == true
@@ -1658,7 +1658,7 @@ function Core.buildUiPreferencesGroup(tab, options)
 	group:CreateToggle(
 		"Reduced motion",
 		ENV.Alleral_UiReducedMotion == true,
-		"Turns off accent flashes and extra UI motion.",
+		"Less UI animation.",
 		function(value)
 			ENV.Alleral_UiReducedMotion = value == true
 			if windUi and type(windUi.SetReducedMotion) == "function" then
@@ -1670,7 +1670,7 @@ function Core.buildUiPreferencesGroup(tab, options)
 	group:CreateToggle(
 		"Bottom notifications",
 		ENV.Alleral_NotifyLower == true,
-		"Move WindUI toasts to the bottom-right.",
+		"Move toasts to the bottom-right.",
 		function(value)
 			ENV.Alleral_NotifyLower = value == true
 			if windUi and type(windUi.SetNotificationLower) == "function" then
@@ -1694,30 +1694,30 @@ function Core.buildUiPreferencesGroup(tab, options)
 	)
 
 	group:CreateButton("Test success toast", function()
-		Core.notify("Alleral", "UI notifications are working.", 4, "success")
-	end, "Preview the styled toast stack.")
+		Core.notify("Alleral", "Success toast.", 4, "success")
+	end, "Fire a success toast.")
 
 	group:CreateButton("Test warning toast", function()
-		Core.notify("Alleral", "This is a warning-style toast.", 4, "warn")
-	end, "Preview warning styling.")
+		Core.notify("Alleral", "Warning toast.", 4, "warn")
+	end, "Fire a warning toast.")
 
 	group:CreateButton("Clear all toasts", function()
 		if windUi and type(windUi.ClearNotifications) == "function" then
 			local cleared = windUi:ClearNotifications()
-			Core.notify("Alleral", "cleared " .. tostring(cleared or 0) .. " toast(s)", 2, "info")
+			Core.notify("Alleral", "cleared " .. tostring(cleared or 0), 2, "info")
 		else
 			Core.notify("Alleral", "Clear unavailable.", 3, "warn")
 		end
-	end, "Dismiss every visible WindUI notification.")
+	end, "Dismiss visible toasts.")
 
 	group:CreateButton("Repair UI chrome", function()
 		if windUi and type(windUi.RepairWindow) == "function" then
 			local ok = windUi:RepairWindow()
-			Core.notify("Alleral", ok and "UI chrome repaired." or "Repair failed.", 3, ok and "success" or "error")
+			Core.notify("Alleral", ok and "UI repaired." or "Repair failed.", 3, ok and "success" or "error")
 		else
 			Core.notify("Alleral", "Repair unavailable.", 3, "warn")
 		end
-	end, "Re-apply Alleral theme rails, strokes, and polish.")
+	end, "Re-apply theme rails and polish.")
 
 	return group
 end
@@ -1746,6 +1746,10 @@ function stateHubStop()
 		if type(state.Alleral_Unload) == "function" then
 			pcall(state.Alleral_Unload)
 		end
+	end
+	local telemetry = ENV.Alleral_Telemetry
+	if type(telemetry) == "table" and type(telemetry.ReportSessionEnd) == "function" then
+		telemetry:ReportSessionEnd("stopped")
 	end
 	Core.notify("Alleral", "loops stopped", 3)
 end

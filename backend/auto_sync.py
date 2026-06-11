@@ -361,6 +361,7 @@ class AutoSyncEngine:
             known_commit = self._state.get("commit") or ""
 
         commit_sha, commit_msg = self._fetch_head_commit()
+        commit_changed = bool(commit_sha and commit_sha != known_commit)
         if not force and commit_sha and commit_sha == known_commit:
             with self._lock:
                 self._state["lastSyncAt"] = utc_iso()
@@ -434,12 +435,16 @@ class AutoSyncEngine:
             self._state["notifyInitialized"] = True
             self._save_state()
 
-        if self.notify_fn and initialized and has_changes:
+        if self.notify_fn and initialized and (commit_changed or has_changes):
             try:
                 self.notify_fn({
                     "type": "games_sync",
                     "commit": commit_sha or "",
                     "commitMessage": commit_msg or "",
+                    "commitChanged": commit_changed,
+                    "coreVersion": str(release.get("core") or ""),
+                    "telemetryVersion": str(release.get("telemetry") or ""),
+                    "analyticsVersion": str(release.get("analytics") or ""),
                     "loaderVersion": loader_version,
                     "loaderChanged": loader_changed,
                     "previousLoaderVersion": prev_loader,

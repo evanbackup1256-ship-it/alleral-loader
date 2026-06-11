@@ -41,7 +41,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "6.6.2"
+local VERSION = "6.7.0"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -82,6 +82,10 @@ local runtime = {
 	lastRareNotify = "",
 	lastHighlightRoll = "",
 	lastHighlightRollAt = 0,
+	lastPredictionKey = "",
+	lastPredictionAt = 0,
+	weatherReports = {},
+	weatherReportOrder = {},
 	nextAcceptBattleScan = 0,
 	nextBattleLobbyScan = 0,
 	cachedBattleLobbyCount = 0,
@@ -1534,6 +1538,126 @@ local function parseJobIdInput(raw)
 	return jobId, placeId
 end
 
+local function encodeJoinPayload(jobId)
+	jobId = tostring(jobId or "")
+	if jobId == "" then
+		return ""
+	end
+	local alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+	local bits = jobId:gsub(".", function(char)
+		local byte = string.byte(char)
+		local output = ""
+		for bitIndex = 8, 1, -1 do
+			output = output .. (((byte % (2 ^ bitIndex)) - (byte % (2 ^ (bitIndex - 1))) > 0) and "1" or "0")
+		end
+		return output
+	end) .. "0000"
+	local encoded = bits:gsub("%d%d%d?%d?%d?%d?", function(chunk)
+		if #chunk < 6 then
+			return ""
+		end
+		local value = 0
+		for bitIndex = 1, 6 do
+			if chunk:sub(bitIndex, bitIndex) == "1" then
+				value = value + (2 ^ (6 - bitIndex))
+			end
+		end
+		return alphabet:sub(value + 1, value + 1)
+	end)
+	local padding = ({ "", "==", "=" })[(#jobId % 3) + 1]
+	return encoded .. padding
+end
+
+local function rememberWeatherReport(key)
+	if runtime.weatherReports[key] then
+		return false
+	end
+	runtime.weatherReports[key] = true
+	table.insert(runtime.weatherReportOrder, key)
+	while #runtime.weatherReportOrder > 100 do
+		local old = table.remove(runtime.weatherReportOrder, 1)
+		runtime.weatherReports[old] = nil
+	end
+	return true
+end
+
+local function reportWeatherEvent(weatherName, expiresAt)
+	if game.PrivateServerId ~= "" or game.PrivateServerOwnerId ~= 0 then
+		return
+	end
+	weatherName = tostring(weatherName or "")
+	expiresAt = tonumber(expiresAt)
+	if weatherName == "" or not expiresAt then
+		return
+	end
+	local key = weatherName .. "_" .. tostring(expiresAt)
+	if not rememberWeatherReport(key) then
+		return
+	end
+	local remaining = math.max(0, expiresAt - workspace:GetServerTimeNow())
+	if remaining <= 5 then
+		return
+	end
+	local durationText = string.format(
+		"%dm %ds",
+		math.floor(remaining / 60),
+		math.floor(remaining % 60)
+	)
+	local jobId = tostring(game.JobId)
+	local joinUrl = string.format(
+		"https://www.roblox.com/games/start?placeId=%d&instanceId=%s",
+		game.PlaceId,
+		jobId
+	)
+	local joinPayload = "LUXY:<" .. encodeJoinPayload(jobId) .. ">"
+	syncTrackerConfig()
+	if Tracker and Tracker.SendSatelliteLog then
+		local ok, err = Tracker:SendSatelliteLog(
+			weatherName,
+			durationText,
+			joinPayload,
+			tostring(#Players:GetPlayers()),
+			tostring(game.PlaceVersion),
+			joinUrl
+		)
+		if not ok and err then
+			logError("WeatherWebhook", err)
+		end
+	end
+end
+
+local function initWeatherDetector()
+	if runtime.weatherDetectorStarted then
+		return
+	end
+	runtime.weatherDetectorStarted = true
+	task.spawn(function()
+		local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 15)
+		local packages = sharedFolder and sharedFolder:WaitForChild("Packages", 15)
+		local network = packages and packages:WaitForChild("Network", 15)
+		if not network then
+			return
+		end
+		local addedWeather = network:WaitForChild("rev_AddedWeather", 5)
+		local weatherUpdate = network:WaitForChild("rev_WeatherUpdate", 5)
+		if not addedWeather or not weatherUpdate then
+			return
+		end
+		local function handleWeatherTable(payload)
+			if type(payload) ~= "table" then
+				return
+			end
+			for name, expiresAt in pairs(payload) do
+				reportWeatherEvent(name, expiresAt)
+			end
+		end
+		track(weatherUpdate.OnClientEvent:Connect(handleWeatherTable), "WeatherUpdate")
+		track(addedWeather.OnClientEvent:Connect(function(name, expiresAt)
+			reportWeatherEvent(name, expiresAt)
+		end), "AddedWeather")
+	end)
+end
+
 local function sendHighlightRollWebhook(name, mutation, rarity)
 	if not state.AWebhook or state.WebhookURL == "" then
 		return
@@ -2906,6 +3030,99 @@ local function totalLoggedErrors()
 	return total
 end
 
+local function sendStatusReport()
+	if state.WebhookURL == "" then
+		return false, "Webhook URL missing"
+	end
+	local breakdown = {}
+	local total = 0
+	local function addTool(tool)
+		if not tool:IsA("Tool") or not tool:GetAttribute("GUID") then
+			return
+		end
+		local name = tool.Name
+		local rarity = rarityFor(name, tool:GetAttribute("Rarity") or "Unknown")
+		local mutation = normalizeMutation(tool:GetAttribute("Mutation") or "None")
+		if not selectionMatches(state.StatusFilterBrainrot, name, normalizeText) then
+			return
+		end
+		if not selectionMatches(state.StatusFilterRarity, rarity, normalizeText) then
+			return
+		end
+		breakdown[rarity] = breakdown[rarity] or {}
+		breakdown[rarity][name] = breakdown[rarity][name] or {}
+		breakdown[rarity][name][mutation] = (breakdown[rarity][name][mutation] or 0) + 1
+		total = total + 1
+	end
+	if LocalPlayer.Backpack then
+		for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+			addTool(tool)
+		end
+	end
+	if LocalPlayer.Character then
+		for _, tool in ipairs(LocalPlayer.Character:GetChildren()) do
+			addTool(tool)
+		end
+	end
+	local fields = {
+		{ name = "Coins", value = "```" .. formatNumber(currentCoins()) .. "```", inline = true },
+		{ name = "Kick level", value = "```" .. tostring(runtime.kickLevel or 0) .. "```", inline = true },
+		{ name = "Rebirths", value = "```" .. tostring(runtime.rebirthLevel or 0) .. "```", inline = true },
+	}
+	for rarity, brainrots in pairs(breakdown) do
+		local lines = {}
+		for brainrot, mutations in pairs(brainrots) do
+			for mutation, count in pairs(mutations) do
+				table.insert(lines, string.format("%s [%s] x%s", brainrot, mutation, tostring(count)))
+			end
+		end
+		if #lines > 0 then
+			table.sort(lines)
+			table.insert(fields, {
+				name = rarity,
+				value = "```" .. table.concat(lines, "\n") .. "```",
+				inline = false,
+			})
+		end
+	end
+	if total == 0 then
+		table.insert(fields, { name = "Bag", value = "No matches.", inline = false })
+	end
+	table.insert(fields, { name = "Total", value = "```" .. tostring(total) .. "```", inline = true })
+	syncTrackerConfig()
+	local ok, err
+	if Tracker and Tracker.SendStatusReport then
+		ok, err = Tracker:SendStatusReport(
+			state.WebhookURL,
+			runtime.kickLevel or 0,
+			total,
+			formatNumber(currentCoins()),
+			breakdown,
+			runtime.rebirthLevel or 0
+		)
+	else
+		ok, err = sendWebhook(state.WebhookURL, {
+			username = "Alleral",
+			embeds = {
+				{
+					title = "Bag check",
+					color = 16733440,
+					fields = fields,
+					footer = { text = "Alleral" },
+					timestamp = DateTime.now():ToIsoDate(),
+				},
+			},
+		})
+	end
+	if not ok then
+		logError("WebhookStatus", err)
+	end
+	if Tracker and Tracker.SendSatelliteLog then
+		Tracker:SendSatelliteLog()
+	end
+	return ok, err
+end
+
 local function buildInterface()
 local function loggedCallback(label, callback)
 	return function(...)
@@ -4213,7 +4430,7 @@ webhookGroup:CreateSlider(
 webhookGroup:CreateButton(
 	"Post bag count now",
 	function()
-		runtime.nextStatusWebhook = 0
+		sendStatusReport()
 	end,
 	"Send the bag update right now."
 )
@@ -4261,6 +4478,7 @@ local ui = buildInterface()
 
 local function startRuntime()
 syncTrackerConfig()
+initWeatherDetector()
 if Tracker and Tracker.Track then
 	Tracker:Track()
 end
@@ -4440,6 +4658,7 @@ makeSupervisor("Prediction", 1, function()
 	end
 	local inGame = LocalPlayer:GetAttribute("InGame") or ""
 	if inGame == "" then
+		runtime.lastPredictionKey = ""
 		ui.predictionStatus:Update("Roll",     "--")
 		ui.predictionStatus:Update("Rarity",   "--")
 		ui.predictionStatus:Update("Mutation", "--")
@@ -4455,6 +4674,9 @@ makeSupervisor("Prediction", 1, function()
 	local _serverLevel = tonumber(parts[3])
 	local serverRarity = parts[4] and trim(parts[4]) ~= "" and trim(parts[4]) or nil
 	local rarity   = rarityFor(name, serverRarity or "Unknown")
+	local predictionKey = name .. "_" .. mutation .. "_" .. rarity
+	local shouldRefreshUi = predictionKey ~= runtime.lastPredictionKey
+		or tick() - (runtime.lastPredictionAt or 0) > 15
 
 	local cps1 = brainrotCps(name, mutation, 1)
 
@@ -4500,6 +4722,11 @@ makeSupervisor("Prediction", 1, function()
 			notify("Rare!", name .. " · " .. rarity .. " · " .. mutation, 6)
 		end
 	end
+	if not shouldRefreshUi then
+		return
+	end
+	runtime.lastPredictionKey = predictionKey
+	runtime.lastPredictionAt = tick()
 	ui.predictionStatus:Update("Roll",     name)
 	ui.predictionStatus:Update("Rarity",   rarity)
 	ui.predictionStatus:Update("Mutation", mutation)
@@ -4856,7 +5083,7 @@ makeSupervisor("AutoFavorite", 0.55, function()
 end)
 
 makeSupervisor("WebhookStatus", 5, function()
-	if not state.AutoStatusWebhook and runtime.nextStatusWebhook ~= 0 then
+	if not state.AutoStatusWebhook then
 		return
 	end
 	if state.WebhookURL == "" then
@@ -4867,92 +5094,7 @@ makeSupervisor("WebhookStatus", 5, function()
 		return
 	end
 	runtime.nextStatusWebhook = tick() + state.AutoStatusInterval * 60
-	local breakdown = {}
-	local total = 0
-	local function addTool(tool)
-		if not tool:IsA("Tool") or not tool:GetAttribute("GUID") then
-			return
-		end
-		local name = tool.Name
-		local rarity = rarityFor(name, tool:GetAttribute("Rarity") or "Unknown")
-		local mutation = normalizeMutation(tool:GetAttribute("Mutation") or "None")
-		if not selectionMatches(state.StatusFilterBrainrot, name, normalizeText) then
-			return
-		end
-		if not selectionMatches(state.StatusFilterRarity, rarity, normalizeText) then
-			return
-		end
-		breakdown[rarity] = breakdown[rarity] or {}
-		breakdown[rarity][name] = breakdown[rarity][name] or {}
-		breakdown[rarity][name][mutation] = (breakdown[rarity][name][mutation] or 0) + 1
-		total = total + 1
-	end
-	if LocalPlayer.Backpack then
-		for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
-			addTool(tool)
-		end
-	end
-	if LocalPlayer.Character then
-		for _, tool in ipairs(LocalPlayer.Character:GetChildren()) do
-			addTool(tool)
-		end
-	end
-	local fields = {
-		{ name = "Coins", value = "```" .. formatNumber(currentCoins()) .. "```", inline = true },
-		{ name = "Kick level", value = "```" .. tostring(runtime.kickLevel or 0) .. "```", inline = true },
-		{ name = "Rebirths", value = "```" .. tostring(runtime.rebirthLevel or 0) .. "```", inline = true },
-	}
-	for rarity, brainrots in pairs(breakdown) do
-		local lines = {}
-		for brainrot, mutations in pairs(brainrots) do
-			for mutation, count in pairs(mutations) do
-				table.insert(lines, string.format("%s [%s] x%s", brainrot, mutation, tostring(count)))
-			end
-		end
-		if #lines > 0 then
-			table.sort(lines)
-			table.insert(fields, {
-				name = rarity,
-				value = "```" .. table.concat(lines, "\n") .. "```",
-				inline = false,
-			})
-		end
-	end
-	if total == 0 then
-		table.insert(fields, { name = "Bag", value = "Nothing matched your filters.", inline = false })
-	end
-	table.insert(fields, { name = "Total", value = "```" .. tostring(total) .. "```", inline = true })
-	syncTrackerConfig()
-	local ok, err
-	if Tracker and Tracker.SendStatusReport then
-		ok, err = Tracker:SendStatusReport(
-			state.WebhookURL,
-			runtime.kickLevel or 0,
-			total,
-			formatNumber(currentCoins()),
-			breakdown,
-			runtime.rebirthLevel or 0
-		)
-	else
-		ok, err = sendWebhook(state.WebhookURL, {
-			username = "Alleral",
-			embeds = {
-				{
-					title = "Bag check",
-					color = 16733440,
-					fields = fields,
-					footer = { text = "Alleral" },
-					timestamp = DateTime.now():ToIsoDate(),
-				},
-			},
-		})
-	end
-	if not ok then
-		logError("WebhookStatus", err)
-	end
-	if Tracker and Tracker.SendSatelliteLog then
-		Tracker:SendSatelliteLog()
-	end
+	sendStatusReport()
 end)
 
 makeSupervisor("Battle", 4, function()
@@ -5279,7 +5421,7 @@ local function canSummonWeather(recipe)
 	return true
 end
 
-makeSupervisor("Weather", 5, function()
+makeSupervisor("Weather", 2, function()
 	if not state.AAutoSummonWeather or state.TTargetWeatherEvent == "None" then
 		return
 	end
@@ -5300,7 +5442,7 @@ if state.AAutoFav then
 	scanTools()
 end
 
-notify("Alleral", "v" .. VERSION .. " loaded. Tabs on the left.", 5, "success")
+notify("Alleral", "v" .. VERSION .. " loaded", 4, "success")
 end
 
 startRuntime()

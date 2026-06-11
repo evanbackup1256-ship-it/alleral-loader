@@ -5,8 +5,8 @@
     "kick_a_lucky_block": {
       "name": "Kick a Lucky Block",
       "status": "working",
-      "version": "6.6",
-      "message": "WindUI with searchable dropdowns and live status panels.",
+      "version": "6.7.0",
+      "message": "",
       "updatedAt": "2026-06-10T00:00:00+00:00",
       "updatedBy": "system"
     },

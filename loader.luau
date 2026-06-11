@@ -10,8 +10,8 @@ local RELEASE_FALLBACK = {
 	loader = "7.6.0",
 	core = "2.7.0",
 	ui = "WindUI",
-	analytics = "1.0",
-	telemetry = "3.1",
+	analytics = "1.2",
+	telemetry = "3.2",
 	helpers = "1.0",
 	weao = "1.0",
 	security = "1.3",
@@ -1384,11 +1384,6 @@ local function wireTelemetry(profile)
 		return
 	end
 	log("Telemetry on")
-	local meta = {
-		gameId = profile and profile.id,
-		scriptVersion = profile and profile.version,
-	}
-	telemetry:ReportSessionStart(meta)
 	telemetry:StartHeartbeat()
 end
 
@@ -1461,7 +1456,7 @@ local GAMES = {
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
-		version = "6.6.2",
+		version = "6.7.0",
 		placeIds = { 89469502395769 },
 		universeIds = { 10004244222 },
 		scriptFiles = { "games/kick_a_lucky_block.luau", "kick_a_lucky_block.luau" },
@@ -1698,6 +1693,19 @@ local function applyRemoteUpdate(profile, expected, reason)
 	ENV._Alleral_UpdateApplying = true
 	stopAutoUpdater()
 	log("Update available (" .. tostring(reason) .. ") — refreshing from GitHub")
+	local telemetry = ENV.Alleral_Telemetry
+	if type(telemetry) == "table" and type(telemetry.ReportEvent) == "function" then
+		pcall(function()
+			telemetry:ReportEvent("milestone", "Hub auto-update: " .. tostring(reason), {
+				commit = expected and expected.commit,
+				loaderVersion = expected and expected.loader,
+				coreVersion = expected and expected.core,
+				telemetryVersion = expected and expected.telemetry,
+				gameId = profile and profile.id,
+				reason = reason,
+			})
+		end)
+	end
 	notify("Alleral", "update found, reloading", 4)
 	ENV._Alleral_ExpectedVersions = expected
 	purgeOutdatedWorkspace()
@@ -2578,6 +2586,13 @@ local function main()
 		else
 			log("UI skipped: " .. tostring(uiErr), true)
 		end
+	end
+
+	if ENV.Alleral_Telemetry and ENV.Alleral_Telemetry.ReportInject then
+		ENV.Alleral_Telemetry:ReportInject("start", {
+			gameId = profile.id,
+			scriptVersion = profile.version,
+		})
 	end
 
 	local src, label = fetchGameScript(profile)
