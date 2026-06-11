@@ -63,6 +63,18 @@ if ($library -match 'Library\.EnsureGuiRoot = function') {
     Fail "library.lua missing EnsureGuiRoot for ScreenGui bootstrap"
 }
 
+if ($library -match 'local LibRef[\s\S]*?LibRef = Library') {
+    Pass "library.lua keeps stable LibRef for GUI roots"
+} else {
+    Fail "library.lua must define LibRef that survives Unload"
+}
+
+if ($library -notmatch 'Library\.Holder') {
+    Pass "library.lua uses LibRef.Holder instead of nil-able upvalue"
+} else {
+    Fail "library.lua must not reference Library.Holder directly"
+}
+
 if ($library -match 'Library\.Window = function\(self, Data\)[\s\S]*?self:EnsureGuiRoot\(\)') {
     Pass "Window bootstraps GUI root before building"
 } else {

@@ -1,5 +1,5 @@
--- Neverlose UI · NEVERLOSE_UI_VERSION = "1.1.0-kick"
-local NEVERLOSE_UI_VERSION = "1.1.0-kick"
+-- Neverlose UI · NEVERLOSE_UI_VERSION = "1.1.1-kick"
+local NEVERLOSE_UI_VERSION = "1.1.1-kick"
 local Library do 
  local Workspace = game:GetService("Workspace")
  local UserInputService = game:GetService("UserInputService")
@@ -56,6 +56,7 @@ local Library do
  local RectNew = Rect.new
 
  local IsMobile = UserInputService.TouchEnabled or false
+ local LibRef
 
  Library = {
  Theme = { },
@@ -102,6 +103,8 @@ local Library do
 
  Font = nil
  }
+
+ LibRef = Library
 
  Library.__index = Library
  Library.Sections.__index = Library.Sections
@@ -1018,7 +1021,7 @@ local Library do
  return self._TooltipItems
  end
  local root = Instances:Create("Frame", {
- Parent = Library.Holder.Instance,
+ Parent = LibRef.Holder.Instance,
  Name = "AlleralTooltip",
  Visible = false,
  BackgroundColor3 = FromRGB(18, 18, 22),
@@ -1389,7 +1392,7 @@ local Library do
  }) Items["Text"]:AddToTheme({TextColor3 = "Text"})
 
  Items["ColorpickerWindow"] = Instances:Create("TextButton", {
- Parent = Library.UnusedHolder.Instance,
+ Parent = LibRef.UnusedHolder.Instance,
  AutoButtonColor = false,
  Text = "",
  Name = "\0",
@@ -1791,7 +1794,7 @@ local Library do
 
  if Colorpicker.IsOpen then 
  Items["ColorpickerWindow"].Instance.Visible = true
- Items["ColorpickerWindow"].Instance.Parent = Library.Holder.Instance
+ Items["ColorpickerWindow"].Instance.Parent = LibRef.Holder.Instance
  
  RenderStepped = RunService.RenderStepped:Connect(function()
  Items["ColorpickerWindow"].Instance.Position = UDim2New(
@@ -1853,7 +1856,7 @@ local Library do
  Debounce = false 
  Items["ColorpickerWindow"].Instance.Visible = Colorpicker.IsOpen
  task.wait(0.2)
- Items["ColorpickerWindow"].Instance.Parent = not Colorpicker.IsOpen and Library.UnusedHolder.Instance or Library.Holder.Instance
+ Items["ColorpickerWindow"].Instance.Parent = not Colorpicker.IsOpen and LibRef.UnusedHolder.Instance or LibRef.Holder.Instance
  end)
  end
 
@@ -2090,7 +2093,7 @@ local Library do
 
  local Items = { } do 
  Items["KeybindsList"] = Instances:Create("Frame", {
- Parent = Library.Holder.Instance,
+ Parent = LibRef.Holder.Instance,
  Name = "\0",
  BorderColor3 = FromRGB(0, 0, 0),
  AnchorPoint = Vector2New(0, 0.5),
@@ -2488,7 +2491,7 @@ local Library do
 
  local Items = { } do
  Items["MainFrame"] = Instances:Create("Frame", {
- Parent = Library.Holder.Instance,
+ Parent = LibRef.Holder.Instance,
  Name = "\0",
  BorderColor3 = FromRGB(0, 0, 0),
  AnchorPoint = Vector2New(0.5, 0.5),
@@ -2577,7 +2580,7 @@ local Library do
 
  if IsMobile then
  Items["FloatingButton"] = Instances:Create("TextButton", {
- Parent = Library.Holder.Instance,
+ Parent = LibRef.Holder.Instance,
  Text = "",
  AutoButtonColor = false,
  Name = "\0",
@@ -3178,7 +3181,7 @@ local Library do
  local SettingsItems = { }
  do
  SettingsItems["Settings"] = Instances:Create("Frame", {
- Parent = Library.UnusedHolder.Instance,
+ Parent = LibRef.UnusedHolder.Instance,
  Name = "\0",
  BorderColor3 = FromRGB(0, 0, 0),
  AnchorPoint = Vector2New(0.5, 0.5),
@@ -3331,7 +3334,7 @@ local Library do
  end
  
  SettingsItems["Settings"].Instance.Visible = true
- SettingsItems["Settings"].Instance.Parent = Library.Holder.Instance
+ SettingsItems["Settings"].Instance.Parent = LibRef.Holder.Instance
  
  RenderStepped = RunService.RenderStepped:Connect(function()
  SettingsItems["Settings"].Instance.Position = UDim2New(0, Items["SettingsIcon"].Instance.AbsolutePosition.X, 0, Items["SettingsIcon"].Instance.AbsolutePosition.Y + Items["SettingsButton"].Instance.AbsoluteSize.Y + 108)
@@ -3390,7 +3393,7 @@ local Library do
  Debounce = false 
  SettingsItems["Settings"].Instance.Visible = Settings.IsOpen
  task.wait(0.2)
- SettingsItems["Settings"].Instance.Parent = not Settings.IsOpen and Library.UnusedHolder.Instance or Library.Holder.Instance
+ SettingsItems["Settings"].Instance.Parent = not Settings.IsOpen and LibRef.UnusedHolder.Instance or LibRef.Holder.Instance
  end)
  end
  
@@ -3564,7 +3567,7 @@ local Library do
 
  TabItem:Connect("InputBegan", function(Input)
  if Input.UserInputType == Enum.UserInputType.MouseButton1 then 
- TabItem.Instance.Parent = Library.Holder.Instance
+ TabItem.Instance.Parent = LibRef.Holder.Instance
  Window:UpdateHighlight(TabItem, true)
  Items["PagePlaceholder"]:Tween(nil, {BackgroundTransparency = 0.3})
  TabDragging = true 
@@ -3651,7 +3654,7 @@ end
 Library.Watermark = function(self, Data)
  if not Library.WatermarkFrame then
  Library.WatermarkFrame = Instances:Create("Frame", {
- Parent = Library.Holder.Instance,
+ Parent = LibRef.Holder.Instance,
  Name = "Watermark",
  AnchorPoint = Vector2New(0, 0),
  Position = UDim2New(0, 15, 0, 15),
@@ -3931,7 +3934,7 @@ Library.Watermark = function(self, Data)
  }) Items["Text"]:AddToTheme({TextColor3 = "Text"}) 
  
  Items["Page"] = Instances:Create("Frame", {
- Parent = Library.UnusedHolder.Instance,
+ Parent = LibRef.UnusedHolder.Instance,
  Name = "\0",
  Visible = false,
  BackgroundTransparency = 1,
@@ -4003,7 +4006,7 @@ Library.Watermark = function(self, Data)
  
  Debounce = true
  Items["Page"].Instance.Visible = Bool 
- Items["Page"].Instance.Parent = Bool and Page.Window.Items["Content"].Instance or Library.UnusedHolder.Instance
+ Items["Page"].Instance.Parent = Bool and Page.Window.Items["Content"].Instance or LibRef.UnusedHolder.Instance
 
  if Page.Active then
  Items["Inactive"]:Tween(nil, {BackgroundTransparency = 0.25})
@@ -4362,7 +4365,7 @@ Library.Watermark = function(self, Data)
 
  function GlobalChat:SetVisibility(Bool)
  Items["GlobalChat"].Instance.Visible = Bool
- Items["GlobalChat"].Instance.Parent = Bool and Data.MainFrame.Instance or Library.UnusedHolder
+ Items["GlobalChat"].Instance.Parent = Bool and Data.MainFrame.Instance or LibRef.UnusedHolder
  end
 
  function GlobalChat:SetStatus(Text, Color)
@@ -5194,7 +5197,7 @@ Library.Watermark = function(self, Data)
 
  SettingsItem = { } do 
  SettingsItem["Settings"] = Instances:Create("Frame", {
- Parent = Library.UnusedHolder.Instance,
+ Parent = LibRef.UnusedHolder.Instance,
  Name = "\0",
  Visible = false,
  BorderColor3 = FromRGB(0, 0, 0),
@@ -5360,7 +5363,7 @@ Library.Watermark = function(self, Data)
  end)
 
  SettingsItem["Settings"].Instance.Visible = true
- SettingsItem["Settings"].Instance.Parent = Library.Holder.Instance
+ SettingsItem["Settings"].Instance.Parent = LibRef.Holder.Instance
  
  RenderStepped = RunService.RenderStepped:Connect(function()
  SettingsItem["Settings"].Instance.Position = UDim2New(
@@ -5420,7 +5423,7 @@ Library.Watermark = function(self, Data)
  Debounce = false 
  SettingsItem["Settings"].Instance.Visible = Settings.IsOpen
  task.wait(0.2)
- SettingsItem["Settings"].Instance.Parent = not Settings.IsOpen and Library.UnusedHolder.Instance or Library.Holder.Instance
+ SettingsItem["Settings"].Instance.Parent = not Settings.IsOpen and LibRef.UnusedHolder.Instance or LibRef.Holder.Instance
  end)
  end
 
@@ -6096,7 +6099,7 @@ Library.Watermark = function(self, Data)
  end})
 
  Items["OptionHolder"] = Instances:Create("TextButton", {
- Parent = Library.UnusedHolder.Instance,
+ Parent = LibRef.UnusedHolder.Instance,
  Text = "",
  AutoButtonColor = false,
  Name = "\0",
@@ -6199,7 +6202,7 @@ Library.Watermark = function(self, Data)
 
  if Dropdown.IsOpen then 
  Items["OptionHolder"].Instance.Visible = true
- Items["OptionHolder"].Instance.Parent = Library.Holder.Instance
+ Items["OptionHolder"].Instance.Parent = LibRef.Holder.Instance
 
  Items["ArrowIcon"]:Tween(nil, {Rotation = 180, ImageColor3 = FromRGB(255, 255, 255)})
  Items["Gradient"].Instance.Enabled = true
@@ -6276,7 +6279,7 @@ Library.Watermark = function(self, Data)
  Debounce = false 
  Items["OptionHolder"].Instance.Visible = Dropdown.IsOpen
  task.wait(0.2)
- Items["OptionHolder"].Instance.Parent = not Dropdown.IsOpen and Library.UnusedHolder.Instance or Library.Holder.Instance
+ Items["OptionHolder"].Instance.Parent = not Dropdown.IsOpen and LibRef.UnusedHolder.Instance or LibRef.Holder.Instance
  end)
  end
 

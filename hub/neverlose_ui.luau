@@ -81,6 +81,13 @@ return function(Core)
 		return lib.Holder and lib.Holder.Instance
 	end
 
+	local function librarySourceValid(source)
+		if type(source) ~= "string" or #source < MIN_LIBRARY_BYTES then
+			return false
+		end
+		return source:find("LibRef", 1, true) ~= nil and source:find("EnsureGuiRoot", 1, true) ~= nil
+	end
+
 	local function loadNeverloseLibrary()
 		if neverloseLibraryLive(ENV._NeverloseLibrary) then
 			return ENV._NeverloseLibrary
@@ -93,9 +100,17 @@ return function(Core)
 		local springFactory = compileModule(readLocal(SPRING_FILE) or fetchRemote(SPRING_FILE, MIN_SPRING_BYTES), "@Neverlose/spring")
 		local Spring = type(springFactory) == "function" and springFactory() or nil
 
-		local libSource = readLocal(LIBRARY_FILE) or fetchRemote(LIBRARY_FILE, MIN_LIBRARY_BYTES)
+		local libSource = readLocal(LIBRARY_FILE)
+		if libSource and not librarySourceValid(libSource) then
+			Core.logWarn("Ignoring stale local Neverlose library.lua")
+			libSource = nil
+		end
+		libSource = libSource or fetchRemote(LIBRARY_FILE, MIN_LIBRARY_BYTES)
 		if not libSource then
 			return nil, "library.lua missing"
+		end
+		if not librarySourceValid(libSource) then
+			return nil, "stale library.lua missing LibRef/EnsureGuiRoot"
 		end
 
 		local Library = compileModule(libSource, "@Neverlose/library")
