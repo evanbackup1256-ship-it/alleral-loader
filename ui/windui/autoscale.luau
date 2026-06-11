@@ -1,5 +1,5 @@
 --[[
-	WindUI AutoScale runtime — Footagesus WindUI (MIT)
+	WindUI AutoScale runtime ? Footagesus WindUI (MIT)
 	https://github.com/Footagesus/WindUI
 	Docs: Window AutoScale fits the UI in the viewport with a 40px margin via SetUIScale.
 ]]

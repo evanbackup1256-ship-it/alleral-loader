@@ -1044,18 +1044,15 @@ local function fixWrappedLabels(root)
 	end
 end
 
-local function relayoutTabColumns(tab)
+local COLUMN_GAP = 8
+
+local function relayoutTwoColumnFrames(tab)
 	local layout = tab._layout
-	if not layout or not layout.ready or not layout.hstack or not layout.cols then
-		return false
-	end
-	local hstack = layout.hstack
-	local hframe = hstack.ElementFrame
-	if not hframe then
+	if not layout or not layout.ready or not layout.row or not layout.left or not layout.right then
 		return false
 	end
 
-	local width = hframe.AbsoluteSize.X
+	local width = layout.row.AbsoluteSize.X
 	if width < 64 then
 		width = measureTabContentWidth(tab._rawTab, tab._window)
 	end
@@ -1063,89 +1060,119 @@ local function relayoutTabColumns(tab)
 		return false
 	end
 
-	hframe.Size = UDim2.new(1, 0, 0, 0)
-	hframe.AutomaticSize = Enum.AutomaticSize.Y
+	layout.row.Size = UDim2.new(1, 0, 0, 0)
+	layout.row.AutomaticSize = Enum.AutomaticSize.Y
 
-	local n = #layout.cols
-	local gap = 6
-	local list = hframe:FindFirstChildOfClass("UIListLayout")
-	if list then
-		gap = list.Padding.Offset
-	end
+	local colWidth = math.max(160, math.floor((width - COLUMN_GAP) / 2))
+	local colSize = UDim2.new(0, colWidth, 0, 0)
 
-	local scale = 1 / n
-	local remainder = -(gap * (n - 1))
-	local baseOffset = math.floor(remainder / n)
-	local extra = remainder - (baseOffset * n)
+	layout.left.Size = colSize
+	layout.left.AutomaticSize = Enum.AutomaticSize.Y
+	layout.right.Size = colSize
+	layout.right.AutomaticSize = Enum.AutomaticSize.Y
 
-	for index, colStack in ipairs(layout.cols) do
-		local colFrame = colStack.ElementFrame
-		if colFrame and colFrame:IsA("GuiObject") then
-			local offset = baseOffset
-			if index <= math.abs(extra) then
-				offset = offset - (extra < 0 and 1 or -1)
-			end
-			colFrame.Size = UDim2.new(scale, offset, 0, 0)
-			colFrame.AutomaticSize = Enum.AutomaticSize.Y
-		end
-	end
-
-	for _, colStack in ipairs(layout.cols) do
-		if colStack.ElementFrame then
-			fixWrappedLabels(colStack.ElementFrame)
-		end
-	end
+	fixWrappedLabels(layout.left)
+	fixWrappedLabels(layout.right)
 	return true
 end
 
-local function ensureTabColumnRelayoutHooks(tab)
-	if tab._columnRelayoutHooked then
-		return
-	end
-	tab._columnRelayoutHooked = true
-
-	local function tryRelayout()
-		relayoutTabColumns(tab)
+local function ensureTwoColumnLayout(tab, rawTab)
+	if not rawTab or tab._columnCount < 2 then
+		return false
 	end
 
+	tab._layout = tab._layout or {}
 	local layout = tab._layout
-	local hframe = layout and layout.hstack and layout.hstack.ElementFrame
-	if hframe then
+	if layout.ready then
+		return true
+	end
+
+	local container = rawTab.UIElements and rawTab.UIElements.ContainerFrame
+	if not container then
+		return false
+	end
+
+	local row = Instance.new("Frame")
+	row.Name = "AlleralColumns"
+	row.BackgroundTransparency = 1
+	row.Size = UDim2.new(1, 0, 0, 0)
+	row.AutomaticSize = Enum.AutomaticSize.Y
+	row.LayoutOrder = -1000
+	row.Parent = container
+
+	local rowList = Instance.new("UIListLayout")
+	rowList.FillDirection = Enum.FillDirection.Horizontal
+	rowList.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	rowList.SortOrder = Enum.SortOrder.LayoutOrder
+	rowList.Padding = UDim.new(0, COLUMN_GAP)
+	rowList.Parent = row
+
+	local function makeColumn(name, order)
+		local col = Instance.new("Frame")
+		col.Name = name
+		col.BackgroundTransparency = 1
+		col.Size = UDim2.new(0, 160, 0, 0)
+		col.AutomaticSize = Enum.AutomaticSize.Y
+		col.LayoutOrder = order
+		col.Parent = row
+
+		local vlist = Instance.new("UIListLayout")
+		vlist.FillDirection = Enum.FillDirection.Vertical
+		vlist.SortOrder = Enum.SortOrder.LayoutOrder
+		vlist.Padding = UDim.new(0, 8)
+		vlist.Parent = col
+		return col
+	end
+
+	layout.row = row
+	layout.left = makeColumn("LeftColumn", 1)
+	layout.right = makeColumn("RightColumn", 2)
+	layout.leftOrder = 0
+	layout.rightOrder = 0
+	layout.ready = true
+
+	if not tab._columnRelayoutHooked then
+		tab._columnRelayoutHooked = true
 		pcall(function()
-			hframe:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-				if hframe.AbsoluteSize.X >= 64 then
-					tryRelayout()
+			row:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+				if row.AbsoluteSize.X >= 64 then
+					relayoutTwoColumnFrames(tab)
+				end
+			end)
+		end)
+		pcall(function()
+			container:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+				if container.AbsoluteSize.X >= 64 then
+					relayoutTwoColumnFrames(tab)
 				end
 			end)
 		end)
 	end
 
-	local rawTab = tab._rawTab
-	if rawTab and rawTab.UIElements and rawTab.UIElements.ContainerFrame then
-		pcall(function()
-			rawTab.UIElements.ContainerFrame:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-				if rawTab.UIElements.ContainerFrame.AbsoluteSize.X >= 64 then
-					tryRelayout()
-				end
-			end)
-		end)
-	end
+	relayoutTwoColumnFrames(tab)
+	return true
 end
 
-local function scheduleTabColumnRelayout(tab)
+local function getColumnFrame(tab, column)
+	local layout = tab._layout
+	if not layout or not layout.ready then
+		return nil
+	end
+	return (column == 2) and layout.right or layout.left
+end
+
+local function scheduleTwoColumnRelayout(tab)
 	if type(tab) ~= "table" then
 		return
 	end
-	ensureTabColumnRelayoutHooks(tab)
 
 	local function tryRelayout()
-		relayoutTabColumns(tab)
+		relayoutTwoColumnFrames(tab)
 	end
 
 	task.defer(tryRelayout)
 	task.delay(0.05, tryRelayout)
 	task.delay(0.15, tryRelayout)
-	task.delay(0.35, tryRelayout)
 end
 
 function Core.wrapUiTab(rawTab, uiBundle, window)
@@ -1156,50 +1183,12 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 		_columnCount = 1,
 	}
 
-	local function resolveSectionParent(column)
+	local function resolveColumn(column)
 		column = math.clamp(tonumber(column) or 1, 1, 2)
-		if not rawTab or tab._columnCount < 2 or type(rawTab.HStack) ~= "function" then
-			return rawTab, column
+		if tab._columnCount >= 2 and rawTab then
+			ensureTwoColumnLayout(tab, rawTab)
 		end
-		tab._layout = tab._layout or {}
-		local layout = tab._layout
-		if not layout.ready then
-			local hstack
-			local ok, result = pcall(function()
-				return rawTab:HStack({})
-			end)
-			if ok then
-				hstack = result
-			end
-			layout.hstack = hstack
-			if layout.hstack and type(layout.hstack.VStack) == "function" then
-				local colOk, colA = pcall(function()
-					return layout.hstack:VStack({})
-				end)
-				local colBOk, colB = pcall(function()
-					return layout.hstack:VStack({})
-				end)
-				if colOk and colBOk and colA and colB then
-					layout.cols = { colA, colB }
-					layout.ready = type(layout.cols[1].Section) == "function" and type(layout.cols[2].Section) == "function"
-					if layout.ready then
-						scheduleTabColumnRelayout(tab)
-						local windUi = uiBundle and (uiBundle.WindUI or uiBundle.Library)
-						if windUi and type(windUi.RelayoutColumns) == "function" then
-							task.defer(function()
-								pcall(function()
-									windUi:RelayoutColumns(window)
-								end)
-							end)
-						end
-					end
-				end
-			end
-		end
-		if layout.ready and layout.cols and layout.cols[column] and type(layout.cols[column].Section) == "function" then
-			return layout.cols[column], column
-		end
-		return rawTab, column
+		return column
 	end
 
 	function tab:CreateGroupbox(settings)
@@ -1209,16 +1198,14 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 			Core.logWarn("CreateGroupbox skipped — tab missing for " .. tostring(name))
 			return Core.createWindUiGroupbox({}, uiBundle)
 		end
-		local parent = select(1, resolveSectionParent(settings.Column or 1))
-		if not parent or type(parent.Section) ~= "function" then
-			parent = rawTab
-		end
-		if not parent or type(parent.Section) ~= "function" then
+		if type(rawTab.Section) ~= "function" then
 			Core.logWarn("CreateGroupbox skipped — Section unavailable for " .. tostring(name))
 			return Core.createWindUiGroupbox({}, uiBundle)
 		end
+
+		local column = resolveColumn(settings.Column or 1)
 		local ok, rawGroup = pcall(function()
-			return parent:Section({
+			return rawTab:Section({
 				Title = name,
 				Box = true,
 				BoxBorder = true,
@@ -1229,8 +1216,30 @@ function Core.wrapUiTab(rawTab, uiBundle, window)
 			Core.logWarn("CreateGroupbox Section failed for " .. tostring(name) .. ": " .. tostring(rawGroup))
 			return Core.createWindUiGroupbox({}, uiBundle)
 		end
+
+		if tab._columnCount >= 2 then
+			local colFrame = getColumnFrame(tab, column)
+			local sectionFrame = rawGroup.ElementFrame
+			if colFrame and sectionFrame and sectionFrame:IsA("GuiObject") then
+				local layout = tab._layout
+				if column == 2 then
+					layout.rightOrder = (layout.rightOrder or 0) + 1
+					sectionFrame.LayoutOrder = layout.rightOrder
+				else
+					layout.leftOrder = (layout.leftOrder or 0) + 1
+					sectionFrame.LayoutOrder = layout.leftOrder
+				end
+				sectionFrame.Parent = colFrame
+				sectionFrame.Size = UDim2.new(1, 0, 0, 0)
+				if sectionFrame:IsA("Frame") then
+					sectionFrame.AutomaticSize = Enum.AutomaticSize.Y
+				end
+				fixWrappedLabels(sectionFrame)
+			end
+		end
+
 		task.defer(function()
-			scheduleTabColumnRelayout(tab)
+			scheduleTwoColumnRelayout(tab)
 			if rawGroup.UIElements and rawGroup.UIElements.Main then
 				fixWrappedLabels(rawGroup.UIElements.Main)
 			end

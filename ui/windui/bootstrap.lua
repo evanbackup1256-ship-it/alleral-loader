@@ -29,12 +29,12 @@ local function validPatchSource(body)
 		and body:find("return function", 1, true) ~= nil
 end
 
-local function httpFetch(url)
+local function httpFetch(url, validator)
 	local bust = url .. (url:find("?", 1, true) and "&" or "?") .. "t=" .. tostring(tick())
 	local ok, body = pcall(function()
 		return game:HttpGet(bust)
 	end)
-	if ok and validPatchSource(body) then
+	if ok and type(body) == "string" and (not validator or validator(body)) then
 		return body
 	end
 
@@ -43,7 +43,7 @@ local function httpFetch(url)
 		ok, body = pcall(function()
 			return HttpService:GetAsync(bust, true)
 		end)
-		if ok and validPatchSource(body) then
+		if ok and type(body) == "string" and (not validator or validator(body)) then
 			return body
 		end
 	end
@@ -77,9 +77,11 @@ end
 
 local function fetchRemotePatch()
 	for _, url in ipairs(PATCH_URLS) do
-		local body = httpFetch(url)
-		if body then
-			return body, url
+		if url:find("arrrel", 1, true) or url:find("aller", 1, true) then
+			local body = httpFetch(url, validPatchSource)
+			if body then
+				return body, url
+			end
 		end
 	end
 	return nil
@@ -93,8 +95,10 @@ return function(WindUI)
 	local function loadModule(fileName, marker)
 		for _, url in ipairs(PATCH_URLS) do
 			if url:find(fileName, 1, true) then
-				local body = httpFetch(url)
-				if body and body:find(marker, 1, true) then
+				local body = httpFetch(url, function(source)
+					return type(source) == "string" and source:find(marker, 1, true) ~= nil
+				end)
+				if body then
 					return body, url
 				end
 			end

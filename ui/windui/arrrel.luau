@@ -99,7 +99,7 @@ return function(WindUI)
 		return palette.accentHot
 	end
 
-	WindUI.ARRREL_UI_VERSION = "2.0.5-alleral-v2"
+	WindUI.ARRREL_UI_VERSION = "2.0.8-alleral-v2"
 	WindUI.ARRREL_BRAND = "Alleral"
 	WindUI.ALLERAL_UI_VERSION = WindUI.ARRREL_UI_VERSION
 	WindUI.ALLERAL_BRAND = "Alleral UI V2"
@@ -520,6 +520,7 @@ return function(WindUI)
 		local urls = {
 			"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/windui/autoscale.luau",
 			"https://github.com/evanbackup1256-ship-it/kick/raw/main/ui/windui/autoscale.luau",
+			"https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua",
 		}
 		local readFn = readfile or (syn and syn.readfile) or (fluxus and fluxus.readfile)
 		local isFileFn = isfile or (syn and syn.isfile)
@@ -560,13 +561,15 @@ return function(WindUI)
 		end
 
 		for _, url in ipairs(urls) do
-			local bust = url .. (url:find("?", 1, true) and "&" or "?") .. "t=" .. tostring(tick())
-			local ok, body = pcall(function()
-				return game:HttpGet(bust)
-			end)
-			local api = ok and activate(body, url)
-			if api then
-				return api
+			if url:find("autoscale", 1, true) then
+				local bust = url .. (url:find("?", 1, true) and "&" or "?") .. "t=" .. tostring(tick())
+				local ok, body = pcall(function()
+					return game:HttpGet(bust)
+				end)
+				local api = ok and activate(body, url)
+				if api then
+					return api
+				end
 			end
 		end
 
@@ -595,11 +598,18 @@ return function(WindUI)
 			if type(window) ~= "table" or type(window.SetUIScale) ~= "function" then
 				return nil
 			end
+			local profileMul = math.clamp(tonumber(WindUI._AlleralUiScale) or 1, 0.75, 1.25)
 			local base = computeScale(window)
-			if not base then
-				return nil
+			local scale = base
+			if not scale then
+				if window.AutoScale == false then
+					scale = profileMul
+				else
+					return nil
+				end
+			else
+				scale = math.clamp(base * profileMul, minScale, maxScale)
 			end
-			local scale = math.clamp(base * (tonumber(WindUI._AlleralUiScale) or 1), minScale, maxScale)
 			local current = (type(window.GetUIScale) == "function" and window:GetUIScale()) or 1
 			if math.abs(scale - current) > threshold then
 				pcall(function()
@@ -627,6 +637,8 @@ return function(WindUI)
 						camera:GetPropertyChangedSignal("ViewportSize"):Connect(refresh)
 					end)
 					task.defer(refresh)
+					task.delay(0.08, refresh)
+					task.delay(0.25, refresh)
 				end
 				hook(Workspace.CurrentCamera)
 				Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
@@ -1085,24 +1097,32 @@ return function(WindUI)
 			return false
 		end
 
-		hframe.Size = UDim2.new(1, 0, hframe.Size.Y.Scale, hframe.Size.Y.Offset)
+		hframe.Size = UDim2.new(1, 0, 0, 0)
+		hframe.AutomaticSize = Enum.AutomaticSize.Y
 
 		local layout = hframe:FindFirstChildOfClass("UIListLayout")
 		local gap = layout and layout.Padding.Offset or 6
-		local scale = 1 / n
-		local totalGap = gap * (n - 1)
-		local remainder = -totalGap
-		local baseOffset = math.floor(remainder / n)
-		local extra = remainder - (baseOffset * n)
+		if layout then
+			layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+		end
 
-		for index, col in ipairs(columns) do
+		local totalGap = gap * math.max(0, n - 1)
+		local colWidth = math.max(140, math.floor((parentWidth - totalGap) / n))
+
+		for _, col in ipairs(columns) do
 			if col and col:IsA("GuiObject") then
-				local offset = baseOffset
-				if index <= math.abs(extra) then
-					offset = offset - (extra < 0 and 1 or -1)
-				end
-				col.Size = UDim2.new(scale, offset, 0, 0)
+				col.Size = UDim2.new(0, colWidth, 0, 0)
 				col.AutomaticSize = Enum.AutomaticSize.Y
+				for _, desc in ipairs(col:GetDescendants()) do
+					if desc:IsA("TextLabel") and desc.TextWrapped then
+						desc.TextWrapped = false
+						desc.TextTruncate = Enum.TextTruncate.AtEnd
+						if desc.AutomaticSize == Enum.AutomaticSize.XY then
+							desc.AutomaticSize = Enum.AutomaticSize.Y
+							desc.Size = UDim2.new(1, 0, 0, 0)
+						end
+					end
+				end
 			end
 		end
 		return true
@@ -3104,6 +3124,7 @@ return function(WindUI)
 				if WindUI.Window then
 					task.defer(function()
 						relayoutAllHStacks(WindUI.Window)
+						polishRowLabels(WindUI.Window.UIElements and WindUI.Window.UIElements.MainBar)
 					end)
 				end
 			end)
@@ -3122,6 +3143,7 @@ return function(WindUI)
 		local scale = applyWindowScale(window)
 		task.defer(function()
 			relayoutAllHStacks(window)
+			polishRowLabels(window.UIElements and window.UIElements.MainBar)
 		end)
 		return scale
 	end
@@ -4537,6 +4559,9 @@ return function(WindUI)
 		WindUI._AlleralUiScale = scale
 		if WindUI.Window then
 			applyWindowScale(WindUI.Window)
+			task.defer(function()
+				relayoutAllHStacks(WindUI.Window)
+			end)
 		end
 		return scale
 	end
