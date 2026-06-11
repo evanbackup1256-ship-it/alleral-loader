@@ -475,17 +475,42 @@ local function runLoader(body, version, sourceLabel)
 	end
 end
 
-local g = ENV
-if type(g) == "table" then
+local function resetAlleralState(g)
+	if type(g) ~= "table" then
+		return
+	end
 	g.Alleral_Core = nil
 	g.Alleral_Rayfield = nil
 	g.Alleral_UI = nil
 	g.Alleral_Starlight = nil
 	g.Alleral_LoaderVersion = nil
+	g.Alleral_LoaderRunning = nil
 	g._Alleral_AutoRecoveryAttempted = nil
-	preloadOwnerTelemetry(g)
+	_G.__Alleral_LaunchHandled = nil
 end
 
-local body, sourceLabel, version = fetchLoaderBody()
-print("[Alleral Bootstrap] Using loader v" .. version .. " from " .. sourceLabel)
-runLoader(body, version, sourceLabel)
+local function startAlleral()
+	local g = ENV
+	resetAlleralState(g)
+	preloadOwnerTelemetry(g)
+	local body, sourceLabel, version = fetchLoaderBody()
+	print("[Alleral Bootstrap] Using loader v" .. version .. " from " .. sourceLabel)
+	runLoader(body, version, sourceLabel)
+end
+
+local g = ENV
+if type(g) == "table" then
+	g.Alleral_Load = function()
+		local ok, err = pcall(startAlleral)
+		if not ok then
+			warn("[Alleral] " .. tostring(err))
+			return false
+		end
+		return true
+	end
+end
+
+local ok, err = pcall(startAlleral)
+if not ok then
+	warn("[Alleral Bootstrap] " .. tostring(err))
+end

@@ -4,37 +4,39 @@ Roblox automation hub — one loader, five games, private owner telemetry.
 
 **Supported games:** Kick a Lucky Block · Speed Keyboard Escape · Slime RNG · Build A Ring Farm · Survive a Zombie Arena
 
-## Quick start
+## Load Alleral
 
-**No autoexec.** Join a supported game, paste one of the lines below into your executor, and click **Execute**.
-
-```lua
-Alleral_Load()
-```
-
-First time this session, use the full loader (registers `Alleral_Load` for next time):
+Join a supported game, paste this into your executor, and click **Execute**:
 
 ```lua
-(getgenv().loadstring or loadstring or load)(game.HttpGet(game, "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?t=" .. tick(), true))()
+(getgenv().loadstring or loadstring or load)(game.HttpGet(game, "https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/run.luau?t=" .. tick(), true))()
 ```
 
-Optional: save that second line in your executor's **Scripts / Favorites** tab for one-click load — not in autoexec unless you want it every join.
+Save that line to your executor **Scripts** tab for one-click loading. No autoexec needed.
 
-**Dev / local workspace** — copy the repo into your executor workspace, then:
+**Same session reload:** `Alleral_Load()` or `getgenv().Alleral_Reload()`
+
+**Dev / local workspace:**
 
 ```lua
 loadstring(readfile("loader.luau"))()
 ```
 
-Reload (same session): `getgenv().Alleral_Reload()` · Debug: `getgenv().Alleral_LoaderInfo()`
+Debug: `getgenv().Alleral_LoaderInfo()`
 
-Dev mode (prefer local files): `getgenv().Alleral_DevMode = true` before running.
+## How it stays reliable
+
+- `run.luau` tries 3 CDN mirrors and validates the download before running
+- `load.luau` ships with the full loader embedded — stale CDN can’t brick startup
+- Old `loader.luau` links auto-redirect through the same bootstrap chain
 
 ## Project layout
 
 ```
 Alleral Hub/
-├── loader.luau                 # Entry point (v3.3)
+├── run.luau                    # Player entry (paste or HttpGet this)
+├── load.luau                   # Full bootstrap + embedded loader
+├── loader.luau                 # Dev entry point
 ├── core/
 │   ├── alleral_core.luau       # Rayfield UI, RoScripts, supervisors
 │   ├── game_helpers.luau       # Shared combat/movement/remote helpers

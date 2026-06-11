@@ -90,7 +90,12 @@ local readFile = firstExecFunc("readfile")
 local isFile = firstExecFunc("isfile")
 local loadStringFn = firstExecFunc("loadstring", "LoadString") or loadstring
 
-local LAUNCH_BOOTSTRAP_URL = REPO_BASE .. "/launch.luau"
+local LAUNCH_ENTRY_FILES = { "load.luau", "launch.luau" }
+local LAUNCH_MIRROR_BASES = {
+	JSDELIVR_BASE .. "/",
+	REPO_BASE .. "/",
+	GITHUB_WEB_RAW .. "/",
+}
 
 local function bootstrapViaLaunch()
 	if rawget(_G, "__Alleral_LaunchHandled") then
@@ -137,14 +142,42 @@ local function bootstrapViaLaunch()
 		return nil
 	end
 
+	local function launchBodyValid(body)
+		return type(body) == "string"
+			and #body > 10000
+			and body:find("EMBEDDED_LOADER", 1, true)
+			and not body:find("404: Not Found", 1, true)
+	end
+
 	if type(loadStringFn) ~= "function" then
 		warn("[Alleral Loader] This executor needs loadstring.")
 		return true
 	end
 
 	_G.__Alleral_LaunchHandled = true
-	local source = httpGet(LAUNCH_BOOTSTRAP_URL)
-	if type(source) ~= "string" or source == "" then
+	local source = nil
+	for _, base in ipairs(LAUNCH_MIRROR_BASES) do
+		for _, file in ipairs(LAUNCH_ENTRY_FILES) do
+			for attempt = 1, 2 do
+				local body = httpGet(base .. file)
+				if launchBodyValid(body) then
+					source = body
+					break
+				end
+				if typeof(task) == "table" and type(task.wait) == "function" then
+					task.wait(0.25 * attempt)
+				end
+			end
+			if source then
+				break
+			end
+		end
+		if source then
+			break
+		end
+	end
+
+	if type(source) ~= "string" then
 		warn("[Alleral Loader] Could not download launch bootstrap.")
 		return true
 	end
