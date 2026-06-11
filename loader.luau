@@ -3,7 +3,7 @@
 	Detects game, fetches core + game script, runs.
 ]]
 
-local LOADER_VERSION = "5.0.3"
+local LOADER_VERSION = "5.1.0"
 local MIN_CORE = "1.18"
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
@@ -13,6 +13,10 @@ local CDN = "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. BRANCH
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local HttpService = nil
+pcall(function()
+	HttpService = game:GetService("HttpService")
+end)
 
 local function genv()
 	local ok, env = pcall(function()
@@ -62,88 +66,253 @@ local function notify(title, text, duration)
 	end)
 end
 
-local function detectExecutor()
+local function normalizeSlug(text)
+	local key = tostring(text or ""):lower()
+	key = key:gsub("synapse%s*z", "synapsez")
+	key = key:gsub("awp%.?gg?", "volt")
+	key = key:gsub("vega%s*x", "vegax")
+	key = key:gsub("[^a-z0-9]", "")
+	return key
+end
+
+local function detectExecutorProfile()
+	local rawName = ""
 	for _, id in ipairs({ "identifyexecutor", "getexecutorname", "whatexecutor", "getexecutor" }) do
 		local fn = firstExecFunc(id)
 		if fn then
-			local ok, name = pcall(fn)
-			if ok and type(name) == "string" and name ~= "" then
-				return name
+			local ok, result, version = pcall(fn)
+			if ok and type(result) == "string" and result ~= "" then
+				rawName = result
+				if type(version) == "string" and version ~= "" then
+					rawName = rawName .. " " .. version
+				end
+				break
 			end
 		end
 	end
-	return ENV.syn and "Synapse" or (ENV.KRNL_LOADED and "Krnl" or "Unknown")
+
+	local slug = normalizeSlug(rawName)
+	if slug == "" or slug == "unknown" then
+		if type(ENV.Volt) == "table" and type(ENV.Volt.request) == "function" then
+			slug = "volt"
+		elseif type(ENV.syn) == "table" and type(ENV.syn.request) == "function" then
+			slug = "synapse"
+		elseif ENV.KRNL_LOADED then
+			slug = "krnl"
+		elseif type(ENV.fluxus) == "table" then
+			slug = "fluxus"
+		elseif type(ENV.Xeno) == "table" then
+			slug = "xeno"
+		elseif type(ENV.Wave) == "table" then
+			slug = "wave"
+		elseif type(ENV.Electron) == "table" then
+			slug = "electron"
+		elseif type(ENV.Solara) == "table" or (ENV.shared and ENV.shared.solara) then
+			slug = "solara"
+		else
+			slug = "unknown"
+		end
+	end
+
+	local display = rawName ~= "" and rawName or slug:sub(1, 1):upper() .. slug:sub(2)
+	if slug == "synapsez" then
+		display = "Synapse Z"
+	elseif slug == "volt" and display:lower():find("volt", 1, true) == nil then
+		display = "Volt"
+	end
+
+	return { slug = slug, name = display, rawName = rawName }
 end
 
+local EXECUTOR = detectExecutorProfile()
+
+-- Per-executor HTTP transport order (first = preferred for that injector)
+local HTTP_STRATEGIES = {
+	volt = { "volt", "request", "httpget", "httpservice" },
+	awp = { "volt", "request", "httpget", "httpservice" },
+	synapse = { "syn", "request", "httpget", "httpservice" },
+	synapsez = { "syn", "request", "httpget", "httpservice" },
+	krnl = { "request", "httpget", "httpservice" },
+	fluxus = { "fluxus", "request", "httpget", "httpservice" },
+	solara = { "solara", "request", "httpget", "httpservice" },
+	solora = { "solara", "request", "httpget", "httpservice" },
+	xeno = { "xeno", "request", "httpget", "httpservice" },
+	wave = { "wave", "request", "httpget", "httpservice" },
+	electron = { "electron", "request", "httpget", "httpservice" },
+	potassium = { "potassium", "request", "httpget", "httpservice" },
+	velocity = { "velocity", "request", "httpget", "httpservice" },
+	codex = { "codex", "request", "httpget", "httpservice" },
+	hydrogen = { "hydrogen", "request", "httpget", "httpservice" },
+	delta = { "delta", "request", "httpget", "httpservice" },
+	celery = { "celery", "request", "httpget", "httpservice" },
+	jjsploit = { "httpget", "request", "httpservice" },
+	default = { "request", "httpget", "httpservice" },
+}
+
+local function extractResponseBody(response)
+	if type(response) == "string" then
+		return response
+	end
+	if type(response) == "table" then
+		return response.Body or response.body or response.Data or response.data
+	end
+	return nil
+end
+
+local function requestVia(fn, url)
+	if type(fn) ~= "function" then
+		return nil
+	end
+	for _, spec in ipairs({
+		{ Url = url, Method = "GET", Headers = { ["Cache-Control"] = "no-cache" } },
+		{ url = url, method = "GET", headers = { ["Cache-Control"] = "no-cache" } },
+	}) do
+		local ok, res = pcall(fn, spec)
+		if ok then
+			local body = extractResponseBody(res)
+			if type(body) == "string" and #body > 0 then
+				return body
+			end
+		end
+	end
+	return nil
+end
+
+local function buildHttpTransports(slug)
+	local sharedEnv = ENV.shared or (typeof(shared) == "table" and shared) or nil
+	local solaraLib = sharedEnv and type(sharedEnv.solara) == "table" and sharedEnv.solara or nil
+	local transports = {
+		volt = function(url)
+			return ENV.Volt and requestVia(ENV.Volt.request, url)
+		end,
+		syn = function(url)
+			return ENV.syn and requestVia(ENV.syn.request, url)
+		end,
+		fluxus = function(url)
+			return ENV.fluxus and requestVia(ENV.fluxus.request, url)
+		end,
+		solara = function(url)
+			if solaraLib and type(solaraLib.request) == "function" then
+				return requestVia(solaraLib.request, url)
+			end
+			if type(ENV.Solara) == "table" then
+				return requestVia(ENV.Solara.request, url)
+			end
+			return nil
+		end,
+		xeno = function(url)
+			return type(ENV.Xeno) == "table" and requestVia(ENV.Xeno.request, url)
+		end,
+		wave = function(url)
+			return type(ENV.Wave) == "table" and requestVia(ENV.Wave.request, url)
+		end,
+		electron = function(url)
+			return type(ENV.Electron) == "table" and requestVia(ENV.Electron.request, url)
+		end,
+		potassium = function(url)
+			return type(ENV.Potassium) == "table" and requestVia(ENV.Potassium.request, url)
+		end,
+		velocity = function(url)
+			return type(ENV.Velocity) == "table" and requestVia(ENV.Velocity.request, url)
+		end,
+		codex = function(url)
+			return type(ENV.Codex) == "table" and requestVia(ENV.Codex.request, url)
+		end,
+		hydrogen = function(url)
+			return type(ENV.Hydrogen) == "table" and requestVia(ENV.Hydrogen.request, url)
+		end,
+		delta = function(url)
+			return type(ENV.delta) == "table" and requestVia(ENV.delta.request, url)
+		end,
+		celery = function(url)
+			return type(ENV.celery) == "table" and requestVia(ENV.celery.request, url)
+		end,
+		request = function(url)
+			return requestVia(ENV.request, url) or requestVia(ENV.http_request, url) or requestVia(ENV.Request, url)
+		end,
+		httpget = function(url)
+			if type(game.HttpGet) == "function" then
+				local ok, body = pcall(game.HttpGet, game, url, true)
+				if type(body) == "string" and #body > 0 then
+					return body
+				end
+				ok, body = pcall(game.HttpGet, game, url)
+				if type(body) == "string" and #body > 0 then
+					return body
+				end
+			end
+			local ok, body = pcall(function()
+				return game:HttpGet(url, true)
+			end)
+			if ok and type(body) == "string" and #body > 0 then
+				return body
+			end
+			ok, body = pcall(function()
+				return game:HttpGet(url)
+			end)
+			if ok and type(body) == "string" and #body > 0 then
+				return body
+			end
+			return nil
+		end,
+		httpservice = function(url)
+			if HttpService and type(HttpService.GetAsync) == "function" then
+				local ok, body = pcall(function()
+					return HttpService:GetAsync(url, true)
+				end)
+				if ok and type(body) == "string" and #body > 0 then
+					return body
+				end
+			end
+			return nil
+		end,
+	}
+
+	local order = HTTP_STRATEGIES[slug] or HTTP_STRATEGIES.default
+	local list, seen = {}, {}
+	for _, id in ipairs(order) do
+		if transports[id] and not seen[id] then
+			seen[id] = true
+			table.insert(list, { id = id, fetch = transports[id] })
+		end
+	end
+	for id, fetch in pairs(transports) do
+		if not seen[id] then
+			table.insert(list, { id = id, fetch = fetch })
+		end
+	end
+	return list
+end
+
+local HTTP_TRANSPORTS = buildHttpTransports(EXECUTOR.slug)
+
 local CAPABILITIES = {
-	executor = detectExecutor(),
+	executor = EXECUTOR.name,
+	executorSlug = EXECUTOR.slug,
 	loadstring = loadStringFn ~= nil,
 	readfile = readFile ~= nil,
 }
 
-local function httpGet(url)
+local function httpGet(url, minBytes)
+	minBytes = minBytes or 0
 	local bust = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(tick())
 
-	if type(game.HttpGet) == "function" then
-		for _, fetchUrl in ipairs({ bust, url }) do
-			local ok, body = pcall(game.HttpGet, game, fetchUrl, true)
-			if type(body) == "string" and #body > 0 then
-				return body
-			end
-			ok, body = pcall(game.HttpGet, game, fetchUrl)
-			if type(body) == "string" and #body > 0 then
-				return body
-			end
-		end
-	end
-
-	for _, fetchUrl in ipairs({ bust, url }) do
-		local ok, body = pcall(function()
-			return game:HttpGet(fetchUrl, true)
-		end)
-		if ok and type(body) == "string" and #body > 0 then
-			return body
-		end
-		ok, body = pcall(function()
-			return game:HttpGet(fetchUrl)
-		end)
-		if ok and type(body) == "string" and #body > 0 then
-			return body
-		end
-	end
-
-	if type(ENV.Volt) == "table" and type(ENV.Volt.request) == "function" then
-		local ok, res = pcall(ENV.Volt.request, { Url = bust, Method = "GET" })
-		if ok and res then
-			local body = res.Body or res.body
-			if type(body) == "string" and #body > 0 then
-				return body
-			end
-		end
-	end
-
-	if type(ENV.request) == "function" then
-		local ok, res = pcall(ENV.request, { Url = bust, Method = "GET" })
-		if ok and res then
-			local body = res.Body or res.body
-			if type(body) == "string" and #body > 0 then
-				return body
-			end
-		end
-	end
-
-	return nil
-end
-
-local function downloadUrl(url)
 	local core = ENV.Alleral_Core
 	if core and type(core.httpGet) == "function" then
-		local body = core.httpGet(url)
-		if type(body) == "string" and #body > 0 then
-			return body
+		local body = core.httpGet(bust)
+		if type(body) == "string" and #body >= minBytes then
+			return body, "core"
 		end
 	end
-	return httpGet(url)
+
+	local bestBody, bestVia, bestLen = nil, nil, 0
+	for _, transport in ipairs(HTTP_TRANSPORTS) do
+		local body = transport.fetch(bust)
+		if type(body) == "string" and #body >= minBytes and #body > bestLen then
+			bestBody, bestVia, bestLen = body, transport.id, #body
+		end
+	end
+	return bestBody, bestVia
 end
 
 local function looksLikeLua(body)
@@ -181,12 +350,29 @@ end
 local function fetchRemote(relativePath, minBytes)
 	minBytes = minBytes or 0
 	for _, base in ipairs({ RAW, GH_WEB, CDN }) do
-		local body = downloadUrl(base .. "/" .. relativePath)
-		if body and #body >= minBytes and looksLikeLua(body) and not body:find("404: Not Found", 1, true) then
-			return body, base
+		local body, via = httpGet(base .. "/" .. relativePath, minBytes)
+		if body and looksLikeLua(body) and not body:find("404: Not Found", 1, true) then
+			local label = base
+			if via then
+				label = label .. " via " .. via
+			end
+			return body, label
 		end
 	end
 	return nil
+end
+
+local function cacheRemote(relativePath, src)
+	local writeFile = firstExecFunc("writefile")
+	local makeFolder = firstExecFunc("makefolder")
+	if type(writeFile) ~= "function" then
+		return
+	end
+	local dir = relativePath:match("^(.+)/[^/]+$")
+	if dir and makeFolder then
+		pcall(makeFolder, dir)
+	end
+	pcall(writeFile, relativePath, src)
 end
 
 local function getSource(localPaths, remotePath, opts)
@@ -208,11 +394,8 @@ local function getSource(localPaths, remotePath, opts)
 		if marker and not src:find(marker, 1, true) then
 			log("Script may be outdated (missing " .. marker .. ")", true)
 		end
-		local writeFile = firstExecFunc("writefile")
-		if type(writeFile) == "function" and remotePath:find("games/", 1, true) then
-			pcall(writeFile, remotePath, src)
-		end
-		return src, "remote"
+		cacheRemote(remotePath, src)
+		return src, "remote" .. (path and (" (" .. path .. ")") or "")
 	end
 
 	return nil, "Could not load " .. remotePath
@@ -501,7 +684,7 @@ local function main()
 		return
 	end
 
-	log("Game: " .. profile.name .. " | executor=" .. CAPABILITIES.executor)
+	log("Game: " .. profile.name .. " | executor=" .. EXECUTOR.name .. " (" .. EXECUTOR.slug .. ")")
 
 	if profile.preload then
 		local ready, preloadErr = profile.preload()
@@ -584,7 +767,7 @@ ENV.Alleral_LoaderInfo = function()
 	return { version = LOADER_VERSION, capabilities = CAPABILITIES, games = GAMES }
 end
 
-print("[Alleral] v" .. LOADER_VERSION .. " | PlaceId " .. tostring(game.PlaceId))
+print("[Alleral] v" .. LOADER_VERSION .. " | PlaceId " .. tostring(game.PlaceId) .. " | executor=" .. EXECUTOR.slug)
 
 local ok, err = pcall(main)
 if not ok then
