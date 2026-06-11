@@ -1,5 +1,5 @@
 local Core = {}
-Core.VERSION = "1.11"
+Core.VERSION = "1.12"
 Core.STARLIGHT_BUILD = "Alleral-3"
 
 local HttpService = game:GetService("HttpService")
@@ -115,12 +115,96 @@ end
 function Core.execFunction(name, requireFilesystem)
 	if requireFilesystem then
 		local profile = Core.executorProfile()
-		if not profile.fsOk then
+		if not profile.fsOk and not profile.hasFilesystem then
 			return nil
 		end
 	end
+	local aliases = Core.EXEC_ALIASES and Core.EXEC_ALIASES[name]
+	if aliases then
+		for _, alias in ipairs(aliases) do
+			local fn = ENV[alias]
+			if type(fn) ~= "function" then
+				fn = Core.firstExecFunc(alias)
+			end
+			if type(fn) == "function" then
+				return fn
+			end
+		end
+	end
 	local fn = ENV[name]
+	if type(fn) ~= "function" then
+		fn = Core.firstExecFunc(name)
+	end
 	return type(fn) == "function" and fn or nil
+end
+
+Core.EXEC_ALIASES = {
+	readfile = { "readfile", "read_file", "ReadFile" },
+	writefile = { "writefile", "write_file", "WriteFile" },
+	isfile = { "isfile", "is_file", "IsFile" },
+	listfiles = { "listfiles", "list_files", "ListFiles" },
+	makefolder = { "makefolder", "make_folder", "MakeFolder" },
+	isfolder = { "isfolder", "is_folder", "IsFolder" },
+	loadstring = { "loadstring", "LoadString" },
+	setclipboard = { "setclipboard", "toclipboard", "setrbxclipboard" },
+	getconnections = { "getconnections", "get_signal_cons" },
+	firetouchinterest = { "firetouchinterest", "FireTouchInterest", "touchinterest" },
+	identifyexecutor = { "identifyexecutor", "getexecutorname", "whatexecutor", "getexecutor" },
+}
+
+local function inferSlugFromText(text)
+	local lower = tostring(text or ""):lower()
+	local map = {
+		{ "synapse z", "synapsez" },
+		{ "synapse", "synapsez" },
+		{ "potassium", "potassium" },
+		{ "matcha", "matcha" },
+		{ "photon", "photon" },
+		{ "volt", "volt" },
+		{ "awp", "volt" },
+		{ "velocity", "velocity" },
+		{ "solara", "solara" },
+		{ "solora", "solara" },
+		{ "xeno", "xeno" },
+		{ "wave", "wave" },
+		{ "delta", "delta" },
+		{ "codex", "codex" },
+		{ "cryptic", "cryptic" },
+		{ "sirhurt", "sirhurt" },
+		{ "seliware", "seliware" },
+		{ "swift", "swift" },
+		{ "volcano", "volcano" },
+		{ "electron", "electron" },
+		{ "ronin", "ronin" },
+		{ "bunni", "bunni" },
+		{ "serotonin", "serotonin" },
+		{ "cosmic", "cosmic" },
+		{ "opiumware", "opiumware" },
+		{ "lumen", "lumen" },
+		{ "severe", "severe" },
+		{ "isaeva", "isaeva" },
+		{ "nihon", "nihon" },
+		{ "zenith", "zenith" },
+		{ "macsploit", "macsploit" },
+		{ "vega x", "vegax" },
+		{ "vega", "vegax" },
+		{ "madium", "madium" },
+		{ "rbxcli", "rbxcli" },
+		{ "krnl", "krnl" },
+		{ "fluxus", "fluxus" },
+		{ "jjsploit", "jjsploit" },
+		{ "comet", "comet" },
+		{ "trigon", "trigon" },
+		{ "hydrogen", "hydrogen" },
+		{ "arceus", "arceus" },
+		{ "oxygen", "oxygenu" },
+	}
+	for _, pair in ipairs(map) do
+		if lower:find(pair[1], 1, true) then
+			return pair[2]
+		end
+	end
+	return nil
 end
 
 function Core.detectExecutor()
@@ -145,7 +229,7 @@ function Core.detectExecutor()
 		end
 	end
 
-	local slug = rawName:lower():gsub("%s+", ""):match("^[%a][%w%-_%.]*") or ""
+	local slug = inferSlugFromText(rawName) or rawName:lower():gsub("%s+", ""):match("^[%a][%w%-_%.]*") or ""
 	local function hasTable(key)
 		local value = ENV[key]
 		return type(value) == "table" and value or nil
@@ -245,6 +329,20 @@ function Core.detectExecutor()
 			slug = "luna"
 		elseif hasTable("Macsploit") or hasTable("macsploit") then
 			slug = "macsploit"
+		elseif hasTable("Potassium") or hasTable("potassium") then
+			slug = "potassium"
+		elseif hasTable("Cosmic") or hasTable("cosmic") then
+			slug = "cosmic"
+		elseif hasTable("Opiumware") or hasTable("opiumware") then
+			slug = "opiumware"
+		elseif hasTable("Volcano") or hasTable("volcano") then
+			slug = "volcano"
+		elseif hasTable("Swift") or hasTable("swift") then
+			slug = "swift"
+		elseif hasTable("Ronin") or hasTable("ronin") then
+			slug = "ronin"
+		elseif hasTable("Synapse") or ENV.SynapseZ == true then
+			slug = "synapsez"
 		elseif hasTable("Arceus") or ENV.ARCEUS_LOADED == true then
 			slug = "arceus"
 		elseif Core.firstExecFunc("queue_on_teleport") and Core.firstExecFunc("getgc") then
@@ -259,12 +357,22 @@ function Core.detectExecutor()
 	end
 
 	local display = slug:sub(1, 1):upper() .. slug:sub(2)
-	if slug == "synapse" then
+	if slug == "synapsez" then
+		display = "Synapse Z"
+	elseif slug == "synapse" then
 		display = "Synapse"
 	elseif slug == "jjsploit" then
 		display = "JJSploit"
 	elseif slug == "solara" then
 		display = "Solara"
+	elseif slug == "vegax" then
+		display = "Vega X"
+	elseif slug == "macsploit" then
+		display = "MacSploit"
+	elseif slug == "oxygenu" then
+		display = "Oxygen U"
+	elseif slug == "bunni" then
+		display = "Bunni"
 	end
 
 	return {
@@ -273,6 +381,177 @@ function Core.detectExecutor()
 		rawName = rawName,
 		isKnown = slug ~= "unknown",
 	}
+end
+
+Core.WEAO_API_URLS = {
+	"https://api.weao.xyz/api/status/exploits",
+	"https://whatexpsare.online/api/status/exploits",
+	"https://api.whatexpsare.online/api/status/exploits",
+	"http://api.weao.xyz/api/status/exploits",
+}
+
+function Core.normalizeExecutorKey(text)
+	local key = tostring(text or ""):lower()
+	key = key:gsub("synapse%s*z", "synapsez")
+	key = key:gsub("awp%.?gg?", "volt")
+	key = key:gsub("bunni%.?fun", "bunni")
+	key = key:gsub("vega%s*x", "vegax")
+	key = key:gsub("[^a-z0-9]", "")
+	return key
+end
+
+function Core.formatWeaoEntry(entry)
+	if type(entry) ~= "table" then
+		return nil
+	end
+	return {
+		title = entry.title,
+		version = entry.version,
+		detected = entry.detected == true,
+		updateStatus = entry.updateStatus ~= false,
+		uncStatus = entry.uncStatus == true,
+		platform = entry.platform,
+		extype = entry.extype,
+		free = entry.free == true,
+		suncPercentage = tonumber(entry.suncPercentage),
+		uncPercentage = tonumber(entry.uncPercentage),
+		updatedDate = entry.updatedDate,
+		websitelink = entry.websitelink,
+	}
+end
+
+function Core.matchWeaoExploit(profile, exploits)
+	if type(exploits) ~= "table" then
+		return nil
+	end
+	local slugKey = Core.normalizeExecutorKey(profile and (profile.name or profile.slug))
+	local rawKey = Core.normalizeExecutorKey(profile and profile.rawName)
+	if slugKey == "" and rawKey == "" then
+		return nil
+	end
+	local best
+	local bestScore = 0
+	for _, entry in ipairs(exploits) do
+		if type(entry) == "table" and type(entry.title) == "string" then
+			local titleKey = Core.normalizeExecutorKey(entry.title)
+			local score = 0
+			if titleKey ~= "" then
+				if titleKey == slugKey or titleKey == rawKey then
+					score = 100
+				elseif slugKey ~= "" and (titleKey:find(slugKey, 1, true) or slugKey:find(titleKey, 1, true)) then
+					score = 80
+				elseif rawKey ~= "" and (titleKey:find(rawKey, 1, true) or rawKey:find(titleKey, 1, true)) then
+					score = 70
+				end
+			end
+			if score > bestScore then
+				bestScore = score
+				best = entry
+			end
+		end
+	end
+	return bestScore >= 70 and best or nil
+end
+
+function Core.fetchWeaoExploits(forceRefresh)
+	local cache = ENV.Alleral_WeaoCache
+	if not forceRefresh and type(cache) == "table" and cache.fetchedAt and (tick() - cache.fetchedAt) < 300 then
+		return cache.data, cache.source
+	end
+
+	local function decodeBody(body)
+		if type(body) ~= "string" or body == "" then
+			return nil
+		end
+		local ok, decoded = pcall(function()
+			return HttpService:JSONDecode(body)
+		end)
+		if ok and type(decoded) == "table" then
+			return decoded
+		end
+		return nil
+	end
+
+	local function fetchUrl(url)
+		local headers = {
+			["User-Agent"] = "WEAO-3PService",
+			["Accept"] = "application/json",
+			["Cache-Control"] = "no-cache",
+		}
+		local requestFn = Core.requestFunction()
+		if requestFn then
+			local ok, response = pcall(function()
+				return requestFn({
+					Url = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(math.random(10000, 99999)),
+					Method = "GET",
+					Headers = headers,
+				})
+			end)
+			if ok then
+				local body = type(response) == "table" and (response.Body or response.body) or (type(response) == "string" and response)
+				local decoded = decodeBody(body)
+				if decoded then
+					return decoded, url
+				end
+			end
+		end
+		if type(game.HttpGet) == "function" then
+			local ok, body = pcall(game.HttpGet, game, url, true)
+			local decoded = decodeBody(ok and body or nil)
+			if decoded then
+				return decoded, url
+			end
+		end
+		return nil
+	end
+
+	for _, url in ipairs(Core.WEAO_API_URLS) do
+		local data, source = fetchUrl(url)
+		if data then
+			ENV.Alleral_WeaoCache = {
+				fetchedAt = tick(),
+				data = data,
+				source = source,
+			}
+			return data, source
+		end
+	end
+
+	if type(cache) == "table" and cache.data then
+		return cache.data, cache.source
+	end
+	return nil, "WEAO exploit list unavailable"
+end
+
+function Core.fetchWeaoExecutorStatus(profile)
+	profile = profile or Core.executorProfile()
+	local exploits, err = Core.fetchWeaoExploits(false)
+	local entry = Core.matchWeaoExploit(profile, exploits)
+	if entry then
+		return Core.formatWeaoEntry(entry)
+	end
+	return nil, err
+end
+
+function Core.weaoStatusLabel(weao)
+	if type(weao) ~= "table" then
+		return "Unknown (see whatexpsare.online)"
+	end
+	local parts = {}
+	if weao.updateStatus then
+		table.insert(parts, "Updated")
+	else
+		table.insert(parts, "Outdated")
+	end
+	if weao.detected then
+		table.insert(parts, "Detected")
+	else
+		table.insert(parts, "Undetected")
+	end
+	if weao.suncPercentage then
+		table.insert(parts, tostring(weao.suncPercentage) .. "% sUNC")
+	end
+	return table.concat(parts, " · ")
 end
 
 Core.EXECUTOR_FS_BROKEN = {
@@ -326,6 +605,21 @@ Core.EXECUTOR_COMPAT = {
 	seliware = true,
 	luna = true,
 	macsploit = true,
+	synapsez = true,
+	potassium = true,
+	matcha = true,
+	photon = true,
+	cosmic = true,
+	opiumware = true,
+	volcano = true,
+	swift = true,
+	ronin = true,
+	serotonin = true,
+	lumen = true,
+	severe = true,
+	isaeva = true,
+	rbxcli = true,
+	unknown = true,
 }
 
 function Core.executorProfile()
@@ -360,8 +654,10 @@ function Core.executorProfile()
 		hasGetConn = hasGetConn,
 		hasClipboard = hasClipboard,
 		hasFireTouch = hasFireTouch,
+		hasLoadstring = type(ENV.loadstring or loadstring) == "function",
 		env = ENV,
 		solara = solaraLib ~= nil or soloraLib ~= nil or slug == "solara",
+		weao = Core.formatWeaoEntry(Core.matchWeaoExploit(detected, ENV.Alleral_WeaoCache and ENV.Alleral_WeaoCache.data)),
 	}
 end
 
@@ -395,6 +691,7 @@ function Core.executorTelemetryProfile()
 		loadstring = loaderCaps.loadstring == true or type(ENV.loadstring) == "function",
 		readfile = profile.hasFilesystem or loaderCaps.readfile == true,
 		apis = apis,
+		weao = profile.weao,
 	}
 end
 
@@ -425,6 +722,9 @@ end
 function Core.notifyExecutorCompat(profile)
 	profile = profile or Core.executorProfile()
 	local caps = {}
+	if profile.hasLoadstring ~= false then
+		table.insert(caps, "Lua")
+	end
 	if profile.hasHttp then
 		table.insert(caps, "HTTP")
 	end
@@ -442,14 +742,20 @@ function Core.notifyExecutorCompat(profile)
 	end
 	local capText = #caps > 0 and (" | " .. table.concat(caps, ", ")) or ""
 	local display = profile.displayName
-	local compat = Core.EXECUTOR_COMPAT[profile.name] or profile.isKnown
-	if not profile.isKnown then
-		Core.notify("Executor", "Couldn't tell what you're on" .. capText .. ". Most stuff should still run.", 6)
-	elseif not compat then
-		Core.notify("Executor", display .. capText .. ". A few features might not run.", 6)
+	local msg = display .. capText
+	if profile.weao then
+		msg = msg .. " — WEAO: " .. Core.weaoStatusLabel(profile.weao)
+		if profile.weao.detected then
+			msg = msg .. ". Consider a different executor if you get banned."
+		elseif not profile.weao.updateStatus then
+			msg = msg .. ". Update your executor for best results."
+		end
+	elseif not profile.isKnown then
+		msg = msg .. " — universal mode (any executor with loadstring)."
 	else
-		Core.notify("Executor", display .. capText .. " — good to go.", 4)
+		msg = msg .. " — ready."
 	end
+	Core.notify("Executor", msg, 5)
 end
 
 local SCRIPT_STATUS_META = {
@@ -608,6 +914,13 @@ function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
 	addRow("Script", status.name)
 	addRow("Version", status.version)
 	addRow("Executor", (Core.executorProfile().displayName))
+	local weao = Core.fetchWeaoExecutorStatus()
+	if weao then
+		addRow("WEAO", Core.weaoStatusLabel(weao))
+		if weao.version then
+			addRow("Exec version", tostring(weao.version))
+		end
+	end
 	if status.message ~= "" then
 		addRow("Notice", status.message)
 	end
@@ -619,6 +932,7 @@ function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
 		Name = "Refresh status",
 		Callback = function()
 			Core.fetchScriptManifest(true)
+			Core.fetchWeaoExploits(true)
 			local nextEval = Core.evaluateScriptStatus(scriptId, profileVersion)
 			local nextStatus = nextEval.status
 			if labels.Status and labels.Status.Set then
@@ -628,6 +942,10 @@ function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
 				labels.Notice:Set({ Name = "Notice: " .. nextStatus.message })
 			elseif labels.Notice and labels.Notice.Instance then
 				labels.Notice.Instance.Visible = nextStatus.message ~= ""
+			end
+			local refreshedWeao = Core.fetchWeaoExecutorStatus()
+			if refreshedWeao and labels.WEAO and labels.WEAO.Set then
+				labels.WEAO:Set({ Name = "WEAO: " .. Core.weaoStatusLabel(refreshedWeao) })
 			end
 			Core.notify("Alleral", "Status refreshed — " .. nextStatus.label, 3)
 		end,
@@ -701,8 +1019,8 @@ function Core.loadStringFn()
 end
 
 function Core.readFile(path)
-	local readFile = ENV.readfile
-	local isFile = ENV.isfile
+	local readFile = Core.execFunction("readfile")
+	local isFile = Core.execFunction("isfile")
 	if type(readFile) ~= "function" or type(isFile) ~= "function" or not isFile(path) then
 		return nil
 	end
@@ -711,7 +1029,7 @@ function Core.readFile(path)
 end
 
 function Core.writeFile(path, data)
-	local writeFile = ENV.writefile
+	local writeFile = Core.execFunction("writefile")
 	local makeFolder = ENV.makefolder
 	if type(writeFile) ~= "function" then
 		return false
@@ -947,6 +1265,14 @@ function Core.prepareGame(state)
 		end
 		if core.fetchScriptManifest then
 			core.fetchScriptManifest(false)
+		end
+		if core.fetchWeaoExploits then
+			task.spawn(function()
+				core.fetchWeaoExploits(false)
+				if core.refreshLoaderCapabilities then
+					core.refreshLoaderCapabilities()
+				end
+			end)
 		end
 		if core.notifyExecutorCompat then
 			core.notifyExecutorCompat()

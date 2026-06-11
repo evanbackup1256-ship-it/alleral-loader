@@ -1,5 +1,5 @@
-local LOADER_VERSION = "3.5.4"
-local REQUIRED_CORE_VERSION = "1.11"
+local LOADER_VERSION = "3.5.5"
+local REQUIRED_CORE_VERSION = "1.12"
 local REQUIRED_STARLIGHT_BUILD = "Alleral-3"
 local REPO_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main"
 local SCRIPT_MANIFEST_URL = REPO_BASE .. "/config/scripts_manifest.json"
@@ -884,15 +884,11 @@ local function runGameScript(profile)
 end
 
 local function preflight()
-	local missing = {}
 	if not CAPABILITIES.loadstring then
-		table.insert(missing, "loadstring")
+		return false, "This executor needs loadstring to run Alleral."
 	end
 	if not CAPABILITIES.http and not CAPABILITIES.readfile then
-		table.insert(missing, "http or readfile")
-	end
-	if #missing > 0 then
-		return false, "Missing: " .. table.concat(missing, ", ")
+		log("warn", "No HTTP or filesystem — remote modules may fail; loadstring-only mode.")
 	end
 	return true
 end
@@ -1009,6 +1005,26 @@ local function main()
 	preloadHelpers()
 	preloadTelemetry()
 	applyCoreCapabilities()
+
+	if ENV.Alleral_Core and type(ENV.Alleral_Core.fetchWeaoExploits) == "function" then
+		task.spawn(function()
+			local exploits, source = ENV.Alleral_Core.fetchWeaoExploits(false)
+			if exploits then
+				local profile = ENV.Alleral_Core.executorProfile and ENV.Alleral_Core.executorProfile()
+				local weao = profile and profile.weao
+				if weao then
+					log("info", string.format(
+						"WEAO: %s — %s (via %s)",
+						tostring(weao.title),
+						ENV.Alleral_Core.weaoStatusLabel and ENV.Alleral_Core.weaoStatusLabel(weao) or "",
+						tostring(source or "api")
+					))
+				else
+					log("info", "WEAO exploit list loaded (" .. tostring(source or "api") .. ")")
+				end
+			end
+		end)
+	end
 
 	local gateEval, gateErr = resolveScriptGate(profile)
 	if gateEval and gateEval.allowed == false then
