@@ -2,7 +2,7 @@
 	Alleral Hub — single entry point.
 	Detects game.PlaceId, loads core + matching games/*.luau script.
 ]]
-local LOADER_VERSION = "3.8.0"
+local LOADER_VERSION = "3.8.1"
 local REQUIRED_CORE_VERSION = "1.17"
 local REQUIRED_UI_LIBRARY = "Rayfield"
 local GITHUB_REPO = "evanbackup1256-ship-it/kick"
@@ -79,35 +79,119 @@ end
 
 local ENV = genv()
 
+local function safeTime()
+	if type(os) == "table" and type(os.time) == "function" then
+		local ok, value = pcall(os.time)
+		if ok and type(value) == "number" then
+			return value
+		end
+	end
+	return typeof(tick) == "function" and tick() or 0
+end
+
+local function safeWait(seconds)
+	if typeof(task) == "table" and type(task.wait) == "function" then
+		task.wait(seconds)
+	elseif type(wait) == "function" then
+		wait(seconds)
+	end
+end
+
 local function firstExecFunc(...)
-	for _, name in ipairs({ ... }) do
-		local fn = ENV[name] or (getfenv and getfenv()[name])
-		if type(fn) == "function" then
-			return fn
+	for i = 1, select("#", ...) do
+		local name = select(i, ...)
+		if type(name) == "function" then
+			return name
+		end
+		if type(name) == "string" then
+			local fn = ENV[name] or (_G and _G[name]) or (getfenv and getfenv()[name])
+			if type(fn) == "function" then
+				return fn
+			end
 		end
 	end
 	return nil
 end
 
-local httpRequest = firstExecFunc("http_request", "request")
-	or (ENV.Volt and ENV.Volt.request)
-	or (ENV.Wave and ENV.Wave.request)
-	or (ENV.Solara and ENV.Solara.request)
-	or (ENV.Xeno and ENV.Xeno.request)
-	or (ENV.Krnl and ENV.Krnl.request)
-	or (ENV.syn and ENV.syn.request)
-	or (ENV.http and ENV.http.request)
-	or (HttpService and type(HttpService.RequestAsync) == "function" and function(opts)
-		return HttpService:RequestAsync({
-			Url = opts.Url or opts.url,
-			Method = opts.Method or opts.method or "GET",
-			Headers = opts.Headers or opts.headers,
-			Body = opts.Body or opts.body,
-		})
-	end)
-local readFile = firstExecFunc("readfile")
-local isFile = firstExecFunc("isfile")
-local loadStringFn = firstExecFunc("loadstring", "LoadString") or loadstring
+local function resolveHttpRequest()
+	local sharedEnv = ENV.shared or (typeof(shared) == "table" and shared) or nil
+	local solaraLib = sharedEnv and type(sharedEnv.solara) == "table" and sharedEnv.solara or nil
+	local soloraLib = sharedEnv and type(sharedEnv.Solora) == "table" and sharedEnv.Solora or nil
+	local candidates = {
+		solaraLib and solaraLib.request,
+		soloraLib and soloraLib.request,
+		type(ENV.Solara) == "table" and ENV.Solara.request or nil,
+		type(ENV.Solora) == "table" and ENV.Solora.request or nil,
+		type(ENV.Volt) == "table" and ENV.Volt.request or nil,
+		type(ENV.Wave) == "table" and ENV.Wave.request or nil,
+		type(ENV.Xeno) == "table" and ENV.Xeno.request or nil,
+		type(ENV.Krnl) == "table" and ENV.Krnl.request or nil,
+		type(ENV.syn) == "table" and ENV.syn.request or nil,
+		type(ENV.fluxus) == "table" and ENV.fluxus.request or nil,
+		type(ENV.http) == "table" and ENV.http.request or nil,
+		type(ENV.http_service) == "table" and ENV.http_service.request or nil,
+		type(ENV.Electron) == "table" and ENV.Electron.request or nil,
+		type(ENV.Potassium) == "table" and ENV.Potassium.request or nil,
+		type(ENV.Velocity) == "table" and ENV.Velocity.request or nil,
+		type(ENV.delta) == "table" and ENV.delta.request or nil,
+		type(ENV.Codex) == "table" and ENV.Codex.request or nil,
+		type(ENV.Hydrogen) == "table" and ENV.Hydrogen.request or nil,
+		ENV.request,
+		ENV.Request,
+		firstExecFunc("http_request", "request", "Request", "httprequest"),
+	}
+	for _, candidate in ipairs(candidates) do
+		if type(candidate) == "function" then
+			return candidate
+		end
+	end
+	if HttpService and type(HttpService.RequestAsync) == "function" then
+		return function(opts)
+			return HttpService:RequestAsync({
+				Url = opts.Url or opts.url,
+				Method = opts.Method or opts.method or "GET",
+				Headers = opts.Headers or opts.headers,
+				Body = opts.Body or opts.body,
+			})
+		end
+	end
+	return nil
+end
+
+local function resolveLoadString()
+	local candidates = {
+		ENV.loadstring,
+		ENV.LoadString,
+		ENV.load,
+		ENV.Load,
+		loadstring,
+		load,
+	}
+	for _, candidate in ipairs(candidates) do
+		if type(candidate) == "function" then
+			return candidate
+		end
+	end
+	return firstExecFunc("loadstring", "LoadString", "load", "Load", "compile")
+end
+
+local httpRequest = resolveHttpRequest()
+local readFile = firstExecFunc("readfile", "read_file", "ReadFile")
+local isFile = firstExecFunc("isfile", "is_file", "IsFile")
+local loadStringFn = resolveLoadString()
+
+local function hasHttp()
+	if type(game.HttpGet) == "function" then
+		return true
+	end
+	if httpRequest then
+		return true
+	end
+	if HttpService and type(HttpService.GetAsync) == "function" then
+		return true
+	end
+	return false
+end
 
 local function notify(title, text, duration)
 	pcall(function()
@@ -158,11 +242,11 @@ end
 
 local CAPABILITIES = {
 	executor = detectExecutor(),
-	http = type(game.HttpGet) == "function" or httpRequest ~= nil,
+	http = hasHttp(),
 	loadstring = loadStringFn ~= nil,
 	readfile = readFile ~= nil,
 	isfile = isFile ~= nil,
-	listfiles = firstExecFunc("listfiles") ~= nil,
+	listfiles = firstExecFunc("listfiles", "list_files", "ListFiles") ~= nil,
 }
 
 local function waitForPath(root, path, timeout)
@@ -502,10 +586,29 @@ end
 local function httpFetchBody(url, nonce)
 	local fetchUrl = withCacheBust(url, nonce)
 	local function accept(body)
-		return type(body) == "string"
-			and body ~= ""
-			and not body:find("404: Not Found", 1, true)
-			and not (body:find("<!DOCTYPE html>", 1, true) and not body:find("LOADER_VERSION", 1, true))
+		if type(body) ~= "string" or body == "" then
+			return false
+		end
+		if body:find("404: Not Found", 1, true) then
+			return false
+		end
+		if body:find("<!DOCTYPE html>", 1, true) or body:find("<html", 1, true) then
+			return body:find("local ", 1, true)
+				or body:find("function ", 1, true)
+				or body:find("Core%.VERSION", 1, true)
+				or body:find("LOADER_VERSION", 1, true)
+		end
+		return true
+	end
+
+	local function extractBody(response)
+		if type(response) == "string" then
+			return response
+		end
+		if type(response) == "table" then
+			return response.Body or response.body or response.Data or response.data
+		end
+		return nil
 	end
 
 	if type(game.HttpGet) == "function" then
@@ -563,8 +666,8 @@ local function httpFetchBody(url, nonce)
 		}) do
 			local reqOk, response = pcall(httpRequest, spec)
 			if reqOk then
-				body = type(response) == "string" and response or (response and (response.Body or response.body))
-				local status = type(response) == "table" and (response.StatusCode or response.status or 200) or 200
+				body = extractBody(response)
+				local status = type(response) == "table" and (response.StatusCode or response.status or response.Status or 200) or 200
 				if accept(body) and (status == 0 or (status >= 200 and status < 300)) then
 					return body
 				end
@@ -609,8 +712,8 @@ local function fetchRemoteMirrors(urls, label, marker)
 	local nonces = {
 		tick(),
 		tick() + 1,
-		os.time(),
-		os.time() + 1,
+		safeTime(),
+		safeTime() + 1,
 		math.random(100000, 999999),
 		math.random(100000, 999999),
 	}
@@ -627,7 +730,7 @@ local function fetchRemoteMirrors(urls, label, marker)
 				lastErr = label .. " download failed (" .. mirrorLabel(baseUrl) .. ")"
 			end
 			if attempt < FETCH_RETRIES then
-				task.wait(FETCH_BACKOFF * attempt)
+				safeWait(FETCH_BACKOFF * attempt)
 			end
 		end
 	end
@@ -746,10 +849,13 @@ local function patchGameSource(profile, source)
 end
 
 local function compileAndRun(source, chunkName, runEnv)
-	if not loadStringFn then
-		return false, "loadstring is not available"
+	local compiled, compileErr = nil, "loadstring unavailable"
+	if loadStringFn then
+		compiled, compileErr = loadStringFn(source, chunkName)
 	end
-	local compiled, compileErr = loadStringFn(source, chunkName)
+	if not compiled and type(load) == "function" and load ~= loadStringFn then
+		compiled, compileErr = load(source, chunkName)
+	end
 	if not compiled then
 		return false, "Compile failed: " .. tostring(compileErr)
 	end
@@ -842,7 +948,7 @@ local function preloadCore(required)
 			log("info", "Retrying core download from alternate mirrors...")
 			ENV._Alleral_ReleaseLoaded = nil
 			ensureReleaseManifest(true)
-			task.wait(FETCH_BACKOFF * 2)
+			safeWait(FETCH_BACKOFF * 2)
 		end
 
 		local source, sourceLabel = resolveFromFiles(
@@ -1204,10 +1310,10 @@ end
 
 local function preflight()
 	if not CAPABILITIES.loadstring then
-		return false, "This executor needs loadstring to run Alleral."
+		return false, "This executor needs loadstring (or load) to run Alleral."
 	end
 	if not CAPABILITIES.http and not CAPABILITIES.readfile then
-		log("warn", "No HTTP or filesystem — remote modules may fail; loadstring-only mode.")
+		return false, "This executor needs HTTP or readfile to download Alleral modules."
 	end
 	return true
 end
@@ -1218,10 +1324,10 @@ local function applyCoreCapabilities()
 		local caps = core.refreshLoaderCapabilities()
 		if type(caps) == "table" then
 			CAPABILITIES.executor = caps.executor or CAPABILITIES.executor
-			CAPABILITIES.http = caps.http == true
-			CAPABILITIES.readfile = caps.readfile == true
-			CAPABILITIES.isfile = type(firstExecFunc("isfile")) ~= nil
-			CAPABILITIES.listfiles = type(firstExecFunc("listfiles")) ~= nil
+			CAPABILITIES.http = caps.http == true or hasHttp()
+			CAPABILITIES.readfile = caps.readfile == true or readFile ~= nil
+			CAPABILITIES.isfile = type(firstExecFunc("isfile", "is_file", "IsFile")) ~= nil
+			CAPABILITIES.listfiles = type(firstExecFunc("listfiles", "list_files", "ListFiles")) ~= nil
 			CAPABILITIES.solara = caps.solara == true
 		end
 	end
@@ -1316,9 +1422,8 @@ local function main()
 			log("info", "Auto-recovering Alleral modules...")
 			ENV.Alleral_LoaderRunning = false
 			ENV._Alleral_ReleaseLoaded = nil
-			task.delay(2.5, function()
-				main()
-			end)
+			safeWait(2.5)
+			main()
 			return
 		end
 		notify("Alleral", "Alleral could not start. Please rejoin and try again.", 8)
@@ -1422,7 +1527,11 @@ ENV.Alleral_Reload = function()
 		end)
 	end
 	unloadPrevious()
-	task.defer(main)
+	if typeof(task) == "table" and type(task.defer) == "function" then
+		task.defer(main)
+	else
+		main()
+	end
 end
 
 ENV.Alleral_LoaderInfo = function()
@@ -1433,5 +1542,12 @@ ENV.Alleral_LoaderInfo = function()
 	}
 end
 
-print("[Alleral] v" .. LOADER_VERSION .. " | PlaceId " .. tostring(game.PlaceId))
-main()
+print("[Alleral] v" .. LOADER_VERSION .. " | PlaceId " .. tostring(game.PlaceId) .. " | executor=" .. tostring(CAPABILITIES.executor))
+
+local okBoot, bootErr = pcall(main)
+if not okBoot then
+	local message = tostring(bootErr)
+	warn("[Alleral Loader] " .. message)
+	notify("Alleral", message, 10)
+	ENV.Alleral_LoaderRunning = false
+end

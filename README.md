@@ -12,15 +12,56 @@ One loader — detects your game by PlaceId and runs the matching script.
 loadstring(readfile("loader.luau"))()
 ```
 
-**Remote:**
+**Remote (works on Volt, Synapse, Krnl, Solara, Wave, etc.):**
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=" .. tick()))()
+(function()
+	local g = (getgenv and getgenv()) or {}
+	local L = g.loadstring or g.LoadString or loadstring or load
+	local url = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=" .. tick()
+	local src
+	if type(L) ~= "function" then
+		return warn("[Alleral] This executor needs loadstring.")
+	end
+	if type(game.HttpGet) == "function" then
+		pcall(function()
+			src = game.HttpGet(game, url, true)
+		end)
+		if type(src) ~= "string" then
+			pcall(function()
+				src = game.HttpGet(game, url)
+			end)
+		end
+	end
+	if type(src) ~= "string" then
+		pcall(function()
+			src = game:HttpGet(url, true)
+		end)
+	end
+	if type(src) ~= "string" and g.Volt and type(g.Volt.request) == "function" then
+		pcall(function()
+			local res = g.Volt.request({ Url = url, Method = "GET" })
+			src = res and (res.Body or res.body)
+		end)
+	end
+	if type(src) ~= "string" and type(g.request) == "function" then
+		pcall(function()
+			local res = g.request({ Url = url, Method = "GET" })
+			src = res and (res.Body or res.body)
+		end)
+	end
+	if type(src) ~= "string" then
+		return warn("[Alleral] HTTP failed — enable HttpService in your executor.")
+	end
+	local fn, err = L(src, "Alleral/loader")
+	if type(fn) ~= "function" then
+		return warn("[Alleral] Compile failed: " .. tostring(err))
+	end
+	fn()
+end)()
 ```
 
 Reload: `getgenv().Alleral_Reload()` · Debug: `getgenv().Alleral_LoaderInfo()`
-
-Dev mode: `getgenv().Alleral_DevMode = true` before running (prefers local files).
 
 ## Layout
 
@@ -28,11 +69,9 @@ Dev mode: `getgenv().Alleral_DevMode = true` before running (prefers local files
 loader.luau          ← only entry point
 core/                ← shared UI, helpers, telemetry
 games/               ← one script per supported game
-config/              ← manifests
 ```
 
 ## Docs
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Games](docs/GAMES.md)
-- [Security](docs/SECURITY.md)
