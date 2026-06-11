@@ -1,37 +1,7 @@
-# Site build deps
-relay/site/node_modules/
-backend/site/node_modules/
-
-# Supabase CLI local state
-supabase/.branches/
-supabase/.temp/
-
-# Local audit databases
-*.db
-manage_audit.db
-
-.zed/
+node_modules/
 __pycache__/
 *.pyc
-
-# Secrets
-relay/.env
-backend/.env
-backend/data/
-relay/data/
-cfg/owner_telemetry.luau
-cfg/telemetry.env
-src/owner_telemetry.luau
-owner_telemetry.luau
-../Alleral-Private/
-
-# Local editor overrides
-.vscode/settings.json
-
-# Legacy entry points
-/load.luau
-/launch.luau
-/bootstrap.luau
-/run.luau
-/entry_redirect.luau
-/launch.template.luau
+.env
+dist/
+build/
+.cache/
