@@ -10,7 +10,7 @@ local CORE_UI_MIN_BYTES = 50000
 local CORE_UI_MAX_BYTES = 90000
 local CORE_HUB_UI_MIN_BYTES = 60000
 local CORE_HUB_UI_MAX_BYTES = 75000
-local CORE_ALLERAL_UI_MIN_BYTES = 15000
+local CORE_ALLERAL_UI_MIN_BYTES = 26000
 local CORE_ALLERAL_UI_MAX_BYTES = 50000
 local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
@@ -21,6 +21,27 @@ local CORE_BASE_LEGACY_PATH = HUB .. "/core.luau"
 local CORE_UI_PATH = HUB .. "/core_ui.luau"
 local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
+local UI_BOOTSTRAP_MODULES = {
+	"ModuleLoader.luau",
+	"Vendor.luau",
+	"Maid.luau",
+	"Spring.luau",
+	"Utils.luau",
+	"Icons.luau",
+	"Theme.luau",
+	"Motion.luau",
+	"Config.luau",
+	"Tooltip.luau",
+	"Notification.luau",
+	"Modal.luau",
+	"CommandPalette.luau",
+	"Components.luau",
+	"Section.luau",
+	"Page.luau",
+	"Navigation.luau",
+	"Window.luau",
+	"Library.luau",
+}
 
 local RELEASE_FALLBACK = {
 	loader = "8.0.0",
@@ -796,6 +817,20 @@ local function looksLikeLua(body)
 	return true
 end
 
+local function uiModuleSourceValid(src, minBytes)
+	minBytes = minBytes or 50
+	if type(src) ~= "string" or #src < minBytes then
+		return false
+	end
+	if #src <= 8192 and src:find("404: Not Found", 1, true) then
+		return false
+	end
+	if src:find("<!DOCTYPE", 1, true) or src:find("<html", 1, true) then
+		return false
+	end
+	return src:find("return", 1, true) ~= nil or src:find("function", 1, true) ~= nil
+end
+
 local function isRobloxHttp404(body)
 	if type(body) ~= "string" then
 		return false
@@ -1308,6 +1343,15 @@ local function alleralUiValid(src)
 	if not src:find("invalid Alleral library:", 1, true) then
 		return false
 	end
+	if not src:find("resolveUiSource", 1, true) then
+		return false
+	end
+	if not src:find("uiHttpGet", 1, true) then
+		return false
+	end
+	if not src:find("moduleSourceValid", 1, true) then
+		return false
+	end
 	if compileCoreSource(src, "Alleral/alleral_ui") then
 		return true
 	end
@@ -1447,6 +1491,15 @@ local function alleralUiRejectReason(src)
 	end
 	if not src:find("invalid Alleral library:", 1, true) then
 		return "missing Alleral library validator"
+	end
+	if not src:find("resolveUiSource", 1, true) then
+		return "missing resolveUiSource bootstrap"
+	end
+	if not src:find("uiHttpGet", 1, true) then
+		return "missing uiHttpGet bootstrap"
+	end
+	if not src:find("moduleSourceValid", 1, true) then
+		return "missing moduleSourceValid bootstrap"
 	end
 	if not looksLikeLua(src) then
 		return "invalid lua body"
@@ -1720,6 +1773,18 @@ local function purgeStaleHubPaths()
 			"kick/" .. HUB .. "/ui/Library.luau",
 			"kick/kick/" .. HUB .. "/ui/Library.luau",
 		}, valid = alleralLibraryValid, kind = "alleral" },
+		{ paths = {
+			HUB .. "/ui/ModuleLoader.luau",
+			".alleral/cache/" .. HUB .. "/ui/ModuleLoader.luau",
+		}, valid = function(src)
+			return uiModuleSourceValid(src, 200) and src:find("readSource", 1, true) ~= nil
+		end, kind = "alleral" },
+		{ paths = {
+			HUB .. "/ui/Vendor.luau",
+			".alleral/cache/" .. HUB .. "/ui/Vendor.luau",
+		}, valid = function(src)
+			return uiModuleSourceValid(src, 100) and src:find("ModuleLoader", 1, true) ~= nil
+		end, kind = "alleral" },
 	}
 	for _, entry in ipairs(hubPaths) do
 		for _, path in ipairs(entry.paths) do
@@ -1739,6 +1804,75 @@ local function purgeStaleHubPaths()
 				end
 			end
 		end
+	end
+end
+
+local function fetchUiModuleBody(rel, minBytes)
+	minBytes = minBytes or 50
+	for _, base in ipairs(CORE_REMOTE_BASES) do
+		local body = select(1, httpGet(base .. "/" .. rel, minBytes))
+		if body and uiModuleSourceValid(body, minBytes) then
+			return body, base
+		end
+	end
+	return nil
+end
+
+local function ensureUiWorkspaceFile(rel, minBytes)
+	minBytes = minBytes or 50
+	local paths = { rel, ".alleral/cache/" .. rel }
+	for _, path in ipairs(paths) do
+		if isFile and readFile then
+			local okExists, exists = pcall(isFile, path)
+			if okExists and exists then
+				local okRead, src = pcall(readFile, path)
+				if okRead and uiModuleSourceValid(src, minBytes) then
+					return src, path
+				end
+				deleteWorkspaceFile(path)
+			end
+		end
+	end
+	if not writeFileFn then
+		return nil
+	end
+	local body, via = fetchUiModuleBody(rel, minBytes)
+	if body then
+		cacheRemote(rel, body)
+		cacheRemote(".alleral/cache/" .. rel, body)
+		-- #region agent log
+		agentDebug("H9", "loader:ensureUiWorkspaceFile", "ui module synced", {
+			rel = rel,
+			bytes = #body,
+			via = via,
+		})
+		-- #endregion
+		return body, rel
+	end
+	-- #region agent log
+	agentDebug("H9", "loader:ensureUiWorkspaceFile", "ui module sync failed", {
+		rel = rel,
+		minBytes = minBytes,
+	})
+	-- #endregion
+	return nil
+end
+
+local function ensureUiWorkspace()
+	local synced, failed = 0, 0
+	for _, moduleName in ipairs(UI_BOOTSTRAP_MODULES) do
+		local rel = "hub/ui/" .. moduleName
+		if ensureUiWorkspaceFile(rel, 50) then
+			synced += 1
+		else
+			failed += 1
+		end
+	end
+	if synced > 0 then
+		log("UI workspace: synced " .. tostring(synced) .. " hub/ui module(s)")
+	end
+	if failed > 0 then
+		log("UI workspace: " .. tostring(failed) .. " hub/ui module(s) could not be synced", true)
 	end
 end
 
@@ -1864,38 +1998,7 @@ local function loadCore()
 	cacheRemote(CORE_HUB_UI_PATH, hubUiSrc)
 	cacheRemote(".alleral/cache/" .. CORE_HUB_UI_PATH, hubUiSrc)
 
-	local UI_BOOTSTRAP_MODULES = {
-		"ModuleLoader.luau",
-		"Vendor.luau",
-		"Maid.luau",
-		"Spring.luau",
-		"Utils.luau",
-		"Icons.luau",
-		"Theme.luau",
-		"Motion.luau",
-		"Config.luau",
-		"Tooltip.luau",
-		"Notification.luau",
-		"Modal.luau",
-		"CommandPalette.luau",
-		"Components.luau",
-		"Section.luau",
-		"Page.luau",
-		"Navigation.luau",
-		"Window.luau",
-		"Library.luau",
-	}
-	for _, moduleName in ipairs(UI_BOOTSTRAP_MODULES) do
-		local rel = "hub/ui/" .. moduleName
-		local cached = readLocal({ rel, ".alleral/cache/" .. rel }, 50)
-		if not cached then
-			local body = select(1, httpGet(GITHUB_RAW .. "/" .. rel, 50))
-			if body and looksLikeLua(body) then
-				cacheRemote(rel, body)
-				cacheRemote(".alleral/cache/" .. rel, body)
-			end
-		end
-	end
+	ensureUiWorkspace()
 
 	ENV.Alleral_HTTP = ENV.Alleral_HTTP or {}
 	ENV.Alleral_HTTP.get = httpGet
@@ -2769,7 +2872,6 @@ local function buildManagedFiles()
 			},
 			expectedKey = "alleral",
 			extract = "alleral",
-			alwaysDelete = true,
 			isValid = function(src)
 				if type(src) ~= "string" then
 					return false
@@ -2777,13 +2879,10 @@ local function buildManagedFiles()
 				if src:find("LibRef", 1, true) and src:find("EnsureGuiRoot", 1, true) then
 					return alleralLibraryValid(src)
 				end
-				if src:find("return function", 1, true) and #src >= 200 then
-					return true
-				end
 				if src:find("Alleral UI layer", 1, true) then
 					return alleralUiValid(src)
 				end
-				return #src >= 100
+				return uiModuleSourceValid(src, 50)
 			end,
 		},
 		{
