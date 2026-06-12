@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.9.4"
+local LOADER_VERSION = "7.9.5"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -23,7 +23,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_NEVERLOSE_UI_PATH = HUB .. "/neverlose_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.9.4",
+	loader = "7.9.5",
 	core = "2.8.8",
 	ui = "Alleral",
 	neverlose = "1.5.3-kick",
@@ -1424,6 +1424,31 @@ local function neverloseUiRejectReason(src)
 	return "unknown"
 end
 
+local VERSION_PATTERNS = {
+	core = 'Core%.VERSION%s*=%s*"([%d%.]+)"',
+	analytics = 'Analytics%.Version%s*=%s*"([%d%.]+)"',
+	telemetry = 'Telemetry%.Version%s*=%s*"([%d%.]+)"',
+	helpers = 'Helpers%.VERSION%s*=%s*"([%d%.]+)"',
+	weao = 'Weao%.VERSION%s*=%s*"([%d%.]+)"',
+	security = 'Security%.VERSION%s*=%s*"([%d%.]+)"',
+	access = 'Access%.VERSION%s*=%s*"([%d%.]+)"',
+	loader = 'LOADER_VERSION%s*=%s*"([%d%.]+)"',
+	neverlose = 'NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"',
+	windui = 'NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"',
+	game = 'local VERSION%s*=%s*"([%d%.]+)"',
+}
+
+local function extractFileVersion(src, kind)
+	if type(src) ~= "string" then
+		return nil
+	end
+	local pattern = VERSION_PATTERNS[kind]
+	if not pattern then
+		return nil
+	end
+	return src:match(pattern)
+end
+
 local function fetchRemoteCoreFile(relativePath, validFn, rejectReasonFn, minBytes)
 	minBytes = minBytes or CORE_BASE_MIN_BYTES
 	local lastReason = "no response"
@@ -1523,7 +1548,7 @@ local function resolveCoreSource(localPaths, cachePaths, remotePath, validFn, re
 		end
 	end
 	-- #region agent log
-	agentDebug("H1", "loader:resolveCoreSource", "core source resolved", {
+	pcall(agentDebug, "H1", "loader:resolveCoreSource", "core source resolved", {
 		label = label,
 		path = path,
 		expectedCore = expectedCore,
@@ -1574,7 +1599,7 @@ end
 
 local function loadCore()
 	ENV.Alleral_Core = nil
-	task.defer(purgeStaleCorePaths)
+	pcall(purgeStaleCorePaths)
 
 	local baseArgs = {
 		{ CORE_BASE_PATH, CORE_BASE_LEGACY_PATH, "core/alleral_core.luau", "alleral_core.luau" },
@@ -2189,31 +2214,6 @@ local GAMES = {
 		end,
 	},
 }
-
-local VERSION_PATTERNS = {
-	core = 'Core%.VERSION%s*=%s*"([%d%.]+)"',
-	analytics = 'Analytics%.Version%s*=%s*"([%d%.]+)"',
-	telemetry = 'Telemetry%.Version%s*=%s*"([%d%.]+)"',
-	helpers = 'Helpers%.VERSION%s*=%s*"([%d%.]+)"',
-	weao = 'Weao%.VERSION%s*=%s*"([%d%.]+)"',
-	security = 'Security%.VERSION%s*=%s*"([%d%.]+)"',
-	access = 'Access%.VERSION%s*=%s*"([%d%.]+)"',
-	loader = 'LOADER_VERSION%s*=%s*"([%d%.]+)"',
-	neverlose = 'NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"',
-	windui = 'NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"',
-	game = 'local VERSION%s*=%s*"([%d%.]+)"',
-}
-
-local function extractFileVersion(src, kind)
-	if type(src) ~= "string" then
-		return nil
-	end
-	local pattern = VERSION_PATTERNS[kind]
-	if not pattern then
-		return nil
-	end
-	return src:match(pattern)
-end
 
 local function readInstalledManifest()
 	if not readFile or not isFile then
