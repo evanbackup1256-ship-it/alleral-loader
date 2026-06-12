@@ -23,7 +23,7 @@ export function OverviewView({
   onCopy: () => void;
 }) {
   const setView = usePlatformStore((s) => s.setView);
-  const { data: live, secondsAgo } = useHubStatus();
+  const { data: live, dataUpdatedAt } = useHubStatus();
   const games = Object.values(site.games || {});
   const working = live?.games?.working ?? games.filter((g) => (g.status || "working").toLowerCase() === "working").length;
   const total = live?.games?.total ?? games.length;
@@ -41,7 +41,7 @@ export function OverviewView({
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <StatusPill kind={relayKind} pulse={online !== false} />
               <StatusPill kind={syncKind} size="sm" />
-              <FreshnessChip secondsAgo={secondsAgo} live />
+              <FreshnessChip dataUpdatedAt={dataUpdatedAt} live />
             </div>
             <p className="obs-kicker">Alleral observability</p>
             <h2 className="obs-title mt-2">{(site.brand || "Alleral").toUpperCase()}</h2>

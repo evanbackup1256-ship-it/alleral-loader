@@ -20,7 +20,7 @@ export function GamesView({ site }: { site: SitePayload }) {
   const [query, setQuery] = useState("");
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [modal, setModal] = useState<{ id: string; game: GameEntry } | null>(null);
-  const { data: live, secondsAgo } = useHubStatus();
+  const { data: live, dataUpdatedAt } = useHubStatus();
 
   const liveStatus = useMemo(() => {
     const map: Record<string, string> = {};
@@ -58,7 +58,7 @@ export function GamesView({ site }: { site: SitePayload }) {
   return (
     <div className="space-y-4">
       <div className="obs-panel flex flex-wrap items-center justify-between gap-3 !py-3">
-        <FreshnessChip secondsAgo={secondsAgo} live />
+        <FreshnessChip dataUpdatedAt={dataUpdatedAt} live />
         <p className="text-xs text-muted">Live script endpoints · observability stream</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">

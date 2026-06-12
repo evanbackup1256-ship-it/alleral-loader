@@ -6,6 +6,7 @@ import { Group, Panel, Separator } from "react-resizable-panels";
 import { Activity, Gamepad2, Layers, Radio } from "lucide-react";
 import { useHubStatus } from "@/lib/hooks/useHubStatus";
 import { useMetricHistory, historyToSeries } from "@/lib/hooks/useMetricHistory";
+import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import { resolveRelayStatus } from "@/lib/status/resolve";
 import type { SitePayload } from "@/lib/types";
 import { MetricCard } from "@/components/observability/MetricCard";
@@ -19,10 +20,61 @@ import { EventTimeline, GameStatusStream } from "@/components/charts/EventTimeli
 import { ServiceGraph } from "@/components/charts/ServiceGraph";
 import { SmoothScroll } from "@/components/ui/SmoothScroll";
 
-export function CommandCenter({ site }: { site: SitePayload }) {
-  const { data, error, secondsAgo, loading } = useHubStatus();
+function MetricsColumn({
+  healthPct,
+  working,
+  total,
+  history,
+  sync,
+  online,
+  dataUpdatedAt,
+}: {
+  healthPct: number;
+  working: number;
+  total: number;
+  history: Record<string, number>[];
+  sync?: { enabled?: boolean; autoStatus?: boolean; lastSyncAt?: string; lastError?: string };
+  online: boolean;
+  dataUpdatedAt?: number;
+}) {
+  return (
+    <div className="flex flex-col gap-3 pb-2">
+      <div className="obs-panel flex items-center gap-4">
+        <HealthRing kind={healthPct >= 80 ? "healthy" : healthPct >= 50 ? "warning" : "error"} value={healthPct} label="Health" />
+        <div className="min-w-0">
+          <p className="obs-kicker">Fleet health</p>
+          <p className="text-sm text-muted">
+            {working} of {total} scripts operational
+          </p>
+        </div>
+      </div>
+      <MetricCard label="Working scripts" numeric={working} icon={Gamepad2} accent="green" sparkline={historyToSeries(history, "working")} trend="Live from relay" />
+      <MetricCard label="Tracked games" numeric={total} icon={Layers} accent="violet" />
+      <SyncMonitor sync={sync} dataUpdatedAt={dataUpdatedAt} online={online} />
+    </div>
+  );
+}
+
+function ChartBlock({ chartData }: { chartData: { value: number; label: string }[] }) {
+  return (
+    <div className="obs-panel obs-panel-chart flex min-h-[280px] flex-col md:min-h-0 md:h-full">
+      <div className="obs-panel-head shrink-0">
+        <div>
+          <p className="obs-kicker">Throughput</p>
+          <h3 className="obs-title-sm">Working scripts · rolling window</h3>
+        </div>
+        <Activity className="h-4 w-4 shrink-0 text-cyan-400" strokeWidth={1.75} />
+      </div>
+      <TelemetryLineChart series={chartData} className="mt-2 min-h-[200px] flex-1" />
+    </div>
+  );
+}
+
+function CommandCenterInner({ site }: { site: SitePayload }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const { data, error, dataUpdatedAt, loading } = useHubStatus();
   const online = !error && data?.ok !== false;
-  const relayKind = resolveRelayStatus(online, error);
+  const relayKind = resolveRelayStatus(online, error ? error.message : null);
 
   const games = useMemo(() => {
     if (data?.games?.items?.length) return data.games.items;
@@ -85,78 +137,73 @@ export function CommandCenter({ site }: { site: SitePayload }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill kind={relayKind} pulse={online} />
-          <FreshnessChip secondsAgo={secondsAgo} live={!loading} />
+          <FreshnessChip dataUpdatedAt={dataUpdatedAt} live={!loading} />
         </div>
       </div>
 
-      <div className="min-h-[640px] flex-1">
-        <Group orientation="horizontal" className="h-full min-h-[640px] gap-2">
-          <Panel defaultSize={20} minSize={18} maxSize={28}>
-            <SmoothScroll className="h-full pr-1" flex>
-              <div className="flex flex-col gap-3 pb-2">
-                <div className="obs-panel flex items-center gap-4">
-                  <HealthRing kind={healthPct >= 80 ? "healthy" : healthPct >= 50 ? "warning" : "error"} value={healthPct} label="Health" />
-                  <div className="min-w-0">
-                    <p className="obs-kicker">Fleet health</p>
-                    <p className="text-sm text-muted">{working} of {total} scripts operational</p>
+      {isMobile ? (
+        <div className="flex flex-col gap-3 pb-4">
+          <MetricsColumn healthPct={healthPct} working={working} total={total} history={history} sync={data?.sync} online={online} dataUpdatedAt={dataUpdatedAt} />
+          <ChartBlock chartData={chartData} />
+          <StatusHeatmap games={games} className="min-h-[220px]" />
+          <ServiceGraph games={games} className="min-h-[220px]" />
+          <GameStatusStream games={games} className="min-h-[280px]" />
+          <EventTimeline events={timeline} className="min-h-[280px]" />
+        </div>
+      ) : (
+        <div className="min-h-[640px] flex-1">
+          <Group orientation="horizontal" className="h-full min-h-[640px] gap-2">
+            <Panel defaultSize={20} minSize={18} maxSize={28}>
+              <SmoothScroll className="h-full pr-1" flex>
+                <MetricsColumn healthPct={healthPct} working={working} total={total} history={history} sync={data?.sync} online={online} dataUpdatedAt={dataUpdatedAt} />
+              </SmoothScroll>
+            </Panel>
+
+            <Separator className="obs-separator" />
+
+            <Panel defaultSize={52} minSize={36}>
+              <Group orientation="vertical" className="h-full min-h-0 gap-2">
+                <Panel defaultSize={58} minSize={35}>
+                  <ChartBlock chartData={chartData} />
+                </Panel>
+                <Separator className="obs-separator horizontal" />
+                <Panel defaultSize={42} minSize={28}>
+                  <div className="grid h-full min-h-0 grid-cols-1 gap-2 xl:grid-cols-2">
+                    <StatusHeatmap games={games} className="min-h-[220px]" />
+                    <ServiceGraph games={games} className="min-h-[220px]" />
                   </div>
-                </div>
-                <MetricCard label="Working scripts" numeric={working} icon={Gamepad2} accent="green" sparkline={historyToSeries(history, "working")} trend="Live from relay" />
-                <MetricCard label="Tracked games" numeric={total} icon={Layers} accent="violet" />
-                <SyncMonitor sync={data?.sync} secondsAgo={secondsAgo} online={online} />
-              </div>
-            </SmoothScroll>
-          </Panel>
+                </Panel>
+              </Group>
+            </Panel>
 
-          <Separator className="obs-separator" />
+            <Separator className="obs-separator" />
 
-          <Panel defaultSize={52} minSize={36}>
-            <Group orientation="vertical" className="h-full min-h-0 gap-2">
-              <Panel defaultSize={58} minSize={35}>
-                <div className="obs-panel obs-panel-chart flex h-full min-h-0 flex-col">
-                  <div className="obs-panel-head shrink-0">
-                    <div>
-                      <p className="obs-kicker">Throughput</p>
-                      <h3 className="obs-title-sm">Working scripts · rolling window</h3>
-                    </div>
-                    <Activity className="h-4 w-4 shrink-0 text-cyan-400" strokeWidth={1.75} />
-                  </div>
-                  <TelemetryLineChart series={chartData} className="mt-2 min-h-[200px] flex-1" />
-                </div>
-              </Panel>
-              <Separator className="obs-separator horizontal" />
-              <Panel defaultSize={42} minSize={28}>
-                <div className="grid h-full min-h-0 grid-cols-1 gap-2 xl:grid-cols-2">
-                  <StatusHeatmap games={games} className="min-h-[220px]" />
-                  <ServiceGraph games={games} className="min-h-[220px]" />
-                </div>
-              </Panel>
-            </Group>
-          </Panel>
-
-          <Separator className="obs-separator" />
-
-          <Panel defaultSize={28} minSize={22} maxSize={36}>
-            <Group orientation="vertical" className="h-full min-h-0 gap-2 pl-1">
-              <Panel defaultSize={55} minSize={30}>
-                <GameStatusStream games={games} className="h-full" />
-              </Panel>
-              <Separator className="obs-separator horizontal" />
-              <Panel defaultSize={45} minSize={25}>
-                <EventTimeline events={timeline} className="h-full" />
-              </Panel>
-            </Group>
-          </Panel>
-        </Group>
-      </div>
+            <Panel defaultSize={28} minSize={22} maxSize={36}>
+              <Group orientation="vertical" className="h-full min-h-0 gap-2 pl-1">
+                <Panel defaultSize={55} minSize={30}>
+                  <GameStatusStream games={games} className="h-full" />
+                </Panel>
+                <Separator className="obs-separator horizontal" />
+                <Panel defaultSize={45} minSize={25}>
+                  <EventTimeline events={timeline} className="h-full" />
+                </Panel>
+              </Group>
+            </Panel>
+          </Group>
+        </div>
+      )}
 
       <div className="mt-3 flex shrink-0 flex-wrap gap-2 font-mono text-[10px] text-muted-2">
-        <span className="inline-flex items-center gap-1"><Radio className="h-3 w-3" /> loader {data?.versions?.loader || site.loaderVersion || "—"}</span>
+        <span className="inline-flex items-center gap-1">
+          <Radio className="h-3 w-3" /> loader {data?.versions?.loader || site.loaderVersion || "—"}
+        </span>
         <span>core {data?.versions?.core || site.coreVersion || "—"}</span>
-        <span>{data?.versions?.ui || site.uiLibrary} {data?.versions?.uiVersion || site.uiVersion}</span>
+        <span>
+          {data?.versions?.ui || site.uiLibrary} {data?.versions?.uiVersion || site.uiVersion}
+        </span>
       </div>
     </div>
   );
 }
 
-export default memo(CommandCenter);
+export const CommandCenter = memo(CommandCenterInner);

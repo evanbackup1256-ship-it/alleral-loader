@@ -2,11 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Lenis from "lenis";
-import { gsap } from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { LenisContext } from "@/lib/lenis-context";
-
-gsap.registerPlugin(ScrollTrigger);
 
 export function LenisProvider({ children }: { children: ReactNode }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -25,25 +21,24 @@ export function LenisProvider({ children }: { children: ReactNode }) {
       duration: 1.05,
       easing: (t) => Math.min(1, 1.001 - 2 ** (-10 * t)),
       smoothWheel: true,
-      wheelMultiplier: 0.9,
-      touchMultiplier: 1.1,
+      wheelMultiplier: 0.85,
+      touchMultiplier: 1,
     });
     setLenis(instance);
 
-    instance.on("scroll", ScrollTrigger.update);
-    const tick = (time: number) => instance.raf(time * 1000);
-    gsap.ticker.add(tick);
-    gsap.ticker.lagSmoothing(0);
-
-    const onGatePassed = () => {
-      instance.resize();
-      ScrollTrigger.refresh();
+    let rafId = 0;
+    const raf = (time: number) => {
+      instance.raf(time);
+      rafId = requestAnimationFrame(raf);
     };
-    window.addEventListener("alleral:gate-passed", onGatePassed);
+    rafId = requestAnimationFrame(raf);
+
+    const onResize = () => instance.resize();
+    window.addEventListener("resize", onResize, { passive: true });
 
     return () => {
-      window.removeEventListener("alleral:gate-passed", onGatePassed);
-      gsap.ticker.remove(tick);
+      window.removeEventListener("resize", onResize);
+      cancelAnimationFrame(rafId);
       instance.destroy();
       setLenis(null);
     };

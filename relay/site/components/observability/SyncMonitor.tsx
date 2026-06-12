@@ -11,11 +11,11 @@ import { spring, stagger } from "@/lib/motion/config";
 
 export function SyncMonitor({
   sync,
-  secondsAgo,
+  dataUpdatedAt,
   online,
 }: {
   sync?: { enabled?: boolean; autoStatus?: boolean; lastSyncAt?: string; lastError?: string };
-  secondsAgo: number | null;
+  dataUpdatedAt?: number;
   online?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -34,7 +34,7 @@ export function SyncMonitor({
           <p className="obs-kicker">Sync Monitor</p>
           <h3 className="obs-title-sm">Live pipeline health</h3>
         </div>
-        <FreshnessChip secondsAgo={secondsAgo} live />
+        <FreshnessChip dataUpdatedAt={dataUpdatedAt} live />
       </div>
 
       <div className="mt-4 space-y-2">

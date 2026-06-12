@@ -75,7 +75,7 @@ export function SupportView({ site }: { site: SitePayload }) {
         ))}
       </div>
 
-      <Panel padding="lg">
+      <Panel padding="lg" className="overflow-visible">
         <motion.form key={tab} onSubmit={submit} className="grid gap-4" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={spring.soft}>
           {tab === "bug" ? (
             <>

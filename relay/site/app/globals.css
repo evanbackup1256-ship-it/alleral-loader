@@ -310,28 +310,77 @@ html.cf-gate-lock body {
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--color-border);
   border-radius: 10px;
-  padding: 10px 36px 10px 12px;
+  padding: 10px 12px;
   cursor: pointer;
-  transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .custom-select.open .custom-select-trigger {
   border-color: rgba(99, 102, 241, 0.5);
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
 }
 .custom-select-menu {
-  position: absolute;
-  z-index: 60;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  background: rgba(12, 16, 24, 0.96);
-  backdrop-filter: blur(24px);
+  background: rgba(12, 16, 24, 0.98);
   border: 1px solid var(--color-border-strong);
   border-radius: 12px;
-  padding: 4px;
   box-shadow: var(--shadow-float);
-  max-height: 240px;
-  overflow-y: auto;
+}
+
+.custom-select-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-align: left;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.custom-select-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text);
+}
+
+.custom-select-option.selected {
+  background: rgba(99, 102, 241, 0.15);
+  color: #c7d2fe;
+}
+
+@media (max-width: 767px) {
+  .mobile-drawer-open {
+    overflow: hidden;
+  }
+}
+
+.view-enter {
+  animation: view-enter 0.28s ease-out both;
+}
+
+@keyframes view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.freshness-pulse {
+  animation: freshness-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes freshness-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }
 
 @media (prefers-reduced-motion: reduce) {

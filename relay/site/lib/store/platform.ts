@@ -15,10 +15,12 @@ export type WorkspacePreset = "default" | "compact" | "wide";
 interface PlatformState {
   activeView: PlatformView;
   sidebarCollapsed: boolean;
+  mobileNavOpen: boolean;
   commandOpen: boolean;
   workspace: WorkspacePreset;
   setView: (view: PlatformView) => void;
   toggleSidebar: () => void;
+  setMobileNavOpen: (open: boolean) => void;
   setCommandOpen: (open: boolean) => void;
   setWorkspace: (workspace: WorkspacePreset) => void;
 }
@@ -28,10 +30,12 @@ export const usePlatformStore = create<PlatformState>()(
     (set) => ({
       activeView: "overview",
       sidebarCollapsed: false,
+      mobileNavOpen: false,
       commandOpen: false,
       workspace: "default",
-      setView: (activeView) => set({ activeView }),
+      setView: (activeView) => set({ activeView, mobileNavOpen: false }),
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+      setMobileNavOpen: (mobileNavOpen) => set({ mobileNavOpen }),
       setCommandOpen: (commandOpen) => set({ commandOpen }),
       setWorkspace: (workspace) => {
         const raw = String(workspace);

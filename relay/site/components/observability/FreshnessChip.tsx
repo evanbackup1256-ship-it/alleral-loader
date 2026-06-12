@@ -1,23 +1,26 @@
 "use client";
 
 import clsx from "clsx";
-import { motion } from "motion/react";
 import { formatFreshness } from "@/lib/status/resolve";
-import { spring } from "@/lib/motion/config";
+import { useSecondsSince } from "@/lib/hooks/useSecondsSince";
 
 export function FreshnessChip({
-  secondsAgo,
+  dataUpdatedAt,
+  secondsAgo: secondsAgoProp,
   live = false,
   className,
 }: {
-  secondsAgo: number | null;
+  dataUpdatedAt?: number | null;
+  secondsAgo?: number | null;
   live?: boolean;
   className?: string;
 }) {
+  const tickSeconds = useSecondsSince(dataUpdatedAt ?? null);
+  const secondsAgo = secondsAgoProp ?? tickSeconds;
   const fresh = secondsAgo != null && secondsAgo < 20;
+
   return (
-    <motion.span
-      transition={spring.status}
+    <span
       className={clsx(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px]",
         fresh ? "border-cyan-400/30 text-cyan-200" : "border-border text-muted",
@@ -28,14 +31,8 @@ export function FreshnessChip({
         boxShadow: fresh ? "0 0 16px rgba(34,211,238,0.15)" : undefined,
       }}
     >
-      {live && fresh ? (
-        <motion.span
-          className="h-1.5 w-1.5 rounded-full bg-cyan-400"
-          animate={{ opacity: [1, 0.4, 1] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-        />
-      ) : null}
+      {live && fresh ? <span className="freshness-pulse h-1.5 w-1.5 rounded-full bg-cyan-400" /> : null}
       {formatFreshness(secondsAgo)}
-    </motion.span>
+    </span>
   );
 }

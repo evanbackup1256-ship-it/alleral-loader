@@ -1,13 +1,17 @@
 "use client";
 
 import clsx from "clsx";
-import { motion, AnimatePresence } from "motion/react";
-import { useEffect, useId, useRef, useState } from "react";
-import { spring } from "@/lib/motion/config";
+import * as Popover from "@radix-ui/react-popover";
+import { Check, ChevronDown } from "lucide-react";
+import { memo, useEffect, useId, useMemo, useState } from "react";
 
 export type SelectOption = { value: string; label: string };
 
-export function Select({
+function normalizeOptions(options: SelectOption[] | string[]): SelectOption[] {
+  return options.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
+}
+
+export const Select = memo(function Select({
   name,
   options,
   value,
@@ -16,6 +20,7 @@ export function Select({
   required,
   placeholder = "Select…",
   className,
+  disabled,
 }: {
   name: string;
   options: SelectOption[] | string[];
@@ -25,22 +30,19 @@ export function Select({
   required?: boolean;
   placeholder?: string;
   className?: string;
+  disabled?: boolean;
 }) {
-  const items = options.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
+  const items = useMemo(() => normalizeOptions(options), [options]);
+  const listId = useId();
   const [open, setOpen] = useState(false);
   const [internal, setInternal] = useState(defaultValue ?? items[0]?.value ?? "");
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const listId = useId();
   const current = value ?? internal;
-  const label = items.find((o) => o.value === current)?.label ?? placeholder;
+  const selected = items.find((o) => o.value === current);
+  const label = selected?.label ?? placeholder;
 
   useEffect(() => {
-    const onDoc = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
+    if (defaultValue !== undefined) setInternal(defaultValue);
+  }, [defaultValue]);
 
   const pick = (next: string) => {
     setInternal(next);
@@ -49,50 +51,55 @@ export function Select({
   };
 
   return (
-    <div ref={wrapRef} className={clsx("select-wrap-enhanced", className)}>
+    <Popover.Root open={open} onOpenChange={setOpen}>
       <input type="hidden" name={name} value={current} required={required && !current} readOnly />
-      <div className={clsx("custom-select", open && "open")}>
-        <motion.button
+      <Popover.Trigger asChild disabled={disabled}>
+        <button
           type="button"
-          className="custom-select-trigger"
+          className={clsx(
+            "custom-select-trigger flex w-full items-center justify-between gap-2 text-left",
+            open && "border-accent/50 shadow-[0_0_0_3px_rgba(99,102,241,0.15)]",
+            disabled && "cursor-not-allowed opacity-50",
+            className
+          )}
           aria-expanded={open}
           aria-haspopup="listbox"
           aria-controls={listId}
-          onClick={() => setOpen((v) => !v)}
-          whileTap={{ scale: 0.99 }}
         >
-          {label}
-        </motion.button>
-        <AnimatePresence>
-          {open ? (
-            <motion.div
-              id={listId}
-              role="listbox"
-              className="custom-select-menu"
-              initial={{ opacity: 0, y: -8, scale: 0.98, filter: "blur(4px)" }}
-              animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-              exit={{ opacity: 0, y: -6, scale: 0.98, filter: "blur(4px)" }}
-              transition={spring.snappy}
-            >
-              {items.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="option"
-                  aria-selected={opt.value === current}
-                  className={clsx("custom-select-option", opt.value === current && "selected")}
-                  onClick={() => pick(opt.value)}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      </div>
-    </div>
+          <span className={clsx("truncate", !selected && "text-muted")}>{label}</span>
+          <ChevronDown className={clsx("h-4 w-4 shrink-0 text-muted transition-transform", open && "rotate-180")} />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          id={listId}
+          role="listbox"
+          sideOffset={6}
+          align="start"
+          collisionPadding={12}
+          className="custom-select-menu z-[600] max-h-60 w-[var(--radix-popover-trigger-width)] overflow-y-auto p-1 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+        >
+          {items.map((opt) => {
+            const active = opt.value === current;
+            return (
+              <button
+                key={`${opt.value}-${opt.label}`}
+                type="button"
+                role="option"
+                aria-selected={active}
+                className={clsx("custom-select-option", active && "selected")}
+                onClick={() => pick(opt.value)}
+              >
+                <span className="truncate">{opt.label}</span>
+                {active ? <Check className="h-3.5 w-3.5 shrink-0 opacity-80" /> : null}
+              </button>
+            );
+          })}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
-}
+});
 
 export function Input({
   className,
