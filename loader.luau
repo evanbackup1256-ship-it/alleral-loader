@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.9.0"
+local LOADER_VERSION = "7.9.2"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -23,11 +23,11 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_NEVERLOSE_UI_PATH = HUB .. "/neverlose_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "7.9.0",
+	loader = "7.9.2",
 	core = "2.8.8",
 	ui = "Alleral",
-	neverlose = "1.3.0-kick",
-	windui = "1.3.0-kick",
+	neverlose = "1.5.1-kick",
+	windui = "1.5.1-kick",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",
@@ -2393,6 +2393,7 @@ local function buildManagedFiles()
 				UI .. "/neverlose/spr.luau",
 				UI .. "/neverlose/ripple.luau",
 				UI .. "/neverlose/fusion.luau",
+				UI .. "/neverlose/lottie.luau",
 			},
 			expectedKey = "neverlose",
 			extract = "neverlose",

@@ -19,10 +19,12 @@ return function(Core)
 	local SPR_FILE = "spr.luau"
 	local RIPPLE_FILE = "ripple.luau"
 	local FUSION_FILE = "fusion.luau"
+	local LOTTIE_FILE = "lottie.luau"
 	local MIN_LIBRARY_BYTES = 80000
 	local MIN_SPRING_BYTES = 200
 	local MIN_SPR_BYTES = 8000
 	local MIN_RIPPLE_BYTES = 800
+	local MIN_LOTTIE_BYTES = 4000
 
 	local function genv()
 		local ok, env = pcall(function()
@@ -95,6 +97,9 @@ return function(Core)
 
 	local function releaseNeverloseRuntime()
 		local lib = ENV._NeverloseLibrary
+		if type(lib) == "table" and type(lib.Lottie) == "table" and type(lib.Lottie.StopAll) == "function" then
+			pcall(lib.Lottie.StopAll, lib.Lottie)
+		end
 		if type(lib) == "table" and type(lib.Unload) == "function" then
 			pcall(lib.Unload, lib)
 		end
@@ -153,6 +158,13 @@ return function(Core)
 
 		if not Spring then
 			Core.logWarn("Neverlose spring unavailable — UI loads with TweenService animation fallback")
+		end
+
+		local lottieFactory = compileModule(readLocal(LOTTIE_FILE) or fetchRemote(LOTTIE_FILE, MIN_LOTTIE_BYTES), "@Neverlose/lottie")
+		if type(lottieFactory) == "function" then
+			pcall(lottieFactory, Library)
+		else
+			Core.logWarn("Neverlose Lottie director unavailable — compound animations use motion fallback")
 		end
 
 		do

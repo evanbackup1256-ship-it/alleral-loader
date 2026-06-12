@@ -39,10 +39,13 @@ return function(deps)
 		end
 	end
 
-	local function springCancel(instance)
+	local function springCancel(instance, property)
 		if Spr and type(Spr.stop) == "function" then
-			Spr.stop(instance)
+			Spr.stop(instance, property)
 		elseif Ripple and type(Ripple.stop) == "function" then
+			if property then
+				return
+			end
 			Ripple.stop(instance)
 		end
 	end

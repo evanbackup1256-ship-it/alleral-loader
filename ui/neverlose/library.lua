@@ -1,5 +1,5 @@
--- Neverlose UI · NEVERLOSE_UI_VERSION = "1.3.0-kick"
-local NEVERLOSE_UI_VERSION = "1.3.0-kick"
+-- Neverlose UI · NEVERLOSE_UI_VERSION = "1.5.1-kick"
+local NEVERLOSE_UI_VERSION = "1.5.1-kick"
 local Library do 
  local Workspace = game:GetService("Workspace")
  local UserInputService = game:GetService("UserInputService")
@@ -205,24 +205,296 @@ local Library do
  return self._SpringMotion or { frequency = 5.5, damping = 1 }
  end
 
+ Library.MotionPresets = {
+ Fast = { frequency = 9, damping = 1, duration = 0.16, easing = "quartOut" },
+ Normal = { frequency = 5.5, damping = 1, duration = 0.26, easing = "quartOut" },
+ Slow = { frequency = 3.8, damping = 1, duration = 0.38, easing = "quartOut" },
+ Bounce = { frequency = 6.5, damping = 0.72, duration = 0.32, easing = "backOut" },
+ Soft = { frequency = 4.2, damping = 1, duration = 0.34, easing = "sineOut" },
+ Snap = { frequency = 11, damping = 1, duration = 0.14, easing = "expoOut" },
+ }
+
+ Library._MotionTokens = {}
+ Library._RipplePool = {}
+
+ Library.ResolveMotionPreset = function(self, preset)
+ if type(preset) == "table" then
+ return preset
+ end
+ return self.MotionPresets[preset or "Normal"] or self.MotionPresets.Normal
+ end
+
+ Library._FadeProperties = {
+ BackgroundTransparency = true,
+ TextTransparency = true,
+ ImageTransparency = true,
+ Transparency = true,
+ ScrollBarImageTransparency = true,
+ }
+
+ Library.IsFadeGoal = function(self, goal)
+ if type(goal) ~= "table" then
+ return false
+ end
+ for property in pairs(goal) do
+ if self._FadeProperties[property] then
+ return true
+ end
+ end
+ return false
+ end
+
+ Library.CancelMotion = function(self, instance, goals)
+ if not instance then
+ return
+ end
+ local props = type(goals) == "table" and goals or nil
+ if props and props[1] == nil then
+ for property in pairs(props) do
+ if Library._Spr and Library._Spr.stop then
+ pcall(Library._Spr.stop, instance, property)
+ end
+ end
+ if Library._Ripple and Library._Ripple.stop then
+ pcall(Library._Ripple.stop, instance)
+ end
+ local token = Library._MotionTokens[instance]
+ if token and token.conn then
+ pcall(function()
+ token.conn:Disconnect()
+ end)
+ end
+ Library._MotionTokens[instance] = nil
+ return
+ end
+ if Library._Spring and Library._Spring.cancel then
+ Library._Spring.cancel(instance)
+ end
+ if Library._Spr and Library._Spr.stop then
+ Library._Spr.stop(instance)
+ end
+ if Library._Ripple and Library._Ripple.stop then
+ Library._Ripple.stop(instance)
+ end
+ local token = Library._MotionTokens[instance]
+ if token and token.conn then
+ pcall(function()
+ token.conn:Disconnect()
+ end)
+ end
+ Library._MotionTokens[instance] = nil
+ end
+
+ Library.MotionTo = function(self, instance, goals, preset, opts)
+ if not instance or type(goals) ~= "table" then
+ return nil
+ end
+ opts = type(opts) == "table" and opts or {}
+ local profile = self:ResolveMotionPreset(preset or opts.preset or "Normal")
+ self:CancelMotion(instance, goals)
+
+ local springGoals = {}
+ local tweenGoals = {}
+ for property, value in pairs(goals) do
+ local valueType = typeof(value)
+ if valueType == "number" or valueType == "UDim2" or valueType == "Vector2" then
+ springGoals[property] = value
+ elseif valueType == "Color3" or valueType == "boolean" then
+ tweenGoals[property] = value
+ end
+ end
+
+ local completed = Instance.new("BindableEvent")
+ local pending = 0
+ local function stepDone()
+ pending -= 1
+ if pending <= 0 then
+ completed:Fire()
+ end
+ end
+
+ if next(springGoals) and Library._Spring and Library._Spring.target then
+ pending += 1
+ Library._Spring.target(instance, springGoals, {
+ frequency = profile.frequency,
+ damping = profile.damping,
+ onComplete = stepDone,
+ })
+ elseif next(springGoals) and Library._Spr and Library._Spr.target then
+ pending += 1
+ Library._Spr.target(instance, profile.damping, profile.frequency, springGoals)
+ if Library._Spr.completed then
+ Library._Spr.completed(instance, stepDone)
+ else
+ task.delay(profile.duration or Library.Tween.Time, stepDone)
+ end
+ elseif next(springGoals) and Library._Ripple and Library._Ripple.tween then
+ pending += 1
+ Library._Ripple.tween(instance, springGoals, {
+ easing = profile.easing,
+ duration = profile.duration,
+ onComplete = stepDone,
+ })
+ end
+
+ if next(tweenGoals) then
+ pending += 1
+ local tween = TweenService:Create(instance, TweenInfo.new(profile.duration or Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), tweenGoals)
+ Library:Connect(tween.Completed, stepDone)
+ tween:Play()
+ end
+
+ if pending == 0 then
+ for property, value in pairs(goals) do
+ pcall(function()
+ instance[property] = value
+ end)
+ end
+ task.defer(function()
+ completed:Fire()
+ end)
+ end
+
+ return completed.Event
+ end
+
  Library.AnimateFluid = function(self, instance, goals, duration)
  if not instance or type(goals) ~= "table" then
  return
  end
- local motion = Library:GetSpringMotion()
- if Library._Ripple and type(Library._Ripple.tween) == "function" and not (Library._Spring and Library._Spring.spr) then
-  Library._Ripple.tween(instance, goals, {
-   easing = "quartOut",
-   duration = duration or Library.Tween.Time,
-  })
-  return
+ local preset = "Normal"
+ if type(duration) == "string" then
+ preset = duration
+ duration = nil
  end
- if Library._Spring and Library._Spring.target then
-  Library._Spring.target(instance, goals, motion)
-  return
+ local profile = self:ResolveMotionPreset(preset)
+ if duration then
+ profile = TableClone(profile)
+ profile.duration = duration
  end
- duration = duration or Library.Tween.Time
- TweenService:Create(instance, TweenInfo.new(duration, Library.Tween.Style, Library.Tween.Direction), goals):Play()
+ self:MotionTo(instance, goals, profile)
+ end
+
+ Library.Motion = function(self, instance, goals, preset, opts)
+ return self:MotionTo(instance, goals, preset, opts)
+ end
+ for name, preset in pairs(Library.MotionPresets) do
+ Library.Motion[name] = preset
+ end
+
+ Library.SpawnRipple = function(self, host, input)
+ if not host or not host.Instance then
+ return
+ end
+ local pool = Library._RipplePool
+ local ripple = table.remove(pool)
+ if not ripple then
+ ripple = InstanceNew("Frame")
+ ripple.Name = "\0"
+ ripple.BackgroundColor3 = FromRGB(255, 255, 255)
+ ripple.BackgroundTransparency = 0.82
+ ripple.BorderSizePixel = 0
+ ripple.AnchorPoint = Vector2New(0.5, 0.5)
+ ripple.ZIndex = (host.Instance.ZIndex or 1) + 3
+ Instances:Create("UICorner", { Parent = ripple, CornerRadius = UDimNew(1, 0) })
+ end
+ ripple.Parent = host.Instance
+ local rel = host.Instance.AbsoluteSize
+ local pos = input and input.Position
+ local x = rel.X * 0.5
+ local y = rel.Y * 0.5
+ if pos and host.Instance.AbsolutePosition then
+ x = pos.X - host.Instance.AbsolutePosition.X
+ y = pos.Y - host.Instance.AbsolutePosition.Y
+ end
+ ripple.Size = UDim2New(0, 8, 0, 8)
+ ripple.Position = UDim2New(0, x, 0, y)
+ ripple.BackgroundTransparency = 0.65
+ Library:MotionTo(ripple, {
+ Size = UDim2New(0, math.max(rel.X, rel.Y) * 1.35, 0, math.max(rel.X, rel.Y) * 1.35),
+ BackgroundTransparency = 1,
+ }, "Fast")
+ task.delay(0.22, function()
+ ripple.Parent = nil
+ if #pool < 8 then
+ table.insert(pool, ripple)
+ end
+ end)
+ end
+
+ Library.BindPremiumInteract = function(self, item, opts)
+ if not item or not item.Instance then
+ return
+ end
+ opts = type(opts) == "table" and opts or {}
+ local gui = item.Instance
+ if gui:GetAttribute("_PremiumBound") then
+ return
+ end
+ gui:SetAttribute("_PremiumBound", true)
+
+ local scaleObj = gui:FindFirstChild("_PremiumScale")
+ if not scaleObj then
+ scaleObj = InstanceNew("UIScale")
+ scaleObj.Name = "_PremiumScale"
+ scaleObj.Scale = 1
+ scaleObj.Parent = gui
+ end
+
+ local glow = gui:FindFirstChild("_PremiumGlow")
+ if not glow and (gui:IsA("TextButton") or gui:IsA("ImageButton")) then
+ glow = InstanceNew("UIStroke")
+ glow.Name = "_PremiumGlow"
+ glow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+ glow.Thickness = 1
+ glow.Transparency = 1
+ glow.Color = Library.Theme.Accent
+ glow.Parent = gui
+ end
+
+ local function animateScale(target, preset)
+ Library:MotionTo(scaleObj, { Scale = target }, preset or "Snap")
+ end
+
+ item:Connect("MouseEnter", function()
+ animateScale(opts.hoverScale or 1.015, "Soft")
+ if glow then
+ Library:MotionTo(glow, { Transparency = 0.55 }, "Soft")
+ end
+ if gui:IsA("TextButton") or gui:IsA("TextLabel") then
+ Library:MotionTo(gui, { TextTransparency = 0 }, "Fast")
+ elseif gui:IsA("ImageButton") or gui:IsA("ImageLabel") then
+ Library:MotionTo(gui, { ImageTransparency = 0 }, "Fast")
+ end
+ end)
+
+ item:Connect("MouseLeave", function()
+ animateScale(1, "Soft")
+ if glow then
+ Library:MotionTo(glow, { Transparency = 1 }, "Soft")
+ end
+ end)
+
+ item:Connect("InputBegan", function(input)
+ if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+ animateScale(opts.pressScale or 0.97, "Snap")
+ if opts.ripple ~= false then
+ Library:SpawnRipple(item, input)
+ end
+ if Library.Lottie and opts.lottiePulse ~= false then
+ Library.Lottie:Play({
+ root = gui,
+ targets = { Self = gui, Glow = glow },
+ }, "ButtonPulse")
+ end
+ end
+ end)
+
+ item:Connect("InputEnded", function(input)
+ if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+ animateScale(opts.hoverScale or 1.015, "Bounce")
+ end
+ end)
  end
 
  -- Folders
@@ -240,31 +512,39 @@ local Library do
  Item = IsRawItem and Item or Item.Instance
  Info = Info or TweenInfo.new(Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction)
 
- if Library._Spring and type(Library._Spring.target) == "function" and type(Goal) == "table" then
+ if type(Goal) == "table" and Library.MotionTo and not Library:IsFadeGoal(Goal) then
   local springGoal = {}
   for property, value in pairs(Goal) do
    local valueType = typeof(value)
-   if valueType == "number" or valueType == "UDim2" or valueType == "Vector2" then
+   if valueType == "number" or valueType == "UDim2" or valueType == "Vector2" or valueType == "Color3" then
     springGoal[property] = value
    end
   end
   if next(springGoal) then
-   local motion = Library._SpringMotion or { frequency = 5.5, damping = 1 }
+   local preset = "Normal"
+   if Info and Info.Time then
+    if Info.Time <= 0.18 then
+     preset = "Snap"
+    elseif Info.Time >= 0.34 then
+     preset = "Soft"
+    end
+   end
    local completed = Instance.new("BindableEvent")
-   Library._Spring.target(Item, springGoal, {
-    frequency = motion.frequency,
-    damping = motion.damping,
-    onComplete = function()
+   local conn = Library:MotionTo(Item, springGoal, preset)
+   if conn then
+    Library:Connect(conn, function()
      completed:Fire()
-    end,
-   })
+    end)
+   else
+    task.defer(function()
+     completed:Fire()
+    end)
+   end
    local fakeTween = {
     Play = function() end,
     Pause = function() end,
     Cancel = function()
-     if Library._Spring.cancel then
-      Library._Spring.cancel(Item)
-     end
+     Library:CancelMotion(Item)
     end,
     Completed = completed.Event,
    }
@@ -382,6 +662,12 @@ local Library do
  NewItem.Instance[Property] = Value
  end
 
+ if NewItem.Instance:IsA("GuiButton") then
+ task.defer(function()
+ Library:BindPremiumInteract(NewItem)
+ end)
+ end
+
  return NewItem
  end
 
@@ -450,11 +736,27 @@ local Library do
  return Library:Connect(self.Instance[Event], Callback, Name)
  end
 
- Instances.Tween = function(self, Info, Goal)
+ Instances.Tween = function(self, Info, Goal, preset)
  if not self.Instance then 
  return
  end
-
+ if type(preset) == "string" and type(Goal) == "table" then
+ local completed = Instance.new("BindableEvent")
+ local conn = Library:MotionTo(self.Instance, Goal, preset)
+ if conn then
+ Library:Connect(conn, function()
+ completed:Fire()
+ end)
+ end
+ return {
+ Tween = { Completed = completed.Event, Cancel = function()
+ Library:CancelMotion(self.Instance)
+ end, Play = function() end, Pause = function() end },
+ Info = Info,
+ Goal = Goal,
+ Item = self.Instance,
+ }
+ end
  return Tween:Create(self, Info, Goal)
  end
 
@@ -489,9 +791,7 @@ local Library do
  local DragDelta = Input.Position - DragStart
  local NewX = StartPosition.X.Offset + DragDelta.X
  local NewY = StartPosition.Y.Offset + DragDelta.Y
- self:Tween(TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
- Position = UDim2New(StartPosition.X.Scale, NewX, StartPosition.Y.Scale, NewY)
- })
+ Gui.Position = UDim2New(StartPosition.X.Scale, NewX, StartPosition.Y.Scale, NewY)
  end
  
  local InputChanged
@@ -509,6 +809,7 @@ local Library do
  InputChanged = Input.Changed:Connect(function()
  if Input.UserInputState == Enum.UserInputState.End then
  Dragging = false
+ Library:MotionTo(Gui, { Position = Gui.Position }, "Soft")
  if InputChanged then
  InputChanged:Disconnect()
  InputChanged = nil
@@ -684,8 +985,8 @@ local Library do
  h = Minimum.Y
  end
  
- self:Tween(TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2FromOffset(x, y)})
- self:Tween(TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2FromOffset(w, h)})
+ self:Tween(nil, {Position = UDim2FromOffset(x, y)}, "Soft")
+ self:Tween(nil, {Size = UDim2FromOffset(w, h)}, "Soft")
  end)
  end
 
@@ -868,6 +1169,15 @@ local Library do
  self.NotifHolder.Instance:Destroy()
  end)
  self.NotifHolder = nil
+ end
+
+ for instance in pairs(self._MotionTokens or {}) do
+ self:CancelMotion(instance)
+ end
+ self._MotionTokens = {}
+
+ if self.Lottie and type(self.Lottie.StopAll) == "function" then
+ pcall(self.Lottie.StopAll, self.Lottie)
  end
 
  if self.WatermarkFrame then
@@ -1088,6 +1398,11 @@ local Library do
  ZIndex = 500,
  })
  Instances:Create("UICorner", { Parent = root.Instance, CornerRadius = UDimNew(0, 6) })
+ local scale = Instances:Create("UIScale", {
+ Parent = root.Instance,
+ Name = "_TooltipScale",
+ Scale = 1,
+ })
  local stroke = Instances:Create("UIStroke", {
  Parent = root.Instance,
  Color = FromRGB(40, 40, 48),
@@ -1125,7 +1440,7 @@ local Library do
  PaddingLeft = UDimNew(0, 10),
  PaddingRight = UDimNew(0, 10),
  })
- self._TooltipItems = { Root = root, Body = body, Stroke = stroke, Accent = accent }
+ self._TooltipItems = { Root = root, Body = body, Stroke = stroke, Accent = accent, Scale = scale }
  return self._TooltipItems
  end
 
@@ -1134,7 +1449,54 @@ local Library do
  if not items or not items.Root then
  return
  end
+ if self._TooltipHideToken then
+ self._TooltipHideToken += 1
+ else
+ self._TooltipHideToken = 1
+ end
+ local token = self._TooltipHideToken
+ local targetBg = items.Root.Instance.BackgroundTransparency
+ local targetStroke = items.Stroke.Instance.Transparency
+ local targetText = items.Body.Instance.TextTransparency
+ if Library.Lottie and not items._HidePlaying then
+ items._HidePlaying = true
+ Library.Lottie:Play({
+ root = items.Root.Instance,
+ items = items,
+ targets = {
+ Self = items.Root.Instance,
+ Stroke = items.Stroke.Instance,
+ Content = items.Body.Instance,
+ Icon = items.Accent.Instance,
+ },
+ }, "TooltipPop", {
+ Direction = "Reverse",
+ onComplete = function()
+ items._HidePlaying = nil
+ if token ~= self._TooltipHideToken then
+ return
+ end
  items.Root.Instance.Visible = false
+ items.Scale.Instance.Scale = 1
+ items.Body.Instance.TextTransparency = 0
+ end,
+ })
+ return
+ end
+ Library:MotionTo(items.Scale.Instance, { Scale = 0.94 }, "Snap")
+ Library:MotionTo(items.Root.Instance, { BackgroundTransparency = 1 }, "Fast")
+ Library:MotionTo(items.Stroke.Instance, { Transparency = 1 }, "Fast")
+ Library:MotionTo(items.Body.Instance, { TextTransparency = 1 }, "Fast")
+ task.delay(0.16, function()
+ if token ~= self._TooltipHideToken then
+ return
+ end
+ items.Root.Instance.Visible = false
+ items.Root.Instance.BackgroundTransparency = targetBg
+ items.Stroke.Instance.Transparency = targetStroke
+ items.Body.Instance.TextTransparency = targetText
+ items.Scale.Instance.Scale = 1
+ end)
  end
 
  Library.ShowTooltip = function(self, text, anchor)
@@ -1143,30 +1505,59 @@ local Library do
  return
  end
  local items = self:EnsureTooltip()
+ self._TooltipHideToken = (self._TooltipHideToken or 0) + 1
  items.Body.Instance.Text = text
  local style = "rich"
  pcall(function()
  local env = getgenv and getgenv() or {}
  style = env.Alleral_TooltipStyle or style
  end)
+ local targetBg = 0.05
+ local targetStroke = 0.2
  if style == "minimal" then
- items.Root.Instance.BackgroundTransparency = 0.15
- items.Stroke.Instance.Transparency = 0.5
+ targetBg = 0.15
+ targetStroke = 0.5
  elseif style == "card" then
- items.Root.Instance.BackgroundTransparency = 0
- items.Stroke.Instance.Transparency = 0.15
- else
- items.Root.Instance.BackgroundTransparency = 0.05
- items.Stroke.Instance.Transparency = 0.2
+ targetBg = 0
+ targetStroke = 0.15
  end
  items.Accent.Instance.BackgroundColor3 = Library.Theme.Accent
  local pos = anchor.AbsolutePosition
  local size = anchor.AbsoluteSize
  items.Root.Instance.Position = UDim2New(0, pos.X + size.X + 12, 0, pos.Y + 4)
+ items.Root.Instance.BackgroundTransparency = 1
+ items.Stroke.Instance.Transparency = 1
+ items.Body.Instance.TextTransparency = 0.35
+ items.Scale.Instance.Scale = 0.92
  items.Root.Instance.Visible = true
- items.Root:Tween(TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
- BackgroundTransparency = items.Root.Instance.BackgroundTransparency,
+ items._TargetBg = targetBg
+ items._TargetStroke = targetStroke
+ if Library.Lottie then
+ Library.Lottie:Play({
+ root = items.Root.Instance,
+ items = items,
+ targets = {
+ Self = items.Root.Instance,
+ Stroke = items.Stroke.Instance,
+ Content = items.Body.Instance,
+ Icon = items.Accent.Instance,
+ },
+ }, "TooltipPop", {
+ onComplete = function()
+ items.Root.Instance.BackgroundTransparency = targetBg
+ items.Stroke.Instance.Transparency = targetStroke
+ items.Body.Instance.TextTransparency = 0
+ items.Scale.Instance.Scale = 1
+ end,
  })
+ return
+ end
+ items.Root.Instance.BackgroundTransparency = targetBg
+ items.Stroke.Instance.Transparency = targetStroke
+ Library:MotionTo(items.Scale.Instance, { Scale = 1 }, "Bounce")
+ Library:MotionTo(items.Root.Instance, { BackgroundTransparency = targetBg }, "Soft")
+ Library:MotionTo(items.Stroke.Instance, { Transparency = targetStroke }, "Soft")
+ Library:MotionTo(items.Body.Instance, { TextTransparency = 0 }, "Fast")
  end
 
  Library.BindTooltip = function(self, target, text)
@@ -1848,17 +2239,31 @@ local Library do
  Colorpicker.IsOpen = Bool
 
  Debounce = true 
+ Library:EnsureGuiRoot()
 
  if Colorpicker.IsOpen then 
  Items["ColorpickerWindow"].Instance.Visible = true
- Items["ColorpickerWindow"].Instance.Parent = LibRef.Holder.Instance
+ Library:SafeReparent(Items["ColorpickerWindow"].Instance, LibRef.Holder.Instance)
+ local cpScale = Items["ColorpickerWindow"].Instance:FindFirstChild("_PopoverScale")
+ if not cpScale then
+ cpScale = InstanceNew("UIScale")
+ cpScale.Name = "_PopoverScale"
+ cpScale.Parent = Items["ColorpickerWindow"].Instance
+ end
+ cpScale.Scale = 0.92
+ Library:MotionTo(cpScale, { Scale = 1 }, "Bounce")
  
  RenderStepped = RunService.RenderStepped:Connect(function()
- Items["ColorpickerWindow"].Instance.Position = UDim2New(
+ local win = Items["ColorpickerWindow"].Instance
+ local btn = Items["ColorpickerButton"] and Items["ColorpickerButton"].Instance
+ if not win or not win.Parent or not btn or not btn.Parent then
+ return
+ end
+ win.Position = UDim2New(
  0, 
- Items["ColorpickerButton"].Instance.AbsolutePosition.X, 
+ btn.AbsolutePosition.X, 
  0, 
- Items["ColorpickerButton"].Instance.AbsolutePosition.Y + Items["ColorpickerButton"].Instance.AbsoluteSize.Y + 5
+ btn.AbsolutePosition.Y + btn.AbsoluteSize.Y + 5
  )
  end)
 
@@ -1912,8 +2317,15 @@ local Library do
  NewTween.Tween.Completed:Connect(function()
  Debounce = false 
  Items["ColorpickerWindow"].Instance.Visible = Colorpicker.IsOpen
- task.wait(0.2)
- Items["ColorpickerWindow"].Instance.Parent = not Colorpicker.IsOpen and LibRef.UnusedHolder.Instance or LibRef.Holder.Instance
+ task.wait(0.12)
+ if RenderStepped then
+ RenderStepped:Disconnect()
+ RenderStepped = nil
+ end
+ Library:SafeReparent(
+ Items["ColorpickerWindow"].Instance,
+ Colorpicker.IsOpen and LibRef.Holder.Instance or LibRef.UnusedHolder.Instance
+ )
  end)
  end
 
@@ -2044,11 +2456,13 @@ local Library do
  })
 
  SavedColor:OnHover(function()
- UIStroke:Tween(nil, {Transparency = 0})
+ UIStroke:Tween(nil, {Transparency = 0.2}, "Soft")
+ SavedColor:Tween(nil, {Size = UDim2New(0, 22, 0, 22)}, "Snap")
  end)
 
  SavedColor:OnHoverLeave(function()
- UIStroke:Tween(nil, {Transparency = 1})
+ UIStroke:Tween(nil, {Transparency = 0.6}, "Soft")
+ SavedColor:Tween(nil, {Size = UDim2New(0, 18, 0, 18)}, "Soft")
  end)
  
  Colorpicker.SavedColors[SaveIndex] = {
@@ -2483,7 +2897,9 @@ local Library do
  end
 
  local Size = Items["Notification"].Instance.AbsoluteSize
- Items["Notification"].Instance.Size = UDim2New(0, 0, 0, 0)
+ Items["Notification"].Instance.Size = UDim2New(0, Size.X + 40, 0, Size.Y)
+ Items["Notification"].Instance.AnchorPoint = Vector2New(1, 0)
+ Items["Notification"].Instance.Position = UDim2New(1, 40, 0, 0)
 
  for Index, Value in Items do 
  if Value.Instance:IsA("Frame") then
@@ -2494,38 +2910,55 @@ local Library do
  Value.Instance.ImageTransparency = 1
  end
  end 
- 
- task.wait(0.2)
 
  Items["Notification"].Instance.AutomaticSize = Enum.AutomaticSize.Y
 
  Library:Thread(function()
+ local notifCtx = Library.Lottie and {
+ root = Items["Notification"].Instance,
+ items = Items,
+ targets = {
+ Self = Items["Notification"].Instance,
+ Icon = Items["Icon"].Instance,
+ Content = Items["Notification"].Instance,
+ Accent = Items["Accent"].Instance,
+ },
+ }
+ if notifCtx then
+ Library.Lottie:Play(notifCtx, "NotificationPop")
+ else
+ Library:MotionTo(Items["Notification"].Instance, { Position = UDim2New(1, 0, 0, 0) }, "Bounce")
+ end
  for Index, Value in Items do 
  if Value.Instance:IsA("Frame") then
- Value:Tween(TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out, 0, false, 0), {BackgroundTransparency = 0})
+ Value:Tween(nil, {BackgroundTransparency = 0.12}, "Soft")
  elseif Value.Instance:IsA("TextLabel") then 
- Value:Tween(TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out, 0, false, 0), {TextTransparency = 0})
+ Value:Tween(nil, {TextTransparency = 0}, "Soft")
  elseif Value.Instance:IsA("ImageLabel") then 
- Value:Tween(TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out, 0, false, 0), {ImageTransparency = 0})
+ Value:Tween(nil, {ImageTransparency = 0}, "Soft")
  end
  end
 
- Items["Notification"]:Tween(TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out, 0, false, 0), {Size = UDim2New(0, Size.X, 0, Size.Y)})
- Items["Accent"]:Tween(TweenInfo.new(Data.Duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut), {Size = UDim2New(1, 0, 0, 6)})
+ Items["Notification"]:Tween(nil, {Size = UDim2New(0, Size.X, 0, Size.Y)}, "Soft")
+ Items["Accent"].Instance.Size = UDim2New(0, 0, 0, 3)
+ TweenService:Create(Items["Accent"].Instance, TweenInfo.new(Data.Duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut), {
+ Size = UDim2New(1, 0, 0, 6),
+ }):Play()
 
  task.delay(Data.Duration + 0.15, function()
+ Library:MotionTo(Items["Notification"].Instance, { Position = UDim2New(1, 48, 0, 0) }, "Fast")
  for Index, Value in Items do 
  if Value.Instance:IsA("Frame") then
- Value:Tween(nil, {BackgroundTransparency = 1})
+ Value:Tween(nil, {BackgroundTransparency = 1}, "Fast")
  elseif Value.Instance:IsA("TextLabel") then 
- Value:Tween(nil, {TextTransparency = 1})
+ Value:Tween(nil, {TextTransparency = 1}, "Fast")
  elseif Value.Instance:IsA("ImageLabel") then 
- Value:Tween(nil, {ImageTransparency = 1})
+ Value:Tween(nil, {ImageTransparency = 1}, "Fast")
  end
  end
 
- Items["Notification"]:Tween(TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out, 0, false, 0), {Size = UDim2New(0, 0, 0, 0)})
- task.wait(0.5)
+ Items["Notification"]:Tween(nil, {Size = UDim2New(0, 0, 0, 0)}, "Fast")
+ task.wait(0.28)
  Items["Notification"]:Clean()
  end)
  end)
@@ -2550,6 +2983,7 @@ local Library do
  Items["MainFrame"] = Instances:Create("Frame", {
  Parent = LibRef.Holder.Instance,
  Name = "\0",
+ Visible = false,
  BorderColor3 = FromRGB(0, 0, 0),
  AnchorPoint = Vector2New(0.5, 0.5),
  BackgroundTransparency = 0.12,
@@ -2559,6 +2993,72 @@ local Library do
  BorderSizePixel = 0,
  BackgroundColor3 = FromRGB(27, 25, 29)
  }) Items["MainFrame"]:AddToTheme({BackgroundColor3 = "Background"})
+
+ Instances:Create("UICorner", {
+ Parent = Items["MainFrame"].Instance,
+ CornerRadius = UDimNew(0, 10)
+ })
+
+ Instances:Create("UIStroke", {
+ Parent = Items["MainFrame"].Instance,
+ Name = "_WindowStroke",
+ Thickness = 1,
+ Transparency = 0.72,
+ Color = FromRGB(255, 255, 255),
+ }):AddToTheme({Color = "Accent"})
+
+ Items["WindowScale"] = Instances:Create("UIScale", {
+ Parent = Items["MainFrame"].Instance,
+ Name = "_WindowScale",
+ Scale = 1,
+ })
+
+ Items["WindowShadow"] = Instances:Create("Frame", {
+ Parent = LibRef.Holder.Instance,
+ Name = "_WindowShadow",
+ AnchorPoint = Vector2New(0.5, 0.5),
+ Position = Items["MainFrame"].Instance.Position,
+ Size = UDim2New(0, 700, 0, 668),
+ BackgroundColor3 = FromRGB(0, 0, 0),
+ BackgroundTransparency = 0.35,
+ BorderSizePixel = 0,
+ ZIndex = 1,
+ Visible = false,
+ })
+ Instances:Create("UICorner", { Parent = Items["WindowShadow"].Instance, CornerRadius = UDimNew(0, 12) })
+
+ Items["BackdropDim"] = Instances:Create("Frame", {
+ Parent = LibRef.Holder.Instance,
+ Name = "_BackdropDim",
+ Size = UDim2New(1, 0, 1, 0),
+ BackgroundColor3 = FromRGB(0, 0, 0),
+ BackgroundTransparency = 1,
+ BorderSizePixel = 0,
+ ZIndex = 1,
+ Visible = false,
+ })
+
+ Items["WindowSheen"] = Instances:Create("Frame", {
+ Parent = Items["MainFrame"].Instance,
+ Name = "_WindowSheen",
+ Size = UDim2New(1, 0, 0, 80),
+ BackgroundTransparency = 0.92,
+ BorderSizePixel = 0,
+ ZIndex = 4,
+ BackgroundColor3 = FromRGB(255, 255, 255),
+ })
+ Instances:Create("UIGradient", {
+ Parent = Items["WindowSheen"].Instance,
+ Rotation = 90,
+ Color = RGBSequence{
+ RGBSequenceKeypoint(0, FromRGB(255, 255, 255)),
+ RGBSequenceKeypoint(1, FromRGB(255, 255, 255)),
+ },
+ Transparency = NumSequence{
+ NumSequenceKeypoint(0, 0.82),
+ NumSequenceKeypoint(1, 1),
+ },
+ })
 
  if IsMobile then 
  Instances:Create("UIScale", {
@@ -2594,7 +3094,10 @@ local Library do
  
  local Set = function(Input)
  local DragDelta = Input.Position - DragStart
- Items["MainFrame"]:Tween(TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2New(StartPosition.X.Scale, StartPosition.X.Offset + DragDelta.X, StartPosition.Y.Scale, StartPosition.Y.Offset + DragDelta.Y)})
+ Items["MainFrame"].Instance.Position = UDim2New(StartPosition.X.Scale, StartPosition.X.Offset + DragDelta.X, StartPosition.Y.Scale, StartPosition.Y.Offset + DragDelta.Y)
+ if Window.Items["WindowShadow"] then
+ Window.Items["WindowShadow"].Instance.Position = Items["MainFrame"].Instance.Position
+ end
  end
  
  Items["MainFrame"]:Connect("InputBegan", function(Input)
@@ -2607,6 +3110,10 @@ local Library do
  Input.Changed:Connect(function()
  if Input.UserInputState == Enum.UserInputState.End then
  Dragging = false
+ Library:MotionTo(Gui, { Position = Gui.Position }, "Soft")
+ if Window.Items["WindowShadow"] then
+ Library:MotionTo(Window.Items["WindowShadow"].Instance, { Position = Gui.Position }, "Soft")
+ end
  end
  end)
  end
@@ -2622,6 +3129,10 @@ local Library do
  Input.Changed:Connect(function()
  if Input.UserInputState == Enum.UserInputState.End then
  Dragging = false
+ Library:MotionTo(Gui, { Position = Gui.Position }, "Soft")
+ if Window.Items["WindowShadow"] then
+ Library:MotionTo(Window.Items["WindowShadow"].Instance, { Position = Gui.Position }, "Soft")
+ end
  end
  end)
  end
@@ -2776,6 +3287,25 @@ local Library do
  PaddingRight = UDimNew(0, 12),
  PaddingLeft = UDimNew(0, 12)
  })
+
+ Items["TabIndicator"] = Instances:Create("Frame", {
+ Parent = Items["LeftTabs"].Instance,
+ Name = "_TabIndicator",
+ BackgroundTransparency = 0.78,
+ Size = UDim2New(0, 200, 0, 40),
+ Position = UDim2New(0, 0, 0, 0),
+ BorderSizePixel = 0,
+ ZIndex = 1,
+ BackgroundColor3 = FromRGB(124, 163, 255),
+ Visible = false,
+ }) Items["TabIndicator"]:AddToTheme({BackgroundColor3 = "Accent"})
+ Instances:Create("UICorner", { Parent = Items["TabIndicator"].Instance, CornerRadius = UDimNew(0, 8) })
+ Instances:Create("UIStroke", {
+ Parent = Items["TabIndicator"].Instance,
+ Thickness = 1,
+ Transparency = 0.35,
+ Color = FromRGB(255, 255, 255),
+ }):AddToTheme({Color = "AccentGradient"})
 
  Items["Logo"] = Instances:Create("ImageLabel", {
  Parent = Items["MainFrame"].Instance,
@@ -3125,6 +3655,72 @@ local Library do
 
  if Window.IsOpen then 
  Items["MainFrame"].Instance.Visible = true 
+ local windowLottie = Library.Lottie and {
+ root = Items["MainFrame"].Instance,
+ items = Items,
+ targets = {
+ Self = Items["MainFrame"].Instance,
+ Shadow = Items["WindowShadow"] and Items["WindowShadow"].Instance,
+ Glow = Items["MainFrame"].Instance:FindFirstChild("_WindowStroke"),
+ Gradient = Items["WindowSheen"] and Items["WindowSheen"].Instance,
+ Backdrop = Items["BackdropDim"] and Items["BackdropDim"].Instance,
+ },
+ }
+ if windowLottie then
+ if Items["WindowScale"] then
+ Items["WindowScale"].Instance.Scale = 0.94
+ end
+ if Items["BackdropDim"] then
+ Items["BackdropDim"].Instance.Visible = true
+ end
+ if Items["WindowShadow"] then
+ Items["WindowShadow"].Instance.Visible = true
+ Items["WindowShadow"].Instance.Position = Items["MainFrame"].Instance.Position
+ Items["WindowShadow"].Instance.Size = UDim2New(0, Items["MainFrame"].Instance.AbsoluteSize.X + 28, 0, Items["MainFrame"].Instance.AbsoluteSize.Y + 28)
+ end
+ Library.Lottie:Play(windowLottie, "PremiumWindowOpen")
+ Library:MotionTo(Items["BackdropDim"].Instance, { BackgroundTransparency = 0.52 }, "Soft")
+ else
+ if Items["BackdropDim"] then
+ Items["BackdropDim"].Instance.Visible = true
+ Library:MotionTo(Items["BackdropDim"].Instance, { BackgroundTransparency = 0.52 }, "Soft")
+ end
+ if Items["WindowShadow"] then
+ Items["WindowShadow"].Instance.Visible = true
+ Items["WindowShadow"].Instance.Position = Items["MainFrame"].Instance.Position
+ Items["WindowShadow"].Instance.Size = UDim2New(0, Items["MainFrame"].Instance.AbsoluteSize.X + 28, 0, Items["MainFrame"].Instance.AbsoluteSize.Y + 28)
+ Library:MotionTo(Items["WindowShadow"].Instance, { BackgroundTransparency = 0.62 }, "Soft")
+ end
+ if Items["WindowScale"] then
+ Items["WindowScale"].Instance.Scale = 0.94
+ Library:MotionTo(Items["WindowScale"].Instance, { Scale = 1 }, "Bounce")
+ end
+ end
+ else
+ local windowLottie = Library.Lottie and {
+ root = Items["MainFrame"].Instance,
+ items = Items,
+ targets = {
+ Self = Items["MainFrame"].Instance,
+ Shadow = Items["WindowShadow"] and Items["WindowShadow"].Instance,
+ Glow = Items["MainFrame"].Instance:FindFirstChild("_WindowStroke"),
+ Gradient = Items["WindowSheen"] and Items["WindowSheen"].Instance,
+ },
+ }
+ if windowLottie then
+ Library.Lottie:Play(windowLottie, "PremiumWindowClose")
+ Library:MotionTo(Items["BackdropDim"].Instance, { BackgroundTransparency = 1 }, "Fast")
+ else
+ if Items["WindowScale"] then
+ Library:MotionTo(Items["WindowScale"].Instance, { Scale = 0.97 }, "Fast")
+ end
+ if Items["BackdropDim"] then
+ Library:MotionTo(Items["BackdropDim"].Instance, { BackgroundTransparency = 1 }, "Fast")
+ end
+ if Items["WindowShadow"] then
+ Library:MotionTo(Items["WindowShadow"].Instance, { BackgroundTransparency = 1 }, "Fast")
+ end
+ end
  end
 
  if Items["FloatingButton"] then
@@ -3152,10 +3748,38 @@ local Library do
  end
  end
  
- NewTween.Tween.Completed:Connect(function()
- WindowOpenDebounce = false 
+ local function finishWindowTransition()
+ if not WindowOpenDebounce then
+ return
+ end
+ WindowOpenDebounce = false
  Items["MainFrame"].Instance.Visible = Window.IsOpen
- end)
+ if not Window.IsOpen then
+ if Items["BackdropDim"] then
+ Items["BackdropDim"].Instance.Visible = false
+ end
+ if Items["WindowShadow"] then
+ Items["WindowShadow"].Instance.Visible = false
+ end
+ if Items["WindowScale"] then
+ Items["WindowScale"].Instance.Scale = 1
+ end
+ end
+ end
+
+ local transitionFinished = false
+ local function finishOnce()
+ if transitionFinished then
+ return
+ end
+ transitionFinished = true
+ finishWindowTransition()
+ end
+
+ if NewTween and NewTween.Tween and NewTween.Tween.Completed then
+ NewTween.Tween.Completed:Connect(finishOnce)
+ end
+ task.delay(Library.FadeSpeed + 0.12, finishOnce)
  end
 
  Instances:Create("UIGradient", {
@@ -3745,6 +4369,23 @@ local Library do
 		end)
 	end
 	Window:SetCenter()
+		if Library.Lottie and Items["Logo"] then
+			local logoScale = Items["Logo"].Instance:FindFirstChild("_LogoScale")
+			if not logoScale then
+				logoScale = InstanceNew("UIScale")
+				logoScale.Name = "_LogoScale"
+				logoScale.Scale = 1
+				logoScale.Parent = Items["Logo"].Instance
+			end
+			Library.Lottie:Play({
+				root = Items["Logo"].Instance,
+				items = Items,
+				targets = {
+					Self = Items["Logo"].Instance,
+					Icon = Items["Logo"].Instance,
+				},
+			}, "IconBreathe", { Loop = true })
+		end
 	task.defer(function()
 		Window:SetOpen(true)
 	end)
@@ -3965,6 +4606,9 @@ Library.Watermark = function(self, Data)
  Active = false
  }
 
+ Page._TabIndex = #Page.Window.Pages + 1
+ Page.Window._ActiveTabIndex = Page.Window._ActiveTabIndex or 1
+
  local Items = { } do
  Items["Inactive"] = Instances:Create("TextButton", {
  Parent = Page.Window.Items["LeftTabs"].Instance,
@@ -4110,21 +4754,74 @@ Library.Watermark = function(self, Data)
  Items["Page"].Instance.Visible = Bool 
  Items["Page"].Instance.Parent = Bool and Page.Window.Items["Content"].Instance or LibRef.UnusedHolder.Instance
 
- local tabMotion = TweenInfo.new(Library.Tween.Time + 0.04, Library.Tween.Style, Library.Tween.Direction)
- local slideOffset = 22
+ local prevIndex = Page.Window._ActiveTabIndex or 1
+ local direction = (Page._TabIndex or 1) >= prevIndex and 1 or -1
+ local slideOffset = 26
 
  if Page.Active then
- Items["Inactive"]:Tween(tabMotion, {BackgroundTransparency = 0.25})
- Items["Page"]:Tween(tabMotion, {Position = UDim2New(0, 0, 0, 0)})
+ Page.Window._ActiveTabIndex = Page._TabIndex or 1
+ local indicator = Page.Window.Items["TabIndicator"]
+ local tabCtx = Library.Lottie and {
+ root = Items["Page"].Instance,
+ items = Items,
+ targets = {
+ Self = Items["Page"].Instance,
+ Icon = Items["Icon"].Instance,
+ Stroke = indicator and indicator.Instance,
+ Content = Items["Page"].Instance,
+ },
+ window = Page.Window.Items,
+ }
+ if tabCtx then
+ if indicator then
+ indicator.Instance.Visible = true
+ end
+ Library.Lottie:Play(tabCtx, "TabLiquidSwitch", {
+ mode = "In",
+ direction = direction,
+ slide = slideOffset,
+ hooks = {
+ onUpdate = function()
+ if indicator and Items["Inactive"] and Items["Inactive"].Instance.Parent then
+ indicator.Instance.Position = Items["Inactive"].Instance.Position
+ indicator.Instance.Size = Items["Inactive"].Instance.Size
+ end
+ end,
+ },
+ })
+ Library:MotionTo(Items["Inactive"].Instance, { BackgroundTransparency = 0.25 }, "Soft")
+ else
+ if indicator then
+ indicator.Instance.Visible = true
+ Library:MotionTo(indicator.Instance, {
+ Position = Items["Inactive"].Instance.Position,
+ Size = Items["Inactive"].Instance.Size,
+ BackgroundTransparency = 0.78,
+ }, "Snap")
+ end
+ Library:MotionTo(Items["Inactive"].Instance, { BackgroundTransparency = 0.25 }, "Soft")
+ Library:MotionTo(Items["Icon"].Instance, { Size = UDim2New(0, 20, 0, 20), Position = UDim2New(0, 18, 0.5, 0) }, "Soft")
+ Items["Page"].Instance.Position = UDim2New(0, direction * slideOffset, 0, 10)
+ Library:MotionTo(Items["Page"].Instance, { Position = UDim2New(0, 0, 0, 0) }, "Soft")
+ end
 
  for Index, Value in Page.Sections do 
  task.spawn(function()
+ task.wait((Index - 1) * 0.025)
  Value:TweenElements(true)
  end)
  end
  else
- Items["Inactive"]:Tween(tabMotion, {BackgroundTransparency = 1})
- Items["Page"]:Tween(tabMotion, {Position = UDim2New(0, 0, 0, slideOffset)})
+ if Library.Lottie then
+ Library.Lottie:Play({
+ root = Items["Page"].Instance,
+ items = Items,
+ targets = { Self = Items["Page"].Instance, Icon = Items["Icon"].Instance },
+ }, "TabLiquidSwitch", { mode = "Out", direction = direction, slide = slideOffset })
+ end
+ Library:MotionTo(Items["Inactive"].Instance, { BackgroundTransparency = 1 }, "Fast")
+ Library:MotionTo(Items["Icon"].Instance, { Size = UDim2New(0, 18, 0, 18), Position = UDim2New(0, 16, 0.5, 0) }, "Fast")
+ Library:MotionTo(Items["Page"].Instance, { Position = UDim2New(0, direction * -slideOffset, 0, slideOffset) }, "Fast")
  end
 
  local AllInstances = Items["Page"].Instance:GetDescendants()
@@ -5280,15 +5977,41 @@ Library.Watermark = function(self, Data)
  Library.Flags[Toggle.Flag] = Value 
 
  if Toggle.Value then 
- Items["Accent"]:Tween(TweenInfo.new(Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), {BackgroundTransparency = 0, Size = UDim2New(1, 0, 1, 0)})
- Items["CheckImage"]:Tween(nil, {ImageTransparency = 0, Size = UDim2New(0, 10, 0, 9)})
-
- --Items["Gradient"].Instance.Enabled = true 
+ Items["Accent"]:Tween(nil, {BackgroundTransparency = 0, Size = UDim2New(1, 0, 1, 0)}, "Bounce")
+ if Library.Lottie then
+ Library.Lottie:Play({
+ root = Items["Indicator"].Instance,
+ items = Items,
+ targets = {
+ Self = Items["Indicator"].Instance,
+ Glow = Items["Accent"].Instance,
+ Icon = Items["CheckImage"].Instance,
+ },
+ }, "ToggleSpark")
  else
- Items["Accent"]:Tween(TweenInfo.new(Library.Tween.Time, Library.Tween.Style, Library.Tween.Direction), {BackgroundTransparency = 1, Size = UDim2New(0, 0, 0, 0)})
- Items["CheckImage"]:Tween(nil, {ImageTransparency = 1, Size = UDim2New(0, 0, 0, 0)})
-
- --Items["Gradient"].Instance.Enabled = false
+ Items["CheckImage"]:Tween(nil, {ImageTransparency = 0, Size = UDim2New(0, 10, 0, 9)}, "Snap")
+ Items["Indicator"]:Tween(nil, {BackgroundColor3 = Library.Theme.Accent}, "Soft")
+ local spark = InstanceNew("Frame")
+ spark.Name = "_ToggleSpark"
+ spark.BackgroundColor3 = Library.Theme.AccentGradient
+ spark.BackgroundTransparency = 0.2
+ spark.BorderSizePixel = 0
+ spark.AnchorPoint = Vector2New(0.5, 0.5)
+ spark.Position = UDim2New(0.5, 0, 0.5, 0)
+ spark.Size = UDim2New(0, 6, 0, 6)
+ spark.ZIndex = 5
+ spark.Parent = Items["Indicator"].Instance
+ Instances:Create("UICorner", { Parent = spark, CornerRadius = UDimNew(1, 0) })
+ Library:MotionTo(spark, { Size = UDim2New(2.2, 0, 2.2, 0), BackgroundTransparency = 1 }, "Fast")
+ task.delay(0.22, function()
+ if spark and spark.Parent then
+ spark:Destroy()
+ end
+ end)
+ end
+ else
+ Items["Accent"]:Tween(nil, {BackgroundTransparency = 1, Size = UDim2New(0, 0, 0, 0)}, "Soft")
+ Items["CheckImage"]:Tween(nil, {ImageTransparency = 1, Size = UDim2New(0, 0, 0, 0)}, "Soft")
  end
 
  if Toggle.Callback and not Silent then 
@@ -6023,13 +6746,19 @@ Library.Watermark = function(self, Data)
  Slider.Value = Library:Round(MathClamp(Value, Slider.Min, Slider.Max), Slider.Decimals)
  Library.Flags[Slider.Flag] = Slider.Value
 
- Items["Accent"]:Tween(TweenInfo.new(Library.Tween.Time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2New((Slider.Value - Slider.Min) / (Slider.Max - Slider.Min), 0, 1, 0)})
+ Items["Accent"]:Tween(nil, {Size = UDim2New((Slider.Value - Slider.Min) / (Slider.Max - Slider.Min), 0, 1, 0)}, Slider.Sliding and "Snap" or "Soft")
+ Items["Value"]:Tween(nil, {TextTransparency = Slider.Sliding and 0 or 0.3, Size = UDim2New(0, 0, 0, Slider.Sliding and 17 or 15)}, "Snap")
  Items["Value"].Instance.Text = StringFormat("%s%s", Slider.Value, Slider.Suffix)
 
  if Slider.Value >= Slider.Max then 
- Items["Icon"].Instance.Position = UDim2New(1, -5, 0.5, 0)
+ Items["Icon"]:Tween(nil, {Position = UDim2New(1, -5, 0.5, 0)}, "Snap")
  else
- Items["Icon"].Instance.Position = UDim2New(1, 5, 0.5, 0)
+ Items["Icon"]:Tween(nil, {Position = UDim2New(1, 5, 0.5, 0)}, "Snap")
+ end
+ if Slider.Sliding then
+ Items["Icon"]:Tween(nil, {Size = UDim2New(0, 20, 0, 16)}, "Snap")
+ else
+ Items["Icon"]:Tween(nil, {Size = UDim2New(0, 16, 0, 12)}, "Soft")
  end
 
  if Slider.Callback and not Silent then 
@@ -6331,17 +7060,29 @@ Library.Watermark = function(self, Data)
 
  if Dropdown.IsOpen then 
  Items["OptionHolder"].Instance.Visible = true
- Items["OptionHolder"].Instance.Parent = LibRef.Holder.Instance
+ Library:SafeReparent(Items["OptionHolder"].Instance, LibRef.Holder.Instance)
 
- Items["ArrowIcon"]:Tween(nil, {Rotation = 180, ImageColor3 = FromRGB(255, 255, 255)})
+ if Library.Lottie then
+ Library.Lottie:Play({
+ root = Items["OptionHolder"].Instance,
+ items = Items,
+ targets = {
+ Self = Items["OptionHolder"].Instance,
+ Icon = Items["ArrowIcon"].Instance,
+ Glow = Items["ArrowIcon"].Instance,
+ },
+ }, "DropdownBloom")
+ else
+ Items["ArrowIcon"]:Tween(nil, {Rotation = 180, ImageColor3 = FromRGB(255, 255, 255)}, "Bounce")
+ end
  Items["Gradient"].Instance.Enabled = true
  
  Library:Thread(function()
  for Index, Value in Dropdown.OptionsWithIndexes do 
  task.spawn(function()
+ task.wait((Index - 1) * 0.025)
  Value:RefreshPosition(true)
  end)
- task.wait(0.05)
  end
  end)
  
@@ -6375,7 +7116,7 @@ Library.Watermark = function(self, Data)
  RenderStepped = nil
  end
 
- Items["ArrowIcon"]:Tween(nil, {Rotation = 0, ImageColor3 = FromRGB(141, 141, 150)})
+ Items["ArrowIcon"]:Tween(nil, {Rotation = 0, ImageColor3 = FromRGB(141, 141, 150)}, "Soft")
  Items["Gradient"].Instance.Enabled = false
  end
 
@@ -6532,21 +7273,21 @@ Library.Watermark = function(self, Data)
  
  function OptionData:Toggle(Value)
  if Value == "Active" then
- OptionText:Tween(nil, {TextTransparency = 0, Position = UDim2New(0, 15, 0.5, 0)})
- OptionAccent:Tween(nil, {BackgroundTransparency = 0})
+ OptionText:Tween(nil, {TextTransparency = 0, Position = UDim2New(0, 15, 0.5, 0)}, "Snap")
+ OptionAccent:Tween(nil, {BackgroundTransparency = 0, Size = UDim2New(0, 3, 0, 14)}, "Bounce")
  else
- OptionText:Tween(nil, {TextTransparency = 0.3, Position = UDim2New(0, 0, 0.5, 0)})
- OptionAccent:Tween(nil, {BackgroundTransparency = 1})
+ OptionText:Tween(nil, {TextTransparency = 0.3, Position = UDim2New(0, 0, 0.5, 0)}, "Soft")
+ OptionAccent:Tween(nil, {BackgroundTransparency = 1, Size = UDim2New(0, 6, 0, 6)}, "Soft")
  end
  end
 
  function OptionData:RefreshPosition(Bool)
  if Bool then 
  if OptionData.Selected then
- OptionAccent:Tween(TweenInfo.new(1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2New(0, 0, 0.5, 0)})
- OptionText:Tween(TweenInfo.new(1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2New(0, 15, 0.5, 0)})
+ OptionAccent:Tween(nil, {Position = UDim2New(0, 0, 0.5, 0), Size = UDim2New(0, 3, 0, 14)}, "Soft")
+ OptionText:Tween(nil, {Position = UDim2New(0, 15, 0.5, 0)}, "Soft")
  else
- OptionText:Tween(TweenInfo.new(1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2New(0, 0, 0.5, 0)})
+ OptionText:Tween(nil, {Position = UDim2New(0, 0, 0.5, 0)}, "Soft")
  end
  else
  if OptionData.Selected then
