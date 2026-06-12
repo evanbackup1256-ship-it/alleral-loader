@@ -97,14 +97,13 @@ if update then return end
 local Library =         game:GetObjects("rbxassetid://123800669522471")[1]
 local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 
-local ALLERAL_SYDE_PATCH = 12
+local ALLERAL_SYDE_PATCH = 13
 
 local SYDE_CANONICAL_NAMES = {
 	Title = "title",
 	Sub = "sub",
 	Subtitle = "sub",
 	Tog = "tog",
-	Toggle = "tog",
 	Check = "check",
 	Gradfr = "gradfr",
 	GradFr = "gradfr",
@@ -548,6 +547,52 @@ local function sydePrepareDropdownDrop(dropdown)
 		return nil
 	end
 	return sydeBindDropFrame(dropFrame) or dropFrame
+end
+
+local PAGE_TEMPLATE_ALIASES = {
+	Button = { "Button", "button" },
+	Toggle = { "Toggle", "toggle" },
+	KeyBind = { "KeyBind", "keybind", "Keybind" },
+	ColorPicker = { "ColorPicker", "colorpicker", "Colorpicker" },
+	Dropdown = { "Dropdown", "dropdown" },
+	Slider = { "Slider", "slider" },
+	Paragraph = { "Paragraph", "paragraph", "Para", "para" },
+	Input = { "Input", "input", "TextInput", "textinput" },
+	Label = { "Label", "label" },
+	Section = { "Section", "section" },
+	["3DView"] = { "3DView", "3dview", "View3D", "view3d" },
+}
+
+local function sydePageTemplate(pageContainer, templateName)
+	if not pageContainer then
+		return nil
+	end
+	local aliases = PAGE_TEMPLATE_ALIASES[templateName]
+	if aliases then
+		return sydeFindChild(pageContainer, table.unpack(aliases))
+	end
+	local lower = templateName:sub(1, 1):lower() .. templateName:sub(2)
+	return sydeFindChild(pageContainer, templateName, lower)
+end
+
+local function sydeClonePageTemplate(pageContainer, templateName)
+	local template = sydePageTemplate(pageContainer, templateName)
+	if not template then
+		warn("[Syde] Missing page template: " .. tostring(templateName))
+		return nil
+	end
+	local clone = template:Clone()
+	sydeSanitizeUiClone(clone)
+	return clone
+end
+
+local function sydeSliderRowTemplate(pageContainer)
+	local sliderTpl = sydePageTemplate(pageContainer, "Slider")
+	if not sliderTpl then
+		return nil
+	end
+	local holder = sydeFindChild(sliderTpl, "slideholder", "SlideHolder", "Slideholder")
+	return holder and sydeFindChild(holder, "slider", "Slider")
 end
 
 local resizing =        false
@@ -2215,6 +2260,10 @@ local window = ui.main
 local top = window.top
 local tabs = window.tabs and window.tabs.tab
 local pages = window.pages
+local pageRoot = pages and sydeFindChild(pages, "page", "Page")
+local settingsPageRoot = window.settings
+	and window.settings.pages
+	and sydeFindChild(window.settings.pages, "page", "Page")
 local pagesClipFrame = pages and sydeFindChild(pages, "clipframe", "Clipframe", "ClipFrame")
 local windowClipFrame = sydeFindChild(window, "clipframe", "Clipframe", "ClipFrame") or pagesClipFrame
 local windowPagesClipFrame = pagesClipFrame
@@ -3957,7 +4006,7 @@ function syde:Init(library)
 					HoldTime = Button.HoldTime or 3;
 				}
 
-				local button = window.settings.pages.page.Button:Clone()
+				local button = sydeClonePageTemplate(settingsPageRoot, "Button")
 				button.Visible = true
 				button.Parent = Page
 				button.title.Text = data.Title
@@ -4138,8 +4187,10 @@ function syde:Init(library)
 					SettingsConfig = true;
 				}
 
-				local toggle = window.settings.pages.page.Toggle:Clone()
-				sydeSanitizeUiClone(toggle)
+				local toggle = sydeClonePageTemplate(settingsPageRoot, "Toggle")
+				if not toggle then
+					return telement
+				end
 				toggle.Visible = true
 				toggle.Parent = Page
 				toggle.title.Text = data.Title
@@ -4450,7 +4501,7 @@ function syde:Init(library)
 					Holding = false
 				}
 
-				local KeyBind = window.settings.pages.page.KeyBind:Clone()
+				local KeyBind = sydeClonePageTemplate(settingsPageRoot, "KeyBind")
 				KeyBind.Visible = true
 				KeyBind.Parent = Page
 				KeyBind.title.Text = data.Title
@@ -4543,7 +4594,7 @@ function syde:Init(library)
 
 				ColorPicker.Linkable = ColorPicker.Linkable or true
 
-				local colorpicker = window.settings.pages.page.ColorPicker:Clone()
+				local colorpicker = sydeClonePageTemplate(settingsPageRoot, "ColorPicker")
 				colorpicker.Visible = true
 				colorpicker.Parent = Page
 				colorpicker.title.Text = data.Title
@@ -5445,7 +5496,7 @@ function syde:Init(library)
 					CallBack = Dropdown.CallBack;
 				}
 
-				local dropdown = window.settings.pages.page.Dropdown:Clone()
+				local dropdown = sydeClonePageTemplate(settingsPageRoot, "Dropdown")
 				sydeSanitizeUiClone(dropdown)
 				dropdown.Visible = true
 				dropdown.Parent = Page
@@ -5776,7 +5827,7 @@ function syde:Init(library)
 					Sliders = Slider.Sliders
 				}
 
-				local slider = window.settings.pages.page.Slider:Clone()
+				local slider = sydeClonePageTemplate(settingsPageRoot, "Slider")
 				slider.Visible = true
 				slider.Parent = Page
 				slider.title.Text = data.Title
@@ -5786,7 +5837,8 @@ function syde:Init(library)
 
 				--[SLIDERS INITIALIZE]
 				for _, Options in ipairs(data.Sliders) do
-					local Slider = sydeBindSliderRow(window.settings.pages.page.Slider.slideholder.slider:Clone())
+					local slideRow = sydeSliderRowTemplate(settingsPageRoot)
+					local Slider = slideRow and sydeBindSliderRow(slideRow:Clone())
 					if not Slider or not Slider.v then
 						warn("[Syde] Skipping settings slider: " .. tostring(Options and Options.Title or "?"))
 					else
@@ -6096,7 +6148,7 @@ function syde:Init(library)
 					Content = Paragraph.Content;
 				}
 
-				local Para = window.settings.pages.page.Paragraph:Clone()
+				local Para = sydeClonePageTemplate(settingsPageRoot, "Paragraph")
 				Para.Visible = true
 				Para.Parent = Page
 				Para.Frame.title.Text = ParaData.Title
@@ -6149,7 +6201,7 @@ function syde:Init(library)
 					CallBack = TextInput.CallBack,
 				}
 
-				local textinput =  window.settings.pages.page.Input:Clone()
+				local textinput = sydeClonePageTemplate(settingsPageRoot, "Input")
 				textinput.Visible = true
 				textinput.Parent = Page
 				textinput.Name = data.Title
@@ -6939,7 +6991,13 @@ function syde:Init(library)
 		end
 
 		--[Page Setup]
-		local Page = pages.page:Clone()
+		local Page = pageRoot and pageRoot:Clone()
+		if Page then
+			sydeSanitizeUiClone(Page)
+		else
+			warn("[Syde] Missing pages.page template — skipping tab " .. tostring(tdata.Title))
+			return
+		end
 		Page.Visible = false
 		Page.Parent = pages
 		Page.Name = tdata.Title
@@ -7496,7 +7554,7 @@ function syde:Init(library)
 				HoldTime = Button.HoldTime or 3;
 			}
 
-			local button = pages.page.Button:Clone()
+			local button = sydeClonePageTemplate(pageRoot, "Button")
 			button.Visible = true
 			button.Parent = Page
 			button.title.Text = data.Title
@@ -7707,8 +7765,10 @@ function syde:Init(library)
 				Flag = Toggle.Flag;
 			}
 
-			local toggle = pages.page.Toggle:Clone()
-			sydeSanitizeUiClone(toggle)
+			local toggle = sydeClonePageTemplate(pageRoot, "Toggle")
+			if not toggle then
+				return initelement
+			end
 			toggle.Visible = true
 			toggle.Parent = Page
 			toggle.title.Text = data.Title
@@ -8035,7 +8095,7 @@ function syde:Init(library)
 				Sliders = Slider.Sliders
 			}
 
-			local slider = pages.page.Slider:Clone()
+			local slider = sydeClonePageTemplate(pageRoot, "Slider")
 			slider.Visible = true
 			slider.Parent = Page
 			slider.title.Text = data.Title
@@ -8046,7 +8106,8 @@ function syde:Init(library)
 
 			--[SLIDERS INITIALIZE]
 			for _, Options in ipairs(data.Sliders) do
-				local Slider = sydeBindSliderRow(pages.page.Slider.slideholder.slider:Clone())
+				local slideRow = sydeSliderRowTemplate(pageRoot)
+				local Slider = slideRow and sydeBindSliderRow(slideRow:Clone())
 				if not Slider or not Slider.v then
 					warn("[Syde] Skipping slider: " .. tostring(Options and Options.Title or "?"))
 				else
@@ -8358,7 +8419,7 @@ function syde:Init(library)
 				Holding = false
 			}
 
-			local KeyBind = pages.page.KeyBind:Clone()
+			local KeyBind = sydeClonePageTemplate(pageRoot, "KeyBind")
 			KeyBind.Visible = true
 			KeyBind.Parent = Page
 			KeyBind.title.Text = data.Title
@@ -8447,7 +8508,7 @@ function syde:Init(library)
 				CallBack = TextInput.CallBack,
 			}
 
-			local textinput = pages.page.Input:Clone()
+			local textinput = sydeClonePageTemplate(pageRoot, "Input")
 			textinput.Visible = true
 			textinput.Parent = Page
 			textinput.Name = data.Title
@@ -8580,7 +8641,7 @@ function syde:Init(library)
 				AutoRotate = View.AutoRotate ~= false -- default true
 			}
 
-			local EnchancedView = pages.page["3DView"]:Clone()
+			local EnchancedView = sydeClonePageTemplate(pageRoot, "3DView")
 			EnchancedView.Visible = true
 			EnchancedView.Parent = Page
 			EnchancedView.Title.Text = Viewdata.Title
@@ -8866,7 +8927,7 @@ function syde:Init(library)
 				Content = Paragraph.Content;
 			}
 
-			local Para = pages.page.Paragraph:Clone()
+			local Para = sydeClonePageTemplate(pageRoot, "Paragraph")
 			Para.Visible = true
 			Para.Parent = Page
 			Para.Frame.title.Text = ParaData.Title
@@ -8901,7 +8962,7 @@ function syde:Init(library)
 
 		function initelement:Label(Text, Alignment)
 
-			local Label = pages.page.Label:Clone()
+			local Label = sydeClonePageTemplate(pageRoot, "Label")
 			Label.Visible = true
 			Label.Parent = Page
 			Label.text.Text = Text
@@ -8921,7 +8982,7 @@ function syde:Init(library)
 				Title = Title
 			}
 
-			local Section =  pages.page.Section:Clone()
+			local Section = sydeClonePageTemplate(pageRoot, "Section")
 			Section.Visible = true
 			Section.Title.Text = Title
 			Section.Parent = Page
@@ -8946,7 +9007,7 @@ function syde:Init(library)
 				CallBack = Dropdown.CallBack;
 			}
 
-			local dropdown = pages.page.Dropdown:Clone()
+			local dropdown = sydeClonePageTemplate(pageRoot, "Dropdown")
 			sydeSanitizeUiClone(dropdown)
 			dropdown.Visible = true
 			dropdown.Parent = Page
@@ -9285,7 +9346,7 @@ function syde:Init(library)
 			ColorPicker.Linkable = ColorPicker.Linkable or true
 
 
-			local colorpicker = pages.page.ColorPicker:Clone()
+			local colorpicker = sydeClonePageTemplate(pageRoot, "ColorPicker")
 			colorpicker.Visible = true
 			colorpicker.Parent = Page
 			colorpicker.title.Text = data.Title
