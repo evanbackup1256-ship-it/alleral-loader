@@ -97,7 +97,7 @@ if update then return end
 local Library =         game:GetObjects("rbxassetid://123800669522471")[1]
 local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 
-local ALLERAL_SYDE_PATCH = 3
+local ALLERAL_SYDE_PATCH = 5
 
 -- Alleral: tolerate Roblox template renames (Title/title, Buttons/buttons, etc.)
 local function sydeFindChild(parent, ...)
@@ -352,6 +352,63 @@ local function sydeSetDropSelectedText(drop, text)
 	if label then
 		label.Text = tostring(text or "")
 	end
+end
+
+local function sydeResolveDropFrame(dropholder)
+	if not dropholder then
+		return nil
+	end
+	local drop = sydeFindChild(dropholder, "drop", "Drop")
+	if drop then
+		return drop
+	end
+	if sydeFindChild(dropholder, "Container", "container") or sydeDropSelectedLabel(dropholder) then
+		return dropholder
+	end
+	for _, child in ipairs(dropholder:GetChildren()) do
+		if child:IsA("GuiObject") then
+			if sydeFindChild(child, "Container", "container") or sydeDropSelectedLabel(child) then
+				return child
+			end
+		end
+	end
+	return nil
+end
+
+local function sydeBindDropHolder(dropholder)
+	if not dropholder then
+		return nil
+	end
+	local dropFrame = sydeResolveDropFrame(dropholder)
+	if not dropFrame then
+		return nil
+	end
+	local boundDrop = sydeBindDropFrame(dropFrame) or dropFrame
+	return setmetatable({
+		drop = boundDrop,
+		Drop = boundDrop,
+	}, {
+		__index = dropholder,
+		__newindex = function(_, key, value)
+			dropholder[key] = value
+		end,
+	})
+end
+
+local function sydeDropdownHolder(dropdown)
+	if not dropdown then
+		return nil
+	end
+	local holder = sydeFindChild(dropdown, "dropholder", "DropHolder", "Dropholder", "dropHolder")
+	if not holder then
+		for _, child in ipairs(dropdown:GetChildren()) do
+			if sydeResolveDropFrame(child) then
+				holder = child
+				break
+			end
+		end
+	end
+	return sydeBindDropHolder(holder) or holder
 end
 
 local resizing =        false
@@ -2692,9 +2749,22 @@ window.top.functions.close.interact.MouseButton1Click:Connect(function()
 		Content = 'Are You Sure You Want To Close This UI?',
 		ConfimCallBack = function()
 			mh = false
-			rs:Disconnect()
-			ss:Disconnect()
-			--	if not ui.Parent then return end
+			if rs and typeof(rs.Disconnect) == "function" then
+				pcall(function()
+					if rs.Connected then
+						rs:Disconnect()
+					end
+				end)
+			end
+			rs = nil
+			if ss and typeof(ss.Disconnect) == "function" then
+				pcall(function()
+					if ss.Connected then
+						ss:Disconnect()
+					end
+				end)
+			end
+			ss = nil
 			task.wait(1)
 			Library:Destroy()
 		end,
@@ -5233,6 +5303,14 @@ function syde:Init(library)
 				dropdown.Parent = Page
 				dropdown.title.Text = data.Title
 				dropdown.Name = data.Title
+				local boundHolder = sydeDropdownHolder(dropdown)
+				if boundHolder then
+					dropdown.dropholder = boundHolder
+				end
+				if not dropdown.dropholder or not dropdown.dropholder.drop then
+					warn("[Syde] Skipping dropdown: " .. tostring(data.Title))
+					return telement
+				end
 				local boundDrop = sydeBindDropFrame(dropdown.dropholder.drop)
 				if boundDrop then
 					dropdown.dropholder.drop = boundDrop
@@ -8722,6 +8800,14 @@ function syde:Init(library)
 			dropdown.Parent = Page
 			dropdown.title.Text = data.Title
 			dropdown.Name = data.Title
+			local boundHolder = sydeDropdownHolder(dropdown)
+			if boundHolder then
+				dropdown.dropholder = boundHolder
+			end
+			if not dropdown.dropholder or not dropdown.dropholder.drop then
+				warn("[Syde] Skipping dropdown: " .. tostring(data.Title))
+				return initelement
+			end
 			local boundDrop = sydeBindDropFrame(dropdown.dropholder.drop)
 			if boundDrop then
 				dropdown.dropholder.drop = boundDrop
