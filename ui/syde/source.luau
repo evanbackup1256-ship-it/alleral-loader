@@ -97,6 +97,197 @@ if update then return end
 local Library =         game:GetObjects("rbxassetid://123800669522471")[1]
 local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 
+-- Alleral: tolerate Roblox template renames (Title/title, Buttons/buttons, etc.)
+local function sydeFindChild(parent, ...)
+	if not parent then
+		return nil
+	end
+	for i = 1, select("#", ...) do
+		local name = select(i, ...)
+		local child = parent:FindFirstChild(name)
+		if child then
+			return child
+		end
+	end
+	return nil
+end
+
+local function sydeTitleLabel(parent)
+	return sydeFindChild(parent, "Title", "title")
+end
+
+local function sydeSetTitleText(parent, text)
+	local label = sydeTitleLabel(parent)
+	if label then
+		label.Text = text
+	end
+end
+
+local function sydeTweenTitle(parent, tweenInfo, props)
+	local label = sydeTitleLabel(parent)
+	if label then
+		tweenservice:Create(label, tweenInfo, props):Play()
+	end
+end
+
+local function sydeButtonLabel(button)
+	if not button then
+		return nil
+	end
+	return sydeFindChild(button, "TextLabel", "text", "title")
+end
+
+local function sydeButtonStroke(button)
+	if not button then
+		return nil
+	end
+	return button:FindFirstChildOfClass("UIStroke") or sydeFindChild(button, "UIStroke")
+end
+
+local function sydeResolveModal(instance)
+	local buttonsFrame = sydeFindChild(instance, "Buttons", "buttons")
+	local confirm = buttonsFrame and sydeFindChild(buttonsFrame, "Confirm", "confirm")
+		or sydeFindChild(instance, "Confirm", "confirm")
+	local cancel = buttonsFrame and sydeFindChild(buttonsFrame, "Cancel", "cancel")
+		or sydeFindChild(instance, "Cancel", "cancel")
+	return {
+		Instance = instance,
+		Title = sydeFindChild(instance, "Title", "title"),
+		Content = sydeFindChild(instance, "Content", "content"),
+		UIStroke = instance:FindFirstChildOfClass("UIStroke"),
+		Confirm = confirm,
+		Cancel = cancel,
+		ConfirmLabel = sydeButtonLabel(confirm),
+		CancelLabel = sydeButtonLabel(cancel),
+		ConfirmStroke = sydeButtonStroke(confirm),
+		CancelStroke = sydeButtonStroke(cancel),
+	}
+end
+
+local function sydeSetInteractable(button, enabled)
+	if not button then
+		return
+	end
+	if typeof(button.Interactable) == "boolean" then
+		button.Interactable = enabled
+	end
+	local interact = sydeFindChild(button, "interact", "Interact")
+	if interact and typeof(interact.Interactable) == "boolean" then
+		interact.Interactable = enabled
+	end
+end
+
+local function sydeConnectClick(button, callback)
+	if not button or type(callback) ~= "function" then
+		return
+	end
+	if button:IsA("GuiButton") then
+		button.MouseButton1Click:Connect(callback)
+		return
+	end
+	local interact = sydeFindChild(button, "interact", "Interact")
+	if interact and interact:IsA("GuiButton") then
+		interact.MouseButton1Click:Connect(callback)
+	end
+end
+
+local function sydeBindSliderRow(row)
+	if not row then
+		return nil
+	end
+	local slide = sydeFindChild(row, "slide", "Slide")
+	if not slide then
+		for _, child in ipairs(row:GetChildren()) do
+			if child:IsA("GuiObject") and sydeFindChild(child, "slideframe", "SlideFrame", "Slideframe") then
+				slide = child
+				break
+			end
+		end
+	end
+	local slideframe = slide and sydeFindChild(slide, "slideframe", "SlideFrame", "Slideframe")
+	if not slide or not slideframe then
+		return nil
+	end
+	local interact = sydeFindChild(slide, "Interact", "interact")
+	local ticks = sydeFindChild(slide, "Ticks", "ticks")
+	local valueLabel = sydeFindChild(row, "v", "V", "value", "Value")
+	local shadowHolder = sydeFindChild(slideframe, "shadowHolder", "ShadowHolder", "shadow", "Shadow")
+	local slideframeProxy = setmetatable({
+		shadowHolder = shadowHolder,
+	}, {
+		__index = slideframe,
+	})
+	local slideProxy = setmetatable({
+		slideframe = slideframeProxy,
+		Interact = interact,
+		interact = interact,
+		Ticks = ticks,
+		ticks = ticks,
+	}, {
+		__index = slide,
+	})
+	return setmetatable({
+		slide = slideProxy,
+		v = valueLabel,
+	}, {
+		__index = row,
+		__newindex = function(_, key, value)
+			row[key] = value
+		end,
+	})
+end
+
+local function sydeTabIndicator(tabButton)
+	if not tabButton then
+		return nil, nil
+	end
+	local indicator = sydeFindChild(tabButton, "indicator", "Indicator")
+	local glow = indicator and sydeFindChild(indicator, "glow", "Glow")
+	return indicator, glow
+end
+
+local function sydeClipDecor(clipFrame, name)
+	if not clipFrame then
+		return nil
+	end
+	return sydeFindChild(clipFrame, name, string.upper(name:sub(1, 1)) .. name:sub(2))
+end
+
+local function sydeSetClipDecorVisible(clipFrame, name, visible)
+	local decor = sydeClipDecor(clipFrame, name)
+	if decor then
+		decor.Visible = visible
+	end
+end
+
+local function sydeSetPagesClipVisible(pagesObj, visible)
+	local clip = pagesObj and sydeFindChild(pagesObj, "clipframe", "Clipframe", "ClipFrame") or pagesClipFrame
+	if clip then
+		clip.Visible = visible
+	end
+end
+
+local function sydeTintSlideframe(slideframeProxy, color)
+	if not slideframeProxy then
+		return
+	end
+	slideframeProxy.BackgroundColor3 = color
+	local shadow = slideframeProxy.shadowHolder
+	if not shadow then
+		return
+	end
+	for _, partName in ipairs({ "ambientShadow", "penumbraShadow", "umbraShadow" }) do
+		local part = sydeFindChild(
+			shadow,
+			partName,
+			partName:sub(1, 1):upper() .. partName:sub(2)
+		)
+		if part then
+			part.ImageColor3 = color
+		end
+	end
+end
+
 local resizing =        false
 local screenSize =      workspace.CurrentCamera.ViewportSize
 local isMobile =        userinput.TouchEnabled or (screenSize.X < 1024 and screenSize.Y < 768)
@@ -1760,8 +1951,10 @@ end
 local ui = Library
 local window = ui.main
 local top = window.top
-local tabs = window.tabs.tab
+local tabs = window.tabs and window.tabs.tab
 local pages = window.pages
+local pagesClipFrame = pages and sydeFindChild(pages, "clipframe", "Clipframe", "ClipFrame")
+local windowPagesClipFrame = pagesClipFrame
 
 --
 
@@ -1948,62 +2141,106 @@ function syde:Modal(Modal)
 		local ModalInstance = ui.main.modal:Clone()
 		ModalInstance.Visible = true
 		ModalInstance.Parent = ui.main
-		ModalInstance.Title.Text = ModalData.Title
-		ModalInstance.Content.Text = ModalData.Content
-		--	ModalInstance.Content.Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)
-		ModalInstance.Size = UDim2.new(0, 350,0, 144)
+		local modalParts = sydeResolveModal(ModalInstance)
+		if modalParts.Title then
+			modalParts.Title.Text = ModalData.Title
+			modalParts.Title.TextTransparency = 1
+		end
+		if modalParts.Content then
+			modalParts.Content.Text = ModalData.Content
+			modalParts.Content.TextTransparency = 1
+		end
+		ModalInstance.Size = UDim2.new(0, 350, 0, 144)
 		ModalInstance.BackgroundTransparency = 1
-		ModalInstance.Title.TextTransparency = 1
-		ModalInstance.Content.TextTransparency = 1
-
-		ModalInstance.Buttons.Confirm.BackgroundTransparency = 1
-		ModalInstance.Buttons.Confirm.TextLabel.TextTransparency = 1
-		--	ModalInstance.Buttons.Confirm.UIStroke.Transparency = 1
-
-		ModalInstance.Buttons.Cancel.BackgroundTransparency = 1
-		ModalInstance.Buttons.Cancel.TextLabel.TextTransparency = 1
-		ModalInstance.Buttons.Cancel.UIStroke.Transparency = 1
+		if modalParts.Confirm then
+			modalParts.Confirm.BackgroundTransparency = 1
+		end
+		if modalParts.ConfirmLabel then
+			modalParts.ConfirmLabel.TextTransparency = 1
+		end
+		if modalParts.Cancel then
+			modalParts.Cancel.BackgroundTransparency = 1
+		end
+		if modalParts.CancelLabel then
+			modalParts.CancelLabel.TextTransparency = 1
+		end
+		if modalParts.CancelStroke then
+			modalParts.CancelStroke.Transparency = 1
+		end
 
 		local function openModal()
-			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)}):Play()
+			if modalParts.Content then
+				tweenservice:Create(
+					modalParts.Content,
+					TweenInfo.new(0.75, Enum.EasingStyle.Quint),
+					{ Size = UDim2.new(1, modalParts.Content.Size.X.Offset, 1, modalParts.Content.TextBounds.Y) }
+				):Play()
+			end
 			activeModals += 1
-			--	ModalInstance.Size = UDim2.new(0, ModalInstance.Size.X.Offset, 0, ModalInstance.Content.TextBounds.Y + 120)
-			tweenservice:Create(ModalInstance, TweenInfo.new(0.65, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0,  ModalInstance.Content.TextBounds.Y + 150)}):Play()
-
-			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-			tweenservice:Create(ModalInstance.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			tweenservice:Create(ModalInstance.Content, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-
-			tweenservice:Create(ModalInstance.Buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			--	tweenservice:Create(ModalInstance.Buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-
-			tweenservice:Create(ModalInstance.Buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-
+			local contentHeight = modalParts.Content and modalParts.Content.TextBounds.Y or 0
+			tweenservice:Create(
+				ModalInstance,
+				TweenInfo.new(0.65, Enum.EasingStyle.Quint),
+				{ Size = UDim2.new(0, 350, 0, contentHeight + 150) }
+			):Play()
+			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+			if modalParts.UIStroke then
+				tweenservice:Create(modalParts.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
+			end
+			if modalParts.Title then
+				tweenservice:Create(modalParts.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+			end
+			if modalParts.Content then
+				tweenservice:Create(modalParts.Content, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+			end
+			if modalParts.Confirm then
+				tweenservice:Create(modalParts.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.5 }):Play()
+			end
+			if modalParts.ConfirmLabel then
+				tweenservice:Create(modalParts.ConfirmLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+			end
+			if modalParts.Cancel then
+				tweenservice:Create(modalParts.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+			end
+			if modalParts.CancelLabel then
+				tweenservice:Create(modalParts.CancelLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+			end
+			if modalParts.CancelStroke then
+				tweenservice:Create(modalParts.CancelStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
+			end
 		end
 		openModal()
 
 		local function closeModal()
 			activeModals -= 1
-			print(activeModals)
-			ModalInstance.Buttons.Cancel.Interactable = false
-			ModalInstance.Buttons.Confirm.Interactable = false
-			tweenservice:Create(ModalInstance, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0, 147)}):Play()
-			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-
-			tweenservice:Create(ModalInstance.Buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			--	tweenservice:Create(ModalInstance.Buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-
-			tweenservice:Create(ModalInstance.Buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+			sydeSetInteractable(modalParts.Cancel, false)
+			sydeSetInteractable(modalParts.Confirm, false)
+			tweenservice:Create(ModalInstance, TweenInfo.new(0.75, Enum.EasingStyle.Quint), { Size = UDim2.new(0, 350, 0, 147) }):Play()
+			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+			if modalParts.Title then
+				tweenservice:Create(modalParts.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+			end
+			if modalParts.UIStroke then
+				tweenservice:Create(modalParts.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+			end
+			if modalParts.Content then
+				tweenservice:Create(modalParts.Content, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+			end
+			if modalParts.Confirm then
+				tweenservice:Create(modalParts.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+			end
+			if modalParts.ConfirmLabel then
+				tweenservice:Create(modalParts.ConfirmLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+			end
+			if modalParts.Cancel then
+				tweenservice:Create(modalParts.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+			end
+			if modalParts.CancelLabel then
+				tweenservice:Create(modalParts.CancelLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+			end
+			if modalParts.CancelStroke then
+				tweenservice:Create(modalParts.CancelStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+			end
 			task.wait(0.45)
 			ModalInstance:Destroy()
 		end
@@ -2017,7 +2254,7 @@ function syde:Modal(Modal)
 			}):Play()
 		end
 
-		ModalInstance.Buttons.Confirm.MouseButton1Click:Connect(function()
+		sydeConnectClick(modalParts.Confirm, function()
 			if typeof(ModalData.ConfirmCallBack) == "function" then
 				ModalData.ConfirmCallBack()
 			end
@@ -2033,7 +2270,7 @@ function syde:Modal(Modal)
 			end
 		end)
 
-		ModalInstance.Buttons.Cancel.MouseButton1Click:Connect(function()
+		sydeConnectClick(modalParts.Cancel, function()
 			closeModal()
 			tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
 				BackgroundTransparency = 1
@@ -2479,7 +2716,10 @@ function syde:Init(library)
 	Data.Home.hSubText = Data.Home.hSubText or Data.SubText
 	Data.Home.profileImage = Data.Home.profileImage or Data.profileImage
 	
-	local Minihome = ui.minihome
+	local Minihome = sydeFindChild(ui, "minihome", "Minihome", "MiniHome")
+	local minihomeOpen = Minihome and sydeFindChild(Minihome, "open", "Open")
+	local minihomeQuickFunc = minihomeOpen and sydeFindChild(minihomeOpen, "quickfunc", "QuickFunc")
+	local minihomeQuickInteract = minihomeQuickFunc and sydeFindChild(minihomeQuickFunc, "interact", "Interact")
 
 	local MinihomeData = {
 		QuickActions = library.QuickActions or false;
@@ -2489,7 +2729,7 @@ function syde:Init(library)
 	local lastTime = tick()
 	local frames = 0
 
-	if mh then
+	if mh and Minihome and Minihome:FindFirstChild("info") then
 		rs = RunService.RenderStepped:Connect(function()
 			-- FPS
 			frames += 1
@@ -2510,14 +2750,19 @@ function syde:Init(library)
 
 
 		if MinihomeData.QuickActions == false then
-			ui.minihome.quick.Visible = false
-			ui.minihome:TweenSize(UDim2.new(0, 150, 0, 40), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.8, true)
+			local quick = sydeFindChild(Minihome, "quick", "Quick")
+			if quick then
+				quick.Visible = false
+			end
+			pcall(function()
+				Minihome:TweenSize(UDim2.new(0, 150, 0, 40), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.8, true)
+			end)
 		end
 	end
 
 
-	if not uiclosed then
-		ui.minihome.open.quickfunc.interact.MouseButton1Click:Connect(function()
+	if not uiclosed and minihomeQuickInteract and minihomeQuickInteract:IsA("GuiButton") then
+		minihomeQuickInteract.MouseButton1Click:Connect(function()
 			ToggleUI()
 		end)
 	end
@@ -5167,7 +5412,7 @@ function syde:Init(library)
 
 						if OptionText == data.StarterOption and not starterSet then
 							starterSet = true
-							dropdown.dropholder.drop.Selected.Text = OptionText
+							dropdown.dropholder.drop.selected.Text = OptionText
 							SelectedOptions = {[OptionText] = true}
 							SelectedOrder = {OptionText}
 
@@ -5247,8 +5492,10 @@ function syde:Init(library)
 
 				--[SLIDERS INITIALIZE]
 				for _, Options in ipairs(data.Sliders) do
-					local Slider = window.settings.pages.page.Slider.slideholder.slider:Clone()
-
+					local Slider = sydeBindSliderRow(window.settings.pages.page.Slider.slideholder.slider:Clone())
+					if not Slider or not Slider.v then
+						warn("[Syde] Skipping settings slider: " .. tostring(Options and Options.Title or "?"))
+					else
 					Options = {
 						Title = Options.Title or "Slider";
 						Increment = Options.Increment or 1;
@@ -5260,7 +5507,7 @@ function syde:Init(library)
 					}
 
 					Slider.Name = Options.Title
-					Slider.Title.Text = Options.Title
+					sydeSetTitleText(Slider, Options.Title)
 					Options.Value = Options.StarterValue
 
 					local dragging = false
@@ -5404,7 +5651,7 @@ function syde:Init(library)
 							Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", newValue, Options.Range[2])
 
 
-							tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+							sydeTweenTitle(Slider, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), { TextTransparency = 0 })
 
 							local success, errorMsg = pcall(function()
 								Options.CallBack(newValue)
@@ -5417,18 +5664,20 @@ function syde:Init(library)
 						end
 					end
 
-					Slider.slide.Interact.MouseButton1Down:Connect(function()
-						dragging = true
-					end)
+					if Slider.slide.Interact then
+						Slider.slide.Interact.MouseButton1Down:Connect(function()
+							dragging = true
+						end)
 
-					Slider.slide.Interact.MouseButton1Up:Connect(function()
-						dragging = false
-					end)
+						Slider.slide.Interact.MouseButton1Up:Connect(function()
+							dragging = false
+						end)
+					end
 
 					syde:AddConnection(userinput.InputEnded, function(input, processed)
 						if input.UserInputType == Enum.UserInputType.MouseButton1  or input.UserInputType == Enum.UserInputType.Touch then
 							dragging = false
-							tweenservice:Create(Slider.Title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
+							sydeTweenTitle(Slider, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0.6 })
 						end
 					end)
 
@@ -5438,20 +5687,14 @@ function syde:Init(library)
 						end
 					end)
 
-					Slider.slide.slideframe.BackgroundColor3 = syde.theme.HitBox
-					Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = syde.theme.HitBox
-					Slider.slide.slideframe.shadowHolder.penumbraShadow.ImageColor3 = syde.theme.HitBox
-					Slider.slide.slideframe.shadowHolder.umbraShadow.ImageColor3 = syde.theme.HitBox
+					sydeTintSlideframe(Slider.slide.slideframe, syde.theme.HitBox)
 					slider.slideholder.Size = UDim2.new(1,-30,0,slider.slideholder.UIListLayout.AbsoluteContentSize.Y)
 					local ss = slider.slideholder.UIListLayout.AbsoluteContentSize.Y
 					slider.Size = UDim2.new(1,-35,0, ss  + 20)
 
 					syde:AddConnection(syde.Comms.Event, function(p, color)
 						if p == 'HitBox' then
-							Slider.slide.slideframe.BackgroundColor3 = color
-							Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = color
-							Slider.slide.slideframe.shadowHolder.penumbraShadow.ImageColor3 = color
-							Slider.slide.slideframe.shadowHolder.umbraShadow.ImageColor3 = color
+							sydeTintSlideframe(Slider.slide.slideframe, color)
 						end
 					end)
 
@@ -5492,9 +5735,9 @@ function syde:Init(library)
 						)
 
 						-- Tween title appearance
-						tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
+						sydeTweenTitle(Slider, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
 							TextTransparency = 0
-						}):Play()
+						})
 
 						-- Callback
 						local success, result = pcall(function()
@@ -5514,6 +5757,7 @@ function syde:Init(library)
 						end
 					end
 
+					end
 				end
 
 				--[DESC]
@@ -5741,6 +5985,7 @@ function syde:Init(library)
 
 		--@@SettingInit
 
+		pcall(function()
 		local a = settings:inittab({Title = 'Theme'})
 		local b = settings:inittab({Title = 'Privacy'})
 		local c = settings:inittab({Title = 'Info'})
@@ -5860,10 +6105,10 @@ function syde:Init(library)
 							tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.8}):Play()
 						end
 					end
-					window.pages.v0.Visible = false
-
-					window.pages.clipframe.v1.Visible = false
-					window.pages.clipframe.v1.Visible = false
+					if window.pages and window.pages.v0 then
+						window.pages.v0.Visible = false
+					end
+					sydeSetClipDecorVisible(pagesClipFrame, "v1", false)
 
 					--		window.shadow.ImageLabel.Visible = false
 					window.shadow.glow.Visible = true
@@ -5882,11 +6127,14 @@ function syde:Init(library)
 					window.shadow.glow1.Visible = false
 
 					if bluron then
-						window.pages.v0.Visible = false
+						if window.pages and window.pages.v0 then
+							window.pages.v0.Visible = false
+						end
 					else
-						window.pages.v0.Visible = true
-						window.pages.clipframe.v1.Visible = true
-						window.pages.clipframe.v1.Visible = true
+						if window.pages and window.pages.v0 then
+							window.pages.v0.Visible = true
+						end
+						sydeSetClipDecorVisible(pagesClipFrame, "v1", true)
 					end
 				end
 			end,
@@ -5901,11 +6149,15 @@ function syde:Init(library)
 					window.shadow.ImageLabel.Visible = false
 					window.BackgroundTransparency = 0.45
 
-					window.pages.v1.Visible = false
-					window.pages.v0.Visible = false
+					if window.pages and window.pages.v1 then
+						window.pages.v1.Visible = false
+					end
+					if window.pages and window.pages.v0 then
+						window.pages.v0.Visible = false
+					end
 
-					window.pages.clipframe.v1.Visible = false
-					window.pages.clipframe.v0.Visible = false
+					sydeSetClipDecorVisible(pagesClipFrame, "v1", false)
+					sydeSetClipDecorVisible(pagesClipFrame, "v0", false)
 
 					syde:BindFrame(window, {
 						Transparency = 0.98;
@@ -5926,11 +6178,15 @@ function syde:Init(library)
 					window.shadow.ImageLabel.Visible = true
 					window.BackgroundTransparency = 0
 
-					window.pages.v1.Visible = true
-					window.pages.v0.Visible = true
+					if window.pages and window.pages.v1 then
+						window.pages.v1.Visible = true
+					end
+					if window.pages and window.pages.v0 then
+						window.pages.v0.Visible = true
+					end
 
-					window.pages.clipframe.v1.Visible = true
-					window.pages.clipframe.v0.Visible = true
+					sydeSetClipDecorVisible(pagesClipFrame, "v1", true)
+					sydeSetClipDecorVisible(pagesClipFrame, "v0", true)
 
 					syde:UnbindFrame(window)
 
@@ -5977,11 +6233,15 @@ function syde:Init(library)
 			CallBack = function (v)
 				if v then
 					window.wallpaper.Visible = true
-					window.pages.clipframe.v0.Visible = false
-					window.pages.clipframe.v1.Visible = false
+					sydeSetClipDecorVisible(pagesClipFrame, "v0", false)
+					sydeSetClipDecorVisible(pagesClipFrame, "v1", false)
 
-					window.pages.v0.Visible = false
-					window.pages.v1.Visible = false
+					if window.pages and window.pages.v0 then
+						window.pages.v0.Visible = false
+					end
+					if window.pages and window.pages.v1 then
+						window.pages.v1.Visible = false
+					end
 					window.wallpaper.ison.Value = true
 				else
 					window.wallpaper.Visible = false
@@ -5989,16 +6249,24 @@ function syde:Init(library)
 					window.wallpaper.ison.Value = false
 
 					if bluron then
-						window.pages.clipframe.v0.Visible = false
-						window.pages.clipframe.v1.Visible = false
-						window.pages.v0.Visible = false
-						window.pages.v1.Visible = false
+						sydeSetClipDecorVisible(pagesClipFrame, "v0", false)
+						sydeSetClipDecorVisible(pagesClipFrame, "v1", false)
+						if window.pages and window.pages.v0 then
+							window.pages.v0.Visible = false
+						end
+						if window.pages and window.pages.v1 then
+							window.pages.v1.Visible = false
+						end
 					else
-						window.pages.clipframe.v0.Visible = true
-						window.pages.clipframe.v1.Visible = true
+						sydeSetClipDecorVisible(pagesClipFrame, "v0", true)
+						sydeSetClipDecorVisible(pagesClipFrame, "v1", true)
 
-						window.pages.v0.Visible = true
-						window.pages.v1.Visible = true
+						if window.pages and window.pages.v0 then
+							window.pages.v0.Visible = true
+						end
+						if window.pages and window.pages.v1 then
+							window.pages.v1.Visible = true
+						end
 					end
 				end
 			end,
@@ -6302,6 +6570,8 @@ function syde:Init(library)
 			uptimeParagraph:Set("Session Uptime: " .. formatted, 'Session UpTime')
 		end)
 
+		end)
+
 	end
 
 
@@ -6365,7 +6635,10 @@ function syde:Init(library)
 		Tab.Name = tdata.Title
 
 		Tab.title.TextTransparency = 1
-		Tab.indicator.BackgroundTransparency = 1
+		local tabIndicator, tabIndicatorGlow = sydeTabIndicator(Tab)
+		if tabIndicator then
+			tabIndicator.BackgroundTransparency = 1
+		end
 
 		--[Page Setup]
 		local Page = pages.page:Clone()
@@ -6409,22 +6682,29 @@ function syde:Init(library)
 
 
 		local function ChangeName(Name)
-			tweenservice:Create(pages.clipframe.title, TweenInfo.new(0), { TextTransparency = pages.clipframe.title.TextTransparency }):Play()
-			tweenservice:Create(pages.clipframe.title, TweenInfo.new(0), { Position = pages.clipframe.title.Position }):Play()
+			if not pagesClipFrame then
+				return
+			end
+			local clipTitle = sydeFindChild(pagesClipFrame, "title", "Title")
+			if not clipTitle then
+				return
+			end
+			tweenservice:Create(clipTitle, TweenInfo.new(0), { TextTransparency = clipTitle.TextTransparency }):Play()
+			tweenservice:Create(clipTitle, TweenInfo.new(0), { Position = clipTitle.Position }):Play()
 
-			local fadeOut = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { TextTransparency = 1 })
-			local moveUp = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Position = UDim2.new(0, 5,0.5, -25) })
+			local fadeOut = tweenservice:Create(clipTitle, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { TextTransparency = 1 })
+			local moveUp = tweenservice:Create(clipTitle, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Position = UDim2.new(0, 5,0.5, -25) })
 
 			fadeOut:Play()
 			moveUp:Play()
 			task.wait(0.2)
 
-			pages.clipframe.title.Position = UDim2.new(0, 5,0.5, 25)
+			clipTitle.Position = UDim2.new(0, 5,0.5, 25)
 
-			pages.clipframe.title.Text = Name
+			clipTitle.Text = Name
 
-			local moveDown = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Position = UDim2.new(0, 5,0.5, 0) })
-			local fadeIn = tweenservice:Create(pages.clipframe.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 })
+			local moveDown = tweenservice:Create(clipTitle, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Position = UDim2.new(0, 5,0.5, 0) })
+			local fadeIn = tweenservice:Create(clipTitle, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 })
 
 			moveDown:Play()
 			fadeIn:Play()
@@ -6437,19 +6717,29 @@ function syde:Init(library)
 		end
 
 		if tbdata.first then
+			local tabIndicator, tabIndicatorGlow = sydeTabIndicator(Tab)
 			tweenservice:Create(Tab.title, TweenInfo.new(2, Enum.EasingStyle.Exponential), { TextTransparency = 0.52 }):Play()
 			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 }):Play()
-			tweenservice:Create(Tab.indicator, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-			tweenservice:Create(Tab.indicator.glow, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+			if tabIndicator then
+				tweenservice:Create(tabIndicator, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+			end
+			if tabIndicatorGlow then
+				tweenservice:Create(tabIndicatorGlow, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+			end
 			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 30,0, 35) }):Play()
 			--	tweenservice:Create(Tab.indicator.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
 		else
+			local tabIndicator, tabIndicatorGlow = sydeTabIndicator(Tab)
 			tbdata.first = tdata.Title
 			tweenservice:Create(Tab.title, TweenInfo.new(2, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-			tweenservice:Create(Tab.indicator, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-			tweenservice:Create(Tab.indicator, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundColor3 = syde.theme.Accent }):Play()
-			tweenservice:Create(Tab.indicator.glow, TweenInfo.new(2, Enum.EasingStyle.Exponential), { ImageColor3 = syde.theme.Accent }):Play()
+			if tabIndicator then
+				tweenservice:Create(tabIndicator, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+				tweenservice:Create(tabIndicator, TweenInfo.new(2, Enum.EasingStyle.Exponential), { BackgroundColor3 = syde.theme.Accent }):Play()
+			end
+			if tabIndicatorGlow then
+				tweenservice:Create(tabIndicatorGlow, TweenInfo.new(2, Enum.EasingStyle.Exponential), { ImageColor3 = syde.theme.Accent }):Play()
+			end
 			tweenservice:Create(Tab, TweenInfo.new(2, Enum.EasingStyle.Quart), { Size = UDim2.new(0, Tab.title.TextBounds.X + 80,0, 35) }):Play()
 			--	tweenservice:Create(Tab.indicator.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.6 }):Play()
 		end
@@ -6504,11 +6794,15 @@ function syde:Init(library)
 			tweenservice:Create(tabButton, positionTweenInfo, { Size = targetSize }):Play()
 			tweenservice:Create(tabButton, colorTweenInfo, { BackgroundTransparency = targetBackgroundTransparency, }):Play()
 			tweenservice:Create(tabButton.title, colorTweenInfo, { TextTransparency = targetTextTransparency }):Play()
-			tweenservice:Create(tabButton.indicator.glow, colorTweenInfo, { ImageColor3 = targetColor }):Play()
-			tweenservice:Create(tabButton.indicator.glow, colorTweenInfo, { ImageTransparency = isSelected and 0.78 or 1 }):Play()
-
-			tweenservice:Create(tabButton.indicator, colorTweenInfo, { BackgroundColor3 = targetColor }):Play()
-			tweenservice:Create(tabButton.indicator, colorTweenInfo, { BackgroundTransparency = isSelected and 0 or 1 }):Play()
+			local indicator, glow = sydeTabIndicator(tabButton)
+			if glow then
+				tweenservice:Create(glow, colorTweenInfo, { ImageColor3 = targetColor }):Play()
+				tweenservice:Create(glow, colorTweenInfo, { ImageTransparency = isSelected and 0.78 or 1 }):Play()
+			end
+			if indicator then
+				tweenservice:Create(indicator, colorTweenInfo, { BackgroundColor3 = targetColor }):Play()
+				tweenservice:Create(indicator, colorTweenInfo, { BackgroundTransparency = isSelected and 0 or 1 }):Play()
+			end
 
 
 		end
@@ -6543,7 +6837,7 @@ function syde:Init(library)
 			end
 
 			ApplyHomeButtonStyle(true)
-			window.pages.clipframe.Visible = false
+			sydeSetPagesClipVisible(window.pages, false)
 			--	window.pages.v0.Visible = false
 			--	window.pages.v1.Visible = false
 		end
@@ -6562,7 +6856,7 @@ function syde:Init(library)
 			end
 
 			ApplyHomeButtonStyle(false)
-			window.pages.clipframe.Visible = true
+			sydeSetPagesClipVisible(window.pages, true)
 			--	window.pages.v0.Visible = true
 			--	window.pages.v1.Visible = true
 		end
@@ -6614,8 +6908,10 @@ function syde:Init(library)
 				-- both are regular tabs → animate
 				ChangeName(tdata.Title)
 			else
-				-- otherwise just snap
-				pages.clipframe.title.Text = tdata.Title
+				local clipTitle = pagesClipFrame and sydeFindChild(pagesClipFrame, "title", "Title")
+				if clipTitle then
+					clipTitle.Text = tdata.Title
+				end
 			end
 
 			-- Hide all pages
@@ -6661,14 +6957,17 @@ function syde:Init(library)
 			if p == 'Accent' then
 				if tbdata.first ~= tdata.Title then return end
 
-				-- live accent update
-				tweenservice:Create(Tab.indicator, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
-					BackgroundColor3 = color
-				}):Play()
-
-				tweenservice:Create(Tab.indicator.glow, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
-					ImageColor3 = color
-				}):Play()
+				local tabIndicator, tabIndicatorGlow = sydeTabIndicator(Tab)
+				if tabIndicator then
+					tweenservice:Create(tabIndicator, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
+						BackgroundColor3 = color
+					}):Play()
+				end
+				if tabIndicatorGlow then
+					tweenservice:Create(tabIndicatorGlow, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
+						ImageColor3 = color
+					}):Play()
+				end
 			end
 		end)
 
@@ -7068,6 +7367,35 @@ function syde:Init(library)
 				end
 			end
 
+			local handle = {}
+			function handle:Set(nextSettings)
+				nextSettings = type(nextSettings) == "table" and nextSettings or {}
+				if nextSettings.Name or nextSettings.Title then
+					local title = tostring(nextSettings.Name or nextSettings.Title)
+					data.Title = title
+					button.title.Text = title
+					button.Name = title
+					button.title.Size = UDim2.new(0, button.title.TextBounds.X + 15, 0, 35)
+				end
+				if nextSettings.Description ~= nil or nextSettings.Desc ~= nil then
+					data.Desc = tostring(nextSettings.Description or nextSettings.Desc or "")
+					local descLabel = button:FindFirstChild("desc")
+					if descLabel then
+						if data.Desc ~= "" then
+							descLabel.Text = data.Desc
+							descLabel.Visible = true
+						else
+							descLabel.Visible = false
+						end
+					end
+				end
+				if nextSettings.Callback then
+					data.CallBack = nextSettings.Callback
+					c = nextSettings.Callback
+				end
+			end
+			return handle
+
 		end
 
 		--@@Toggle
@@ -7419,7 +7747,10 @@ function syde:Init(library)
 
 			--[SLIDERS INITIALIZE]
 			for _, Options in ipairs(data.Sliders) do
-				local Slider = pages.page.Slider.slideholder.slider:Clone()
+				local Slider = sydeBindSliderRow(pages.page.Slider.slideholder.slider:Clone())
+				if not Slider or not Slider.v then
+					warn("[Syde] Skipping slider: " .. tostring(Options and Options.Title or "?"))
+				else
 
 				Options = {
 					Title = Options.Title or "Slider";
@@ -7431,7 +7762,7 @@ function syde:Init(library)
 				}
 
 				Slider.Name = Options.Title
-				Slider.Title.Text = Options.Title
+				sydeSetTitleText(Slider, Options.Title)
 				Options.Value = Options.StarterValue
 
 				local dragging = false
@@ -7579,7 +7910,7 @@ function syde:Init(library)
 						-- Update the displayed value
 						Slider.v.Text = string.format("<font size='14'>%d</font><font color='#434343'>/%d</font>", newValue, Options.Range[2])
 
-						tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+						sydeTweenTitle(Slider, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), { TextTransparency = 0 })
 
 						local success, errorMsg = pcall(function()
 							Options.CallBack(newValue)
@@ -7596,18 +7927,20 @@ function syde:Init(library)
 				end
 				UpdateSlider()
 
-				Slider.slide.Interact.MouseButton1Down:Connect(function()
-					dragging = true
-				end)
+				if Slider.slide.Interact then
+					Slider.slide.Interact.MouseButton1Down:Connect(function()
+						dragging = true
+					end)
 
-				Slider.slide.Interact.MouseButton1Up:Connect(function()
-					dragging = false
-				end)
+					Slider.slide.Interact.MouseButton1Up:Connect(function()
+						dragging = false
+					end)
+				end
 
 				syde:AddConnection(userinput.InputEnded, function(input, processed)
 					if input.UserInputType == Enum.UserInputType.MouseButton1  or input.UserInputType == Enum.UserInputType.Touch then
 						dragging = false
-						tweenservice:Create(Slider.Title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
+						sydeTweenTitle(Slider, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0.6 })
 					end
 				end)
 
@@ -7617,20 +7950,14 @@ function syde:Init(library)
 					end
 				end)
 
-				Slider.slide.slideframe.BackgroundColor3 = syde.theme.HitBox
-				Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = syde.theme.HitBox
-				Slider.slide.slideframe.shadowHolder.penumbraShadow.ImageColor3 = syde.theme.HitBox
-				Slider.slide.slideframe.shadowHolder.umbraShadow.ImageColor3 = syde.theme.HitBox
+				sydeTintSlideframe(Slider.slide.slideframe, syde.theme.HitBox)
 				slider.slideholder.Size = UDim2.new(1,-30,0,slider.slideholder.UIListLayout.AbsoluteContentSize.Y)
 				local ss = slider.slideholder.UIListLayout.AbsoluteContentSize.Y
 				slider.Size = UDim2.new(1,-35,0, ss  + 20)
 
 				syde:AddConnection(syde.Comms.Event, function(p, color)
 					if p == 'HitBox' then
-						Slider.slide.slideframe.BackgroundColor3 = color
-						Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = color
-						Slider.slide.slideframe.shadowHolder.penumbraShadow.ImageColor3 = color
-						Slider.slide.slideframe.shadowHolder.umbraShadow.ImageColor3 = color
+						sydeTintSlideframe(Slider.slide.slideframe, color)
 					end
 				end)
 
@@ -7658,9 +7985,9 @@ function syde:Init(library)
 					Slider.v.Text = string.format("<font size='14'>%d</font><font color='#434343'>/%d</font>", tostring(NewVal), Options.Range[2])
 
 					-- Tween title appearance
-					tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
+					sydeTweenTitle(Slider, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
 						TextTransparency = 0
-					}):Play()
+					})
 
 					-- Callback
 					local success, result = pcall(function()
@@ -7680,6 +8007,7 @@ function syde:Init(library)
 					end
 				end
 
+				end
 			end
 
 			--[DESC]
@@ -8568,7 +8896,7 @@ function syde:Init(library)
 
 					if OptionText == data.StarterOption and not starterSet then
 						starterSet = true
-						dropdown.dropholder.drop.Selected.Text = OptionText
+						dropdown.dropholder.drop.selected.Text = OptionText
 						SelectedOptions = {[OptionText] = true}
 						SelectedOrder = {OptionText}
 

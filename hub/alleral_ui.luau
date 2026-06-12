@@ -6,7 +6,16 @@ return function(Core)
 	Core.UI_LIBRARY = "Syde"
 
 	local SYDE_SOURCE_PATH = "ui/syde/source.luau"
-	local SYDE_RAW_URL = "https://raw.githubusercontent.com/essencejs/syde/main/source"
+	local SYDE_SOURCE_PATHS = {
+		"ui/syde/source.luau",
+		".alleral/cache/ui/syde/source.luau",
+		"kick/ui/syde/source.luau",
+		"kick/kick/ui/syde/source.luau",
+	}
+	local SYDE_PATCH_MARKER = "sydeFindChild"
+	local SYDE_RAW_URLS = {
+		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/syde/source.luau",
+	}
 
 	local THEME_ACCENTS = {
 		Maclib = Color3.fromRGB(83, 252, 18),
@@ -26,47 +35,120 @@ return function(Core)
 	end
 	local ENV = genv()
 
-	local function iconImage(icon)
+	local DEFAULT_ICON_ID = "18821914323"
+
+	local function extractIconId(icon)
+		if icon == nil or icon == "" then
+			return nil
+		end
 		if type(icon) == "number" then
 			return tostring(icon)
 		end
-		local text = tostring(icon or "")
-		if text:match("^%d+$") then
-			return text
+		local text = tostring(icon)
+		local digits = text:match("(%d+)$")
+		if digits then
+			return digits
 		end
-		local mapped = Core.windUiIcon and Core.windUiIcon(icon)
-		if type(mapped) == "string" and mapped:match("^%d+$") then
-			return mapped
+		if type(Core.uiIcon) == "function" then
+			local numeric = Core.uiIcon(icon)
+			if type(numeric) == "string" and numeric ~= "" then
+				return numeric
+			end
+		end
+		if type(Core.windUiIcon) == "function" then
+			local mapped = Core.windUiIcon(icon)
+			if type(mapped) == "string" then
+				local fromMapped = mapped:match("(%d+)$")
+				if fromMapped then
+					return fromMapped
+				end
+			end
 		end
 		return nil
 	end
 
+	local function iconImage(icon)
+		return extractIconId(icon) or DEFAULT_ICON_ID
+	end
+
+	local function optionalIconImage(icon)
+		if icon == nil or icon == "" then
+			return nil
+		end
+		return iconImage(icon)
+	end
+
+	local function sydeSourceValid(src)
+		return type(src) == "string"
+			and #src >= 5000
+			and not src:find("<!DOCTYPE", 1, true)
+			and src:find(SYDE_PATCH_MARKER, 1, true)
+	end
+
+	local function sydeRawUrls()
+		local urls = {}
+		local seen = {}
+		local function add(url)
+			if type(url) == "string" and url ~= "" and not seen[url] then
+				seen[url] = true
+				table.insert(urls, url)
+			end
+		end
+		for _, url in ipairs(SYDE_RAW_URLS) do
+			add(url)
+		end
+		local bases = (type(Core._UiRemoteBases) == "table" and Core._UiRemoteBases)
+			or (type(ENV.Alleral_Core) == "table" and ENV.Alleral_Core._UiRemoteBases)
+		if type(bases) == "table" then
+			for _, base in ipairs(bases) do
+				add(tostring(base) .. "/ui/syde/source.luau")
+			end
+		end
+		return urls
+	end
+
 	local function readSydeSource()
-		local src = Core.readFile and Core.readFile(SYDE_SOURCE_PATH)
-		if type(src) ~= "string" or #src < 5000 then
-			local url = SYDE_RAW_URL .. "?t=" .. tostring(tick())
+		for _, path in ipairs(SYDE_SOURCE_PATHS) do
+			local src = Core.readFile and Core.readFile(path)
+			if sydeSourceValid(src) then
+				return src, "local:" .. path
+			end
+		end
+
+		for _, baseUrl in ipairs(sydeRawUrls()) do
+			local url = baseUrl .. "?t=" .. tostring(tick())
+			local src
 			if type(Core.httpGet) == "function" then
 				src = Core.httpGet(url)
 			end
-			if type(src) ~= "string" or #src < 5000 then
+			if not sydeSourceValid(src) then
 				local http = ENV.Alleral_HTTP
 				if type(http) == "table" and type(http.get) == "function" then
 					src = http.get(url, 8000)
 				end
 			end
+			if sydeSourceValid(src) then
+				if type(Core.writeFile) == "function" then
+					pcall(Core.writeFile, SYDE_SOURCE_PATH, src)
+					pcall(Core.writeFile, ".alleral/cache/" .. SYDE_SOURCE_PATH, src)
+				end
+				return src, "remote:" .. baseUrl
+			end
 		end
-		return type(src) == "string" and #src >= 5000 and not src:find("<!DOCTYPE", 1, true) and src or nil
+
+		return nil, nil
 	end
 
 	local function loadSyde()
-		local cached = ENV._AlleralSyde
-		if type(cached) == "table" and type(cached.Init) == "function" then
-			return cached
-		end
-		local source = readSydeSource()
+		local source, sourceLabel = readSydeSource()
 		if not source then
-			return nil, "Syde source missing"
+			return nil, "Syde source missing (need patched ui/syde/source.luau)"
 		end
+		local sourceKey = tostring(#source) .. ":" .. tostring(sourceLabel or "unknown")
+		if ENV._AlleralSydeSourceKey == sourceKey and type(ENV._AlleralSyde) == "table" and type(ENV._AlleralSyde.Init) == "function" then
+			return ENV._AlleralSyde
+		end
+		ENV._AlleralSyde = nil
 		local loadFn = Core.loadStringFn()
 		if not loadFn then
 			return nil, "load unavailable"
@@ -79,6 +161,7 @@ return function(Core)
 		if not ok or type(Syde) ~= "table" or type(Syde.Init) ~= "function" then
 			return nil, tostring(Syde or "Syde runtime failed")
 		end
+		ENV._AlleralSydeSourceKey = sourceKey
 		ENV._AlleralSyde = Syde
 		return Syde
 	end
@@ -180,7 +263,6 @@ return function(Core)
 		function Library:RepairWindow(window)
 			window = window or activeWindow or Library.Window
 			if window and type(window.Toggle) == "function" then
-				pcall(window.Toggle, window)
 				pcall(window.Toggle, window)
 			end
 			return true
@@ -313,7 +395,10 @@ return function(Core)
 			sydeWindow._sydeTabGroup = {
 				Tab = function(_, opts)
 					opts = type(opts) == "table" and opts or { Name = tostring(opts or "Tab") }
-					return sydeWindow:InitTab({ Title = opts.Name or "Tab" })
+					return sydeWindow:InitTab({
+						Title = opts.Name or "Tab",
+						Icon = opts.Image and iconImage(opts.Image) or nil,
+					})
 				end,
 			}
 
@@ -494,12 +579,28 @@ return function(Core)
 		end
 
 		function groupbox:CreateButton(settings, id)
-			sydeTab:Button({
+			local userCallback = settings.Callback or function() end
+			local handle = sydeTab:Button({
 				Title = settings.Name,
 				Description = settings.Description or "",
-				CallBack = settings.Callback or function() end,
+				CallBack = function()
+					userCallback()
+				end,
 			})
-			return wrapElement(function() end, {})
+			return wrapElement(function(nextSettings)
+				if type(nextSettings) ~= "table" then
+					return
+				end
+				if nextSettings.Callback then
+					userCallback = nextSettings.Callback
+				end
+				if handle and type(handle.Set) == "function" then
+					pcall(handle.Set, handle, nextSettings)
+				end
+			end, {
+				raw = handle,
+				kind = "button",
+			})
 		end
 
 		function groupbox:CreateInput(settings, id)
@@ -640,7 +741,7 @@ return function(Core)
 				return Core.createStubUiGroup(name)
 			end
 			pcall(function()
-				rawTab:Section(name, iconImage(settings.Icon))
+				rawTab:Section(name, optionalIconImage(settings.Icon))
 			end)
 			return Core.createWindUiGroupbox(rawTab, uiBundle)
 		end
@@ -707,7 +808,7 @@ return function(Core)
 			if not tabGroup or type(tabGroup.Tab) ~= "function" then
 				return nil
 			end
-			return tabGroup:Tab({ Name = name, Image = icon })
+			return tabGroup:Tab({ Name = name, Image = icon and iconImage(icon) or nil })
 		end
 
 		function window:Toggle()
@@ -733,7 +834,7 @@ return function(Core)
 			Core.logWarn("buildUiTab skipped — tab group missing")
 			return Core.wrapUiTab(nil, window._ui, window)
 		end
-		local rawTab = tabGroup:Tab({ Name = name, Image = icon })
+		local rawTab = tabGroup:Tab({ Name = name, Image = icon and iconImage(icon) or nil })
 		local wrapped = Core.wrapUiTab(rawTab, window._ui or (type(section) == "table" and section._ui) or nil, window)
 		wrapped._columnCount = math.max(1, tonumber(columns) or 2)
 		if not window._defaultTab then

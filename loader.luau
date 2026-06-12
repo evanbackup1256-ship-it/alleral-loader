@@ -11,6 +11,9 @@ local CORE_HUB_UI_MIN_BYTES = 60000
 local CORE_HUB_UI_MAX_BYTES = 75000
 local CORE_ALLERAL_UI_MIN_BYTES = 12000
 local CORE_ALLERAL_UI_MAX_BYTES = 45000
+local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
+local SYDE_SOURCE_MIN_BYTES = 5000
+local SYDE_PATCH_MARKER = "sydeFindChild"
 local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
@@ -864,6 +867,42 @@ local function cacheRemote(relativePath, src)
 		pcall(makeFolderFn, dir)
 	end
 	pcall(writeFileFn, relativePath, src)
+end
+
+local function sydeSourceValid(src)
+	return type(src) == "string"
+		and #src >= SYDE_SOURCE_MIN_BYTES
+		and src:find(SYDE_PATCH_MARKER, 1, true)
+		and looksLikeLua(src)
+end
+
+local function ensureSydeSource()
+	local localPaths = {
+		SYDE_SOURCE_PATH,
+		"kick/" .. SYDE_SOURCE_PATH,
+		"kick/kick/" .. SYDE_SOURCE_PATH,
+	}
+	local cachePaths = {
+		".alleral/cache/" .. SYDE_SOURCE_PATH,
+	}
+	local src, path = readLocal(localPaths, SYDE_SOURCE_MIN_BYTES)
+	if src and sydeSourceValid(src) then
+		cacheRemote(SYDE_SOURCE_PATH, src)
+		cacheRemote(".alleral/cache/" .. SYDE_SOURCE_PATH, src)
+		return true, "local:" .. tostring(path)
+	end
+	src, path = readLocal(cachePaths, SYDE_SOURCE_MIN_BYTES)
+	if src and sydeSourceValid(src) then
+		cacheRemote(SYDE_SOURCE_PATH, src)
+		return true, "cache:" .. tostring(path)
+	end
+	src, path = fetchRemote(SYDE_SOURCE_PATH, SYDE_SOURCE_MIN_BYTES)
+	if src and sydeSourceValid(src) then
+		cacheRemote(SYDE_SOURCE_PATH, src)
+		cacheRemote(".alleral/cache/" .. SYDE_SOURCE_PATH, src)
+		return true, "remote"
+	end
+	return false, path or "patched Syde source unavailable"
 end
 
 local function usesLegacyHttpHash(src)
@@ -1828,6 +1867,13 @@ local function loadCore()
 		return false, alleralUiLabel or "Alleral UI layer download failed"
 	end
 
+	local sydeOk, sydeLabel = ensureSydeSource()
+	if sydeOk then
+		log("Syde source ready (" .. tostring(sydeLabel) .. ")")
+	else
+		log("Syde source not cached yet: " .. tostring(sydeLabel), true)
+	end
+
 	if not hubUiSrc then
 		ENV.Alleral_Core = nil
 		return false, hubUiLabel or "Core hub UI download failed"
@@ -2623,6 +2669,7 @@ local function buildManagedFiles()
 			},
 			expectedKey = "alleral",
 			extract = "alleral",
+			isValid = sydeSourceValid,
 		},
 		{
 			paths = {
