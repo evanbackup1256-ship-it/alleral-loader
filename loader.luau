@@ -1,4 +1,4 @@
-local LOADER_VERSION = "8.2.9"
+local LOADER_VERSION = "8.2.10"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -22,7 +22,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.9",
+	loader = "8.2.10",
 	core = "2.9.4",
 	ui = "Maclib",
 	windui = "3.0.5-premium",
@@ -2534,100 +2534,6 @@ local function stopAutoUpdater()
 	ENV._Alleral_AutoUpdateToken = nil
 end
 
-local function applyRemoteUpdate(profile, expected, reason)
-	if ENV._Alleral_UpdateApplying then
-		return
-	end
-	ENV._Alleral_UpdateApplying = true
-	stopAutoUpdater()
-	log("Update available (" .. tostring(reason) .. ") — refreshing from GitHub")
-	local telemetry = ENV.Alleral_Telemetry
-	if type(telemetry) == "table" and type(telemetry.ReportEvent) == "function" then
-		pcall(function()
-			telemetry:ReportEvent("milestone", "Hub auto-update: " .. tostring(reason), {
-				commit = expected and expected.commit,
-				loaderVersion = expected and expected.loader,
-				coreVersion = expected and expected.core,
-				telemetryVersion = expected and expected.telemetry,
-				gameId = profile and profile.id,
-				reason = reason,
-			})
-		end)
-	end
-	notify("Alleral", "update found, reloading", 4)
-	ENV._Alleral_ExpectedVersions = expected
-	purgeOutdatedWorkspace()
-	recordInstalledVersions()
-	task.defer(function()
-		ENV._Alleral_UpdateApplying = false
-		if ENV.Alleral_Reload then
-			ENV.Alleral_Reload()
-		end
-	end)
-end
-
-local function checkForRemoteUpdate(profile, quiet)
-	local expected = fetchExpectedVersions(true)
-	local fingerprint = buildUpdateFingerprint(expected, profile)
-	local previous = ENV._Alleral_UpdateFingerprint
-	ENV._Alleral_ExpectedVersions = expected
-
-	if type(previous) ~= "string" or previous == "" then
-		ENV._Alleral_UpdateFingerprint = fingerprint
-		if not quiet then
-			log("Auto-update armed (" .. tostring(expected.commit ~= "" and expected.commit or "release") .. ")")
-		end
-		return false
-	end
-
-	if fingerprint == previous then
-		return false
-	end
-
-	local reason = "release changed"
-	if expected.commit ~= "" and not previous:find(tostring(expected.commit), 1, true) then
-		reason = "commit " .. tostring(expected.commit)
-	elseif expected.loader and not previous:find("loader=" .. tostring(expected.loader), 1, true) then
-		reason = "loader v" .. tostring(expected.loader)
-	elseif profile and expected.games and expected.games[profile.id] then
-		reason = profile.name .. " v" .. tostring(expected.games[profile.id])
-	end
-
-	applyRemoteUpdate(profile, expected, reason)
-	return true
-end
-
-local function startAutoUpdater(profile)
-	stopAutoUpdater()
-	local expected = ENV._Alleral_ExpectedVersions or fetchExpectedVersions()
-	if expected.autoUpdate == false then
-		return
-	end
-	local pollSeconds = tonumber(expected.updatePollSeconds) or DEFAULT_UPDATE_POLL_SECONDS
-	pollSeconds = clampNumber(math.floor(pollSeconds), 15, 600)
-	ENV._Alleral_AutoUpdateRunning = true
-	local token = tick()
-	ENV._Alleral_AutoUpdateToken = token
-	task.spawn(function()
-		while ENV._Alleral_AutoUpdateRunning and ENV._Alleral_AutoUpdateToken == token do
-			task.wait(pollSeconds)
-			if ENV._Alleral_AutoUpdateToken ~= token then
-				break
-			end
-			pcall(function()
-				checkForRemoteUpdate(profile, true)
-			end)
-			if ENV._Alleral_AutoUpdatePollCount == nil or ENV._Alleral_AutoUpdatePollCount % 3 == 0 then
-				pcall(function()
-					syncWeaoConfig(true)
-				end)
-			end
-			ENV._Alleral_AutoUpdatePollCount = (ENV._Alleral_AutoUpdatePollCount or 0) + 1
-		end
-	end)
-	log("Auto-update polling every " .. tostring(pollSeconds) .. "s")
-end
-
 local function buildManagedFiles()
 	local managed = {
 		{
@@ -3135,6 +3041,109 @@ local function recordInstalledVersions()
 	end
 end
 
+local function applyRemoteUpdate(profile, expected, reason)
+	if ENV._Alleral_UpdateApplying then
+		return
+	end
+	ENV._Alleral_UpdateApplying = true
+	stopAutoUpdater()
+	log("Update available (" .. tostring(reason) .. ") — refreshing from GitHub")
+	local telemetry = ENV.Alleral_Telemetry
+	if type(telemetry) == "table" and type(telemetry.ReportEvent) == "function" then
+		pcall(function()
+			telemetry:ReportEvent("milestone", "Hub auto-update: " .. tostring(reason), {
+				commit = expected and expected.commit,
+				loaderVersion = expected and expected.loader,
+				coreVersion = expected and expected.core,
+				telemetryVersion = expected and expected.telemetry,
+				gameId = profile and profile.id,
+				reason = reason,
+			})
+		end)
+	end
+	notify("Alleral", "update found, reloading", 4)
+	ENV._Alleral_ExpectedVersions = expected
+	pcall(purgeOutdatedWorkspace)
+	pcall(recordInstalledVersions)
+	task.defer(function()
+		ENV._Alleral_UpdateApplying = false
+		if ENV.Alleral_Reload then
+			ENV.Alleral_Reload()
+		end
+	end)
+end
+
+local function checkForRemoteUpdate(profile, quiet)
+	local expected = fetchExpectedVersions(true)
+	local fingerprint = buildUpdateFingerprint(expected, profile)
+	local previous = ENV._Alleral_UpdateFingerprint
+	ENV._Alleral_ExpectedVersions = expected
+
+	if type(previous) ~= "string" or previous == "" then
+		ENV._Alleral_UpdateFingerprint = fingerprint
+		if not quiet then
+			log("Auto-update armed (" .. tostring(expected.commit ~= "" and expected.commit or "release") .. ")")
+		end
+		return false
+	end
+
+	if fingerprint == previous then
+		return false
+	end
+
+	local reason = "release changed"
+	if expected.commit ~= "" and not previous:find(tostring(expected.commit), 1, true) then
+		reason = "commit " .. tostring(expected.commit)
+	elseif expected.loader and not previous:find("loader=" .. tostring(expected.loader), 1, true) then
+		reason = "loader v" .. tostring(expected.loader)
+	elseif profile and expected.games and expected.games[profile.id] then
+		reason = profile.name .. " v" .. tostring(expected.games[profile.id])
+	end
+
+	applyRemoteUpdate(profile, expected, reason)
+	return true
+end
+
+local function armAutoUpdateFingerprint(profile, quiet)
+	local expected = ENV._Alleral_ExpectedVersions or fetchExpectedVersions(true)
+	ENV._Alleral_ExpectedVersions = expected
+	ENV._Alleral_UpdateFingerprint = buildUpdateFingerprint(expected, profile)
+	if not quiet then
+		log("Auto-update armed (" .. tostring(expected.commit ~= "" and expected.commit or "release") .. ")")
+	end
+end
+
+local function startAutoUpdater(profile)
+	stopAutoUpdater()
+	local expected = ENV._Alleral_ExpectedVersions or fetchExpectedVersions()
+	if expected.autoUpdate == false then
+		return
+	end
+	local pollSeconds = tonumber(expected.updatePollSeconds) or DEFAULT_UPDATE_POLL_SECONDS
+	pollSeconds = clampNumber(math.floor(pollSeconds), 15, 600)
+	ENV._Alleral_AutoUpdateRunning = true
+	local token = tick()
+	ENV._Alleral_AutoUpdateToken = token
+	task.spawn(function()
+		while ENV._Alleral_AutoUpdateRunning and ENV._Alleral_AutoUpdateToken == token do
+			task.wait(pollSeconds)
+			if ENV._Alleral_AutoUpdateToken ~= token then
+				break
+			end
+			pcall(function()
+				checkForRemoteUpdate(profile, true)
+			end)
+			if ENV._Alleral_AutoUpdatePollCount == nil or ENV._Alleral_AutoUpdatePollCount % 3 == 0 then
+				pcall(function()
+					syncWeaoConfig(true)
+				end)
+			end
+			ENV._Alleral_AutoUpdatePollCount = (ENV._Alleral_AutoUpdatePollCount or 0) + 1
+		end
+	end)
+	log("Auto-update polling every " .. tostring(pollSeconds) .. "s")
+end
+
 local TELEPORT_RELAUNCH_COOLDOWN = 5
 
 local function markSupportedPlaces()
@@ -3433,6 +3442,7 @@ local function main()
 
 	if type(PREVIOUS_LOADER_VERSION) == "string" and versionLt(PREVIOUS_LOADER_VERSION, LOADER_VERSION) then
 		log("Upgrading from loader v" .. PREVIOUS_LOADER_VERSION .. " — purging stale workspace cache")
+		ENV._Alleral_UpdateFingerprint = nil
 	end
 
 	if ENV._Alleral_PendingRelaunch then
@@ -3681,8 +3691,8 @@ local function main()
 	wireTelemetry(profile)
 	recordInstalledVersions()
 	task.defer(function()
-		purgeOutdatedWorkspace()
-		checkForRemoteUpdate(profile, true)
+		pcall(purgeOutdatedWorkspace)
+		armAutoUpdateFingerprint(profile, true)
 	end)
 	startAutoUpdater(profile)
 	ENV._Alleral_LastLoadAt = tick()
