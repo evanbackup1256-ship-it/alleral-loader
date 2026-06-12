@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="/assets/style.css" />
   <link rel="stylesheet" href="/assets/animations.css" />
   <link rel="stylesheet" href="/assets/admin.css" />
+  <link rel="stylesheet" href="/assets/admin-telemetry.css" />
   <script src="/assets/config.js"></script>
 </head>
 <body class="admin-page">
@@ -213,10 +214,12 @@
 
     <section data-tab-panel="stats" class="admin-panel hidden">
       <div id="statsGrid" class="stats-grid"></div>
+      <div id="telemetryCharts" class="telemetry-charts"></div>
+      <p id="telemetryAuthNote" class="telemetry-auth-note hidden">Sign in with your admin API key to view inject telemetry charts and the live feed.</p>
       <section class="card card-enter" style="margin-top:1.25rem">
         <div class="card-head">
           <h3>Live telemetry feed</h3>
-          <p class="muted">Recent injects, errors, and game place updates from the last 7 days.</p>
+          <p class="muted">Admin-only — recent injects, errors, and game place updates.</p>
         </div>
         <div id="telemetryFeed" class="telemetry-feed"></div>
       </section>
@@ -241,6 +244,7 @@
   <div id="toast" class="toast"></div>
   <script src="/assets/select-ui.js"></script>
   <script src="/assets/effects.js"></script>
+  <script src="/assets/admin-telemetry.js"></script>
   <script src="/assets/admin.js"></script>
 </body>
 </html>

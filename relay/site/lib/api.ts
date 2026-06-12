@@ -1,6 +1,6 @@
 import { API_BASE } from "./config";
 import { sanitizePublicSite } from "./sanitize";
-import type { LiveStatusPayload, SitePayload, WeaoPayload } from "./types";
+import type { HubStatusPayload, SitePayload, WeaoPayload } from "./types";
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -20,8 +20,8 @@ export async function fetchSite(): Promise<SitePayload> {
   return sanitizePublicSite(data);
 }
 
-export async function fetchLiveStatus(): Promise<LiveStatusPayload> {
-  return fetchJson<LiveStatusPayload>("/api/live/status");
+export async function fetchLiveStatus(): Promise<HubStatusPayload> {
+  return fetchJson<HubStatusPayload>("/api/live/status");
 }
 
 export async function fetchWeao(): Promise<WeaoPayload> {

@@ -1,10 +1,14 @@
 "use client";
 
 import { motion } from "motion/react";
+import { ArrowRight, Copy, Radio, Shield } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { AnimatedNumber, StatusPulse } from "@/components/ui/DataViz";
-import { Badge } from "@/components/ui/Form";
-import { CardHeader, MetricTile, Panel } from "@/components/ui/Panel";
+import { MetricCard } from "@/components/observability/MetricCard";
+import { StatusPill } from "@/components/observability/StatusPill";
+import { FreshnessChip } from "@/components/observability/FreshnessChip";
+import { HealthRing } from "@/components/observability/HealthRing";
+import { useHubStatus } from "@/lib/hooks/useHubStatus";
+import { resolveRelayStatus, resolveSyncStatus } from "@/lib/status/resolve";
 import { reveal, spring, stagger } from "@/lib/motion/config";
 import type { SitePayload } from "@/lib/types";
 import { usePlatformStore } from "@/lib/store/platform";
@@ -19,53 +23,75 @@ export function OverviewView({
   onCopy: () => void;
 }) {
   const setView = usePlatformStore((s) => s.setView);
+  const { data: live, secondsAgo } = useHubStatus(15000);
   const games = Object.values(site.games || {});
-  const working = games.filter((g) => (g.status || "working").toLowerCase() === "working").length;
+  const working = live?.games?.working ?? games.filter((g) => (g.status || "working").toLowerCase() === "working").length;
+  const total = live?.games?.total ?? games.length;
+  const health = total ? Math.round((working / total) * 100) : 100;
+  const relayKind = resolveRelayStatus(online);
+  const syncKind = resolveSyncStatus(live?.sync);
 
   return (
     <div className="grid-workspace">
-      <motion.div className="col-span-12 lg:col-span-7" initial={reveal.initial} animate={reveal.animate} transition={{ ...spring.soft, delay: 0 }}>
-        <Panel glow padding="lg" className="relative overflow-hidden">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-accent/20 blur-3xl" />
-          <p className="label-gradient mb-2 text-xs font-semibold uppercase tracking-[0.12em]">Alleral Platform</p>
-          <h2 className="text-gradient text-[clamp(2rem,4vw,3.2rem)] font-bold tracking-tight">{(site.brand || "Alleral").toUpperCase()}</h2>
-          <p className="mt-3 max-w-xl text-muted">{site.tagline}</p>
-          {site.announcement ? (
-            <div className="mt-4 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-200">{site.announcement}</div>
-          ) : null}
-          <div className="mt-6 flex flex-wrap gap-2">
-            <Button variant="primary" magnetic onClick={onCopy}>
-              Copy loader
-            </Button>
-            <Button magnetic onClick={() => setView("control")}>
-              Open mission control
-            </Button>
-            <Button variant="ghost" onClick={() => setView("games")}>
-              Browse games
-            </Button>
+      <motion.div className="col-span-12 xl:col-span-8" initial={reveal.initial} animate={reveal.animate} transition={spring.soft}>
+        <div className="obs-panel relative overflow-hidden p-6 md:p-8">
+          <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-cyan-400/15 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-16 left-1/3 h-48 w-48 rounded-full bg-indigo-500/15 blur-3xl" />
+          <div className="relative z-[1]">
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <StatusPill kind={relayKind} pulse={online !== false} />
+              <StatusPill kind={syncKind} size="sm" />
+              <FreshnessChip secondsAgo={secondsAgo} live />
+            </div>
+            <p className="obs-kicker">Alleral observability</p>
+            <h2 className="obs-title mt-2">{(site.brand || "Alleral").toUpperCase()}</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted md:text-base">{site.tagline}</p>
+            {site.announcement ? (
+              <div className="mt-5 rounded-2xl border border-cyan-400/25 bg-cyan-400/8 px-4 py-3 text-sm text-cyan-100 backdrop-blur-sm">{site.announcement}</div>
+            ) : null}
+            <div className="mt-8 flex flex-wrap gap-2">
+              <Button variant="primary" magnetic onClick={onCopy}>
+                <Copy className="h-4 w-4" /> Copy loader
+              </Button>
+              <Button magnetic onClick={() => setView("status")}>
+                <Radio className="h-4 w-4" /> Mission control
+              </Button>
+              <Button variant="ghost" onClick={() => setView("games")}>
+                Browse scripts <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        </Panel>
+        </div>
       </motion.div>
 
-      <motion.div className="col-span-12 grid gap-3 sm:grid-cols-2 lg:col-span-5 lg:grid-cols-1" initial={reveal.initial} animate={reveal.animate} transition={{ ...spring.soft, delay: stagger.base }}>
-        <MetricTile label="Games tracked" value={<AnimatedNumber value={games.length} />} accent="cyan" />
-        <MetricTile label="Working scripts" value={<AnimatedNumber value={working} />} accent="green" />
-        <Panel padding="md">
-          <StatusPulse online={!!online} label={online ? "Relay connected" : "Relay unreachable"} />
-          <p className="mt-3 font-mono text-xs text-muted">loader v{site.loaderVersion || "—"} · core {site.coreVersion || "—"}</p>
-          <Badge tone="violet" className="mt-3">
-            {site.uiLibrary || "Syde"} {site.uiVersion || ""}
-          </Badge>
-        </Panel>
+      <motion.div className="col-span-12 grid gap-3 sm:grid-cols-2 xl:col-span-4 xl:grid-cols-1" initial={reveal.initial} animate={reveal.animate} transition={{ ...spring.soft, delay: stagger.base }}>
+        <div className="obs-panel flex items-center gap-4">
+          <HealthRing kind={health >= 80 ? "healthy" : "warning"} value={health} label="Fleet" />
+          <div>
+            <p className="obs-kicker">Script fleet</p>
+            <p className="text-2xl font-semibold">{working}<span className="text-muted">/{total}</span></p>
+            <p className="text-xs text-muted">Operational endpoints</p>
+          </div>
+        </div>
+        <MetricCard label="Loader version" value={`v${live?.versions?.loader || site.loaderVersion || "—"}`} icon={Shield} accent="cyan" />
+        <MetricCard label="Core runtime" value={`v${live?.versions?.core || site.coreVersion || "—"}`} accent="violet" trend={`${site.uiLibrary || "Syde"} ${site.uiVersion || ""}`} />
       </motion.div>
 
       <motion.div className="col-span-12" initial={reveal.initial} animate={reveal.animate} transition={{ ...spring.soft, delay: stagger.base * 2 }}>
-        <Panel padding="md">
-          <CardHeader title="Loader script" desc="Auto-synced from GitHub on every inject" />
-          <pre className="max-h-40 overflow-auto rounded-xl border border-border bg-black/30 p-4 font-mono text-xs leading-relaxed text-muted">
+        <div className="obs-panel">
+          <div className="obs-panel-head">
+            <div>
+              <p className="obs-kicker">Bootstrap</p>
+              <h3 className="obs-title-sm">Loader script · auto-synced</h3>
+            </div>
+            <Button size="sm" variant="ghost" onClick={onCopy}>
+              Copy
+            </Button>
+          </div>
+          <pre className="mt-4 max-h-44 overflow-auto rounded-xl border border-border bg-black/40 p-4 font-mono text-xs leading-relaxed text-muted obs-scroll">
             {site.loadstring || "Loading…"}
           </pre>
-        </Panel>
+        </div>
       </motion.div>
     </div>
   );

@@ -88,16 +88,33 @@ export interface SitePayload {
   games?: Record<string, GameEntry>;
 }
 
-export interface LiveStatusPayload {
+export interface HubStatusPayload {
   ok?: boolean;
-  online?: boolean;
-  autoSync?: boolean;
-  updatedAt?: string;
-  versions?: Record<string, string>;
-  sync?: Record<string, unknown>;
-  telemetry?: Record<string, unknown>;
-  feed?: { at?: string; kind?: string; message?: string }[];
+  at?: string;
+  versions?: Record<string, string | number | undefined>;
+  release?: {
+    commit?: string;
+    branch?: string;
+    updatedAt?: string;
+    scriptsUpdatedAt?: string;
+  };
+  sync?: {
+    enabled?: boolean;
+    autoStatus?: boolean;
+    lastSyncAt?: string;
+    lastError?: string;
+  };
+  games?: {
+    total?: number;
+    working?: number;
+    items?: { id: string; name?: string; status?: string; version?: string; message?: string }[];
+  };
+  relay?: { online?: boolean; autoSync?: boolean };
+  changelog?: { date?: string; title?: string; items?: string[] }[];
 }
+
+/** @deprecated Use HubStatusPayload — kept for legacy imports */
+export type LiveStatusPayload = HubStatusPayload;
 
 export interface WeaoExploit {
   slug?: string;

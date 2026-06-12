@@ -6,7 +6,13 @@ import { useEffect } from "react";
 import { spring } from "@/lib/motion/config";
 import { usePlatformStore, VIEW_META, type PlatformView } from "@/lib/store/platform";
 
-export function CommandPalette({ onCopyScript }: { onCopyScript?: () => void }) {
+export function CommandPalette({
+  onCopyScript,
+  onRefresh,
+}: {
+  onCopyScript?: () => void;
+  onRefresh?: () => void;
+}) {
   const open = usePlatformStore((s) => s.commandOpen);
   const setOpen = usePlatformStore((s) => s.setCommandOpen);
   const setView = usePlatformStore((s) => s.setView);
@@ -34,7 +40,7 @@ export function CommandPalette({ onCopyScript }: { onCopyScript?: () => void }) 
           <motion.button
             type="button"
             aria-label="Close command palette"
-            className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-md"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -47,7 +53,7 @@ export function CommandPalette({ onCopyScript }: { onCopyScript?: () => void }) 
             exit={{ opacity: 0, y: -8, scale: 0.98, filter: "blur(4px)" }}
             transition={spring.snappy}
           >
-            <Command className="glass-raised overflow-hidden rounded-2xl" label="Command palette">
+            <Command className="glass-float overflow-hidden rounded-2xl border border-border-strong shadow-[0_40px_120px_rgba(0,0,0,0.65)]" label="Command palette">
               <div className="border-b border-border px-4 py-3">
                 <Command.Input
                   placeholder="Search views, actions, shortcuts…"
@@ -79,6 +85,16 @@ export function CommandPalette({ onCopyScript }: { onCopyScript?: () => void }) 
                     className="cursor-pointer rounded-xl px-3 py-2.5 text-sm text-muted aria-selected:bg-white/[0.06] aria-selected:text-text"
                   >
                     Copy loader script
+                  </Command.Item>
+                  <Command.Item
+                    value="refresh telemetry"
+                    onSelect={() => {
+                      onRefresh?.();
+                      setOpen(false);
+                    }}
+                    className="cursor-pointer rounded-xl px-3 py-2.5 text-sm text-muted aria-selected:bg-white/[0.06] aria-selected:text-text"
+                  >
+                    Refresh live data
                   </Command.Item>
                   <Command.Item
                     value="open admin panel"

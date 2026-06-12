@@ -1,18 +1,32 @@
 "use client";
 
 import clsx from "clsx";
+import {
+  Activity,
+  ChevronLeft,
+  ChevronRight,
+  Gamepad2,
+  History,
+  LayoutDashboard,
+  LifeBuoy,
+  Sparkles,
+  Users,
+  Wrench,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { spring } from "@/lib/motion/config";
 import { usePlatformStore, VIEW_META, type PlatformView } from "@/lib/store/platform";
+import { StatusPill } from "@/components/observability/StatusPill";
+import { resolveRelayStatus } from "@/lib/status/resolve";
 
-const ICONS: Record<PlatformView, string> = {
-  overview: "◆",
-  control: "◎",
-  games: "▦",
-  tools: "⚡",
-  changelog: "↗",
-  support: "✉",
-  credits: "★",
+const ICONS: Record<PlatformView, typeof LayoutDashboard> = {
+  overview: LayoutDashboard,
+  status: Activity,
+  games: Gamepad2,
+  tools: Wrench,
+  changelog: History,
+  support: LifeBuoy,
+  credits: Users,
 };
 
 export function Sidebar({ online }: { online?: boolean }) {
@@ -20,21 +34,22 @@ export function Sidebar({ online }: { online?: boolean }) {
   const activeView = usePlatformStore((s) => s.activeView);
   const setView = usePlatformStore((s) => s.setView);
   const toggle = usePlatformStore((s) => s.toggleSidebar);
+  const relayKind = resolveRelayStatus(online);
 
   return (
     <motion.aside
-      animate={{ width: collapsed ? 72 : 248 }}
+      animate={{ width: collapsed ? 76 : 260 }}
       transition={spring.panel}
-      className="glass-panel relative z-20 flex h-full shrink-0 flex-col border-r border-border"
+      className="glass-raised relative z-30 flex h-full shrink-0 flex-col border-r border-border"
     >
       <div className="flex items-center gap-3 border-b border-border px-4 py-4">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-accent/30 bg-gradient-to-br from-accent/25 to-cyan-400/10 text-sm font-bold text-text accent-glow">
-          A
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-400/25 bg-gradient-to-br from-indigo-500/30 via-cyan-400/10 to-violet-500/20 shadow-[0_0_24px_rgba(34,211,238,0.15)]">
+          <Sparkles className="h-4 w-4 text-cyan-200" strokeWidth={2} />
         </div>
         {!collapsed ? (
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">Alleral</p>
-            <p className="truncate text-[11px] text-muted">Telemetry Platform</p>
+            <p className="truncate text-sm font-semibold tracking-tight">Alleral</p>
+            <p className="truncate text-[11px] text-muted">Observability Platform</p>
           </div>
         ) : null}
       </div>
@@ -42,40 +57,37 @@ export function Sidebar({ online }: { online?: boolean }) {
       <nav className="flex-1 space-y-1 p-2">
         {(Object.keys(VIEW_META) as PlatformView[]).map((view) => {
           const active = activeView === view;
+          const Icon = ICONS[view];
           return (
             <button
               key={view}
               type="button"
               onClick={() => setView(view)}
-              className={clsx(
-                "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition",
-                active ? "bg-white/[0.06] text-text" : "text-muted hover:bg-white/[0.03] hover:text-text"
-              )}
+              className={clsx("nav-rail-item group", active && "nav-rail-item-active", !active && "text-muted hover:bg-white/[0.03] hover:text-text")}
             >
               {active ? (
-                <motion.span
-                  layoutId="nav-active"
-                  className="absolute inset-0 rounded-xl border border-accent/25 bg-gradient-to-r from-accent/10 to-transparent"
-                  transition={spring.panel}
-                />
+                <motion.span layoutId="nav-active" className="absolute inset-0 rounded-xl border border-cyan-400/20" transition={spring.layout} />
               ) : null}
-              <span className="relative z-[1] w-5 text-center text-xs opacity-80">{ICONS[view]}</span>
+              <Icon className="relative z-[1] h-4 w-4 shrink-0 opacity-85" strokeWidth={1.75} />
               {!collapsed ? <span className="relative z-[1] truncate">{VIEW_META[view].label}</span> : null}
+              {!collapsed && active ? (
+                <kbd className="relative z-[1] ml-auto rounded border border-border bg-black/30 px-1.5 py-0.5 font-mono text-[9px] text-muted-2">
+                  {VIEW_META[view].shortcut}
+                </kbd>
+              ) : null}
             </button>
           );
         })}
       </nav>
 
       <div className="border-t border-border p-3">
-        {!collapsed ? (
-          <p className="mb-2 px-1 text-[10px] uppercase tracking-wider text-muted-2">Relay</p>
-        ) : null}
-        <div className={clsx("flex items-center gap-2 rounded-xl border border-border bg-black/20 px-3 py-2", collapsed && "justify-center px-2")}>
-          <span className={clsx("h-2 w-2 rounded-full", online ? "bg-green-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" : "bg-muted-2")} />
-          {!collapsed ? <span className="text-xs text-muted">{online ? "Online" : "Offline"}</span> : null}
+        {!collapsed ? <p className="mb-2 px-1 text-[10px] uppercase tracking-wider text-muted-2">Relay status</p> : null}
+        <div className={clsx("flex items-center gap-2 rounded-xl border border-border bg-black/25 px-3 py-2.5", collapsed && "justify-center px-2")}>
+          {!collapsed ? <StatusPill kind={relayKind} size="sm" pulse={online !== false} /> : <span className={clsx("h-2 w-2 rounded-full", online !== false ? "bg-green-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" : "bg-red-400")} />}
         </div>
-        <button type="button" onClick={toggle} className="mt-2 w-full rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-white/[0.04] hover:text-text">
-          {collapsed ? "→" : "← Collapse"}
+        <button type="button" onClick={toggle} className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-white/[0.04] hover:text-text">
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          {!collapsed ? "Collapse" : null}
         </button>
       </div>
     </motion.aside>

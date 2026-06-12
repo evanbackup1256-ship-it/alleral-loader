@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit, IBM_Plex_Mono } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -16,18 +17,27 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Alleral Platform",
-  description: "Premium telemetry platform for Alleral — live sync, inject health, and script operations.",
+  title: "Alleral Observability",
+  description: "Premium observability platform — live script health, sync monitoring, and fleet analytics.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#030406",
+  themeColor: "#020204",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${outfit.variable} ${plexMono.variable}`}>
-      <body className="site-body">{children}</body>
+      <body className="site-body">
+        {children}
+        <Toaster
+          theme="dark"
+          position="bottom-center"
+          toastOptions={{
+            className: "glass-float border border-border text-sm",
+          }}
+        />
+      </body>
     </html>
   );
 }

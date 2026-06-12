@@ -1,23 +1,40 @@
 export const spring = {
-  snappy: { type: "spring" as const, stiffness: 420, damping: 32, mass: 0.8 },
-  soft: { type: "spring" as const, stiffness: 260, damping: 28, mass: 1 },
-  panel: { type: "spring" as const, stiffness: 320, damping: 34, mass: 0.95 },
-  magnetic: { type: "spring" as const, stiffness: 180, damping: 18, mass: 0.6 },
+  snappy: { type: "spring" as const, stiffness: 480, damping: 34, mass: 0.72 },
+  soft: { type: "spring" as const, stiffness: 280, damping: 30, mass: 0.95 },
+  panel: { type: "spring" as const, stiffness: 340, damping: 36, mass: 0.88 },
+  magnetic: { type: "spring" as const, stiffness: 200, damping: 20, mass: 0.55 },
+  layout: { type: "spring" as const, stiffness: 380, damping: 38, mass: 0.9 },
+  tooltip: { type: "spring" as const, stiffness: 520, damping: 38, mass: 0.65 },
+  status: { type: "spring" as const, stiffness: 420, damping: 32, mass: 0.7 },
 };
 
 export const ease = {
   out: [0.16, 1, 0.3, 1] as [number, number, number, number],
   inOut: [0.65, 0, 0.35, 1] as [number, number, number, number],
+  expo: [0.19, 1, 0.22, 1] as [number, number, number, number],
 };
 
 export const stagger = {
-  fast: 0.04,
-  base: 0.06,
-  slow: 0.09,
+  fast: 0.035,
+  base: 0.055,
+  slow: 0.085,
+  children: 0.04,
 };
 
 export const reveal = {
-  initial: { opacity: 0, y: 18, filter: "blur(10px)" },
+  initial: { opacity: 0, y: 22, filter: "blur(12px)" },
   animate: { opacity: 1, y: 0, filter: "blur(0px)" },
-  exit: { opacity: 0, y: -12, filter: "blur(6px)" },
+  exit: { opacity: 0, y: -14, filter: "blur(8px)" },
+};
+
+export const scaleReveal = {
+  initial: { opacity: 0, scale: 0.96, filter: "blur(8px)" },
+  animate: { opacity: 1, scale: 1, filter: "blur(0px)" },
+  exit: { opacity: 0, scale: 0.98, filter: "blur(4px)" },
+};
+
+export const slidePanel = {
+  initial: { opacity: 0, x: -16 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: 12 },
 };

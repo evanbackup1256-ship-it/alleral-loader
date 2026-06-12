@@ -3,14 +3,14 @@ import { persist } from "zustand/middleware";
 
 export type PlatformView =
   | "overview"
-  | "control"
+  | "status"
   | "games"
   | "tools"
   | "changelog"
   | "support"
   | "credits";
 
-export type WorkspacePreset = "default" | "telemetry" | "ops";
+export type WorkspacePreset = "default" | "compact" | "wide";
 
 interface PlatformState {
   activeView: PlatformView;
@@ -33,7 +33,12 @@ export const usePlatformStore = create<PlatformState>()(
       setView: (activeView) => set({ activeView }),
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setCommandOpen: (commandOpen) => set({ commandOpen }),
-      setWorkspace: (workspace) => set({ workspace }),
+      setWorkspace: (workspace) => {
+        const raw = String(workspace);
+        const next: WorkspacePreset =
+          raw === "compact" || raw === "wide" ? raw : "default";
+        set({ workspace: next });
+      },
     }),
     { name: "alleral-platform", partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed, workspace: s.workspace }) }
   )
@@ -41,10 +46,10 @@ export const usePlatformStore = create<PlatformState>()(
 
 export const VIEW_META: Record<PlatformView, { label: string; shortcut: string; desc: string }> = {
   overview: { label: "Overview", shortcut: "O", desc: "Platform summary and loader" },
-  control: { label: "Mission Control", shortcut: "M", desc: "Live telemetry and sync" },
+  status: { label: "Mission Control", shortcut: "L", desc: "Observability command center" },
   games: { label: "Games", shortcut: "G", desc: "Script library and status" },
   tools: { label: "Executors", shortcut: "E", desc: "WEAO exploit tracker" },
-  changelog: { label: "Ship Log", shortcut: "L", desc: "Release history" },
+  changelog: { label: "Ship Log", shortcut: "H", desc: "Release history" },
   support: { label: "Support", shortcut: "S", desc: "Bug reports and contact" },
   credits: { label: "Team", shortcut: "T", desc: "Credits and contributors" },
 };

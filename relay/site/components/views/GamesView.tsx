@@ -4,12 +4,14 @@ import clsx from "clsx";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { fetchThumbnails } from "@/lib/api";
+import { useHubStatus } from "@/lib/hooks/useHubStatus";
 import { spring } from "@/lib/motion/config";
 import type { GameEntry, SitePayload } from "@/lib/types";
-import { Badge } from "@/components/ui/Form";
+import { FreshnessChip } from "@/components/observability/FreshnessChip";
+import { StatusPill } from "@/components/observability/StatusPill";
+import { resolveGameStatus } from "@/lib/status/resolve";
 import { Input } from "@/components/ui/Form";
 import { Button } from "@/components/ui/Button";
-import { Panel } from "@/components/ui/Panel";
 
 const STATUSES = ["all", "working", "testing", "maintenance", "broken"] as const;
 
@@ -18,13 +20,30 @@ export function GamesView({ site }: { site: SitePayload }) {
   const [query, setQuery] = useState("");
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [modal, setModal] = useState<{ id: string; game: GameEntry } | null>(null);
+  const { data: live, secondsAgo } = useHubStatus(15000);
 
-  const games = useMemo(() => Object.entries(site.games || {}).map(([id, game]) => ({ id, ...game })), [site.games]);
+  const liveStatus = useMemo(() => {
+    const map: Record<string, string> = {};
+    live?.games?.items?.forEach((g) => {
+      if (g.id) map[g.id] = (g.status || "working").toLowerCase();
+    });
+    return map;
+  }, [live?.games?.items]);
+
+  const games = useMemo(
+    () =>
+      Object.entries(site.games || {}).map(([id, game]) => ({
+        id,
+        ...game,
+        liveStatus: liveStatus[id] || (game.status || "working").toLowerCase(),
+      })),
+    [site.games, liveStatus]
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return games.filter((g) => {
-      const status = (g.status || "working").toLowerCase();
+      const status = g.liveStatus;
       if (filter !== "all" && status !== filter) return false;
       if (!q) return true;
       return (g.name || g.id).toLowerCase().includes(q) || (g.description || "").toLowerCase().includes(q);
@@ -38,6 +57,10 @@ export function GamesView({ site }: { site: SitePayload }) {
 
   return (
     <div className="space-y-4">
+      <div className="obs-panel flex flex-wrap items-center justify-between gap-3 !py-3">
+        <FreshnessChip secondsAgo={secondsAgo} live />
+        <p className="text-xs text-muted">Live script endpoints · observability stream</p>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         {STATUSES.map((s) => (
           <Button key={s} size="sm" variant={filter === s ? "primary" : "ghost"} onClick={() => setFilter(s)} className="capitalize">
@@ -49,12 +72,12 @@ export function GamesView({ site }: { site: SitePayload }) {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {filtered.map((game, i) => {
-          const status = (game.status || "working").toLowerCase();
+          const status = game.liveStatus;
           const placeId = game.placeIds?.[0] ? String(game.placeIds[0]) : null;
           const thumb = placeId ? thumbs[placeId] : null;
           return (
             <motion.div key={game.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring.soft, delay: Math.min(i * 0.04, 0.3) }}>
-              <Panel hover padding="none" className="overflow-hidden text-left" glow={false}>
+              <div className="obs-panel group overflow-hidden p-0 transition hover:border-cyan-400/20 hover:shadow-[0_0_32px_rgba(34,211,238,0.08)]">
                 <button type="button" className="block w-full text-left" onClick={() => setModal({ id: game.id, game })}>
                   <div className="relative h-36 overflow-hidden">
                     {thumb ? (
@@ -73,7 +96,7 @@ export function GamesView({ site }: { site: SitePayload }) {
                     <p className="line-clamp-2 text-sm text-muted">{game.description || game.message || "No description."}</p>
                   </div>
                 </button>
-              </Panel>
+              </div>
             </motion.div>
           );
         })}
@@ -105,10 +128,6 @@ export function GamesView({ site }: { site: SitePayload }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const tone = status === "working" ? "green" : status === "broken" ? "red" : status === "testing" ? "cyan" : "yellow";
-  return (
-    <Badge tone={tone as "green"} className="capitalize">
-      {status}
-    </Badge>
-  );
+  const kind = resolveGameStatus(status);
+  return <StatusPill kind={kind} size="sm" pulse={kind === "healthy"} className="capitalize" label={status} />;
 }

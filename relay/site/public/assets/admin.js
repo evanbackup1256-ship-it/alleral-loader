@@ -663,18 +663,44 @@
   async function loadStats() {
     const root = $("#statsGrid");
     const feedRoot = $("#telemetryFeed");
+    const chartsRoot = $("#telemetryCharts");
+    const authNote = $("#telemetryAuthNote");
     root.innerHTML = '<p class="empty">Loading stats…</p>';
     if (feedRoot) feedRoot.innerHTML = '<p class="empty">Loading telemetry…</p>';
+    if (chartsRoot) chartsRoot.innerHTML = "";
     const base = apiBase();
+    const authed = Boolean(adminToken());
     try {
-      const [health, banStatus, site, sync, telemetrySummary, telemetryRecent] = await Promise.all([
+      const fetches = [
         fetch(`${base}/health`).then((r) => r.json()),
         fetch(`${base}/api/ban/status`).then((r) => r.json()),
         fetch(`${base}/api/site`).then((r) => r.json()),
         fetch(`${base}/api/sync/status`).then((r) => r.json()),
-        fetch(`${base}/api/admin/telemetry/summary`, { headers: headers(), cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
-        fetch(`${base}/api/admin/telemetry/recent?limit=30`, { headers: headers(), cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
-      ]);
+      ];
+      if (authed) {
+        fetches.push(
+          fetch(`${base}/api/admin/telemetry/summary`, { headers: headers(), cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
+          fetch(`${base}/api/admin/telemetry/recent?limit=30`, { headers: headers(), cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
+          fetch(`${base}/api/admin/telemetry/timeseries?hours=48&bucket=1`, { headers: headers(), cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false }))
+        );
+      }
+      const results = await Promise.all(fetches);
+      const [health, banStatus, site, sync] = results;
+      const telemetrySummary = authed ? results[4] : { ok: false };
+      const telemetryRecent = authed ? results[5] : { ok: false };
+      const telemetrySeries = authed ? results[6] : { ok: false };
+
+      if (authNote) authNote.classList.toggle("hidden", authed && telemetrySummary.ok !== false);
+      if (chartsRoot) {
+        if (telemetrySeries?.ok && window.AlleralAdminTelemetry) {
+          window.AlleralAdminTelemetry.mountCharts(chartsRoot, telemetrySeries.series || {});
+        } else if (!authed) {
+          chartsRoot.innerHTML = "";
+        } else {
+          chartsRoot.innerHTML = '<p class="empty">Telemetry charts unavailable — check admin auth.</p>';
+        }
+      }
+
       const games = Object.values(site.games || {});
       const working = games.filter((g) => (g.status || "").toLowerCase() === "working").length;
       const summary = telemetrySummary.ok ? telemetrySummary.summary || {} : {};
@@ -684,24 +710,27 @@
         <article class="stat-card card-enter" style="animation-delay:0.05s"><span class="stat-card-label">GitHub Commit</span><strong>${esc(sync.commit || health.githubCommit || "—")}</strong></article>
         <article class="stat-card card-enter" style="animation-delay:0.1s"><span class="stat-card-label">Last Auto Sync</span><strong>${sync.lastSyncAt ? new Date(sync.lastSyncAt).toLocaleTimeString() : "—"}</strong></article>
         <article class="stat-card card-enter" style="animation-delay:0.15s"><span class="stat-card-label">Active Bans</span><strong>${banStatus.activeBans ?? health.bans ?? 0}</strong></article>
-        <article class="stat-card card-enter" style="animation-delay:0.2s"><span class="stat-card-label">48h Injects OK</span><strong>${summary.inject_loaded ?? "—"}</strong></article>
-        <article class="stat-card card-enter" style="animation-delay:0.25s"><span class="stat-card-label">48h Inject Fail</span><strong>${summary.inject_failed ?? "—"}</strong></article>
-        <article class="stat-card card-enter" style="animation-delay:0.3s"><span class="stat-card-label">48h Errors</span><strong>${summary.errors ?? summary.feed_errors ?? "—"}</strong></article>
-        <article class="stat-card card-enter" style="animation-delay:0.35s"><span class="stat-card-label">48h Game Updates</span><strong>${summary.place_updated ?? "—"}</strong></article>
-        <article class="stat-card card-enter" style="animation-delay:0.4s"><span class="stat-card-label">Inject Success</span><strong>${successRate}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.2s"><span class="stat-card-label">48h Injects OK</span><strong>${authed ? (summary.inject_loaded ?? "—") : "Sign in"}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.25s"><span class="stat-card-label">48h Inject Fail</span><strong>${authed ? (summary.inject_failed ?? "—") : "Sign in"}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.3s"><span class="stat-card-label">48h Errors</span><strong>${authed ? (summary.errors ?? summary.feed_errors ?? "—") : "Sign in"}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.35s"><span class="stat-card-label">48h Game Updates</span><strong>${authed ? (summary.place_updated ?? "—") : "Sign in"}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.4s"><span class="stat-card-label">Inject Success</span><strong>${authed ? successRate : "Sign in"}</strong></article>
         <article class="stat-card card-enter" style="animation-delay:0.45s"><span class="stat-card-label">Games Listed</span><strong>${games.length}</strong></article>
         <article class="stat-card card-enter" style="animation-delay:0.5s"><span class="stat-card-label">Working Scripts</span><strong>${working}</strong></article>
       `;
       if (feedRoot) {
-        const items = telemetryRecent.ok ? telemetryRecent.items || [] : [];
-        if (!items.length) {
-          feedRoot.innerHTML = '<p class="empty">No recent telemetry events yet.</p>';
+        if (!authed) {
+          feedRoot.innerHTML = '<p class="empty">Sign in to view the live telemetry feed.</p>';
         } else {
-          feedRoot.innerHTML = items.map((item) => {
-            const build = item.previousPlaceVersion
-              ? `build ${esc(item.previousPlaceVersion)} → ${esc(item.placeVersion || "?")}`
-              : (item.placeVersion ? `build ${esc(item.placeVersion)}` : "");
-            return `
+          const items = telemetryRecent.ok ? telemetryRecent.items || [] : [];
+          if (!items.length) {
+            feedRoot.innerHTML = '<p class="empty">No recent telemetry events yet.</p>';
+          } else {
+            feedRoot.innerHTML = items.map((item) => {
+              const build = item.previousPlaceVersion
+                ? `build ${esc(item.previousPlaceVersion)} → ${esc(item.placeVersion || "?")}`
+                : (item.placeVersion ? `build ${esc(item.placeVersion)}` : "");
+              return `
               <article class="telemetry-feed-item">
                 <div class="telemetry-feed-head">
                   <strong>${esc(item.event || "?")}</strong>
@@ -714,12 +743,14 @@
                 <div class="telemetry-feed-message">${esc(item.message || "")}</div>
                 ${item.details ? `<pre class="telemetry-feed-details">${esc(item.details)}</pre>` : ""}
               </article>`;
-          }).join("");
+            }).join("");
+          }
         }
       }
     } catch (e) {
       root.innerHTML = `<p class="empty">${esc(e.message)}</p>`;
       if (feedRoot) feedRoot.innerHTML = "";
+      if (chartsRoot) chartsRoot.innerHTML = "";
     }
   }
 
@@ -990,6 +1021,9 @@
 
   setInterval(() => {
     if (activeTab === "scripts") loadScripts();
-    if (activeTab === "stats") loadStats();
   }, 30000);
+
+  setInterval(() => {
+    if (activeTab === "stats") loadStats();
+  }, 5000);
 })();

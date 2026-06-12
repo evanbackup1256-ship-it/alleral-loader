@@ -2027,18 +2027,23 @@ def live_status():
         except Exception:
             pass
 
-    telemetry_24h: dict[str, Any] = {}
-    if AUTO_SYNC is not None:
-        try:
-            telemetry_24h = AUTO_SYNC.stats.global_summary(24)
-        except Exception:
-            pass
-
     games = site.get("games") if isinstance(site.get("games"), dict) else {}
     working = sum(
         1 for g in games.values()
         if isinstance(g, dict) and str(g.get("status", "working")).lower() == "working"
     )
+    game_list: list[dict[str, Any]] = []
+    for gid, meta in games.items():
+        if not isinstance(meta, dict):
+            continue
+        game_list.append({
+            "id": gid,
+            "name": meta.get("name") or gid.replace("_", " ").title(),
+            "status": str(meta.get("status") or "working").lower(),
+            "version": meta.get("version"),
+            "message": meta.get("message"),
+        })
+    game_list.sort(key=lambda g: (g.get("status") != "working", g.get("name") or ""))
 
     changelog = site.get("changelog") if isinstance(site.get("changelog"), list) else []
     recent_changes = []
@@ -2077,13 +2082,11 @@ def live_status():
         "games": {
             "total": len(games),
             "working": working,
+            "items": game_list,
         },
-        "telemetry24h": {
-            "inject_loaded": telemetry_24h.get("inject_loaded"),
-            "inject_failed": telemetry_24h.get("inject_failed"),
-            "errors": telemetry_24h.get("errors"),
-            "place_updated": telemetry_24h.get("place_updated"),
-            "success_rate": telemetry_24h.get("success_rate"),
+        "relay": {
+            "online": True,
+            "autoSync": bool(sync_meta.get("enabled")),
         },
         "changelog": recent_changes,
     })
@@ -2639,6 +2642,27 @@ def admin_telemetry_recent():
         limit = 40
     items = AUTO_SYNC.stats.recent_feed(limit=max(1, min(limit, 100)))
     return jsonify({"ok": True, "items": items})
+
+
+@app.get("/api/admin/telemetry/timeseries")
+def admin_telemetry_timeseries():
+    if not admin_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    if AUTO_SYNC is None:
+        return jsonify({"ok": False, "error": "auto_sync_unavailable"}), 503
+    try:
+        window_hours = int(request.args.get("hours") or 48)
+    except ValueError:
+        window_hours = 48
+    try:
+        bucket_hours = int(request.args.get("bucket") or 1)
+    except ValueError:
+        bucket_hours = 1
+    series = AUTO_SYNC.stats.timeseries(
+        window_hours=max(1, min(window_hours, 168)),
+        bucket_hours=max(1, min(bucket_hours, 24)),
+    )
+    return jsonify({"ok": True, "series": series})
 
 
 @app.get("/api/admin/ban-api/key")

@@ -387,6 +387,70 @@ class TelemetryStatsStore:
             "success_rate": (loaded / total) if total else None,
         }
 
+    def timeseries(self, window_hours: int = 48, bucket_hours: int = 1) -> dict[str, Any]:
+        window_hours = max(1, min(window_hours, 168))
+        bucket_hours = max(1, min(bucket_hours, 24))
+        now = time.time()
+        cutoff = now - (window_hours * 3600)
+        bucket_sec = bucket_hours * 3600
+        with self._lock:
+            conn = self._connect()
+            try:
+                rows = conn.execute(
+                    """
+                    SELECT
+                        CAST((ts - ?) / ? AS INTEGER) AS bucket_idx,
+                        event,
+                        COUNT(*) AS c
+                    FROM telemetry_events
+                    WHERE ts >= ?
+                    GROUP BY bucket_idx, event
+                    ORDER BY bucket_idx
+                    """,
+                    (cutoff, bucket_sec, cutoff),
+                ).fetchall()
+            finally:
+                conn.close()
+
+        bucket_count = max(1, int((window_hours + bucket_hours - 1) / bucket_hours))
+        buckets: list[dict[str, Any]] = []
+        for idx in range(bucket_count):
+            start = cutoff + (idx * bucket_sec)
+            end = min(start + bucket_sec, now)
+            buckets.append(
+                {
+                    "at": datetime.fromtimestamp(start, timezone.utc).replace(microsecond=0).isoformat(),
+                    "endAt": datetime.fromtimestamp(end, timezone.utc).replace(microsecond=0).isoformat(),
+                    "inject_loaded": 0,
+                    "inject_failed": 0,
+                    "error": 0,
+                    "place_updated": 0,
+                    "milestone": 0,
+                }
+            )
+
+        for row in rows:
+            idx = int(row["bucket_idx"])
+            if idx < 0 or idx >= len(buckets):
+                continue
+            event = str(row["event"])
+            if event in buckets[idx]:
+                buckets[idx][event] = int(row["c"])
+
+        totals = {
+            "inject_loaded": sum(b["inject_loaded"] for b in buckets),
+            "inject_failed": sum(b["inject_failed"] for b in buckets),
+            "error": sum(b["error"] for b in buckets),
+        }
+        inject_total = totals["inject_loaded"] + totals["inject_failed"]
+        return {
+            "windowHours": window_hours,
+            "bucketHours": bucket_hours,
+            "buckets": buckets,
+            "totals": totals,
+            "success_rate": (totals["inject_loaded"] / inject_total) if inject_total else None,
+        }
+
 
 class AutoSyncEngine:
     def __init__(
