@@ -101,7 +101,7 @@ local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 15
+local ALLERAL_SYDE_PATCH = 16
 
 local SYDE_CANONICAL_NAMES = {
 	Main = "main",
@@ -113,7 +113,7 @@ local SYDE_CANONICAL_NAMES = {
 	Modal = "modal",
 	User = "user",
 	Search = "search",
-	Render = "render",
+	-- Render: keep PascalCase — upstream uses ui.Render.ToggleConfiguration
 	Minihome = "minihome",
 	Toastholder = "toastholder",
 	ToastHolder = "toastholder",
