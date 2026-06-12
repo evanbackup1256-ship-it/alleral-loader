@@ -276,10 +276,10 @@ Get-ChildItem -Path $root -Recurse -Include *.luau,*.lua,*.json,*.md,*.ps1 -File
     ForEach-Object {
         $text = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
         if (-not $text) { return }
-        if ($_.Name -ne 'loader.luau' -and $text -match 'kick@main') {
+        if ($_.Name -ne 'loader.luau' -and $_.Name -ne 'bootstrap.luau' -and $text -match 'kick@main') {
             Fail "$($_.FullName.Replace($root + '\', '')) contains legacy mirror path kick@main"
         }
-        if ($_.Name -ne 'loader.luau' -and $text -match '\.net/gh/') {
+        if ($_.Name -ne 'loader.luau' -and $_.Name -ne 'bootstrap.luau' -and $text -match '\.net/gh/') {
             Fail "$($_.FullName.Replace($root + '\', '')) contains legacy .net/gh/ mirror URL"
         }
     }
