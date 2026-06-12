@@ -3456,7 +3456,7 @@ local function startAutoUpdater(profile)
 	log("Auto-update polling every " .. tostring(pollSeconds) .. "s")
 end
 
-do
+(function()
 	local TELEPORT_RELAUNCH_COOLDOWN = 5
 
 	local function installAutoexecRedirect()
@@ -3493,162 +3493,162 @@ do
 	end
 
 	local function relaunchViaBootstrap(reason)
-	reason = reason or "relaunch"
-	stopAutoUpdater()
-	if type(ENV.Alleral_Bootstrap) == "function" then
-		local ok, result = ENV.Alleral_Bootstrap(reason)
-		return ok == true, result
-	end
-	local src, via = httpGet(GITHUB_RAW .. "/" .. BOOTSTRAP_REMOTE_PATH .. "?t=" .. tostring(tick()), 200)
-	if type(src) ~= "string" or #src < 200 then
-		return false, "bootstrap fetch failed (" .. tostring(via) .. ")"
-	end
-	ENV._Alleral_BootstrapSkipAutoRun = true
-	local ok, err = compileAndRun(src, "Alleral/bootstrap", loaderRunEnv())
-	if not ok then
+		reason = reason or "relaunch"
+		stopAutoUpdater()
+		if type(ENV.Alleral_Bootstrap) == "function" then
+			local ok, result = ENV.Alleral_Bootstrap(reason)
+			return ok == true, result
+		end
+		local src, via = httpGet(GITHUB_RAW .. "/" .. BOOTSTRAP_REMOTE_PATH .. "?t=" .. tostring(tick()), 200)
+		if type(src) ~= "string" or #src < 200 then
+			return false, "bootstrap fetch failed (" .. tostring(via) .. ")"
+		end
+		ENV._Alleral_BootstrapSkipAutoRun = true
+		local ok, err = compileAndRun(src, "Alleral/bootstrap", loaderRunEnv())
+		if not ok then
+			ENV._Alleral_BootstrapSkipAutoRun = nil
+			return false, err
+		end
+		if type(ENV.Alleral_Bootstrap) == "function" then
+			local bootOk, bootResult = ENV.Alleral_Bootstrap(reason)
+			ENV._Alleral_BootstrapSkipAutoRun = nil
+			return bootOk == true, bootResult
+		end
 		ENV._Alleral_BootstrapSkipAutoRun = nil
-		return false, err
+		return false, "bootstrap entry missing after load"
 	end
-	if type(ENV.Alleral_Bootstrap) == "function" then
-		local bootOk, bootResult = ENV.Alleral_Bootstrap(reason)
-		ENV._Alleral_BootstrapSkipAutoRun = nil
-		return bootOk == true, bootResult
-	end
-	ENV._Alleral_BootstrapSkipAutoRun = nil
-	return false, "bootstrap entry missing after load"
-end
 
-local function installGlobalBootstrap()
-	if ENV._Alleral_BootstrapInstalled then
-		return
-	end
-	ENV._Alleral_BootstrapInstalled = true
-
-	ENV._Alleral_RunLoader = function(reason)
-		local g = getgenv()
-		if g.Alleral_AutoRelaunch == false then
+	local function installGlobalBootstrap()
+		if ENV._Alleral_BootstrapInstalled then
 			return
 		end
-		g._Alleral_RunLoaderToken = (g._Alleral_RunLoaderToken or 0) + 1
-		local token = g._Alleral_RunLoaderToken
-		task.delay(0.75, function()
-			if g._Alleral_RunLoaderToken ~= token then
-				return
-			end
-			if g.Alleral_LoaderRunning then
-				return
-			end
+		ENV._Alleral_BootstrapInstalled = true
 
-			if g.Alleral_State and type(g.Alleral_State.Alleral_Unload) == "function" then
-				pcall(g.Alleral_State.Alleral_Unload)
-			end
-			local prevCore = g.Alleral_Core
-			if type(prevCore) == "table" and type(prevCore.releaseUiWindow) == "function" then
-				pcall(prevCore.releaseUiWindow)
-			end
-			g.Alleral_LoaderRunning = false
-			g._Alleral_TeleportWatchConnected = nil
-			g._Alleral_RelaunchScheduledAt = nil
-			g._Alleral_AutoUpdateRunning = false
-			g._Alleral_AutoUpdateToken = nil
-			if reason then
-				g._Alleral_PendingRelaunch = true
-			end
-
-			local ok, err = relaunchViaBootstrap(reason or "relaunch")
-			if not ok then
-				warn("[Alleral] Bootstrap relaunch failed: " .. tostring(err))
-			end
-		end)
-	end
-
-	pcall(function()
-		local TeleportService = game:GetService("TeleportService")
-		TeleportService.LocalPlayerArrivedFromTeleport:Connect(function()
+		ENV._Alleral_RunLoader = function(reason)
 			local g = getgenv()
-			g._Alleral_PendingRelaunch = true
-			task.delay(2.5, function()
-				if type(g._Alleral_RunLoader) == "function" then
-					g._Alleral_RunLoader("arrived-from-teleport")
+			if g.Alleral_AutoRelaunch == false then
+				return
+			end
+			g._Alleral_RunLoaderToken = (g._Alleral_RunLoaderToken or 0) + 1
+			local token = g._Alleral_RunLoaderToken
+			task.delay(0.75, function()
+				if g._Alleral_RunLoaderToken ~= token then
+					return
+				end
+				if g.Alleral_LoaderRunning then
+					return
+				end
+
+				if g.Alleral_State and type(g.Alleral_State.Alleral_Unload) == "function" then
+					pcall(g.Alleral_State.Alleral_Unload)
+				end
+				local prevCore = g.Alleral_Core
+				if type(prevCore) == "table" and type(prevCore.releaseUiWindow) == "function" then
+					pcall(prevCore.releaseUiWindow)
+				end
+				g.Alleral_LoaderRunning = false
+				g._Alleral_TeleportWatchConnected = nil
+				g._Alleral_RelaunchScheduledAt = nil
+				g._Alleral_AutoUpdateRunning = false
+				g._Alleral_AutoUpdateToken = nil
+				if reason then
+					g._Alleral_PendingRelaunch = true
+				end
+
+				local ok, err = relaunchViaBootstrap(reason or "relaunch")
+				if not ok then
+					warn("[Alleral] Bootstrap relaunch failed: " .. tostring(err))
 				end
 			end)
-		end)
-	end)
-end
+		end
 
-local function scheduleHubRelaunch(reason, delaySeconds)
-	if ENV.Alleral_AutoRelaunch == false then
-		return
+		pcall(function()
+			local TeleportService = game:GetService("TeleportService")
+			TeleportService.LocalPlayerArrivedFromTeleport:Connect(function()
+				local g = getgenv()
+				g._Alleral_PendingRelaunch = true
+				task.delay(2.5, function()
+					if type(g._Alleral_RunLoader) == "function" then
+						g._Alleral_RunLoader("arrived-from-teleport")
+					end
+				end)
+			end)
+		end)
 	end
-	delaySeconds = delaySeconds or 2
-	local now = tick()
-	if ENV._Alleral_RelaunchScheduledAt and (now - ENV._Alleral_RelaunchScheduledAt) < 1 then
-		return
-	end
-	if ENV._Alleral_LastLoadAt and (now - ENV._Alleral_LastLoadAt) < TELEPORT_RELAUNCH_COOLDOWN then
-		if ENV._Alleral_LastJobId and tostring(ENV._Alleral_LastJobId) == tostring(game.JobId) then
+
+	local function scheduleHubRelaunch(reason, delaySeconds)
+		if ENV.Alleral_AutoRelaunch == false then
 			return
 		end
-	end
-	ENV._Alleral_RelaunchScheduledAt = now
-	task.delay(delaySeconds, function()
-		ENV._Alleral_RelaunchScheduledAt = nil
-		if type(ENV._Alleral_RunLoader) == "function" then
-			log("Teleport relaunch: " .. tostring(reason))
-			notify("Alleral", "new server — reloading hub", 3)
-			ENV._Alleral_RunLoader(reason)
-		elseif type(ENV.Alleral_Reload) == "function" then
-			ENV.Alleral_Reload()
-		else
-			log("Relaunch unavailable after teleport — re-run the loader", true)
+		delaySeconds = delaySeconds or 2
+		local now = tick()
+		if ENV._Alleral_RelaunchScheduledAt and (now - ENV._Alleral_RelaunchScheduledAt) < 1 then
+			return
 		end
-	end)
-end
-
-local function ensureAutoexecLoader()
-	if ENV.Alleral_AutoRelaunch == false then
-		return
-	end
-	if type(writeFileFn) ~= "function" then
-		log("Teleport auto-relaunch works best with writefile (autoexec stub skipped)", true)
-		return
-	end
-	installAutoexecRedirect()
-end
-
-local function wireTeleportRelaunch()
-	if ENV.Alleral_AutoRelaunch == nil then
-		ENV.Alleral_AutoRelaunch = true
-	end
-	installGlobalBootstrap()
-	if ENV._Alleral_TeleportWatchConnected then
-		return
-	end
-	ENV._Alleral_TeleportWatchConnected = true
-	ENV._Alleral_SessionWasActive = true
-	ENV._Alleral_LastPlaceId = game.PlaceId
-	ENV._Alleral_LastJobId = game.JobId
-	markSupportedPlaces()
-
-	pcall(function()
-		local Players = game:GetService("Players")
-		local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
-
-		LocalPlayer.OnTeleport:Connect(function(_teleportState, placeId)
-			ENV._Alleral_PendingRelaunch = true
-			ENV._Alleral_PendingPlaceId = placeId
-			ENV._Alleral_TeleportAt = tick()
-			log("Teleport detected — hub will reload when you arrive")
-		end)
-
-		LocalPlayer.CharacterAdded:Connect(function()
-			local teleAt = ENV._Alleral_TeleportAt
-			if type(teleAt) ~= "number" or (tick() - teleAt) > 60 then
+		if ENV._Alleral_LastLoadAt and (now - ENV._Alleral_LastLoadAt) < TELEPORT_RELAUNCH_COOLDOWN then
+			if ENV._Alleral_LastJobId and tostring(ENV._Alleral_LastJobId) == tostring(game.JobId) then
 				return
 			end
-			ENV._Alleral_TeleportAt = nil
-			scheduleHubRelaunch("spawn-after-teleport", 2)
+		end
+		ENV._Alleral_RelaunchScheduledAt = now
+		task.delay(delaySeconds, function()
+			ENV._Alleral_RelaunchScheduledAt = nil
+			if type(ENV._Alleral_RunLoader) == "function" then
+				log("Teleport relaunch: " .. tostring(reason))
+				notify("Alleral", "new server — reloading hub", 3)
+				ENV._Alleral_RunLoader(reason)
+			elseif type(ENV.Alleral_Reload) == "function" then
+				ENV.Alleral_Reload()
+			else
+				log("Relaunch unavailable after teleport — re-run the loader", true)
+			end
 		end)
+	end
+
+	local function ensureAutoexecLoader()
+		if ENV.Alleral_AutoRelaunch == false then
+			return
+		end
+		if type(writeFileFn) ~= "function" then
+			log("Teleport auto-relaunch works best with writefile (autoexec stub skipped)", true)
+			return
+		end
+		installAutoexecRedirect()
+	end
+
+	local function wireTeleportRelaunch()
+		if ENV.Alleral_AutoRelaunch == nil then
+			ENV.Alleral_AutoRelaunch = true
+		end
+		installGlobalBootstrap()
+		if ENV._Alleral_TeleportWatchConnected then
+			return
+		end
+		ENV._Alleral_TeleportWatchConnected = true
+		ENV._Alleral_SessionWasActive = true
+		ENV._Alleral_LastPlaceId = game.PlaceId
+		ENV._Alleral_LastJobId = game.JobId
+		markSupportedPlaces()
+
+		pcall(function()
+			local Players = game:GetService("Players")
+			local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+
+			LocalPlayer.OnTeleport:Connect(function(_teleportState, placeId)
+				ENV._Alleral_PendingRelaunch = true
+				ENV._Alleral_PendingPlaceId = placeId
+				ENV._Alleral_TeleportAt = tick()
+				log("Teleport detected — hub will reload when you arrive")
+			end)
+
+			LocalPlayer.CharacterAdded:Connect(function()
+				local teleAt = ENV._Alleral_TeleportAt
+				if type(teleAt) ~= "number" or (tick() - teleAt) > 60 then
+					return
+				end
+				ENV._Alleral_TeleportAt = nil
+				scheduleHubRelaunch("spawn-after-teleport", 2)
+			end)
 		end)
 	end
 
@@ -3659,7 +3659,7 @@ local function wireTeleportRelaunch()
 	ENV._Alleral_EnsureAutoexec = ensureAutoexecLoader
 	ENV._Alleral_EnsureTeleportWatch = wireTeleportRelaunch
 	ENV._Alleral_ScheduleRelaunch = scheduleHubRelaunch
-end
+end)()
 
 local function detectGame()
 	local placeId = game.PlaceId
