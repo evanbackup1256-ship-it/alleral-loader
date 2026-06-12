@@ -1,24 +1,12 @@
 return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "2.3.0-vendor"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "3.0.0-maclib"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
-	Core.UI_LIBRARY = "Alleral"
+	Core.UI_LIBRARY = "Maclib"
 
-	local UI_ROOTS = {
-		"hub/ui/",
-		"kick/hub/ui/",
-		"kick/kick/hub/ui/",
-		".alleral/cache/hub/ui/",
-	}
-	local UI_MIRRORS = {
-		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/ui/",
-		"https://github.com/evanbackup1256-ship-it/kick/raw/main/hub/ui/",
-		"https://cdn.jsdelivr.net/gh/evanbackup1256-ship-it/kick@main/hub/ui/",
-	}
-	local LIBRARY_FILE = "Library.luau"
-	local MIN_LIBRARY_BYTES = 8000
-	local MIN_MODULE_BYTES = 50
+	local MACLIB_URL = "https://github.com/biggaboy212/Maclib/releases/download/9.Maclib/maclib.txt"
+	local MACLIB_FALLBACK = "https://raw.githubusercontent.com/biggaboy212/Maclib/main/maclib.txt"
 
 	local function genv()
 		local ok, env = pcall(function()
@@ -27,326 +15,250 @@ return function(Core)
 		return ok and env or {}
 	end
 	local ENV = genv()
-	local agentDebug = ENV._AlleralAgentDebug or function() end
 
-	local function moduleSourceValid(source, minBytes)
-		minBytes = minBytes or MIN_MODULE_BYTES
-		if type(source) ~= "string" or #source < minBytes then
-			return false
+	local function iconImage(icon)
+		if type(icon) == "number" then
+			return "rbxassetid://" .. tostring(icon)
 		end
-		if #source <= 8192 and source:find("404: Not Found", 1, true) then
-			return false
+		local text = tostring(icon or "")
+		if text:find("rbxassetid", 1, true) then
+			return text
 		end
-		if source:find("<!DOCTYPE", 1, true) or source:find("<html", 1, true) then
-			return false
+		if text:match("^%d+$") then
+			return "rbxassetid://" .. text
 		end
-		return source:find("return", 1, true) ~= nil or source:find("function", 1, true) ~= nil
+		local mapped = Core.windUiIcon and Core.windUiIcon(icon)
+		if type(mapped) == "string" and mapped ~= "" then
+			if mapped:find("rbxassetid", 1, true) then
+				return mapped
+			end
+			if mapped:match("^%d+$") then
+				return "rbxassetid://" .. mapped
+			end
+		end
+		return "rbxassetid://18821914323"
 	end
 
-	local function readLocal(name, minBytes)
-		minBytes = minBytes or MIN_MODULE_BYTES
-		local roots = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
-		for _, vendor in ipairs(UI_ROOTS) do
-			for _, root in ipairs(roots) do
-				local path = root .. vendor .. name
-				local body = Core.readFile(path)
-				if moduleSourceValid(body, minBytes) then
-					return body, path
+	local function fetchMaclibSource()
+		local urls = {
+			MACLIB_URL,
+			MACLIB_URL .. "?t=" .. tostring(tick()),
+			MACLIB_FALLBACK,
+		}
+		for _, url in ipairs(urls) do
+			local body = type(Core.httpGet) == "function" and Core.httpGet(url)
+			if type(body) ~= "string" or #body < 5000 then
+				local http = ENV.Alleral_HTTP
+				if type(http) == "table" and type(http.get) == "function" then
+					body = http.get(url, 5000)
 				end
 			end
-		end
-		return nil
-	end
-
-	local function cacheUiSource(name, body)
-		if type(body) ~= "string" or not moduleSourceValid(body) then
-			return
-		end
-		local rel = "hub/ui/" .. name:gsub("\\", "/")
-		local cacheRel = ".alleral/cache/" .. rel
-		if Core.writeFile then
-			pcall(Core.writeFile, rel, body)
-			pcall(Core.writeFile, cacheRel, body)
-		end
-	end
-
-	local function uiHttpGet(url, minBytes)
-		minBytes = minBytes or 0
-		if type(Core.httpGet) == "function" then
-			local body = Core.httpGet(url)
-			if type(body) == "string" and #body >= minBytes then
-				return body
-			end
-		end
-		local http = ENV.Alleral_HTTP
-		if type(http) == "table" and type(http.get) == "function" then
-			local body = http.get(url, minBytes)
-			if type(body) == "string" and #body >= minBytes then
-				return body
+			if type(body) == "string" and #body >= 5000 and not body:find("<!DOCTYPE", 1, true) then
+				return body, url
 			end
 		end
 		return nil
 	end
 
-	local function librarySourceValid(source)
-		if type(source) ~= "string" or #source < MIN_LIBRARY_BYTES then
-			return false
+	local function loadMaclib()
+		local cached = ENV._AlleralMaclib
+		if type(cached) == "table" and type(cached.Window) == "function" then
+			return cached
 		end
-		if source:find("writefile(`", 1, true) or source:find("return `", 1, true) then
-			return false
-		end
-		return source:find("LibRef", 1, true) ~= nil and source:find("EnsureGuiRoot", 1, true) ~= nil
-	end
-
-	local function fetchRemote(name, minBytes, opts)
-		minBytes = minBytes or MIN_LIBRARY_BYTES
-		opts = type(opts) == "table" and opts or {}
-		local validate = opts.validate or moduleSourceValid
-		local versionTag = tostring(Core.ALLERAL_UI_VERSION or "kick"):gsub("[^%w%.%-]", "")
-		local bases = UI_MIRRORS
-		if type(Core._UiRemoteBases) == "table" and #Core._UiRemoteBases > 0 then
-			local merged = {}
-			for _, base in ipairs(Core._UiRemoteBases) do
-				table.insert(merged, base .. "/hub/ui/")
-			end
-			for _, base in ipairs(UI_MIRRORS) do
-				table.insert(merged, base)
-			end
-			bases = merged
-		end
-		for _, base in ipairs(bases) do
-			local plain = base .. name
-			local candidates = {
-				plain .. (plain:find("?", 1, true) and "&" or "?") .. "v=" .. versionTag .. "&t=" .. tostring(tick()),
-				plain,
-			}
-			if opts.bustOnly then
-				candidates = { candidates[1] }
-			end
-			for _, url in ipairs(candidates) do
-				local body = uiHttpGet(url, minBytes)
-				if type(body) == "string" and #body >= minBytes and validate(body, minBytes) then
-					cacheUiSource(name, body)
-					return body, url
-				end
-			end
-		end
-		return nil
-	end
-
-	local function resolveUiSource(name, minBytes)
-		minBytes = minBytes or MIN_MODULE_BYTES
-		local source, path = readLocal(name, minBytes)
-		if source then
-			return source, path, nil
-		end
-		source, path = fetchRemote(name, minBytes, { validate = moduleSourceValid })
-		if source then
-			return source, path or ("remote:" .. name), nil
-		end
-		return nil, nil, "missing module " .. name
-	end
-
-	local function sanitizeLuauSource(source)
-		if type(source) ~= "string" or source == "" then
-			return source
-		end
-		source = source:gsub("\r\n", "\n")
-		local out = {}
-		for line in (source .. "\n"):gmatch("(.-)\n") do
-			if not line:match("^%-%-![%w_]+") then
-				table.insert(out, line)
-			end
-		end
-		return table.concat(out, "\n")
-	end
-
-	local moduleCache = {}
-
-	local function loadUiModule(name)
-		if moduleCache[name] then
-			return moduleCache[name]
-		end
-		local source, path, resolveErr = resolveUiSource(name, MIN_MODULE_BYTES)
+		local source, label = fetchMaclibSource()
 		if not source then
-			-- #region agent log
-			agentDebug("H7", "alleral_ui:loadUiModule", "module source missing", {
-				name = name,
-				err = resolveErr,
-			})
-			-- #endregion
-			return nil, resolveErr or ("missing module " .. name)
+			return nil, "Maclib download failed"
 		end
 		local loadFn = Core.loadStringFn()
 		if not loadFn then
 			return nil, "load unavailable"
 		end
-		local chunk, err = loadFn(sanitizeLuauSource(source), "@Alleral/ui/" .. name .. ":" .. tostring(path))
+		local chunk, err = loadFn(source, "@Maclib/" .. tostring(label))
 		if not chunk then
-			-- #region agent log
-			agentDebug("H8", "alleral_ui:loadUiModule", "module compile failed", {
-				name = name,
-				path = path,
-				bytes = #source,
-				err = tostring(err),
-			})
-			-- #endregion
-			return nil, tostring(err)
+			return nil, tostring(err or "Maclib compile failed")
 		end
-		local ok, result = pcall(chunk)
-		if not ok then
-			-- #region agent log
-			agentDebug("H8", "alleral_ui:loadUiModule", "module execute failed", {
-				name = name,
-				path = path,
-				err = tostring(result),
-			})
-			-- #endregion
-			return nil, tostring(result)
+		local ok, MacLib = pcall(chunk)
+		if not ok or type(MacLib) ~= "table" then
+			return nil, tostring(MacLib or "Maclib runtime failed")
 		end
-		if name == LIBRARY_FILE and type(result) ~= "function" then
-			return nil, "invalid Alleral library: " .. tostring(result)
-		end
-		moduleCache[name] = result
-		return result
+		ENV._AlleralMaclib = MacLib
+		pcall(function()
+			MacLib:SetFolder("Alleral_Maclib")
+		end)
+		return MacLib
 	end
 
-	local function loadUiLibrary()
-		local moduleLoaderFactory, mlErr = loadUiModule("ModuleLoader.luau")
-		local vendorFactory, vendorErr = loadUiModule("Vendor.luau")
-		if not moduleLoaderFactory or not vendorFactory then
-			-- #region agent log
-			agentDebug("H7", "alleral_ui:loadUiLibrary", "vendor bootstrap missing", {
-				hasModuleLoader = moduleLoaderFactory ~= nil,
-				moduleLoaderErr = mlErr,
-				hasVendor = vendorFactory ~= nil,
-				vendorErr = vendorErr,
-			})
-			-- #endregion
-			local detail = mlErr or vendorErr or "unknown"
-			return nil, "Alleral UI vendor loader missing: " .. tostring(detail)
-		end
-		local readVendorSource = function(rel)
-			rel = tostring(rel or ""):gsub("\\", "/")
-			local body, path = readLocal(rel, MIN_MODULE_BYTES)
-			if body then
-				return body
-			end
-			local alt = rel:gsub("^vendor/", "")
-			body, path = readLocal("vendor/" .. alt, MIN_MODULE_BYTES)
-			if body then
-				return body
-			end
-			body = fetchRemote(rel, MIN_MODULE_BYTES, { validate = moduleSourceValid })
-			if body then
-				return body
-			end
-			return fetchRemote("vendor/" .. alt, MIN_MODULE_BYTES, { validate = moduleSourceValid })
-		end
-		local loadChunk = function(source, name)
-			local loadFn = Core.loadStringFn()
-			if not loadFn then
-				error("load unavailable", 0)
-			end
-			local chunk, err = loadFn(sanitizeLuauSource(source), name)
-			if not chunk then
-				error(tostring(err), 0)
-			end
-			return chunk
-		end
-		local ModuleLoader = moduleLoaderFactory({
-			readSource = readVendorSource,
-			loadChunk = loadChunk,
-			root = "vendor",
-		})
-		local Vendor = vendorFactory({ ModuleLoader = ModuleLoader })
-		if not Vendor or not Vendor.spr or not Vendor.Fusion then
-			return nil, "Alleral UI vendor stack incomplete"
-		end
+	local function wrapLibrary(MacLib)
+		local themes = { "Maclib", "Default", "Dark", "Light" }
+		local motionProfiles = { "fluid", "snappy", "bouncy", "cinematic", "reduced" }
+		local layoutProfiles = { "auto", "desktop", "mobile", "compact" }
+		local activeTheme = "Maclib"
+		local motionProfile = "fluid"
+		local glassIntensity = 0.55
+		local chromeDepth = 0.65
+		local tooltipStyle = "rich"
+		local notificationStyle = "glass"
+		local ambientGlow = true
+		local tabAurora = true
+		local sectionLift = true
+		local activeWindow = nil
 
-		local Maid = loadUiModule("Maid.luau")
-		local springFactory = loadUiModule("Spring.luau")
-		local Spring = springFactory and springFactory({ Vendor = Vendor }) or nil
-		local Utils = loadUiModule("Utils.luau")
-		local Icons = loadUiModule("Icons.luau")
-		local Theme = loadUiModule("Theme.luau")
-		if not Maid or not Spring or not Utils or not Theme or not Icons then
-			return nil, "Alleral UI foundation modules missing"
-		end
-		local MotionFactory = loadUiModule("Motion.luau")
-		local ConfigFactory = loadUiModule("Config.luau")
-		local Motion = MotionFactory and MotionFactory({ Spring = Spring, Utils = Utils }) or nil
-		local Config = ConfigFactory and ConfigFactory({}) or nil
-		local baseDeps = {
-			Utils = Utils,
-			Motion = Motion,
-			Theme = Theme,
-			Maid = Maid,
-			Icons = Icons,
-			Config = Config,
-			Vendor = Vendor,
+		local Library = {
+			MacLib = MacLib,
+			Holder = nil,
+			Window = nil,
+			Version = Core.ALLERAL_UI_VERSION,
+			ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION,
 		}
-		local TooltipFactory = loadUiModule("Tooltip.luau")
-		local NotificationFactory = loadUiModule("Notification.luau")
-		local ModalFactory = loadUiModule("Modal.luau")
-		local CommandPaletteFactory = loadUiModule("CommandPalette.luau")
-		local Tooltip = TooltipFactory and TooltipFactory(baseDeps) or nil
-		local Notification = NotificationFactory and NotificationFactory(baseDeps) or nil
-		local Modal = ModalFactory and ModalFactory(baseDeps) or nil
-		local CommandPalette = CommandPaletteFactory and CommandPaletteFactory(baseDeps) or nil
-		local fullDeps = {}
-		for k, v in pairs(baseDeps) do
-			fullDeps[k] = v
-		end
-		fullDeps.Tooltip = Tooltip
-		fullDeps.Notification = Notification
-		fullDeps.Modal = Modal
-		fullDeps.CommandPalette = CommandPalette
-		local ComponentsFactory = loadUiModule("Components.luau")
-		local SectionFactory = loadUiModule("Section.luau")
-		local PageFactory = loadUiModule("Page.luau")
-		local NavigationFactory = loadUiModule("Navigation.luau")
-		local WindowFactory = loadUiModule("Window.luau")
-		fullDeps.Components = ComponentsFactory and ComponentsFactory(fullDeps) or nil
-		fullDeps.Section = SectionFactory and SectionFactory(fullDeps) or nil
-		fullDeps.Page = PageFactory and PageFactory(fullDeps) or nil
-		fullDeps.Navigation = NavigationFactory and NavigationFactory(fullDeps) or nil
-		fullDeps.Window = WindowFactory and WindowFactory({
-			Utils = Utils,
-			Motion = Motion,
-			Theme = Theme,
-			Maid = Maid,
-			Page = fullDeps.Page,
-			Navigation = fullDeps.Navigation,
-			Notification = Notification,
-			Modal = Modal,
-			CommandPalette = CommandPalette,
-		}) or nil
-		local LibraryFactory = loadUiModule(LIBRARY_FILE)
-		if not LibraryFactory or type(LibraryFactory) ~= "function" then
-			return nil, "invalid Alleral library: factory missing"
-		end
-		if not Motion or not Components or not fullDeps.Section or not fullDeps.Page or not fullDeps.Navigation or not fullDeps.Window then
-			return nil, "Alleral UI modules incomplete"
-		end
-		local Library = LibraryFactory(fullDeps)
-		if not Library or type(Library.EnsureGuiRoot) ~= "function" then
-			return nil, "invalid Alleral library: EnsureGuiRoot missing"
-		end
-		ENV._AlleralUiLibrary = Library
-		return Library
-	end
 
-	local function releaseUiRuntime()
-		local lib = ENV._AlleralUiLibrary
-		if type(lib) == "table" and lib.Holder and typeof(lib.Holder) == "Instance" then
-			pcall(function()
-				lib.Holder:Destroy()
-			end)
-			lib.Holder = nil
+		function Library:GetAlleralVersion()
+			return Core.ALLERAL_UI_VERSION
 		end
-		ENV._AlleralUiLibrary = nil
-		moduleCache = {}
+
+		function Library:GetArrrelVersion()
+			return Core.ALLERAL_UI_VERSION
+		end
+
+		function Library:EnsureGuiRoot()
+			return true
+		end
+
+		function Library:Notification(info)
+			info = type(info) == "table" and info or { Description = tostring(info) }
+			local win = activeWindow
+			if win and type(win.Notify) == "function" then
+				pcall(win.Notify, win, {
+					Title = info.Title or "Alleral",
+					Description = info.Description or info.Content or info.Text or "",
+					Lifetime = info.Duration or info.Time or 4,
+				})
+			end
+		end
+
+		function Library:ListThemeNames()
+			return themes
+		end
+
+		function Library:SetTheme(name)
+			activeTheme = tostring(name or activeTheme)
+			if activeWindow and type(activeWindow.SetTheme) == "function" then
+				pcall(activeWindow.SetTheme, activeWindow, activeTheme)
+			end
+		end
+
+		function Library:CycleTheme(step)
+			step = tonumber(step) or 1
+			local index = 1
+			for i, name in ipairs(themes) do
+				if name == activeTheme then
+					index = i
+					break
+				end
+			end
+			index = ((index - 1 + step) % #themes) + 1
+			Library:SetTheme(themes[index])
+			return { Name = themes[index] }
+		end
+
+		function Library:ListMotionProfiles()
+			return motionProfiles
+		end
+
+		function Library:GetMotionProfile()
+			return motionProfile
+		end
+
+		function Library:SetMotionProfile(name)
+			motionProfile = tostring(name or motionProfile)
+		end
+
+		function Library:ListProfiles()
+			return layoutProfiles
+		end
+
+		function Library:ApplyProfile(name)
+			ENV.Alleral_UiProfile = tostring(name or "auto")
+		end
+
+		function Library:GetGlassIntensity()
+			return glassIntensity
+		end
+
+		function Library:SetGlassIntensity(value)
+			glassIntensity = tonumber(value) or glassIntensity
+			if activeWindow and type(activeWindow.SetAcrylicBlurState) == "function" then
+				pcall(activeWindow.SetAcrylicBlurState, activeWindow, glassIntensity > 0.2)
+			end
+		end
+
+		function Library:SetChromeDepth(value)
+			chromeDepth = tonumber(value) or chromeDepth
+			ENV.Alleral_ChromeDepth = chromeDepth
+		end
+
+		function Library:GetTooltipStyle()
+			return tooltipStyle
+		end
+
+		function Library:SetTooltipStyle(style)
+			tooltipStyle = tostring(style or tooltipStyle)
+		end
+
+		function Library:GetNotificationStyle()
+			return notificationStyle
+		end
+
+		function Library:SetNotificationStyle(style)
+			notificationStyle = tostring(style or notificationStyle)
+		end
+
+		function Library:SetAmbientGlow(enabled)
+			ambientGlow = enabled == true
+			ENV.Alleral_AmbientGlow = ambientGlow
+		end
+
+		function Library:SetTabAurora(enabled)
+			tabAurora = enabled == true
+			ENV.Alleral_TabAurora = tabAurora
+		end
+
+		function Library:SetSectionLift(enabled)
+			sectionLift = enabled == true
+			ENV.Alleral_SectionLift = sectionLift
+		end
+
+		function Library:ApplyAccentPreset(_name)
+			if type(Core.applyThemeAccent) == "function" then
+				pcall(Core.applyThemeAccent, Library, Color3.fromHex("#53fc18"))
+			end
+		end
+
+		function Library:FlashAccent()
+			return true
+		end
+
+		function Library:CreateWindow(settings)
+			settings = type(settings) == "table" and settings or {}
+			local Players = game:GetService("Players")
+			local lp = Players.LocalPlayer
+			local playerLabel = lp and ((lp.DisplayName ~= "" and lp.DisplayName) or lp.Name) or ""
+			local window = MacLib:Window({
+				Title = settings.Title or settings.Name or "Alleral",
+				Subtitle = settings.Subtitle or settings.SubName or playerLabel,
+				Size = settings.Size or UDim2.fromOffset(868, 650),
+				DragStyle = 1,
+				ShowUserInfo = true,
+				Keybind = Enum.KeyCode.RightControl,
+				AcrylicBlur = settings.Acrylic ~= false,
+			})
+			activeWindow = window
+			Library.Window = window
+			window._macTabGroup = window:TabGroup()
+			window._macTabs = {}
+			return window
+		end
+
+		return Library
 	end
 
 	local function uiOk(bundle)
@@ -363,59 +275,38 @@ return function(Core)
 		return bundle
 	end
 
-	local function iconId(icon)
-		if type(icon) == "number" then
-			return tostring(icon)
-		end
-		if type(icon) == "string" and icon:find("%d") then
-			return icon:match("%d+") or "layout-dashboard"
-		end
-		return icon or "layout-dashboard"
-	end
-
 	function Core.loadUi()
 		local cached = ENV.Alleral_UI
 		if uiOk(cached) then
 			return cacheUi(cached)
 		end
 		if cached then
-			releaseUiRuntime()
 			ENV.Alleral_UI = nil
 		end
 
-		local Library, err = loadUiLibrary()
-		if not Library then
-			Core.logWarn("Alleral UI load failed: " .. tostring(err or "unknown"))
-			return nil, err or "Alleral UI missing"
+		local MacLib, err = loadMaclib()
+		if not MacLib then
+			Core.logWarn("Alleral UI load failed: " .. tostring(err or "Maclib missing"))
+			return nil, err or "Maclib missing"
 		end
 
+		local Library = wrapLibrary(MacLib)
+		ENV._AlleralUiLibrary = Library
 		Core.clearUiStateBindings()
 
 		local bundle = {
 			Library = Library,
 			Alleral = Library,
 			WindUI = Library,
+			MacLib = MacLib,
 			CreateWindow = function(_, settings)
-				return Library.CreateWindow(Library, settings)
+				return Library:CreateWindow(settings)
 			end,
 			Notify = function(_, info)
-				if type(info) == "table" then
-					Library:Notification({
-						Title = info.Title or "Alleral",
-						Description = info.Content or info.Description or info.Text or "",
-						Duration = info.Duration or info.Time or 4,
-						Type = info.Type or info.type,
-					})
-				else
-					Library:Notification({
-						Title = "Alleral",
-						Description = tostring(info or ""),
-						Duration = 4,
-					})
-				end
+				Library:Notification(info)
 			end,
 		}
-		Core.say("Alleral UI " .. tostring(Library.GetAlleralVersion and Library:GetAlleralVersion() or Core.ALLERAL_UI_VERSION))
+		Core.say("Alleral UI " .. tostring(Library:GetAlleralVersion()) .. " (Maclib)")
 		return cacheUi(bundle)
 	end
 
@@ -423,35 +314,22 @@ return function(Core)
 		return Core.loadUi()
 	end
 
-	Core.releaseAlleralRuntime = releaseUiRuntime
+	Core.releaseAlleralRuntime = function()
+		ENV._AlleralUiLibrary = nil
+		ENV._AlleralMaclib = nil
+	end
 
 	function Core.uiLibrary(bundle)
 		if type(bundle) ~= "table" then
 			return nil
 		end
-		return bundle.Alleral or bundle.Library
+		return bundle.Alleral or bundle.Library or bundle.MacLib
 	end
 
 	function Core.createWindUiGroupbox(rawSection, uiBundle)
 		rawSection = rawSection or {}
 		uiBundle = uiBundle or {}
 		local serial = 0
-		local lib = Core.uiLibrary(uiBundle)
-
-		local function attachTooltip(handle, tooltip)
-			if type(handle) ~= "table" or not tooltip or tostring(tooltip) == "" then
-				return
-			end
-			handle.Desc = handle.Desc or tostring(tooltip)
-			handle.Tooltip = handle.Tooltip or tostring(tooltip)
-			local target = handle._instance
-			if not target and type(handle._raw) == "table" then
-				target = handle._raw._instance
-			end
-			if lib and lib.Tooltip and type(lib.Tooltip.attach) == "function" and target then
-				pcall(lib.Tooltip.attach, target, tooltip)
-			end
-		end
 
 		local function nextFlag(name, explicit)
 			serial += 1
@@ -499,16 +377,12 @@ return function(Core)
 		function groupbox:CreateToggle(settings, id)
 			local handle = rawSection:Toggle({
 				Name = settings.Name,
-				Description = settings.Tooltip,
-				Desc = settings.Tooltip,
 				Default = settings.CurrentValue == true,
-				Flag = nextFlag(settings.Name, id),
 				Callback = settings.Callback or function() end,
-			})
-			attachTooltip(handle, settings.Tooltip)
+			}, nextFlag(settings.Name, id))
 			return wrapElement(function(nextSettings)
 				if nextSettings.CurrentValue ~= nil and handle and handle.Set then
-					handle:Set(nextSettings.CurrentValue == true, true)
+					pcall(handle.Set, handle, nextSettings.CurrentValue == true)
 				end
 			end, {
 				raw = handle,
@@ -522,19 +396,14 @@ return function(Core)
 			local minValue, maxValue = range[1], range[2]
 			local handle = rawSection:Slider({
 				Name = settings.Name,
-				Description = settings.Tooltip,
-				Min = minValue,
-				Max = maxValue,
 				Default = tonumber(settings.CurrentValue) or minValue,
-				Increment = Core.sliderIncrement(minValue, maxValue, settings.Increment),
-				Suffix = settings.Suffix or "",
-				Flag = nextFlag(settings.Name, id),
+				Minimum = minValue,
+				Maximum = maxValue,
 				Callback = settings.Callback or function() end,
-			})
-			attachTooltip(handle, settings.Tooltip)
+			}, nextFlag(settings.Name, id))
 			return wrapElement(function(nextSettings)
 				if nextSettings.CurrentValue ~= nil and handle and handle.Set then
-					handle:Set(tonumber(nextSettings.CurrentValue) or minValue, true)
+					pcall(handle.Set, handle, tonumber(nextSettings.CurrentValue) or minValue)
 				end
 			end, {
 				raw = handle,
@@ -544,26 +413,22 @@ return function(Core)
 		end
 
 		function groupbox:CreateButton(settings, id)
-			local handle = rawSection:Button({
+			rawSection:Button({
 				Name = settings.Name,
 				Callback = settings.Callback or function() end,
 			})
-			attachTooltip(handle, settings.Tooltip)
 			return { Set = function() end }
 		end
 
 		function groupbox:CreateInput(settings, id)
-			local handle = rawSection:Textbox({
+			local handle = rawSection:Input({
 				Name = settings.Name,
-				Default = tostring(settings.CurrentValue or settings.Default or ""),
 				Placeholder = settings.PlaceholderText or settings.Placeholder or "",
-				Flag = nextFlag(settings.Name, id),
 				Callback = settings.Callback or function() end,
-			})
-			attachTooltip(handle, settings.Tooltip)
+			}, nextFlag(settings.Name, id))
 			return wrapElement(function(nextSettings)
 				if nextSettings.CurrentValue ~= nil and handle and handle.Set then
-					handle:Set(tostring(nextSettings.CurrentValue))
+					pcall(handle.Set, handle, tostring(nextSettings.CurrentValue))
 				end
 			end)
 		end
@@ -572,12 +437,21 @@ return function(Core)
 			local values = settings.Options or settings.Values or {}
 			local multi = settings.MultipleOptions == true or settings.Multi == true
 			local current = dropdownDefault(values, settings.CurrentOption, multi)
+			local defaultIndex = 1
+			if not multi then
+				for i, value in ipairs(values) do
+					if tostring(value) == tostring(current) then
+						defaultIndex = i
+						break
+					end
+				end
+			end
 			local handle = rawSection:Dropdown({
 				Name = settings.Name,
 				Options = values,
-				Default = current,
+				Default = multi and current or defaultIndex,
 				Multi = multi,
-				Flag = nextFlag(settings.Name, id),
+				Search = settings.Searchable == true,
 				Callback = function(selection)
 					local userCallback = settings.Callback or function() end
 					if multi then
@@ -586,21 +460,20 @@ return function(Core)
 						userCallback(Core.normalizeDropdownValue(selection, values[1]))
 					end
 				end,
-			})
-			attachTooltip(handle, settings.Tooltip)
+			}, nextFlag(settings.Name, id))
 			return wrapElement(function(nextSettings)
-				if not handle or not handle.Set then
+				if not handle then
 					return
-				end
-				local nextValues = nextSettings.Options or nextSettings.Values
-				if nextValues and handle.Refresh then
-					handle:Refresh(nextValues, nextSettings.CurrentOption or nextSettings.CurrentOptions)
 				end
 				local pick = nextSettings.CurrentOption or nextSettings.CurrentOptions
 				if pick == nil then
 					return
 				end
-				handle:Set(pick)
+				if handle.UpdateSelection then
+					pcall(handle.UpdateSelection, handle, pick)
+				elseif handle.Set then
+					pcall(handle.Set, handle, pick)
+				end
 			end, {
 				raw = handle,
 				bindKey = settings.BindKey or settings.StateKey,
@@ -610,24 +483,19 @@ return function(Core)
 
 		function groupbox:CreateLabel(settings, id)
 			local text = type(settings) == "table" and (settings.Name or settings.Text) or tostring(settings or "")
-			local label = rawSection:Label(text)
+			local label = rawSection:Label({ Text = text })
 			return {
 				Set = function(_, nextSettings)
 					local nextText = type(nextSettings) == "table" and (nextSettings.Name or nextSettings.Text)
 						or tostring(nextSettings or "")
 					if label and label.Set then
-						label:Set(nextText)
-					elseif label and label.SetText then
-						label:SetText(nextText)
+						pcall(label.Set, label, nextText)
 					end
 				end,
 			}
 		end
 
 		function groupbox:CreateStatus(label, fields)
-			if type(rawSection.CreateStatus) == "function" then
-				return rawSection:CreateStatus(label, fields)
-			end
 			local status = {
 				Labels = {},
 				LastValues = {},
@@ -659,20 +527,13 @@ return function(Core)
 			end
 			function status:SetVisible(visible)
 				self.Visible = visible == true
-				for _, row in pairs(self.Labels) do
-					if type(row) == "table" and row._raw and row._raw._frame then
-						row._raw._frame.Visible = self.Visible
-					end
-				end
 			end
 			return status
 		end
 
 		function groupbox:CreateDivider()
-			if type(rawSection.Space) == "function" then
-				rawSection:Space({ Size = 10 })
-			elseif type(rawSection.CreateDivider) == "function" then
-				rawSection:CreateDivider()
+			if type(rawSection.Divider) == "function" then
+				rawSection:Divider()
 			end
 			return {}
 		end
@@ -682,29 +543,29 @@ return function(Core)
 
 	Core._UiTabRegistry = Core._UiTabRegistry or {}
 
-	function Core.wrapUiTab(rawPage, uiBundle, window)
+	function Core.wrapUiTab(rawTab, uiBundle, window)
 		local tab = {
-			_rawPage = rawPage,
+			_macTab = rawTab,
 			_ui = uiBundle,
 			_window = window,
-			_columnCount = rawPage and rawPage.Columns or 2,
+			_columnCount = 2,
 		}
 		table.insert(Core._UiTabRegistry, tab)
 
 		function tab:CreateGroupbox(settings)
 			settings = settings or {}
 			local name = settings.Name or "Group"
-			local pageColumns = math.max(1, tonumber(rawPage and rawPage.Columns) or 2)
-			local column = math.clamp(tonumber(settings.Column) or 1, 1, pageColumns)
-			if not rawPage or (type(rawPage.Section) ~= "function" and type(rawPage.CreateSection) ~= "function") then
-				Core.logWarn("CreateGroupbox skipped — page missing for " .. tostring(name))
+			local column = math.clamp(tonumber(settings.Column) or 1, 1, 2)
+			local side = column == 2 and "Right" or "Left"
+			if not rawTab or type(rawTab.Section) ~= "function" then
+				Core.logWarn("CreateGroupbox skipped — tab missing for " .. tostring(name))
 				return Core.createStubUiGroup(name)
 			end
-			local section
-			if type(rawPage.CreateSection) == "function" then
-				section = rawPage:CreateSection({ Name = name, Side = column, Column = column })
-			else
-				section = rawPage:Section({ Name = name, Side = column, Column = column })
+			local section = rawTab:Section({ Side = side })
+			if name ~= "" and type(section.Header) == "function" then
+				pcall(function()
+					section:Header({ Name = name })
+				end)
 			end
 			return Core.createWindUiGroupbox(section, uiBundle)
 		end
@@ -713,14 +574,15 @@ return function(Core)
 			local group = Core.buildUiGroup(tab, "Appearance", column or 1)
 			local lib = Core.uiLibrary(uiBundle)
 			local themes = (lib and type(lib.ListThemeNames) == "function" and lib:ListThemeNames())
-				or { "Private", "Obsidian", "Graphite", "Midnight", "Neon", "Linoria" }
-			local current = (lib and type(lib.GetCurrentTheme) == "function" and lib:GetCurrentTheme()) or "Private"
+				or { "Maclib", "Default", "Dark", "Light" }
+			local current = ENV.Alleral_ActiveTheme or "Maclib"
 			group:CreateDropdown("Theme preset", themes, current, function(selected)
 				if lib and type(lib.SetTheme) == "function" then
 					pcall(lib.SetTheme, lib, selected)
 				end
+				ENV.Alleral_ActiveTheme = selected
 				Core.notify("Theme", "Applied " .. tostring(selected), 2, "success")
-			end, "Dark presets tuned for exploit menus.")
+			end, "Maclib interface themes.")
 			group:CreateButton("Next theme", function()
 				if lib and type(lib.CycleTheme) == "function" then
 					local ok, nextTheme = pcall(function()
@@ -734,6 +596,12 @@ return function(Core)
 			return group
 		end
 
+		function tab:Select()
+			if rawTab and type(rawTab.Select) == "function" then
+				pcall(rawTab.Select, rawTab)
+			end
+		end
+
 		return tab
 	end
 
@@ -743,19 +611,9 @@ return function(Core)
 		if not lib or type(lib.CreateWindow) ~= "function" then
 			return nil
 		end
-		local Players = game:GetService("Players")
-		local lp = Players.LocalPlayer
-		local playerLabel = lp and ((lp.DisplayName ~= "" and lp.DisplayName) or lp.Name) or ""
-		local rawWindow = lib:CreateWindow({
-			Title = settings.Name or settings.Title or "Alleral",
-			Subtitle = settings.Subtitle or settings.SubName or playerLabel,
-			Theme = settings.Theme or "Private",
-			Size = settings.Size or UDim2.fromOffset(860, 580),
-			Acrylic = settings.Acrylic ~= false,
-			Icon = iconId(settings.Icon or "sparkles"),
-		})
+		local rawWindow = lib:CreateWindow(settings)
 		if not rawWindow then
-			Core.logWarn("Alleral window create failed")
+			Core.logWarn("Maclib window create failed")
 			return nil
 		end
 		local window = {
@@ -765,26 +623,22 @@ return function(Core)
 			_ui = ui,
 			_library = lib,
 			_initialized = false,
+			_tabGroup = rawWindow._macTabGroup,
 		}
 		Core.registerUiWindow(window)
 		Core.flushPendingNotifications()
 		function window:AddTab(name, icon)
-			if not self._rawWindow then
+			if not self._tabGroup or type(self._tabGroup.Tab) ~= "function" then
 				return nil
 			end
-			if type(self._rawWindow.AddTab) == "function" then
-				return self._rawWindow:AddTab(name, icon)
-			end
-			if type(self._rawWindow.CreatePage) == "function" then
-				return self._rawWindow:CreatePage({ Name = name, Icon = iconId(icon), Columns = 2 })
-			end
-			return nil
+			return self._tabGroup:Tab({
+				Name = name,
+				Image = iconImage(icon),
+			})
 		end
 		function window:Toggle()
-			if self._rawWindow and self._rawWindow.Toggle then
-				self._rawWindow:Toggle()
-			elseif self._rawWindow and self._rawWindow.SetOpen then
-				self._rawWindow:SetOpen(not self._rawWindow.IsOpen)
+			if self._rawWindow and type(self._rawWindow.Toggle) == "function" then
+				pcall(self._rawWindow.Toggle, self._rawWindow)
 			end
 		end
 		return window
@@ -797,20 +651,20 @@ return function(Core)
 			Core.logWarn("buildUiTab skipped — window missing")
 			return Core.wrapUiTab(nil, type(section) == "table" and section._ui or nil, window)
 		end
-		local requested = math.max(1, tonumber(columns) or 2)
-		local pageColumns = math.max(1, requested)
-		local rawPage
-		if type(window._rawWindow.CreatePage) == "function" then
-			rawPage = window._rawWindow:CreatePage({
-				Name = name,
-				Icon = iconId(icon),
-				Columns = pageColumns,
-			})
-		elseif type(window._rawWindow.AddTab) == "function" then
-			rawPage = window._rawWindow:AddTab(name, iconId(icon))
+		local tabGroup = window._tabGroup or window._rawWindow._macTabGroup
+		if not tabGroup or type(tabGroup.Tab) ~= "function" then
+			Core.logWarn("buildUiTab skipped — tab group missing")
+			return Core.wrapUiTab(nil, window._ui, window)
 		end
-		local wrapped = Core.wrapUiTab(rawPage, window._ui or (type(section) == "table" and section._ui) or nil, window)
-		wrapped._columnCount = requested
+		local rawTab = tabGroup:Tab({
+			Name = name,
+			Image = iconImage(icon),
+		})
+		local wrapped = Core.wrapUiTab(rawTab, window._ui or (type(section) == "table" and section._ui) or nil, window)
+		wrapped._columnCount = math.max(1, tonumber(columns) or 2)
+		if not window._defaultTab then
+			window._defaultTab = rawTab
+		end
 		return wrapped
 	end
 
@@ -832,13 +686,13 @@ return function(Core)
 
 	function Core.finalizeGameUi(window, ui, options)
 		options = type(options) == "table" and options or {}
-		local lib = ui and (ui.Library or ui.Alleral)
 		if type(window) == "table" and window._rawWindow and not window._initialized then
 			window._initialized = true
 			task.defer(function()
 				pcall(function()
-					if type(window._rawWindow.Init) == "function" then
-						window._rawWindow:Init()
+					local defaultTab = window._defaultTab
+					if defaultTab and type(defaultTab.Select) == "function" then
+						defaultTab:Select()
 					end
 				end)
 			end)

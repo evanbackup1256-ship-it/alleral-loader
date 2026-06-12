@@ -1,4 +1,4 @@
-local LOADER_VERSION = "8.1.0"
+local LOADER_VERSION = "8.2.0"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -10,8 +10,8 @@ local CORE_UI_MIN_BYTES = 50000
 local CORE_UI_MAX_BYTES = 90000
 local CORE_HUB_UI_MIN_BYTES = 60000
 local CORE_HUB_UI_MAX_BYTES = 75000
-local CORE_ALLERAL_UI_MIN_BYTES = 26000
-local CORE_ALLERAL_UI_MAX_BYTES = 50000
+local CORE_ALLERAL_UI_MIN_BYTES = 12000
+local CORE_ALLERAL_UI_MAX_BYTES = 45000
 local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
@@ -21,34 +21,13 @@ local CORE_BASE_LEGACY_PATH = HUB .. "/core.luau"
 local CORE_UI_PATH = HUB .. "/core_ui.luau"
 local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
-local UI_BOOTSTRAP_MODULES = {
-	"ModuleLoader.luau",
-	"Vendor.luau",
-	"Maid.luau",
-	"Spring.luau",
-	"Utils.luau",
-	"Icons.luau",
-	"Theme.luau",
-	"Motion.luau",
-	"Config.luau",
-	"Tooltip.luau",
-	"Notification.luau",
-	"Modal.luau",
-	"CommandPalette.luau",
-	"Components.luau",
-	"Section.luau",
-	"Page.luau",
-	"Navigation.luau",
-	"Window.luau",
-	"Library.luau",
-}
 
 local RELEASE_FALLBACK = {
-	loader = "8.1.0",
-	core = "2.8.9",
-	ui = "Alleral",
-	windui = "2.3.0-vendor",
-	alleral = "2.3.0-vendor",
+	loader = "8.2.0",
+	core = "2.9.0",
+	ui = "Maclib",
+	windui = "3.0.0-maclib",
+	alleral = "3.0.0-maclib",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",
@@ -1337,19 +1316,13 @@ local function alleralUiValid(src)
 	if not src:find("Alleral UI layer", 1, true) then
 		return false
 	end
-	if not src:find("sanitizeLuauSource", 1, true) then
+	if not src:find("Maclib", 1, true) then
 		return false
 	end
-	if not src:find("invalid Alleral library:", 1, true) then
+	if not src:find("loadMaclib", 1, true) then
 		return false
 	end
-	if not src:find("resolveUiSource", 1, true) then
-		return false
-	end
-	if not src:find("uiHttpGet", 1, true) then
-		return false
-	end
-	if not src:find("moduleSourceValid", 1, true) then
+	if not src:find("MACLIB_URL", 1, true) then
 		return false
 	end
 	if compileCoreSource(src, "Alleral/alleral_ui") then
@@ -1489,17 +1462,11 @@ local function alleralUiRejectReason(src)
 	if not src:find("Alleral UI layer", 1, true) then
 		return "missing Alleral UI layer marker"
 	end
-	if not src:find("invalid Alleral library:", 1, true) then
-		return "missing Alleral library validator"
+	if not src:find("Maclib", 1, true) then
+		return "missing Maclib integration"
 	end
-	if not src:find("resolveUiSource", 1, true) then
-		return "missing resolveUiSource bootstrap"
-	end
-	if not src:find("uiHttpGet", 1, true) then
-		return "missing uiHttpGet bootstrap"
-	end
-	if not src:find("moduleSourceValid", 1, true) then
-		return "missing moduleSourceValid bootstrap"
+	if not src:find("loadMaclib", 1, true) then
+		return "missing loadMaclib bootstrap"
 	end
 	if not looksLikeLua(src) then
 		return "invalid lua body"
@@ -1767,24 +1734,6 @@ local function purgeStaleHubPaths()
 	local hubPaths = {
 		{ paths = { HUB .. "/alleral_ui.luau", CORE_ALLERAL_UI_PATH }, valid = alleralUiValid, kind = "alleral" },
 		{ paths = { HUB .. "/core_base.luau", CORE_BASE_PATH }, valid = coreBaseValid, kind = "core" },
-		{ paths = {
-			HUB .. "/ui/Library.luau",
-			".alleral/cache/" .. HUB .. "/ui/Library.luau",
-			"kick/" .. HUB .. "/ui/Library.luau",
-			"kick/kick/" .. HUB .. "/ui/Library.luau",
-		}, valid = alleralLibraryValid, kind = "alleral" },
-		{ paths = {
-			HUB .. "/ui/ModuleLoader.luau",
-			".alleral/cache/" .. HUB .. "/ui/ModuleLoader.luau",
-		}, valid = function(src)
-			return uiModuleSourceValid(src, 200) and src:find("readSource", 1, true) ~= nil
-		end, kind = "alleral" },
-		{ paths = {
-			HUB .. "/ui/Vendor.luau",
-			".alleral/cache/" .. HUB .. "/ui/Vendor.luau",
-		}, valid = function(src)
-			return uiModuleSourceValid(src, 100) and src:find("ModuleLoader", 1, true) ~= nil
-		end, kind = "alleral" },
 	}
 	for _, entry in ipairs(hubPaths) do
 		for _, path in ipairs(entry.paths) do
@@ -1807,79 +1756,41 @@ local function purgeStaleHubPaths()
 	end
 end
 
-local function uiModuleCompileOk(body, chunkName)
-	if not loadStringFn or type(body) ~= "string" then
-		return true
-	end
-	return compileCoreSource(body, chunkName or "Alleral/ui-check")
-end
+local LEGACY_HUB_UI_FILES = {
+	HUB .. "/ui/Library.luau",
+	HUB .. "/ui/Maid.luau",
+	HUB .. "/ui/Spring.luau",
+	HUB .. "/ui/Motion.luau",
+	HUB .. "/ui/Theme.luau",
+	HUB .. "/ui/Components.luau",
+	HUB .. "/ui/Window.luau",
+	HUB .. "/ui/ModuleLoader.luau",
+	HUB .. "/ui/Vendor.luau",
+	HUB .. "/ui/Section.luau",
+	HUB .. "/ui/Page.luau",
+	HUB .. "/ui/Navigation.luau",
+	HUB .. "/ui/Utils.luau",
+	HUB .. "/ui/Icons.luau",
+	HUB .. "/ui/Config.luau",
+	HUB .. "/ui/Tooltip.luau",
+	HUB .. "/ui/Notification.luau",
+	HUB .. "/ui/Modal.luau",
+	HUB .. "/ui/CommandPalette.luau",
+	HUB .. "/ui/Signals.luau",
+	HUB .. "/ui/Exploit.luau",
+}
 
-local function fetchUiModuleBody(rel, minBytes)
-	minBytes = minBytes or 50
-	for _, base in ipairs(CORE_REMOTE_BASES) do
-		local body = select(1, httpGet(base .. "/" .. rel, minBytes))
-		if body and uiModuleSourceValid(body, minBytes) then
-			return body, base
-		end
-	end
-	return nil
-end
-
-local function ensureUiWorkspaceFile(rel, minBytes)
-	minBytes = minBytes or 50
-	local paths = { rel, ".alleral/cache/" .. rel }
-	for _, path in ipairs(paths) do
-		if isFile and readFile then
-			local okExists, exists = pcall(isFile, path)
-			if okExists and exists then
-				local okRead, src = pcall(readFile, path)
-				if okRead and uiModuleSourceValid(src, minBytes) and uiModuleCompileOk(src, "@Alleral/" .. rel) then
-					return src, path
-				end
-				deleteWorkspaceFile(path)
+local function purgeLegacyHubUiFiles()
+	local removed = 0
+	for _, rel in ipairs(LEGACY_HUB_UI_FILES) do
+		for _, path in ipairs({ rel, ".alleral/cache/" .. rel, "kick/" .. rel, "kick/kick/" .. rel }) do
+			if deleteWorkspaceFile(path) then
+				removed += 1
 			end
 		end
 	end
-	if not writeFileFn then
-		return nil
-	end
-	local body, via = fetchUiModuleBody(rel, minBytes)
-	if body and uiModuleCompileOk(body, "@Alleral/" .. rel) then
-		cacheRemote(rel, body)
-		cacheRemote(".alleral/cache/" .. rel, body)
-		-- #region agent log
-		agentDebug("H9", "loader:ensureUiWorkspaceFile", "ui module synced", {
-			rel = rel,
-			bytes = #body,
-			via = via,
-		})
-		-- #endregion
-		return body, rel
-	end
-	-- #region agent log
-	agentDebug("H9", "loader:ensureUiWorkspaceFile", "ui module sync failed", {
-		rel = rel,
-		minBytes = minBytes,
-	})
-	-- #endregion
-	return nil
-end
-
-local function ensureUiWorkspace()
-	local synced, failed = 0, 0
-	for _, moduleName in ipairs(UI_BOOTSTRAP_MODULES) do
-		local rel = "hub/ui/" .. moduleName
-		if ensureUiWorkspaceFile(rel, 50) then
-			synced += 1
-		else
-			failed += 1
-		end
-	end
-	if synced > 0 then
-		log("UI workspace: synced " .. tostring(synced) .. " hub/ui module(s)")
-	end
-	if failed > 0 then
-		log("UI workspace: " .. tostring(failed) .. " hub/ui module(s) could not be synced", true)
+	if removed > 0 then
+		log("Removed " .. tostring(removed) .. " legacy hub/ui file(s)")
 	end
 end
 
@@ -1887,6 +1798,7 @@ local function loadCore()
 	ENV.Alleral_Core = nil
 	pcall(purgeStaleCorePaths)
 	pcall(purgeStaleHubPaths)
+	pcall(purgeLegacyHubUiFiles)
 
 	local baseArgs = {
 		{ CORE_BASE_PATH, CORE_BASE_LEGACY_PATH, "core/alleral_core.luau", "alleral_core.luau" },
@@ -2004,8 +1916,6 @@ local function loadCore()
 	cacheRemote(".alleral/cache/" .. CORE_ALLERAL_UI_PATH, alleralUiSrc)
 	cacheRemote(CORE_HUB_UI_PATH, hubUiSrc)
 	cacheRemote(".alleral/cache/" .. CORE_HUB_UI_PATH, hubUiSrc)
-
-	ensureUiWorkspace()
 
 	ENV.Alleral_HTTP = ENV.Alleral_HTTP or {}
 	ENV.Alleral_HTTP.get = httpGet
@@ -2863,34 +2773,15 @@ local function buildManagedFiles()
 			extract = "access",
 		},
 		{
+			paths = LEGACY_HUB_UI_FILES,
+			alwaysDelete = true,
+		},
+		{
 			paths = {
-				HUB .. "/ui/Library.luau",
-				HUB .. "/ui/Maid.luau",
-				HUB .. "/ui/Spring.luau",
-				HUB .. "/ui/Motion.luau",
-				HUB .. "/ui/Theme.luau",
-				HUB .. "/ui/Components.luau",
-				HUB .. "/ui/Window.luau",
-				HUB .. "/ui/ModuleLoader.luau",
-				HUB .. "/ui/Vendor.luau",
-				".alleral/cache/" .. HUB .. "/ui/Library.luau",
 				UI .. "/neverlose/library.lua",
 				".alleral/cache/" .. UI .. "/neverlose/library.lua",
 			},
-			expectedKey = "alleral",
-			extract = "alleral",
-			isValid = function(src)
-				if type(src) ~= "string" then
-					return false
-				end
-				if src:find("LibRef", 1, true) and src:find("EnsureGuiRoot", 1, true) then
-					return alleralLibraryValid(src)
-				end
-				if src:find("Alleral UI layer", 1, true) then
-					return alleralUiValid(src)
-				end
-				return uiModuleSourceValid(src, 50)
-			end,
+			alwaysDelete = true,
 		},
 		{
 			paths = {

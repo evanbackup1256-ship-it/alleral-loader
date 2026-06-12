@@ -53,7 +53,7 @@ return function(Core)
 		if uiOk(cached) then
 			return cacheUi(cached)
 		end
-		return nil, "Alleral UI layer missing — sync hub/alleral_ui.luau and hub/ui/ to your executor workspace"
+		return nil, "Alleral UI layer missing — sync hub/alleral_ui.luau (Maclib integration)"
 	end
 
 	function Core.preloadUi()

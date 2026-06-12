@@ -1299,7 +1299,7 @@ function Core.buildCustomizationStudioGroup(tab, options)
 	local group = Core.buildUiGroup(tab, "Customization V2", column, nil, nil, "CustomizationV2")
 
 	if not windUi or type(windUi.SetMotionProfile) ~= "function" then
-		group:CreateLabel("UI layer missing — sync hub/alleral_ui.luau and hub/ui/")
+		group:CreateLabel("Maclib UI layer unavailable — re-run the loader.")
 		return group
 	end
 
