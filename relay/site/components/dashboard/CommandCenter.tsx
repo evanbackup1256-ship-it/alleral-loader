@@ -1,8 +1,7 @@
 "use client";
 
 import { memo, useEffect, useMemo, useRef } from "react";
-import { gsap } from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { ensureGsapPlugins, gsap, ScrollTrigger } from "@/lib/motion/gsap";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { Activity, Gamepad2, Layers, Radio } from "lucide-react";
 import { useLiveSyncMeta } from "@/lib/queries/hooks";
@@ -68,6 +67,7 @@ function ChartBlock({ chartData, hasLiveData }: { chartData: { value: number; la
   useEffect(() => {
     const el = chartRef.current;
     if (!el) return;
+    ensureGsapPlugins();
     const ctx = gsap.context(() => {
       gsap.fromTo(
         el,
@@ -202,7 +202,7 @@ function CommandCenterInner({ site }: { site: SitePayload }) {
           <h2 className="obs-title">Mission control</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2 md:hidden">
-          <StatusPill kind={relayKind} pulse={relayKind === "syncing"} />
+          <StatusPill kind={relayKind} />
           <FreshnessChip dataUpdatedAt={dataUpdatedAt} live={!loading} />
         </div>
       </Reveal>

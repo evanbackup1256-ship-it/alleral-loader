@@ -3,11 +3,12 @@
 import clsx from "clsx";
 import { motion, useReducedMotion } from "motion/react";
 import { status, type StatusKind } from "@/lib/design/tokens";
+import { shouldStatusPulse } from "@/lib/status/resolve";
 
 export function StatusPill({
   kind,
   label,
-  pulse = false,
+  pulse,
   size = "md",
   className,
 }: {
@@ -20,7 +21,7 @@ export function StatusPill({
   const reduce = useReducedMotion();
   const meta = status[kind];
   const text = label ?? meta.label;
-  const showPulse = !reduce && pulse && kind === "syncing";
+  const showPulse = !reduce && shouldStatusPulse(kind, pulse);
 
   return (
     <span

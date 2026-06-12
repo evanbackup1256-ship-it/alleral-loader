@@ -112,18 +112,46 @@ def patch_slider_labels(text: str) -> str:
         "do local _sliderTitle = sydeSliderLabel(Slider); if _sliderTitle then _sliderTitle.Text = Options.Title end end",
     )
 
-    def wrap_slider_tween(match: re.Match[str]) -> str:
-        args = match.group(1)
-        return (
-            "do local _sliderTitle = sydeSliderLabel(Slider); "
-            f"if _sliderTitle then tweenservice:Create(_sliderTitle,{args}):Play() end end"
-        )
+    def wrap_slider_create(source: str, target: str) -> str:
+        prefix = f"tweenservice:Create({target},"
+        play_suffix = ":Play()"
+        out: list[str] = []
+        i = 0
+        while i < len(source):
+            idx = source.find(prefix, i)
+            if idx == -1:
+                out.append(source[i:])
+                break
+            out.append(source[i:idx])
+            paren_start = source.find("(", idx)
+            if paren_start == -1:
+                out.append(source[idx:])
+                break
+            depth = 0
+            j = paren_start
+            while j < len(source):
+                ch = source[j]
+                if ch == "(":
+                    depth += 1
+                elif ch == ")":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                j += 1
+            if j >= len(source) or source[j + 1 : j + 1 + len(play_suffix)] != play_suffix:
+                out.append(source[idx : idx + len(prefix)])
+                i = idx + len(prefix)
+                continue
+            args = source[idx + len(prefix) : j]
+            out.append(
+                "do local _sliderTitle = sydeSliderLabel(Slider); "
+                f"if _sliderTitle then tweenservice:Create(_sliderTitle,{args}):Play() end end"
+            )
+            i = j + 1 + len(play_suffix)
+        return "".join(out)
 
-    for pattern in (
-        r"tweenservice:Create\(Slider\.Title,(.*?)\):Play\(\)",
-        r"tweenservice:Create\(sydeSliderLabel\(Slider\),(.*?)\):Play\(\)",
-    ):
-        text = re.sub(pattern, wrap_slider_tween, text, flags=re.DOTALL)
+    for target in ("Slider.Title", "sydeSliderLabel(Slider)"):
+        text = wrap_slider_create(text, target)
 
     return text
 

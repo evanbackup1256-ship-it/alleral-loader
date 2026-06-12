@@ -112,7 +112,7 @@ export const EventTimeline = memo(function EventTimeline({
             />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <StatusPill kind={eventKind(ev)} size="sm" label={ev.kind || "event"} pulse={ev.kind === "sync"} />
+                <StatusPill kind={eventKind(ev)} size="sm" label={ev.kind || "event"} />
                 <time className="font-mono text-[10px] text-muted-2">{ev.at || "—"}</time>
               </div>
               <p className="mt-1 text-sm font-medium text-text">{ev.title || "Update"}</p>
@@ -170,7 +170,7 @@ export const GameStatusStream = memo(function GameStatusStream({
                     {g.message || (broken ? "Non-operational — check relay auto-status logs" : "Operational")}
                   </p>
                 </div>
-                <StatusPill kind={pillKind} size="sm" pulse={pillKind === "syncing"} />
+                <StatusPill kind={pillKind} size="sm" />
               </div>
             </div>
           );

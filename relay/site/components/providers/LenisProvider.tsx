@@ -2,15 +2,12 @@
 
 import clsx from "clsx";
 import Lenis from "lenis";
-import { gsap } from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { ensureGsapPlugins, gsap, ScrollTrigger } from "@/lib/motion/gsap";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LenisContext } from "@/lib/scroll/lenis-context";
 import "lenis/dist/lenis.css";
 
-if (typeof window !== "undefined") {
-  gsap.registerPlugin(ScrollTrigger);
-}
+ensureGsapPlugins();
 
 type LenisProviderProps = {
   children: ReactNode;

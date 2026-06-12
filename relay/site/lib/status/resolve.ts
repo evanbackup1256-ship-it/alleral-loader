@@ -34,6 +34,12 @@ export function formatFreshness(seconds: number | null | undefined): string {
   return `${Math.floor(seconds / 3600)}h ago`;
 }
 
+export function shouldStatusPulse(kind: StatusKind, pulse?: boolean): boolean {
+  if (pulse === false) return false;
+  if (pulse === true) return kind === "syncing";
+  return kind === "syncing";
+}
+
 export function formatDisplayValue(value: unknown, fallback = "—"): string {
   if (value == null || value === "") return fallback;
   if (typeof value === "boolean") return value ? "Active" : "Inactive";
