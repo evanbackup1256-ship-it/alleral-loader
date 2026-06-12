@@ -5,9 +5,9 @@ $failed = @()
 function Fail($msg) { $script:failed += $msg; Write-Host "FAIL: $msg" -ForegroundColor Red }
 function Pass($msg) { Write-Host "OK: $msg" -ForegroundColor Green }
 
-$neverloseUi = Get-Content (Join-Path $root "hub/neverlose_ui.luau") -Raw
+$alleralUi = Get-Content (Join-Path $root "hub/alleral_ui.luau") -Raw
 $coreUi = Get-Content (Join-Path $root "hub/core_ui.luau") -Raw
-$library = Get-Content (Join-Path $root "ui/neverlose/library.lua") -Raw
+$library = Get-Content (Join-Path $root "hub/ui/Library.luau") -Raw
 
 if ($coreUi -match 'function Core\.resolveUiWindow') {
     Pass "core_ui exposes resolveUiWindow"
@@ -21,10 +21,22 @@ if ($coreUi -match 'function Core\.buildUiSection[\s\S]*?_rawWindow = window\._r
     Fail "buildUiSection must expose _rawWindow for tab boot"
 }
 
-if ($neverloseUi -match 'Core\.resolveUiWindow') {
-    Pass "neverlose_ui buildUiTab uses resolveUiWindow"
+if ($alleralUi -match 'Alleral UI layer') {
+    Pass "alleral_ui declares UI layer marker"
 } else {
-    Fail "neverlose_ui buildUiTab must call Core.resolveUiWindow"
+    Fail "alleral_ui missing Alleral UI layer marker"
+}
+
+if ($alleralUi -match 'function Core\.buildUiWindow') {
+    Pass "alleral_ui overrides buildUiWindow"
+} else {
+    Fail "alleral_ui missing buildUiWindow override"
+}
+
+if ($alleralUi -match 'function Core\.createWindUiGroupbox') {
+    Pass "alleral_ui exposes createWindUiGroupbox adapter"
+} else {
+    Fail "alleral_ui missing createWindUiGroupbox adapter"
 }
 
 if ($coreUi -match 'function Core\.createStubUiGroup[\s\S]*?stub\.CreateDivider\s*=') {
@@ -39,52 +51,77 @@ if ($coreUi -match 'function group:CreateDivider\(\)[\s\S]*?groupbox\.CreateDivi
     Fail "wrapUiGroup must guard groupbox CreateDivider"
 }
 
-$menuKeybindBlock = [regex]::Match(
-    $library,
-    'Settings:Keybind\(\{[\s\S]*?Name = "Menu Keybind"[\s\S]*?\}\)'
-).Value
-if ($menuKeybindBlock -eq "") {
-    Fail "Settings Menu Keybind block not found in library.lua"
-} elseif ($menuKeybindBlock -match 'Window:SetOpen') {
-    Fail "Menu Keybind callback must not call Window:SetOpen"
+if ($library -match 'LibRef') {
+    Pass "hub/ui/Library.luau defines LibRef"
 } else {
-    Pass "Menu Keybind callback avoids Window:SetOpen"
+    Fail "hub/ui/Library.luau missing LibRef marker"
 }
 
-if ($library -match 'function Window:SetOpen[\s\S]*?Name = "Menu Keybind"') {
-    Pass "Window:SetOpen defined before Menu Keybind registration"
+if ($library -match 'EnsureGuiRoot') {
+    Pass "hub/ui/Library.luau exposes EnsureGuiRoot"
 } else {
-    Fail "Window:SetOpen must be defined before Settings Menu Keybind is created"
+    Fail "hub/ui/Library.luau missing EnsureGuiRoot"
 }
 
-if ($library -match 'Library\.EnsureGuiRoot = function') {
-    Pass "library.lua exposes EnsureGuiRoot"
+if ($library -match 'ALLERAL_UI_VERSION') {
+    Pass "hub/ui/Library.luau version pinned"
 } else {
-    Fail "library.lua missing EnsureGuiRoot for ScreenGui bootstrap"
+    Fail "hub/ui/Library.luau missing ALLERAL_UI_VERSION"
 }
 
-if ($library -match 'local LibRef[\s\S]*?LibRef = Library') {
-    Pass "library.lua keeps stable LibRef for GUI roots"
+if ($library -match 'CreateWindow') {
+    Pass "hub/ui/Library.luau exposes CreateWindow"
 } else {
-    Fail "library.lua must define LibRef that survives Unload"
+    Fail "hub/ui/Library.luau missing CreateWindow"
 }
 
-if ($library -notmatch 'Library\.Holder') {
-    Pass "library.lua uses LibRef.Holder instead of nil-able upvalue"
+if ($alleralUi -match 'invalid Alleral library:') {
+    Pass "alleral_ui validates library factory output"
 } else {
-    Fail "library.lua must not reference Library.Holder directly"
+    Fail "alleral_ui must validate Alleral library load"
 }
 
-if ($library -match 'Library\.Window = function\(self, Data\)[\s\S]*?self:EnsureGuiRoot\(\)') {
-    Pass "Window bootstraps GUI root before building"
+$uiModules = @(
+    "Maid.luau", "Spring.luau", "Utils.luau", "Icons.luau", "Theme.luau",
+    "Motion.luau", "Config.luau", "Tooltip.luau", "Notification.luau", "Modal.luau",
+    "CommandPalette.luau", "Components.luau", "Section.luau", "Page.luau",
+    "Navigation.luau", "Window.luau", "Library.luau"
+)
+$missing = @()
+foreach ($name in $uiModules) {
+    if (-not (Test-Path (Join-Path $root "hub/ui/$name"))) {
+        $missing += $name
+    }
+}
+if ($missing.Count -eq 0) {
+    Pass "hub/ui ships all $($uiModules.Count) load modules"
 } else {
-    Fail "Library.Window must call EnsureGuiRoot before creating frames"
+    Fail "hub/ui missing modules: $($missing -join ', ')"
 }
 
-if ($neverloseUi -match 'neverloseLibraryLive') {
-    Pass "neverlose_ui validates cached library Holder"
+if ($alleralUi -match 'SectionFactory and SectionFactory\(fullDeps\)') {
+    Pass "alleral_ui instantiates Section/Page/Navigation factories"
 } else {
-    Fail "neverlose_ui must reject stale cached libraries missing Holder"
+    Fail "alleral_ui must call Section/Page/Navigation factories with deps"
+}
+
+if ($alleralUi -match 'Alleral UI modules incomplete') {
+    Pass "alleral_ui validates complete module graph"
+} else {
+    Fail "alleral_ui missing incomplete-module guard"
+}
+
+if ($alleralUi -match 'type\(result\) ~= "function"' -and $alleralUi -match 'LIBRARY_FILE') {
+    Pass "alleral_ui accepts Library factory function"
+} else {
+    Fail "alleral_ui must accept Library.luau factory return type"
+}
+
+$continueHits = Select-String -Path (Join-Path $root "hub/ui/*.luau") -Pattern '\bcontinue\b' -ErrorAction SilentlyContinue
+if (-not $continueHits) {
+    Pass "hub/ui avoids continue keyword"
+} else {
+    Fail "hub/ui uses continue (executor compat risk)"
 }
 
 if ($failed.Count -gt 0) {

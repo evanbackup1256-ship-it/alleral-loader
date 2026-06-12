@@ -623,9 +623,10 @@ track(LocalPlayer.CharacterAdded:Connect(function(character)
 	end
 end))
 
-local window = Core.buildUiWindow(ui, Core.gameUiSettings({
+local window = Core.buildUiWindow(ui, Core.premiumUiSettings({
 	Subtitle = "Survive a Zombie Arena · v" .. VERSION,
 	Icon = "skull",
+	Theme = "Obsidian",
 }))
 if not window or not window._rawWindow then
 	getgenv().Alleral_StartupFailed = "UI window failed"
@@ -633,6 +634,36 @@ if not window or not window._rawWindow then
 	return
 end
 local section = Core.buildUiSection(window)
+Core.buildPremiumExploitHub(section, {
+	window = window,
+	ui = ui,
+	state = state,
+	loops = loopControllers,
+	version = VERSION,
+	scriptId = "survive_a_zombie_arena",
+	gameName = "Zombie Arena",
+	gameStats = { Wave = waveLabel(), Kills = "?", Zombies = "0", Credits = "?" },
+	statsTick = function(status)
+		status:Update("Wave", waveLabel())
+		status:Update("Kills", G.leaderstatValue and G.leaderstatValue(LocalPlayer, "Kills") or "?")
+		status:Update("Zombies", tostring(#livingZombies()))
+		status:Update("Credits", G.leaderstatValue and G.leaderstatValue(LocalPlayer, "Credits") or "?")
+	end,
+	automationFlags = {
+		{ key = "AAutoFarm", label = "Auto farm" },
+		{ key = "AKillAura", label = "Kill aura" },
+		{ key = "AAutoShoot", label = "Auto shoot" },
+		{ key = "AGodMode", label = "God mode" },
+		{ key = "AFly", label = "Fly" },
+		{ key = "ANoclip", label = "Noclip" },
+		{ key = "AAimbot", label = "Aimbot" },
+		{ key = "AZombieEsp", label = "ESP" },
+	},
+	saveFn = saveSettings,
+	onRemoteScan = function()
+		refreshRemotes()
+	end,
+})
 local farmTab = Core.buildUiTab(section, "Farm", 10734923214, 2, "farm")
 local combatTab = Core.buildUiTab(section, "Combat", 10723407389, 2, "combat")
 local playerTab = Core.buildUiTab(section, "Player", 10734950020, 2, "player")
@@ -755,22 +786,6 @@ util:CreateButton("Scan remotes", function()
 	notify("Alleral", "Indexed " .. tostring(count) .. " remotes.", 3)
 end)
 util:CreateButton("Save now", saveSettings)
-
-local liveStatus = util:CreateStatus("Live stats", {
-	Wave = waveLabel(),
-	Kills = G.leaderstatValue and G.leaderstatValue(LocalPlayer, "Kills") or "?",
-	Minerals = G.leaderstatValue and G.leaderstatValue(LocalPlayer, "Minerals") or "?",
-	Credits = G.leaderstatValue and G.leaderstatValue(LocalPlayer, "Credits") or "?",
-	Zombies = "0",
-})
-
-Core.makeSupervisor(state, loops, loopControllers, "Stats", 1.5, function()
-	liveStatus:Update("Wave", waveLabel())
-	liveStatus:Update("Kills", G.leaderstatValue and G.leaderstatValue(LocalPlayer, "Kills") or "?")
-	liveStatus:Update("Minerals", G.leaderstatValue and G.leaderstatValue(LocalPlayer, "Minerals") or "?")
-	liveStatus:Update("Credits", G.leaderstatValue and G.leaderstatValue(LocalPlayer, "Credits") or "?")
-	liveStatus:Update("Zombies", tostring(#livingZombies()))
-end)
 
 settingsTab:BuildThemeGroupbox(1)
 Core.buildConfigProfileGroup(settingsTab, {

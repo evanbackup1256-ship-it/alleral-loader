@@ -1,4 +1,4 @@
-local LOADER_VERSION = "7.9.7"
+local LOADER_VERSION = "8.0.0"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -20,14 +20,16 @@ local CORE_BASE_PATH = HUB .. "/core_base.luau"
 local CORE_BASE_LEGACY_PATH = HUB .. "/core.luau"
 local CORE_UI_PATH = HUB .. "/core_ui.luau"
 local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
-local CORE_NEVERLOSE_UI_PATH = HUB .. "/neverlose_ui.luau"
+local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
+local CORE_NEVERLOSE_UI_PATH = CORE_ALLERAL_UI_PATH
 
 local RELEASE_FALLBACK = {
-	loader = "7.9.7",
+	loader = "8.0.0",
 	core = "2.8.8",
 	ui = "Alleral",
-	neverlose = "1.5.4-kick",
-	windui = "1.5.4-kick",
+	neverlose = "2.1.0-private",
+	windui = "2.1.0-private",
+	alleral = "2.1.0-private",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",
@@ -1238,10 +1240,12 @@ local function coreBaseValid(src)
 	if not coreVersionOk(ver) then
 		return false
 	end
-	local neverloseVer = src:match('Core%.NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"')
-	local expectedNeverlose = (ENV._Alleral_ExpectedVersions and ENV._Alleral_ExpectedVersions.neverlose)
+	local alleralVer = src:match('Core%.ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
+		or src:match('Core%.NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"')
+	local expectedAlleral = (ENV._Alleral_ExpectedVersions and (ENV._Alleral_ExpectedVersions.alleral or ENV._Alleral_ExpectedVersions.neverlose))
+		or RELEASE_FALLBACK.alleral
 		or RELEASE_FALLBACK.neverlose
-	if type(neverloseVer) == "string" and type(expectedNeverlose) == "string" and neverloseVer ~= expectedNeverlose then
+	if type(alleralVer) == "string" and type(expectedAlleral) == "string" and alleralVer ~= expectedAlleral then
 		return false
 	end
 	return compileCoreSource(src, "Alleral/core-base")
@@ -1279,11 +1283,11 @@ local function coreHubUiValid(src)
 	return compileCoreSource(src, "Alleral/core_hub_ui")
 end
 
-local function neverloseUiValid(src)
+local function alleralUiValid(src)
 	if type(src) ~= "string" or #src < CORE_NEVERLOSE_UI_MIN_BYTES then
 		return false
 	end
-	if not src:find("return function(Core)", 1, true) then
+	if not src:find("return function%(Core%)", 1, false) then
 		return false
 	end
 	if not src:find("function Core.loadUi", 1, true) then
@@ -1292,23 +1296,44 @@ local function neverloseUiValid(src)
 	if not src:find("createWindUiGroupbox", 1, true) or not src:find("buildUiWindow", 1, true) then
 		return false
 	end
-	if not src:find("Neverlose UI layer", 1, true) then
-		return false
-	end
-	if not src:find("resolveUiWindow", 1, true) then
+	if not src:find("Alleral UI layer", 1, true) then
 		return false
 	end
 	if not src:find("sanitizeLuauSource", 1, true) then
 		return false
 	end
-	if not src:find("invalid Neverlose library:", 1, true) then
+	if not src:find("invalid Alleral library:", 1, true) then
 		return false
 	end
-	if compileCoreSource(src, "Alleral/neverlose_ui") then
+	if compileCoreSource(src, "Alleral/alleral_ui") then
 		return true
 	end
 	return looksLikeLua(src)
 end
+
+local neverloseUiValid = alleralUiValid
+
+local function alleralLibraryValid(src)
+	if type(src) ~= "string" or #src < 3000 then
+		return false
+	end
+	if not src:find("LibRef", 1, true) or not src:find("EnsureGuiRoot", 1, true) then
+		return false
+	end
+	if not src:find("ALLERAL_UI_VERSION", 1, true) then
+		return false
+	end
+	local libVer = src:match('ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
+	if not libVer or libVer == "" then
+		return false
+	end
+	if src:find("writefile(`", 1, true) or src:find("return `", 1, true) then
+		return false
+	end
+	return true
+end
+
+local neverloseLibraryValid = alleralLibraryValid
 
 local function coreValid(src)
 	return coreMonolithValid(src) or coreBaseValid(src)
@@ -1418,11 +1443,11 @@ local function neverloseUiRejectReason(src)
 	if not src:find("createWindUiGroupbox", 1, true) or not src:find("buildUiWindow", 1, true) then
 		return "missing Neverlose UI helpers"
 	end
-	if not src:find("Neverlose UI layer", 1, true) then
-		return "missing Neverlose UI layer marker"
+	if not src:find("Alleral UI layer", 1, true) then
+		return "missing Alleral UI layer marker"
 	end
-	if not src:find("resolveUiWindow", 1, true) then
-		return "missing resolveUiWindow helper"
+	if not src:find("invalid Alleral library:", 1, true) then
+		return "missing Alleral library validator"
 	end
 	if not looksLikeLua(src) then
 		return "invalid lua body"
@@ -1445,14 +1470,19 @@ local VERSION_PATTERNS = {
 	security = 'Security%.VERSION%s*=%s*"([%d%.]+)"',
 	access = 'Access%.VERSION%s*=%s*"([%d%.]+)"',
 	loader = 'LOADER_VERSION%s*=%s*"([%d%.]+)"',
-	neverlose = 'NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"',
-	windui = 'NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"',
+	neverlose = 'ALLERAL_UI_VERSION%s*=%s*"([^"]+)"',
+	windui = 'ALLERAL_UI_VERSION%s*=%s*"([^"]+)"',
+	alleral = 'ALLERAL_UI_VERSION%s*=%s*"([^"]+)"',
 	game = 'local VERSION%s*=%s*"([%d%.]+)"',
 }
 
 local function extractFileVersion(src, kind)
 	if type(src) ~= "string" then
 		return nil
+	end
+	if kind == "alleral" then
+		return src:match('Core%.ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
+			or src:match('ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
 	end
 	local pattern = VERSION_PATTERNS[kind]
 	if not pattern then
@@ -1465,8 +1495,8 @@ local function expectedVersionForKind(expected, kind)
 	if type(expected) ~= "table" then
 		return nil
 	end
-	if kind == "neverlose" or kind == "windui" then
-		return expected.neverlose or expected.windui
+	if kind == "neverlose" or kind == "windui" or kind == "alleral" then
+		return expected.alleral or expected.neverlose or expected.windui
 	end
 	return expected[kind] or expected.core
 end
@@ -1652,25 +1682,14 @@ local function purgeStaleHubPaths()
 		expected = fetchExpectedVersions()
 	end
 	local hubPaths = {
-		{ paths = { HUB .. "/neverlose_ui.luau", CORE_NEVERLOSE_UI_PATH }, valid = neverloseUiValid, kind = "neverlose" },
+		{ paths = { HUB .. "/alleral_ui.luau", HUB .. "/neverlose_ui.luau", CORE_ALLERAL_UI_PATH }, valid = alleralUiValid, kind = "alleral" },
 		{ paths = { HUB .. "/core_base.luau", CORE_BASE_PATH }, valid = coreBaseValid, kind = "core" },
-		{ paths = { UI .. "/neverlose/library.lua" }, valid = function(src)
-			if type(src) ~= "string" or #src < 80000 then
-				return false
-			end
-			if not src:find("LibRef", 1, true) or not src:find("EnsureGuiRoot", 1, true) then
-				return false
-			end
-			if src:find("writefile(`", 1, true) or src:find("return `", 1, true) then
-				return false
-			end
-			local ver = extractFileVersion(src, "neverlose")
-			local expectedNeverlose = expectedVersionForKind(expected, "neverlose") or RELEASE_FALLBACK.neverlose
-			if ver and expectedNeverlose and ver ~= expectedNeverlose then
-				return false
-			end
-			return true
-		end, kind = "neverlose" },
+		{ paths = {
+			HUB .. "/ui/Library.luau",
+			".alleral/cache/" .. HUB .. "/ui/Library.luau",
+			"kick/" .. HUB .. "/ui/Library.luau",
+			"kick/kick/" .. HUB .. "/ui/Library.luau",
+		}, valid = alleralLibraryValid, kind = "alleral" },
 	}
 	for _, entry in ipairs(hubPaths) do
 		for _, path in ipairs(entry.paths) do
@@ -1723,10 +1742,10 @@ local function loadCore()
 		CORE_HUB_UI_MIN_BYTES,
 	}
 	local neverloseArgs = {
-		{ CORE_NEVERLOSE_UI_PATH, HUB .. "/neverlose_ui.luau" },
-		{ ".alleral/cache/" .. CORE_NEVERLOSE_UI_PATH },
-		CORE_NEVERLOSE_UI_PATH,
-		neverloseUiValid,
+		{ CORE_ALLERAL_UI_PATH, HUB .. "/alleral_ui.luau", HUB .. "/neverlose_ui.luau" },
+		{ ".alleral/cache/" .. CORE_ALLERAL_UI_PATH },
+		CORE_ALLERAL_UI_PATH,
+		alleralUiValid,
 		neverloseUiRejectReason,
 		CORE_NEVERLOSE_UI_MIN_BYTES,
 	}
@@ -1775,7 +1794,7 @@ local function loadCore()
 
 	if not neverloseUiSrc then
 		ENV.Alleral_Core = nil
-		return false, neverloseUiLabel or "Neverlose UI layer download failed"
+		return false, neverloseUiLabel or "Alleral UI layer download failed"
 	end
 
 	if not hubUiSrc then
@@ -1789,10 +1808,10 @@ local function loadCore()
 		return false, applyErr or "Core UI layer failed"
 	end
 
-	applied, applyErr = ENV.Alleral_Core.applyUiLayer(neverloseUiSrc, neverloseUiLabel or "@Alleral/neverlose_ui")
+	applied, applyErr = ENV.Alleral_Core.applyUiLayer(neverloseUiSrc, neverloseUiLabel or "@Alleral/alleral_ui")
 	if not applied then
 		ENV.Alleral_Core = nil
-		return false, applyErr or "Neverlose UI layer failed"
+		return false, applyErr or "Alleral UI layer failed"
 	end
 
 	applied, applyErr = ENV.Alleral_Core.applyUiLayer(hubUiSrc, hubUiLabel or "@Alleral/core_hub_ui")
@@ -2615,13 +2634,14 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
-				CORE_NEVERLOSE_UI_PATH,
+				CORE_ALLERAL_UI_PATH,
+				HUB .. "/alleral_ui.luau",
 				HUB .. "/neverlose_ui.luau",
-				".alleral/cache/" .. CORE_NEVERLOSE_UI_PATH,
+				".alleral/cache/" .. CORE_ALLERAL_UI_PATH,
 			},
-			expectedKey = "core",
-			extract = "core",
-			isValid = neverloseUiValid,
+			expectedKey = "alleral",
+			extract = "alleral",
+			isValid = alleralUiValid,
 		},
 		{
 			paths = {
@@ -2665,20 +2685,16 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
+				HUB .. "/ui/Library.luau",
+				HUB .. "/ui/Maid.luau",
+				HUB .. "/ui/Spring.luau",
+				HUB .. "/ui/Motion.luau",
+				HUB .. "/ui/Theme.luau",
+				HUB .. "/ui/Components.luau",
+				HUB .. "/ui/Window.luau",
+				".alleral/cache/" .. HUB .. "/ui/Library.luau",
 				UI .. "/neverlose/library.lua",
-				UI .. "/neverlose/executor_compat.luau",
-				UI .. "/neverlose/spring.luau",
-				UI .. "/neverlose/spr.luau",
-				UI .. "/neverlose/ripple.luau",
-				UI .. "/neverlose/fusion.luau",
-				UI .. "/neverlose/lottie.luau",
 				".alleral/cache/" .. UI .. "/neverlose/library.lua",
-				".alleral/cache/" .. UI .. "/neverlose/executor_compat.luau",
-				".alleral/cache/" .. UI .. "/neverlose/spring.luau",
-				".alleral/cache/" .. UI .. "/neverlose/spr.luau",
-				".alleral/cache/" .. UI .. "/neverlose/ripple.luau",
-				".alleral/cache/" .. UI .. "/neverlose/fusion.luau",
-				".alleral/cache/" .. UI .. "/neverlose/lottie.luau",
 			},
 			expectedKey = "neverlose",
 			extract = "neverlose",
@@ -2687,21 +2703,15 @@ local function buildManagedFiles()
 					return false
 				end
 				if src:find("LibRef", 1, true) and src:find("EnsureGuiRoot", 1, true) then
-					if #src < 80000 then
-						return false
-					end
-					if src:find("writefile(`", 1, true) or src:find("return `", 1, true) then
-						return false
-					end
+					return alleralLibraryValid(src)
+				end
+				if src:find("return function", 1, true) and #src >= 200 then
 					return true
 				end
-				if src:find("sanitizeLuauSource", 1, true) and src:find("bindFilesystem", 1, true) then
-					return #src >= 200
+				if src:find("Alleral UI layer", 1, true) then
+					return alleralUiValid(src)
 				end
-				if src:find("return function(Core)", 1, true) and src:find("Neverlose UI layer", 1, true) then
-					return neverloseUiValid(src)
-				end
-				return true
+				return #src >= 100
 			end,
 		},
 		{

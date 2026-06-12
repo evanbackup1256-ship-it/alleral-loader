@@ -1832,9 +1832,10 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoOptimizePets", 10, funct
 	end
 end)
 
-local window = Core.buildUiWindow(ui, Core.gameUiSettings({
+local window = Core.buildUiWindow(ui, Core.premiumUiSettings({
 	Subtitle = "Build A Ring Farm · v" .. VERSION,
 	Icon = "leaf",
+	Theme = "Private",
 }))
 if not window or not window._rawWindow then
 	getgenv().Alleral_StartupFailed = "UI window failed"
@@ -1842,6 +1843,32 @@ if not window or not window._rawWindow then
 	return
 end
 local section = Core.buildUiSection(window)
+Core.buildPremiumExploitHub(section, {
+	window = window,
+	ui = ui,
+	state = state,
+	loops = loopControllers,
+	version = VERSION,
+	scriptId = "build_a_ring_farm",
+	gameName = "Build A Ring Farm",
+	gameStats = { Cash = tostring(getPlayerCash()), Plot = runtime.playerPlot and "Ready" or "Finding...", Planting = "Off" },
+	statsTick = function(status)
+		status:Update("Cash", tostring(getPlayerCash()))
+		status:Update("Plot", runtime.playerPlot and tostring(runtime.playerPlot.Name or "Ready") or "Finding...")
+		status:Update("Planting", state.AutoPlaceSeed and "On" or "Off")
+	end,
+	automationFlags = {
+		{ key = "AutoPlaceSeed", label = "Plant" },
+		{ key = "AutoSell", label = "Sell" },
+		{ key = "AutoBuySeed", label = "Buy seeds" },
+		{ key = "AutoRollManual", label = "Roll seeds" },
+		{ key = "AutoFeedPet", label = "Feed pets" },
+		{ key = "EnableFly", label = "Fly" },
+		{ key = "AutoHoney", label = "Honey" },
+		{ key = "AutoShootEvent", label = "Event shoot" },
+	},
+	saveFn = saveSettings,
+})
 local farmTab = Core.buildUiTab(section, "Farm", 10723407389, 2, "farm")
 local seedTab = Core.buildUiTab(section, "Seeds", 10734923214, 2, "seeds")
 local upgradeTab = Core.buildUiTab(section, "Upgrade", 10747376638, 2, "upgrade")
@@ -1944,18 +1971,6 @@ util:CreateToggle("Anti AFK", state.AntiAFK, "So you don't get booted for sittin
 	saveSettings()
 end)
 util:CreateButton("Save now", saveSettings)
-
-local liveStatus = util:CreateStatus("Live stats", {
-	Cash = tostring(getPlayerCash()),
-	Plot = runtime.playerPlot and "Ready" or "Finding...",
-	Planting = state.AutoPlaceSeed and "On" or "Off",
-})
-
-Core.makeSupervisor(state, loops, loopControllers, "Stats", 2, function()
-	liveStatus:Update("Cash", tostring(getPlayerCash()))
-	liveStatus:Update("Plot", runtime.playerPlot and tostring(runtime.playerPlot.Name or "Ready") or "Finding...")
-	liveStatus:Update("Planting", state.AutoPlaceSeed and "On" or "Off")
-end)
 
 settingsTab:BuildThemeGroupbox(1)
 Core.buildConfigProfileGroup(settingsTab, {

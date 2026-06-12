@@ -3122,9 +3122,11 @@ local function loggedCallback(label, callback)
 	end
 end
 
-local uiWindow = Core.buildUiWindow(ui, Core.gameUiSettings({
+local uiWindow = Core.buildUiWindow(ui, Core.premiumUiSettings({
 	Subtitle = "Kick a Lucky Block · v" .. VERSION,
 	Icon = "zap",
+	Theme = "Private",
+	Size = UDim2.fromOffset(960, 660),
 }))
 if not uiWindow or not uiWindow._rawWindow then
 	getgenv().Alleral_StartupFailed = "UI window failed"
@@ -3187,21 +3189,6 @@ local serverGroup = createUiGroup(miscTab, "Server", "rbxassetid://10734950020",
 local webhookGroup = createUiGroup(miscTab, "Webhooks", "rbxassetid://10734950020", 2)
 local configGroup = createUiGroup(configTab, "Alerts", "rbxassetid://10734950309", 1)
 local recoveryGroup = createUiGroup(configTab, "Stuck?", "rbxassetid://10734950309", 2)
-Core.buildAutomationStatusGroup(configTab, {
-	state = state,
-	loops = loops,
-	column = 2,
-	flags = {
-		{ key = "AFarm", label = "Kick" },
-		{ key = "APlaceBest", label = "Place" },
-		{ key = "AAutoUpgrade", label = "Upgrade" },
-		{ key = "AAutoFav", label = "Favorite" },
-		{ key = "ATrain", label = "Train" },
-		{ key = "ACollect", label = "Collect" },
-		{ key = "AAutoBattle", label = "Battle" },
-		{ key = "AAutoMastery", label = "Mastery" },
-	},
-})
 local tuningGroup = createUiGroup(configTab, "Speed tweaks", "rbxassetid://10734950309", 1)
 local diagnosticsGroup = createUiGroup(configTab, "Debug info", "rbxassetid://10734950309", 2)
 local profileGroup = createUiGroup(configTab, "Save slots", "rbxassetid://10734950309", 1)
@@ -3228,6 +3215,41 @@ local diagnosticsStatus = diagnosticsGroup:CreateStatus("Live stats", {
 	Latest      = "--",
 	Previous    = "--",
 	Log         = appendFile and logFile or "n/a",
+})
+
+Core.buildPremiumExploitHub(uiSection, {
+	window = uiWindow,
+	ui = ui,
+	state = state,
+	loops = loops,
+	version = VERSION,
+	scriptId = "kick_a_lucky_block",
+	gameName = "Kick a Lucky Block",
+	gameStats = {
+		FPS = "--",
+		Tasks = "0",
+		Errors = "0",
+		Build = VERSION,
+	},
+	statsTick = function(status)
+		if not diagnosticsStatus or not diagnosticsStatus.LastValues then
+			return
+		end
+		for key, value in pairs(diagnosticsStatus.LastValues) do
+			status:Update(key, value)
+		end
+	end,
+	automationFlags = {
+		{ key = "AFarm", label = "Kick" },
+		{ key = "APlaceBest", label = "Place" },
+		{ key = "AAutoUpgrade", label = "Upgrade" },
+		{ key = "AAutoFav", label = "Favorite" },
+		{ key = "ATrain", label = "Train" },
+		{ key = "ACollect", label = "Collect" },
+		{ key = "AAutoBattle", label = "Battle" },
+		{ key = "AAutoMastery", label = "Mastery" },
+	},
+	saveFn = saveSettings,
 })
 
 local profileFolder = "Alleral_Configs/Profiles"

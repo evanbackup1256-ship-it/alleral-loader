@@ -167,10 +167,23 @@ function Core.pushErrorLog(scope, err, details)
 	while #log > ERROR_LOG_MAX do
 		table.remove(log)
 	end
+	local statuses = Core._errorLogStatuses or {}
 	if Core._errorLogStatus then
+		local seen = false
+		for _, entry in ipairs(statuses) do
+			if entry == Core._errorLogStatus then
+				seen = true
+				break
+			end
+		end
+		if not seen then
+			table.insert(statuses, Core._errorLogStatus)
+		end
+	end
+	for _, status in ipairs(statuses) do
 		pcall(function()
-			Core._errorLogStatus:Update("Latest", entry.scope .. ": " .. entry.message:sub(1, 80))
-			Core._errorLogStatus:Update("Count", tostring(#log))
+			status:Update("Latest", entry.scope .. ": " .. entry.message:sub(1, 80))
+			status:Update("Count", tostring(#log))
 		end)
 	end
 end
@@ -229,6 +242,16 @@ Core._UiStateBindings = Core._UiStateBindings or {}
 
 function Core.clearUiStateBindings()
 	Core._UiStateBindings = {}
+	Core._errorLogStatuses = {}
+	ENV._AlleralStatsTickGen = (ENV._AlleralStatsTickGen or 0) + 1
+	ENV._AlleralCommandPaletteReady = false
+	if ENV._Alleral_KeybindConn then
+		pcall(function()
+			ENV._Alleral_KeybindConn:Disconnect()
+		end)
+		ENV._Alleral_KeybindConn = nil
+	end
+	ENV._AlleralMenuKeyBound = false
 end
 
 function Core.bindUiState(stateKey, widget, kind, rawHandle)
@@ -908,6 +931,8 @@ function Core.buildErrorLogGroup(tab, column)
 		Count = tostring(#(ENV.Alleral_ErrorLog or {})),
 		Latest = "None",
 	})
+	Core._errorLogStatuses = Core._errorLogStatuses or {}
+	table.insert(Core._errorLogStatuses, status)
 	Core._errorLogStatus = status
 	if #(ENV.Alleral_ErrorLog or {}) > 0 then
 		local latest = ENV.Alleral_ErrorLog[1]
@@ -1009,6 +1034,7 @@ function Core.setupHubKeybinds(options)
 	local UserInputService = game:GetService("UserInputService")
 	local panicKey = options.panicKey or Enum.KeyCode.Delete
 	local uiKey = options.uiKey or Enum.KeyCode.RightControl
+	local insertKey = options.insertKey or Enum.KeyCode.Insert
 	ENV._Alleral_KeybindConn = UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or input.UserInputType ~= Enum.UserInputType.Keyboard then
 			return
@@ -1016,12 +1042,25 @@ function Core.setupHubKeybinds(options)
 		if input.KeyCode == panicKey then
 			Core.stateHubStop()
 			Core.notify("Alleral", "everything stopped", 4)
-		elseif input.KeyCode == uiKey then
+		elseif input.KeyCode == uiKey or input.KeyCode == insertKey then
 			if Core.toggleUiVisibility() then
 				Core.notify("Alleral", "UI toggled.", 2)
 			end
+		elseif input.KeyCode == Enum.KeyCode.K and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+			local ui = options.ui or options.uiBundle or ENV.Alleral_UI
+			local lib = ui and (ui.Library or ui.Alleral)
+			if lib and lib.CommandPalette and type(lib.CommandPalette.toggle) == "function" then
+				local root = lib.Holder
+				if not root and type(lib.EnsureGuiRoot) == "function" then
+					root = lib:EnsureGuiRoot()
+				end
+				if root then
+					lib.CommandPalette.toggle(root)
+				end
+			end
 		end
 	end)
+	ENV._AlleralMenuKeyBound = true
 end
 
 function Core.buildUiPreferencesGroup(tab, options)
@@ -1215,6 +1254,20 @@ function Core.buildThemeStudioGroup(tab, options)
 		end
 	end, "How bright the accent reads.", 1)
 
+	local themeNames = { "Private", "Obsidian", "Linoria", "Fluent", "Graphite", "Midnight" }
+	group:CreateDropdown("Hub theme", themeNames, ENV.Alleral_UiThemePreset or "Private", function(value)
+		ENV.Alleral_UiThemePreset = value
+		local win = options.window
+		if type(win) == "table" and win._rawWindow and type(win._rawWindow.SetTheme) == "function" then
+			win._rawWindow:SetTheme(value)
+		elseif windUi and type(windUi.SetTheme) == "function" then
+			pcall(function()
+				windUi:SetTheme(value)
+			end)
+		end
+		Core.notify("Alleral", "Theme: " .. tostring(value), 2)
+	end)
+
 	group:CreateButton("Apply accent", pushAccent, "Commit the wheel color to the UI.")
 	group:CreateButton("Reset to mint", function()
 		ENV.Alleral_AccentHue = 108
@@ -1246,7 +1299,7 @@ function Core.buildCustomizationStudioGroup(tab, options)
 	local group = Core.buildUiGroup(tab, "Customization V2", column, nil, nil, "CustomizationV2")
 
 	if not windUi or type(windUi.SetMotionProfile) ~= "function" then
-		group:CreateLabel("Neverlose UI layer not loaded — sync hub/neverlose_ui.luau")
+		group:CreateLabel("UI layer missing — sync hub/alleral_ui.luau and hub/ui/")
 		return group
 	end
 
@@ -1453,6 +1506,435 @@ function Core.buildAdvancedHubGroup(tab, options)
 	return group
 end
 
+function Core.getExecutorDisplayName()
+	local name = "Unknown"
+	pcall(function()
+		if type(identifyexecutor) == "function" then
+			local a, b = identifyexecutor()
+			name = tostring(b or a or name)
+		elseif type(getexecutorname) == "function" then
+			name = tostring(getexecutorname())
+		end
+	end)
+	return name
+end
+
+function Core.buildExecutorIntelGroup(tab, column)
+	local group = Core.buildUiGroup(tab, "Executor intel", column or 1, nil, nil, "ExecutorIntel")
+	local execName = Core.getExecutorDisplayName()
+	group:CreateLabel("Executor · " .. execName)
+	group:CreateLabel("PlaceId · " .. tostring(game.PlaceId))
+	group:CreateLabel("JobId · " .. tostring(game.JobId):sub(1, 20) .. "...")
+	group:CreateLabel("UserId · " .. tostring(game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.UserId or "?"))
+	local caps = {}
+	for _, cap in ipairs({ "clipboard", "filesystem", "http", "hookmetamethod", "decompile", "getconnections" }) do
+		local ok = false
+		if cap == "clipboard" then
+			ok = type(Core.execFunction("setclipboard")) == "function" or type(setclipboard) == "function"
+		elseif cap == "filesystem" then
+			ok = type(writefile) == "function"
+		elseif cap == "http" then
+			ok = type(request) == "function" or type(http_request) == "function"
+		else
+			ok = type(_G[cap]) == "function" or type(getfenv()[cap]) == "function"
+			pcall(function()
+				ok = ok or type(loadstring("return " .. cap)()) == "function"
+			end)
+		end
+		if ok then
+			table.insert(caps, cap)
+		end
+	end
+	group:CreateLabel("Caps · " .. (#caps > 0 and table.concat(caps, ", ") or "sandboxed"))
+	group:CreateButton("Copy JobId", Core.copyJobId, "Copy this server's JobId.")
+	group:CreateButton("Copy join link", Core.copyPlaceJoinLink, "Roblox app join link.")
+	return group
+end
+
+function Core.buildPlayerOpsGroup(tab, column)
+	local Players = game:GetService("Players")
+	local LocalPlayer = Players.LocalPlayer
+	local group = Core.buildUiGroup(tab, "Player ops", column or 2, nil, nil, "PlayerOps")
+
+	local function playerNames()
+		local names = {}
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr ~= LocalPlayer then
+				table.insert(names, plr.Name)
+			end
+		end
+		if #names == 0 then
+			table.insert(names, "(no other players)")
+		end
+		return names
+	end
+
+	local names = playerNames()
+	local selectedName = names[1]
+
+	local function getTarget()
+		if selectedName and selectedName ~= "(no other players)" then
+			return Players:FindFirstChild(selectedName)
+		end
+		return nil
+	end
+
+	local dropdown = group:CreateDropdown("Target player", names, selectedName, function(value)
+		selectedName = value
+	end, "Select a player for exploit actions.")
+
+	local function refreshPlayers()
+		local nextNames = playerNames()
+		local stillHere = false
+		for _, name in ipairs(nextNames) do
+			if name == selectedName then
+				stillHere = true
+				break
+			end
+		end
+		if selectedName and not stillHere then
+			selectedName = nextNames[1]
+		end
+		if dropdown and dropdown.Set then
+			dropdown:Set({ Options = nextNames, CurrentOption = selectedName })
+		end
+	end
+
+	Players.PlayerAdded:Connect(refreshPlayers)
+	Players.PlayerRemoving:Connect(refreshPlayers)
+
+	group:CreateButton("Teleport to player", function()
+		local target = getTarget()
+		local char = LocalPlayer.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		local tRoot = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+		if root and tRoot then
+			root.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+			Core.notify("Alleral", "Teleported to " .. target.Name, 3, "success")
+		else
+			Core.notify("Alleral", "Target not available.", 3, "warn")
+		end
+	end, "Client-side teleport to target HRP.")
+
+	group:CreateButton("Spectate player", function()
+		local target = getTarget()
+		local hum = target and target.Character and target.Character:FindFirstChildOfClass("Humanoid")
+		local cam = workspace.CurrentCamera
+		if hum and cam then
+			cam.CameraSubject = hum
+			Core.notify("Alleral", "Spectating " .. target.Name, 3)
+		end
+	end, "Camera follows target humanoid.")
+
+	group:CreateButton("Reset camera", function()
+		local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+		if hum and workspace.CurrentCamera then
+			workspace.CurrentCamera.CameraSubject = hum
+			Core.notify("Alleral", "Camera reset.", 2)
+		end
+	end, "Return camera to your character.")
+
+	group:CreateButton("Fling target", function()
+		local target = getTarget()
+		local tRoot = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+		if not tRoot then
+			Core.notify("Alleral", "Target not available.", 3, "warn")
+			return
+		end
+		local vel = Instance.new("BodyVelocity")
+		vel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+		vel.Velocity = Vector3.new(0, 500, 0)
+		vel.Parent = tRoot
+		task.delay(0.15, function()
+			if vel and vel.Parent then
+				vel:Destroy()
+			end
+		end)
+		Core.notify("Alleral", "Fling applied to " .. target.Name, 3)
+	end, "Classic client fling (visual/local).")
+
+	group:CreateButton("Copy username", function()
+		local target = getTarget()
+		if not target then
+			return
+		end
+		local clip = Core.execFunction("setclipboard")
+		if type(clip) == "function" then
+			pcall(clip, target.Name)
+			Core.notify("Alleral", "Copied " .. target.Name, 3)
+		end
+	end, "Copy target username to clipboard.")
+
+	return group
+end
+
+function Core.buildRemoteToolsGroup(tab, column, options)
+	options = type(options) == "table" and options or {}
+	local group = Core.buildUiGroup(tab, "Remote tools", column or 2, nil, nil, "RemoteTools")
+	local indexed = 0
+	local status = group:CreateStatus("Remotes", {
+		Indexed = "0",
+		LastScan = "never",
+	})
+
+	local scanToken = 0
+
+	local function isRemote(inst)
+		return inst:IsA("RemoteEvent") or inst:IsA("RemoteFunction") or inst:IsA("UnreliableRemoteEvent")
+	end
+
+	local function scanRemotesAsync(done)
+		scanToken += 1
+		local token = scanToken
+		status:Update("LastScan", "scanning")
+		task.spawn(function()
+			local count = 0
+			local descendants = game:GetDescendants()
+			for i, inst in ipairs(descendants) do
+				if token ~= scanToken then
+					return
+				end
+				if isRemote(inst) then
+					count += 1
+				end
+				if i % 2500 == 0 then
+					status:Update("Indexed", tostring(count))
+					task.wait()
+				end
+			end
+			if token ~= scanToken then
+				return
+			end
+			indexed = count
+			status:Update("Indexed", tostring(count))
+			status:Update("LastScan", os.date("%H:%M:%S"))
+			if type(done) == "function" then
+				done(count)
+			end
+		end)
+	end
+
+	local function scanRemotes()
+		scanRemotesAsync()
+		return indexed
+	end
+
+	group:CreateButton("Scan remotes", function()
+		scanRemotesAsync(function(count)
+			Core.notify("Alleral", "Indexed " .. tostring(count) .. " remotes.", 3)
+			if type(options.onScan) == "function" then
+				options.onScan(count)
+			end
+		end)
+	end, "Count RemoteEvent/RemoteFunction instances.")
+
+	group:CreateButton("Copy remote list", function()
+		scanRemotesAsync(function()
+			scanToken += 1
+			local token = scanToken
+			task.spawn(function()
+				local lines = {}
+				local descendants = game:GetDescendants()
+				for i, inst in ipairs(descendants) do
+					if token ~= scanToken then
+						return
+					end
+					if isRemote(inst) then
+						table.insert(lines, inst:GetFullName())
+					end
+					if i % 2500 == 0 then
+						task.wait()
+					end
+				end
+				if token ~= scanToken then
+					return
+				end
+				local clip = Core.execFunction("setclipboard")
+				if type(clip) == "function" then
+					pcall(clip, table.concat(lines, "\n"))
+					Core.notify("Alleral", "Remote list copied (" .. #lines .. ").", 3)
+				end
+			end)
+		end)
+	end, "Copy full remote paths to clipboard.")
+
+	return group, status, scanRemotes
+end
+
+function Core.buildMovementExploitGroup(tab, options)
+	options = type(options) == "table" and options or {}
+	local state = options.state or ENV.Alleral_State or {}
+	local saveFn = options.saveFn
+	local column = options.column or 1
+	local group = Core.buildUiGroup(tab, "Movement exploits", column, nil, nil, "MovementExploit")
+
+	if state.Noclip ~= nil or state.ANoclip ~= nil then
+		local key = state.Noclip ~= nil and "Noclip" or "ANoclip"
+		group:CreateToggle("Noclip", state[key] == true, "Walk through walls.", function(value)
+			state[key] = value
+			if type(saveFn) == "function" then
+				saveFn()
+			end
+		end)
+	end
+
+	if state.Freecam ~= nil then
+		group:CreateToggle("Freecam", state.Freecam == true, "Detach camera for scouting.", function(value)
+			state.Freecam = value
+			if type(saveFn) == "function" then
+				saveFn()
+			end
+		end)
+	end
+
+	if state.AFly ~= nil or state.EnableFly ~= nil then
+		local key = state.AFly ~= nil and "AFly" or "EnableFly"
+		group:CreateToggle("Fly", state[key] == true, "Toggle fly mode if script supports it.", function(value)
+			state[key] = value
+			if type(saveFn) == "function" then
+				saveFn()
+			end
+		end)
+	end
+
+	if state.RunSpeed ~= nil then
+		group:CreateSlider("Walk speed", 16, 500, state.RunSpeed, function(value)
+			state.RunSpeed = value
+			local hum = game:GetService("Players").LocalPlayer.Character
+				and game:GetService("Players").LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+			if hum then
+				hum.WalkSpeed = value
+			end
+			if type(saveFn) == "function" then
+				saveFn()
+			end
+		end, "Local walkspeed override.")
+	end
+
+	group:CreateButton("Reset character", function()
+		local lp = game:GetService("Players").LocalPlayer
+		if lp and lp.Character and lp.Character:FindFirstChildOfClass("Humanoid") then
+			lp.Character:FindFirstChildOfClass("Humanoid").Health = 0
+		end
+	end, "Kill character to respawn.")
+
+	return group
+end
+
+function Core.registerExploitCommandPalette(window, ui)
+	if ENV._AlleralCommandPaletteReady then
+		return
+	end
+	if type(window) ~= "table" or type(ui) ~= "table" then
+		return
+	end
+	local lib = ui.Library or ui.Alleral
+	if not lib or not lib.CommandPalette or type(lib.CommandPalette.register) ~= "function" then
+		return
+	end
+	local cmds = {
+		{ Name = "Toggle UI", Callback = function()
+			if window.Toggle then
+				window:Toggle()
+			end
+		end },
+		{ Name = "Copy JobId", Callback = Core.copyJobId },
+		{ Name = "Copy join link", Callback = Core.copyPlaceJoinLink },
+		{ Name = "Rejoin server", Callback = Core.rejoinServer },
+		{ Name = "Server hop (low pop)", Callback = function()
+			Core.notify("Alleral", "Use Settings → Server tools for hop controls.", 4)
+		end },
+	}
+	for _, cmd in ipairs(cmds) do
+		lib.CommandPalette.register(cmd)
+	end
+	ENV._AlleralCommandPaletteReady = true
+end
+
+function Core.bindExploitMenuKey(window)
+	Core.setupHubKeybinds({
+		window = window,
+		ui = type(window) == "table" and window._ui or ENV.Alleral_UI,
+	})
+end
+
+function Core.premiumUiSettings(options)
+	options = type(options) == "table" and options or {}
+	local base = Core.gameUiSettings(options)
+	base.Theme = options.Theme or "Private"
+	base.Size = options.Size or UDim2.fromOffset(860, 580)
+	base.Acrylic = options.Acrylic ~= false
+	base.Subtitle = options.Subtitle
+	return base
+end
+
+function Core.buildPremiumExploitHub(section, options)
+	options = type(options) == "table" and options or {}
+	local state = options.state or ENV.Alleral_State or {}
+
+	local hub = {}
+	hub.dashboardTab = Core.buildUiTab(section, "Dashboard", "layout-dashboard", 2, "dashboard")
+	hub.exploitTab = Core.buildUiTab(section, "Exploit", "terminal", 2, "exploit")
+
+	Core.buildSessionStatsGroup(hub.dashboardTab, 1)
+
+	if options.automationFlags then
+		Core.buildAutomationStatusGroup(hub.dashboardTab, {
+			state = state,
+			loops = options.loops,
+			flags = options.automationFlags,
+			column = 2,
+		})
+	end
+
+	if type(options.gameStats) == "table" then
+		local telemetry = Core.buildUiGroup(hub.dashboardTab, "Game telemetry", 1, nil, nil, "GameTelemetry")
+		hub.gameStatus = telemetry:CreateStatus(options.gameName or "Script", options.gameStats)
+		if type(options.statsTick) == "function" then
+			local tickGen = ENV._AlleralStatsTickGen or 0
+			task.spawn(function()
+				while ENV._AlleralStatsTickGen == tickGen do
+					local liveState = ENV.Alleral_State or state
+					if liveState.HubRunning == false then
+						break
+					end
+					pcall(options.statsTick, hub.gameStatus)
+					task.wait(options.statsInterval or 2)
+				end
+			end)
+		end
+	end
+
+	if options.scriptId then
+		Core.buildScriptStatusGroupbox(hub.dashboardTab, 2, options.scriptId, options.version)
+	end
+
+	Core.buildExecutorIntelGroup(hub.exploitTab, 1)
+	local hopGroup = Core.buildUiGroup(hub.exploitTab, "Server hop", 1, nil, nil, "ServerHop")
+	Core.buildJoinServerControls(hopGroup, {
+		state = state,
+		saveSettings = options.saveFn,
+	})
+	Core.buildServerToolsGroup(hub.exploitTab, 1)
+	Core.buildPlayerOpsGroup(hub.exploitTab, 2)
+	Core.buildRemoteToolsGroup(hub.exploitTab, 2, { onScan = options.onRemoteScan })
+	Core.buildMovementExploitGroup(hub.exploitTab, {
+		state = state,
+		saveFn = options.saveFn,
+		column = 2,
+	})
+	Core.buildQuickTogglesGroup(hub.exploitTab, {
+		state = state,
+		saveFn = options.saveFn,
+		column = 1,
+	})
+	Core.buildErrorLogGroup(hub.exploitTab, 2)
+
+	Core.registerExploitCommandPalette(options.window, options.ui)
+
+	return hub
+end
+
 function Core.buildStandardSettingsExtras(tab, options)
 	options = type(options) == "table" and options or {}
 	Core.installErrorLogHook()
@@ -1488,7 +1970,14 @@ function Core.buildStandardSettingsExtras(tab, options)
 	Core.buildErrorLogGroup(tab, options.errorColumn or 2)
 	Core.buildSettingsBackupGroup(tab, options)
 	if options.setupKeybinds ~= false then
-		Core.setupHubKeybinds(options)
+		Core.setupHubKeybinds({
+			window = options.window,
+			ui = options.ui or options.uiBundle,
+			uiBundle = options.uiBundle,
+			panicKey = options.panicKey,
+			uiKey = options.uiKey,
+			insertKey = options.insertKey,
+		})
 	end
 	if type(options.window) == "table" then
 		task.defer(function()

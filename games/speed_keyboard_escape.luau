@@ -770,9 +770,10 @@ Core.makeSupervisor(state, loops, loopControllers, "autoRebirth", 0.5, function(
 	end
 end)
 
-local window = Core.buildUiWindow(ui, Core.gameUiSettings({
+local window = Core.buildUiWindow(ui, Core.premiumUiSettings({
 	Subtitle = "Speed Keyboard Escape · v" .. VERSION,
 	Icon = "keyboard",
+	Theme = "Linoria",
 }))
 if not window or not window._rawWindow then
 	getgenv().Alleral_StartupFailed = "UI window failed"
@@ -780,6 +781,38 @@ if not window or not window._rawWindow then
 	return
 end
 local section = Core.buildUiSection(window)
+Core.buildPremiumExploitHub(section, {
+	window = window,
+	ui = ui,
+	state = state,
+	loops = loopControllers,
+	version = VERSION,
+	scriptId = "speed_keyboard_escape",
+	gameName = "Speed Keyboard Escape",
+	gameStats = { World = state.isWorld2 and "2" or "1", Wins = "?", Steps = "?", Speed = "?" },
+	statsTick = function(status)
+		status:Update("World", state.isWorld2 and "2" or "1")
+		if not ClientState or type(ClientState.Get) ~= "function" then
+			return
+		end
+		local data = ClientState:Get()
+		if type(data) ~= "table" then
+			return
+		end
+		status:Update("Wins", tostring(data.Wins or 0))
+		status:Update("Steps", tostring(data.Steps or data.Step or "?"))
+		status:Update("Speed", tostring(data.Speed or data.WalkSpeed or "?"))
+	end,
+	automationFlags = {
+		{ key = "AutoStepFarm", label = "Step farm" },
+		{ key = "AutoWinsFarm", label = "Win farm" },
+		{ key = "AutoEquipBest", label = "Equip best" },
+		{ key = "AutoBuyItems", label = "Auto buy" },
+		{ key = "AutoRebirth", label = "Rebirth" },
+		{ key = "FreezePosition", label = "Freeze" },
+	},
+	saveFn = saveSettings,
+})
 local mainTab = Core.buildUiTab(section, "Main", 10723407389, 2, "main")
 local autoTab = Core.buildUiTab(section, "Auto", 10734923214, 2, "auto")
 local shopTab = Core.buildUiTab(section, "Shop", 10734952479, 1, "shop")
@@ -878,29 +911,6 @@ util:CreateToggle("Anti AFK", state.AntiAFK ~= false, "So you don't get kicked f
 	if enabled then
 		Core.setupAntiAfk(LocalPlayer)
 	end
-end)
-
-local liveStatus = util:CreateStatus("Live stats", {
-	World = state.isWorld2 and "2" or "1",
-	Wins = "?",
-	Steps = "?",
-	Speed = "?",
-	Rebirths = "?",
-})
-
-Core.makeSupervisor(state, loops, loopControllers, "Stats", 1.5, function()
-	liveStatus:Update("World", state.isWorld2 and "2" or "1")
-	if not ClientState or type(ClientState.Get) ~= "function" then
-		return
-	end
-	local data = ClientState:Get()
-	if type(data) ~= "table" then
-		return
-	end
-	liveStatus:Update("Wins", tostring(data.Wins or 0))
-	liveStatus:Update("Steps", tostring(data.Steps or data.Step or "?"))
-	liveStatus:Update("Speed", tostring(data.Speed or data.WalkSpeed or "?"))
-	liveStatus:Update("Rebirths", tostring(data.Rebirths or data.Rebirth or 0))
 end)
 
 local config = Core.buildUiGroup(settingsTab, "Save / reset", 1, nil, nil, "config")

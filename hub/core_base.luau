@@ -1,10 +1,10 @@
 local Core = {}
 Core.VERSION = "2.8.8"
 Core._CORE_ARTIFACT = "base"
-Core.UI_LIBRARY = "Neverlose"
-Core.NEVERLOSE_UI_VERSION = "1.5.4-kick"
-Core.ALLERAL_UI_VERSION = Core.NEVERLOSE_UI_VERSION
-Core.WINDUI_VERSION = Core.NEVERLOSE_UI_VERSION
+Core.UI_LIBRARY = "Alleral"
+Core.ALLERAL_UI_VERSION = "2.1.0-private"
+Core.NEVERLOSE_UI_VERSION = Core.ALLERAL_UI_VERSION
+Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")

@@ -5,7 +5,7 @@
   "tagline": "Roblox scripts that stay updated without babysitting.",
   "loaderVersion": "7.9.0",
   "coreVersion": "2.8.8",
-  "uiLibrary": "Neverlose",
+  "uiLibrary": "Alleral",
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=\" .. tick()))()",
   "repo": "evanbackup1256-ship-it/kick",

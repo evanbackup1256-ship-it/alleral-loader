@@ -1505,9 +1505,10 @@ Core.makeSupervisor(state, loops, loopControllers, "Freecam", 0.5, function()
 	end
 end)
 
-local window = Core.buildUiWindow(ui, Core.gameUiSettings({
+local window = Core.buildUiWindow(ui, Core.premiumUiSettings({
 	Subtitle = "Slime RNG · v" .. VERSION,
 	Icon = "droplet",
+	Theme = "Private",
 }))
 if not window or not window._rawWindow then
 	getgenv().Alleral_StartupFailed = "UI window failed"
@@ -1515,6 +1516,38 @@ if not window or not window._rawWindow then
 	return
 end
 local section = Core.buildUiSection(window)
+Core.buildPremiumExploitHub(section, {
+	window = window,
+	ui = ui,
+	state = state,
+	loops = loopControllers,
+	version = VERSION,
+	scriptId = "slime_rng",
+	gameName = "Slime RNG",
+	gameStats = { Zone = "?", Coins = "?", Rolls = "?", Equipped = "?" },
+	statsTick = function(status)
+		if not dataClient or type(dataClient.get) ~= "function" then
+			return
+		end
+		local zone = dataClient:get("maxZone") or dataClient:get("zone") or "?"
+		status:Update("Zone", tostring(zone))
+		status:Update("Coins", tostring(dataClient:get("coins") or 0))
+		status:Update("Rolls", tostring(dataClient:get("rollCurrency") or 0))
+		local equipped = dataClient:get("equipped") or {}
+		status:Update("Equipped", tostring(#equipped))
+	end,
+	automationFlags = {
+		{ key = "AutoFarmPreset", label = "Farm preset" },
+		{ key = "AutoRoll", label = "Auto roll" },
+		{ key = "AutoGun", label = "Auto shoot" },
+		{ key = "AutoCollectLoot", label = "Loot farm" },
+		{ key = "AutoRebirth", label = "Rebirth" },
+		{ key = "AutoCraft", label = "Craft" },
+		{ key = "Noclip", label = "Noclip" },
+		{ key = "Freecam", label = "Freecam" },
+	},
+	saveFn = saveSettings,
+})
 local mainTab = Core.buildUiTab(section, "Main", 10723407389, 2, "main")
 local autoTab = Core.buildUiTab(section, "Auto", 10734923214, 2, "auto")
 local inventoryTab = Core.buildUiTab(section, "Inventory", 10709769841, 2, "inventory")
@@ -1701,25 +1734,6 @@ config:CreateButton("Save settings", function()
 end)
 config:CreateButton("Reset settings", function()
 	resetSettings()
-end)
-
-local liveStatus = config:CreateStatus("Live stats", {
-	Zone = "?",
-	Coins = "?",
-	Rolls = "?",
-	Equipped = "?",
-})
-
-Core.makeSupervisor(state, loops, loopControllers, "Stats", 2, function()
-	if not dataClient or type(dataClient.get) ~= "function" then
-		return
-	end
-	local zone = dataClient:get("maxZone") or dataClient:get("zone") or "?"
-	liveStatus:Update("Zone", tostring(zone))
-	liveStatus:Update("Coins", tostring(dataClient:get("coins") or 0))
-	liveStatus:Update("Rolls", tostring(dataClient:get("rollCurrency") or 0))
-	local equipped = dataClient:get("equipped") or {}
-	liveStatus:Update("Equipped", tostring(#equipped))
 end)
 
 performance:CreateToggle("Anti AFK", state.AntiAFK ~= false, "Stops Roblox from kicking you while you farm.", function(value)
