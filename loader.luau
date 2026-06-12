@@ -1,4 +1,4 @@
-local LOADER_VERSION = "8.2.6"
+local LOADER_VERSION = "8.2.7"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -22,7 +22,7 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.6",
+	loader = "8.2.7",
 	core = "2.9.4",
 	ui = "Maclib",
 	windui = "3.0.5-premium",
@@ -116,6 +116,43 @@ local ENV = genv()
 local PREVIOUS_LOADER_VERSION = ENV._Alleral_LoaderVersion or ENV.Alleral_LoaderVersion
 ENV._Alleral_LoaderVersion = LOADER_VERSION
 ENV.Alleral_LoaderRunning = false
+
+local LOADSTRING_HINT =
+	"loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=\" .. tick(), true))()"
+
+local function publishConsoleApi(name, fn)
+	ENV[name] = fn
+	if type(getgenv) == "function" then
+		local ok, g = pcall(getgenv)
+		if ok and type(g) == "table" then
+			g[name] = fn
+		end
+	end
+end
+
+local function notLoadedApi(name)
+	return function()
+		warn(
+			"[Alleral] "
+				.. name
+				.. " — loader is not running. Run the GitHub loadstring first:\n"
+				.. LOADSTRING_HINT
+		)
+		return false
+	end
+end
+
+for _, apiName in ipairs({
+	"Alleral_Load",
+	"Alleral_PurgeCache",
+	"Alleral_CheckUpdate",
+	"Alleral_Reload",
+	"Alleral_ScanLegacy",
+	"Alleral_LoaderInfo",
+	"Alleral_SyncWeao",
+}) do
+	publishConsoleApi(apiName, notLoadedApi(apiName))
+end
 
 local function firstExecFunc(...)
 	for i = 1, select("#", ...) do
@@ -3587,11 +3624,34 @@ local function main()
 	log("ready")
 end
 
-ENV.Alleral_Reload = function()
+publishConsoleApi("Alleral_Load", function()
+	if type(loadStringFn) ~= "function" then
+		warn("[Alleral v" .. LOADER_VERSION .. "] loadstring unavailable")
+		return false
+	end
+	local body, via = httpGet(GITHUB_RAW .. "/loader.luau?t=" .. tick(), 500)
+	if type(body) ~= "string" or #body < 500 then
+		warn("[Alleral v" .. LOADER_VERSION .. "] Could not download loader (" .. tostring(via) .. ")")
+		return false
+	end
+	local fn, err = loadStringFn(body, "Alleral/loader")
+	if not fn then
+		warn("[Alleral v" .. LOADER_VERSION .. "] Loader compile failed: " .. tostring(err))
+		return false
+	end
+	local ok, runErr = pcall(fn)
+	if not ok then
+		warn("[Alleral v" .. LOADER_VERSION .. "] Loader runtime failed: " .. tostring(runErr))
+		return false
+	end
+	return true
+end)
+
+publishConsoleApi("Alleral_Reload", function()
 	stopAutoUpdater()
 	if type(ENV._Alleral_RunLoader) == "function" then
 		ENV._Alleral_RunLoader("manual-reload")
-		return
+		return true
 	end
 	if ENV.Alleral_State and type(ENV.Alleral_State.Alleral_Unload) == "function" then
 		pcall(ENV.Alleral_State.Alleral_Unload)
@@ -3602,18 +3662,19 @@ ENV.Alleral_Reload = function()
 	else
 		main()
 	end
-end
+	return true
+end)
 
-ENV.Alleral_LoaderInfo = function()
+publishConsoleApi("Alleral_LoaderInfo", function()
 	return {
 		version = LOADER_VERSION,
 		capabilities = CAPABILITIES,
 		executor = EXECUTOR,
 		games = GAMES,
 	}
-end
+end)
 
-ENV.Alleral_ScanLegacy = function()
+publishConsoleApi("Alleral_ScanLegacy", function()
 	local hits = scanLegacyLoaders()
 	print("[Alleral v" .. LOADER_VERSION .. "] Legacy scan (" .. tostring(#hits) .. " hit(s)):")
 	for _, hit in ipairs(hits) do
@@ -3623,15 +3684,22 @@ ENV.Alleral_ScanLegacy = function()
 		print("  (none — if you still see v3.x logs, it is a Saved Script or old one-liner, not a workspace file)")
 	end
 	return hits
-end
+end)
 
-ENV.Alleral_PurgeCache = function()
-	purgeOutdatedWorkspace()
-	checkForRemoteUpdate(ENV._Alleral_ActiveProfile, false)
+publishConsoleApi("Alleral_PurgeCache", function()
+	local ok, err = pcall(function()
+		purgeOutdatedWorkspace()
+		checkForRemoteUpdate(ENV._Alleral_ActiveProfile, false)
+	end)
+	if not ok then
+		warn("[Alleral v" .. LOADER_VERSION .. "] Purge failed: " .. tostring(err))
+		return false
+	end
 	print("[Alleral v" .. LOADER_VERSION .. "] Workspace cache purge complete")
-end
+	return true
+end)
 
-ENV.Alleral_CheckUpdate = function()
+publishConsoleApi("Alleral_CheckUpdate", function()
 	local profile = ENV._Alleral_ActiveProfile
 	if checkForRemoteUpdate(profile, false) then
 		print("[Alleral v" .. LOADER_VERSION .. "] Update found — reloading")
@@ -3639,10 +3707,9 @@ ENV.Alleral_CheckUpdate = function()
 	end
 	print("[Alleral v" .. LOADER_VERSION .. "] Already up to date")
 	return false
-end
+end)
 
-ENV.Alleral_SyncWeao = syncWeaoConfig
-getgenv().Alleral_SyncWeao = syncWeaoConfig
+publishConsoleApi("Alleral_SyncWeao", syncWeaoConfig)
 
 log("v" .. LOADER_VERSION .. " booting on PlaceId " .. tostring(game.PlaceId) .. " (" .. EXECUTOR.slug .. ")")
 
