@@ -1,10 +1,9 @@
 (() => {
-  const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   function initHeroMesh() {
     const canvas = document.getElementById("heroMesh");
-    if (!canvas || prefersReduced) return;
-
+    if (!canvas || reduced) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -15,18 +14,11 @@
     let mx = 0.5;
     let my = 0.4;
 
-    const blobs = [
-      { x: 0.32, y: 0.38, r: 0.28, hue: 210, speed: 0.00035 },
-      { x: 0.68, y: 0.42, r: 0.24, hue: 275, speed: 0.00028 },
-      { x: 0.5, y: 0.58, r: 0.22, hue: 145, speed: 0.00032 },
-      { x: 0.42, y: 0.28, r: 0.18, hue: 195, speed: 0.0004 },
-    ];
-
     function resize() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       const rect = canvas.parentElement?.getBoundingClientRect();
-      w = Math.floor((rect?.width || window.innerWidth) * dpr);
-      h = Math.floor((rect?.height || window.innerHeight * 0.7) * dpr);
+      w = Math.floor((rect?.width || 480) * dpr);
+      h = Math.floor((rect?.height || 480) * dpr);
       canvas.width = w;
       canvas.height = h;
       canvas.style.width = `${w / dpr}px`;
@@ -34,25 +26,31 @@
     }
 
     window.addEventListener("mousemove", (e) => {
-      mx = e.clientX / window.innerWidth;
-      my = e.clientY / window.innerHeight;
+      const rect = canvas.getBoundingClientRect();
+      mx = (e.clientX - rect.left) / rect.width;
+      my = (e.clientY - rect.top) / rect.height;
     }, { passive: true });
 
     function draw() {
       t += 1;
       ctx.clearRect(0, 0, w, h);
 
-      blobs.forEach((b, i) => {
-        const ox = Math.sin(t * b.speed + i) * 0.06;
-        const oy = Math.cos(t * b.speed * 1.3 + i * 2) * 0.05;
-        const px = (b.x + ox + (mx - 0.5) * 0.04) * w;
-        const py = (b.y + oy + (my - 0.5) * 0.04) * h;
-        const rad = b.r * Math.min(w, h);
+      const blobs = [
+        { x: 0.35, y: 0.4, r: 0.45, hue: 190 },
+        { x: 0.65, y: 0.55, r: 0.38, hue: 265 },
+        { x: 0.5, y: 0.25, r: 0.32, hue: 320 },
+      ];
 
+      blobs.forEach((b, i) => {
+        const ox = Math.sin(t * 0.002 + i * 1.7) * 0.08;
+        const oy = Math.cos(t * 0.0016 + i) * 0.07;
+        const px = (b.x + ox + (mx - 0.5) * 0.08) * w;
+        const py = (b.y + oy + (my - 0.5) * 0.08) * h;
+        const rad = b.r * Math.min(w, h);
         const g = ctx.createRadialGradient(px, py, 0, px, py, rad);
-        g.addColorStop(0, `hsla(${b.hue}, 90%, 62%, 0.22)`);
-        g.addColorStop(0.45, `hsla(${b.hue}, 80%, 50%, 0.08)`);
-        g.addColorStop(1, "hsla(0, 0%, 0%, 0)");
+        g.addColorStop(0, `hsla(${b.hue}, 95%, 62%, 0.28)`);
+        g.addColorStop(0.5, `hsla(${b.hue}, 80%, 50%, 0.08)`);
+        g.addColorStop(1, "transparent");
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, w, h);
       });
@@ -65,24 +63,24 @@
     requestAnimationFrame(draw);
   }
 
-  function initHeroParallax() {
-    const scene = document.querySelector(".hero-render-scene");
-    if (!scene || prefersReduced) return;
+  function initOrbitParallax() {
+    const scene = document.querySelector(".hero-orbit-scene");
+    if (!scene || reduced) return;
+    let tx = 0;
+    let ty = 0;
+    let cx = 0;
+    let cy = 0;
 
-    let targetX = 0;
-    let targetY = 0;
-    let currentX = 0;
-    let currentY = 0;
-
-    window.addEventListener("mousemove", (e) => {
-      targetX = (e.clientX / window.innerWidth - 0.5) * 18;
-      targetY = (e.clientY / window.innerHeight - 0.5) * 12;
-    }, { passive: true });
+    scene.addEventListener("mousemove", (e) => {
+      const rect = scene.getBoundingClientRect();
+      tx = ((e.clientX - rect.left) / rect.width - 0.5) * 24;
+      ty = ((e.clientY - rect.top) / rect.height - 0.5) * 18;
+    });
 
     function tick() {
-      currentX += (targetX - currentX) * 0.06;
-      currentY += (targetY - currentY) * 0.06;
-      scene.style.transform = `translate(calc(-50% + ${currentX.toFixed(2)}px), calc(-50% + ${currentY.toFixed(2)}px))`;
+      cx += (tx - cx) * 0.08;
+      cy += (ty - cy) * 0.08;
+      scene.style.transform = `rotateX(${cy * 0.15}deg) rotateY(${cx * 0.15}deg)`;
       requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
@@ -90,7 +88,7 @@
 
   function boot() {
     initHeroMesh();
-    initHeroParallax();
+    initOrbitParallax();
   }
 
   window.AlleralRenders = { boot };

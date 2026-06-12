@@ -65,21 +65,7 @@
     position: relative;
   }
   .nav-links a::after {
-    content: "";
-    position: absolute;
-    left: 14px;
-    right: 14px;
-    bottom: 4px;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    transform: scaleX(0);
-    transform-origin: center;
-    transition: transform 0.55s var(--ease-out);
-    opacity: 0.9;
-  }
-  .nav-links a:hover::after,
-  .nav-links a.active::after {
-    transform: scaleX(1);
+    display: none;
   }
 
   .filter-pill {
@@ -92,7 +78,7 @@
   }
   .filter-pill:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 28px rgba(41, 151, 255, 0.12);
+    box-shadow: 0 10px 28px rgba(34, 211, 238, 0.12);
   }
   .filter-pill.active {
     animation: filter-settle 0.65s var(--ease-out);
@@ -117,7 +103,7 @@
   }
   .faq-list details:hover {
     transform: translateY(-2px);
-    border-color: rgba(41, 151, 255, 0.2);
+    border-color: rgba(34, 211, 238, 0.2);
   }
   .faq-list details[open] summary {
     color: var(--text);
@@ -144,7 +130,7 @@
   }
   .script-panel:hover {
     transform: translateY(-4px);
-    box-shadow: 0 32px 100px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(41, 151, 255, 0.12);
+    box-shadow: 0 32px 100px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(34, 211, 238, 0.12);
   }
 
   .hero-brand {
@@ -183,7 +169,7 @@
   inset: -1px;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(135deg, transparent, rgba(41, 151, 255, 0.28), transparent);
+  background: linear-gradient(135deg, transparent, rgba(34, 211, 238, 0.28), transparent);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
@@ -363,7 +349,7 @@
 }
 .custom-select.open .custom-select-trigger {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(41, 151, 255, 0.14);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.14);
   background: rgba(0, 0, 0, 0.55);
 }
 .custom-select.open .custom-select-trigger::after {
@@ -425,7 +411,7 @@
   transform: translateX(3px);
 }
 .custom-select-option.selected {
-  background: rgba(41, 151, 255, 0.12);
+  background: rgba(34, 211, 238, 0.12);
   color: #9fd0ff;
   font-weight: 500;
 }
@@ -496,8 +482,8 @@
   }
   .share-url:hover {
     transform: translateY(-3px);
-    border-color: rgba(41, 151, 255, 0.3);
-    box-shadow: 0 12px 36px rgba(41, 151, 255, 0.1);
+    border-color: rgba(34, 211, 238, 0.3);
+    box-shadow: 0 12px 36px rgba(34, 211, 238, 0.1);
   }
 
   .footer-links a:hover {
@@ -524,7 +510,7 @@
   .field-input:focus,
   .field-textarea:focus {
     transform: translateY(-1px);
-    box-shadow: 0 0 0 3px rgba(41, 151, 255, 0.12);
+    box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
   }
 
   .section-label {
@@ -614,21 +600,22 @@
     }
   }
 
-  /* Subtle hero brand shimmer */
-  .hero-brand span {
+  /* Per-character hero shimmer */
+  .hero-char {
     background: linear-gradient(
       90deg,
-      var(--text) 0%,
-      rgba(255, 255, 255, 0.92) 42%,
+      #f0f4f8 0%,
+      rgba(240, 244, 248, 0.9) 40%,
       var(--accent) 50%,
-      rgba(255, 255, 255, 0.92) 58%,
-      var(--text) 100%
+      var(--violet) 55%,
+      rgba(240, 244, 248, 0.9) 65%,
+      #f0f4f8 100%
     );
-    background-size: 220% auto;
+    background-size: 240% auto;
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    animation: brand-shimmer 8s ease-in-out infinite;
+    animation: char-rise 0.8s var(--ease-out) both, brand-shimmer 10s ease-in-out infinite;
   }
   @keyframes brand-shimmer {
     0%, 100% { background-position: 0% center; }
@@ -677,7 +664,7 @@
     height: 420px;
     left: -8%;
     top: 8%;
-    background: radial-gradient(circle, rgba(41, 151, 255, 0.35), transparent 70%);
+    background: radial-gradient(circle, rgba(34, 211, 238, 0.35), transparent 70%);
     animation-duration: 22s;
   }
   .hero-orb-2 {
@@ -727,7 +714,7 @@
   }
   @keyframes panel-glow {
     from { box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06); }
-    to { box-shadow: 0 28px 90px rgba(41, 151, 255, 0.12), 0 0 0 1px rgba(41, 151, 255, 0.18); }
+    to { box-shadow: 0 28px 90px rgba(34, 211, 238, 0.12), 0 0 0 1px rgba(34, 211, 238, 0.18); }
   }
 
   .feature-card,
@@ -767,7 +754,7 @@
     left: 10%;
     right: 10%;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(41, 151, 255, 0.45), transparent);
+    background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.45), transparent);
     animation: footer-line 4s ease-in-out infinite alternate;
   }
   @keyframes footer-line {
@@ -779,8 +766,8 @@
     animation: banner-pulse 3s ease-in-out infinite;
   }
   @keyframes banner-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(41, 151, 255, 0.15); }
-    50% { box-shadow: 0 0 0 6px rgba(41, 151, 255, 0); }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.15); }
+    50% { box-shadow: 0 0 0 6px rgba(34, 211, 238, 0); }
   }
 
   .card-enter {
@@ -793,4 +780,32 @@
   @keyframes modal-pop {
     from { opacity: 0; transform: scale(0.96) translateY(12px); }
     to { opacity: 1; transform: none; }
+  }
+
+  .game-card,
+  .glass-panel.tilt {
+    transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+
+  .glass-panel {
+    transition:
+      transform 0.35s var(--ease-out),
+      box-shadow 0.55s var(--ease-out),
+      border-color 0.45s var(--ease-out);
+  }
+  .glass-panel:hover {
+    border-color: rgba(34, 211, 238, 0.2);
+    box-shadow:
+      0 0 0 1px rgba(34, 211, 238, 0.08) inset,
+      0 28px 80px rgba(0, 0, 0, 0.5);
+  }
+
+  .live-dashboard {
+    animation: panel-glow 6s ease-in-out infinite alternate;
+  }
+  @keyframes panel-glow {
+    from { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset, 0 24px 80px rgba(0, 0, 0, 0.45); }
+    to { box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.12) inset, 0 32px 90px rgba(34, 211, 238, 0.08); }
   }
