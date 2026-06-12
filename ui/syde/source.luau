@@ -97,7 +97,7 @@ if update then return end
 local Library =         game:GetObjects("rbxassetid://123800669522471")[1]
 local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 
-local ALLERAL_SYDE_PATCH = 9
+local ALLERAL_SYDE_PATCH = 11
 
 -- Alleral: tolerate Roblox template renames (Title/title, Buttons/buttons, etc.)
 local function sydeFindChild(parent, ...)
@@ -352,8 +352,11 @@ local function sydeBindDropFrame(drop)
 			end
 			local instValue = drop[key]
 			if type(instValue) == "function" then
-				return function(_, ...)
-					return instValue(drop, ...)
+				return function(first, ...)
+					if first == drop or first == bound then
+						return instValue(drop, ...)
+					end
+					return instValue(drop, first, ...)
 				end
 			end
 			return instValue
@@ -379,16 +382,25 @@ local function sydeSetDropSelectedText(drop, text)
 	end
 end
 
-local function sydeSanitizeUiClone(root)
+local function sydeSanitizeAssetRoot(root)
 	if not root then
 		return
 	end
 	for _, desc in ipairs(root:GetDescendants()) do
-		if desc:IsA("LocalScript") or desc:IsA("Script") then
-			desc:Destroy()
+		if desc:IsA("LocalScript") or desc:IsA("Script") or desc:IsA("ModuleScript") then
+			pcall(function()
+				desc:Destroy()
+			end)
 		end
 	end
 end
+
+local function sydeSanitizeUiClone(root)
+	sydeSanitizeAssetRoot(root)
+end
+
+sydeSanitizeAssetRoot(Library)
+sydeSanitizeAssetRoot(Loader)
 
 local function sydeEnsureDropholderDropFrame(dropholder)
 	if not dropholder then
@@ -429,9 +441,6 @@ local function sydeResolveDropFrame(dropholder)
 	for _, child in ipairs(dropholder:GetChildren()) do
 		if child:IsA("GuiObject") then
 			if sydeFindChild(child, "Container", "container") or sydeDropSelectedLabel(child) then
-				return child
-			end
-			if sydeFindChild(child, "down", "Down") or sydeFindChild(child, "search", "Search") then
 				return child
 			end
 		end
@@ -5578,23 +5587,24 @@ function syde:Init(library)
 					local searchText = drop.search.TextBox.Text:lower()
 
 					for _, option in ipairs(drop.Container:GetChildren()) do
-						if option:IsA("Frame") and option:FindFirstChild("Title") then
-							local optionText = option.Title.Text:lower()
+						local optionLabel = sydeTitleLabel(option)
+						if option:IsA("Frame") and optionLabel then
+							local optionText = optionLabel.Text:lower()
 							local isTemplate = option.Name == "Option"
-							local shouldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[option.Title.Text])
+							local shouldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[optionLabel.Text])
 
 							if shouldShow then
 								option.Visible = true
-								if SelectedOptions[option.Title.Text] then
+								if SelectedOptions[optionLabel.Text] then
 									tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
 									tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-									tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+									tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 									tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 									tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
 								else
 									tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
 									tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-									tweenservice:Create(option.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+									tweenservice:Create(optionLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 									tweenservice:Create(option.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
 									tweenservice:Create(option.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
 								end
@@ -5602,7 +5612,7 @@ function syde:Init(library)
 								-- Hide with animation, but wait before setting Visible = false
 								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
 								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-								tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+								tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 								tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
 								option.Visible = false
@@ -5619,7 +5629,11 @@ function syde:Init(library)
 					local starterSet = false
 					for _, OptionText in ipairs(data.Options) do
 						local option = OptionButton:Clone()
-						option.Title.Text = OptionText
+						sydeSanitizeUiClone(option)
+						local optionLabel = sydeTitleLabel(option)
+						if optionLabel then
+							optionLabel.Text = OptionText
+						end
 						option.Parent = drop.Container
 						option.Visible = true
 						option.Name = OptionText
@@ -5634,7 +5648,7 @@ function syde:Init(library)
 							tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
 						end
 
-						option.Interact.MouseButton1Click:Connect(function()
+						sydeConnectClick(option, function()
 							if data.Multi then
 								if SelectedOptions[OptionText] then
 									RemoveFromSelected(OptionText)
@@ -9068,23 +9082,24 @@ function syde:Init(library)
 				local searchText = drop.search.TextBox.Text:lower()
 
 				for _, option in ipairs(drop.Container:GetChildren()) do
-					if option:IsA("Frame") and option:FindFirstChild("Title") then
-						local optionText = option.Title.Text:lower()
+					local optionLabel = sydeTitleLabel(option)
+					if option:IsA("Frame") and optionLabel then
+						local optionText = optionLabel.Text:lower()
 						local isTemplate = option.Name == "Option"
-						local shouldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[option.Title.Text])
+						local shouldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[optionLabel.Text])
 
 						if shouldShow then
 							option.Visible = true
-							if SelectedOptions[option.Title.Text] then
+							if SelectedOptions[optionLabel.Text] then
 								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
 								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-								tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+								tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 								tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
 							else
 								tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
 								tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-								tweenservice:Create(option.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+								tweenservice:Create(optionLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 								tweenservice:Create(option.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
 								tweenservice:Create(option.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
 							end
@@ -9092,7 +9107,7 @@ function syde:Init(library)
 							-- Hide with animation, but wait before setting Visible = false
 							tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
 							tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-							tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+							tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 							tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 							tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
 							option.Visible = false
@@ -9109,7 +9124,11 @@ function syde:Init(library)
 				local starterSet = false
 				for _, OptionText in ipairs(data.Options) do
 					local option = OptionButton:Clone()
-					option.Title.Text = OptionText
+					sydeSanitizeUiClone(option)
+					local optionLabel = sydeTitleLabel(option)
+					if optionLabel then
+						optionLabel.Text = OptionText
+					end
 					option.Parent = drop.Container
 					option.Visible = true
 					option.Name = OptionText
@@ -9124,7 +9143,7 @@ function syde:Init(library)
 						tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
 					end
 
-					option.Interact.MouseButton1Click:Connect(function()
+					sydeConnectClick(option, function()
 						if data.Multi then
 							if SelectedOptions[OptionText] then
 								RemoveFromSelected(OptionText)
