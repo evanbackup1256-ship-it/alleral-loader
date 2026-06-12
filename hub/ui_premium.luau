@@ -1,5 +1,6 @@
 -- Premium Maclib chrome: mesh gradients, notification center, theme live preview,
 -- window snap/dock, tab pill, page transitions, charts, acrylic, animated search.
+local HUB_UI_LAYER_VERSION = "3.0.5-premium"
 return function(Core, spr, Motion)
 	if type(Motion) ~= "table" or type(Motion.target) ~= "function" then
 		return nil

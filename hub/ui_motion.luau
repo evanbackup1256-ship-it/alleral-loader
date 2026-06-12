@@ -1,4 +1,5 @@
 -- Spring motion hooks for Maclib (uses spr).
+local HUB_UI_LAYER_VERSION = "3.0.5-premium"
 return function(Core, spr)
 	if type(spr) ~= "table" or type(spr.target) ~= "function" then
 		return nil

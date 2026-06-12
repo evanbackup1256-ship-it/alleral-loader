@@ -18,14 +18,29 @@ return function(Core)
 
 	local HUB_RAW_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/"
 
+	local function hubModuleVersion(src)
+		if type(src) ~= "string" then
+			return nil
+		end
+		return src:match('HUB_UI_LAYER_VERSION%s*=%s*"([^"]+)"')
+			or src:match("hub_ui_layer=([%w%.%-]+)")
+	end
+
 	local function loadHubSource(filename)
 		local rel = "hub/" .. filename
-		local src = Core.readFile and Core.readFile(rel)
-		if type(src) ~= "string" or #src < 100 then
-			local url = HUB_RAW_BASE .. filename .. "?t=" .. tostring(tick())
-			if type(Core.httpGet) == "function" then
-				src = Core.httpGet(url)
+		local expectedVer = Core.ALLERAL_UI_VERSION
+		local localSrc = Core.readFile and Core.readFile(rel)
+		if type(localSrc) == "string" and #localSrc >= 100 then
+			local localVer = hubModuleVersion(localSrc)
+			if not localVer or localVer == expectedVer then
+				return localSrc
 			end
+			Core.logWarn("Stale hub cache for " .. filename .. " (" .. tostring(localVer) .. " != " .. tostring(expectedVer) .. ") — fetching remote")
+		end
+		local url = HUB_RAW_BASE .. filename .. "?t=" .. tostring(tick())
+		local src = nil
+		if type(Core.httpGet) == "function" then
+			src = Core.httpGet(url)
 		end
 		return type(src) == "string" and #src >= 100 and src or nil
 	end
@@ -70,6 +85,9 @@ return function(Core)
 		end
 	end
 	ENV.Alleral_UiPremium = UiPremium
+	if not UiPremium then
+		Core.logWarn("Premium UI layer failed to load — run getgenv().Alleral_PurgeCache() and reload")
+	end
 
 	local function iconImage(icon)
 		if type(icon) == "number" then
