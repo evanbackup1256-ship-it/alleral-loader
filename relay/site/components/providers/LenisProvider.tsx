@@ -2,12 +2,9 @@
 
 import clsx from "clsx";
 import Lenis from "lenis";
-import { ensureGsapPlugins, gsap, ScrollTrigger } from "@/lib/motion/gsap";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LenisContext } from "@/lib/scroll/lenis-context";
 import "lenis/dist/lenis.css";
-
-ensureGsapPlugins();
 
 type LenisProviderProps = {
   children: ReactNode;
@@ -39,37 +36,13 @@ export function LenisProvider({ children, id = "main-scroll", className }: Lenis
     lenisRef.current = instance;
     setLenis(instance);
 
-    instance.on("scroll", ScrollTrigger.update);
-
-    ScrollTrigger.scrollerProxy(wrapper, {
-      scrollTop(value) {
-        if (arguments.length && typeof value === "number") {
-          instance.scrollTo(value, { immediate: true });
-        }
-        return instance.scroll;
-      },
-      getBoundingClientRect() {
-        return wrapper.getBoundingClientRect();
-      },
-      pinType: wrapper.style.transform ? "transform" : "fixed",
-    });
-
-    ScrollTrigger.defaults({ scroller: wrapper });
-
     const raf = (time: number) => {
       instance.raf(time);
       requestAnimationFrame(raf);
     };
     requestAnimationFrame(raf);
 
-    requestAnimationFrame(() => ScrollTrigger.refresh());
-
-    const onResize = () => ScrollTrigger.refresh();
-    window.addEventListener("resize", onResize, { passive: true });
-
     return () => {
-      window.removeEventListener("resize", onResize);
-      ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
       instance.destroy();
       lenisRef.current = null;
       setLenis(null);

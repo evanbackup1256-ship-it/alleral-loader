@@ -1,7 +1,6 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef } from "react";
-import { ensureGsapPlugins, gsap, ScrollTrigger } from "@/lib/motion/gsap";
+import { memo, useMemo } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { Activity, Gamepad2, Layers, Radio } from "lucide-react";
 import { useLiveSyncMeta } from "@/lib/queries/hooks";
@@ -62,33 +61,6 @@ function MetricsColumn({
 }
 
 function ChartBlock({ chartData, hasLiveData }: { chartData: { value: number; label: string }[]; hasLiveData: boolean }) {
-  const chartRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = chartRef.current;
-    if (!el) return;
-    ensureGsapPlugins();
-    const ctx = gsap.context(() => {
-      gsap.fromTo(
-        el,
-        { opacity: 0.6, y: 12 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power2.out",
-          scrollTrigger: {
-            trigger: el,
-            scroller: "[data-lenis-root]",
-            start: "top 85%",
-            toggleActions: "play none none reverse",
-          },
-        }
-      );
-    }, el);
-    return () => ctx.revert();
-  }, []);
-
   return (
     <InViewReveal className="obs-panel obs-panel-chart flex h-full min-h-0 flex-col overflow-hidden">
       <div className="obs-panel-head shrink-0">
@@ -98,7 +70,7 @@ function ChartBlock({ chartData, hasLiveData }: { chartData: { value: number; la
         </div>
         <Activity className="h-4 w-4 shrink-0 text-cyan-400" strokeWidth={1.75} />
       </div>
-      <div ref={chartRef} className="relative mt-2 min-h-0 flex-1 overflow-hidden">
+      <div className="relative mt-2 min-h-0 flex-1 overflow-hidden">
         {hasLiveData ? (
           <TelemetryLineChart series={chartData} className="absolute inset-0" />
         ) : (
