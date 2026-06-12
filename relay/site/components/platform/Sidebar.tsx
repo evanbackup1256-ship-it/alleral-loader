@@ -1,6 +1,7 @@
 "use client";
 
 import clsx from "clsx";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   Activity,
   ChevronLeft,
@@ -17,6 +18,7 @@ import {
 import { usePlatformStore, VIEW_META, type PlatformView } from "@/lib/store/platform";
 import { StatusPill } from "@/components/observability/StatusPill";
 import { resolveRelayStatus } from "@/lib/status/resolve";
+import { spring } from "@/lib/motion/config";
 
 const ICONS: Record<PlatformView, typeof LayoutDashboard> = {
   overview: LayoutDashboard,
@@ -32,13 +34,19 @@ function SidebarNav({ online, collapsed }: { online?: boolean; collapsed: boolea
   const activeView = usePlatformStore((s) => s.activeView);
   const setView = usePlatformStore((s) => s.setView);
   const relayKind = resolveRelayStatus(online);
+  const reduce = useReducedMotion();
 
   return (
     <>
       <div className="flex items-center gap-3 border-b border-border px-4 py-4">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-400/25 bg-gradient-to-br from-indigo-500/30 via-cyan-400/10 to-violet-500/20 shadow-[0_0_24px_rgba(34,211,238,0.15)]">
+        <motion.div
+          layout
+          whileHover={reduce ? undefined : { scale: 1.04, rotate: -2 }}
+          transition={spring.snappy}
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-400/25 bg-gradient-to-br from-indigo-500/30 via-cyan-400/10 to-violet-500/20 shadow-[0_0_24px_rgba(34,211,238,0.15)]"
+        >
           <Sparkles className="h-4 w-4 text-cyan-200" strokeWidth={2} />
-        </div>
+        </motion.div>
         {!collapsed ? (
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold tracking-tight">Alleral</p>
@@ -52,16 +60,27 @@ function SidebarNav({ online, collapsed }: { online?: boolean; collapsed: boolea
           const active = activeView === view;
           const Icon = ICONS[view];
           return (
-            <button
+            <motion.button
               key={view}
               type="button"
+              layout="position"
               onClick={() => setView(view)}
+              whileHover={reduce ? undefined : { x: 2 }}
+              whileTap={reduce ? undefined : { scale: 0.98 }}
+              transition={spring.snappy}
               className={clsx(
-                "nav-rail-item group",
+                "nav-rail-item group relative",
                 active && "nav-rail-item-active border border-cyan-400/20 bg-cyan-400/8",
                 !active && "text-muted hover:bg-white/[0.03] hover:text-text"
               )}
             >
+              {active ? (
+                <motion.span
+                  layoutId="sidebar-active-pill"
+                  className="absolute inset-0 rounded-[inherit] bg-cyan-400/10"
+                  transition={spring.layout}
+                />
+              ) : null}
               <Icon className="relative z-[1] h-4 w-4 shrink-0 opacity-85" strokeWidth={1.75} />
               {!collapsed ? <span className="relative z-[1] truncate">{VIEW_META[view].label}</span> : null}
               {!collapsed && active ? (
@@ -69,7 +88,7 @@ function SidebarNav({ online, collapsed }: { online?: boolean; collapsed: boolea
                   {VIEW_META[view].shortcut}
                 </kbd>
               ) : null}
-            </button>
+            </motion.button>
           );
         })}
       </nav>
@@ -105,9 +124,21 @@ export function Sidebar({ online }: { online?: boolean }) {
         </button>
       </aside>
 
-      {mobileNavOpen ? (
-        <button type="button" className="fixed inset-0 z-40 bg-black/60 md:hidden" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />
-      ) : null}
+      <AnimatePresence>
+        {mobileNavOpen ? (
+          <motion.button
+            key="nav-backdrop"
+            type="button"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-40 bg-black/60 md:hidden"
+            aria-label="Close navigation"
+            onClick={() => setMobileNavOpen(false)}
+          />
+        ) : null}
+      </AnimatePresence>
 
       <aside
         className={clsx(

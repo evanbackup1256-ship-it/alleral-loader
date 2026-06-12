@@ -19,7 +19,7 @@ import { TelemetryLineChart } from "@/components/charts/TelemetryLineChart";
 import { StatusHeatmap } from "@/components/charts/StatusHeatmap";
 import { EventTimeline, GameStatusStream } from "@/components/charts/EventTimeline";
 import { ServiceGraph } from "@/components/charts/ServiceGraph";
-import { Reveal } from "@/components/motion/Reveal";
+import { Reveal, Stagger, StaggerItem } from "@/components/motion/Reveal";
 
 type GameRow = {
   id: string;
@@ -198,26 +198,8 @@ function MissionControlInner({ site }: { site: SitePayload }) {
       <TelemetryMetaStrip data={data} siteLoader={site.loaderVersion} siteCore={site.coreVersion} />
 
       {isMobile ? (
-        <div className="mt-4 flex flex-col gap-3 pb-2">
-          <MetricsRail
-            healthPct={healthPct}
-            working={working}
-            total={total}
-            history={history}
-            sync={data?.sync}
-            online={online}
-            dataUpdatedAt={dataUpdatedAt}
-            relayError={relayError}
-          />
-          <ThroughputPanel chartData={chartData} hasLiveData={hasLiveData} />
-          <StatusHeatmap games={games} className="min-h-[200px]" />
-          <ServiceGraph games={games} sync={data?.sync} embedded className="min-h-[260px]" />
-          <GameStatusStream games={games} embedded className="min-h-[260px]" />
-          <EventTimeline events={timeline} embedded className="min-h-[260px]" />
-        </div>
-      ) : (
-        <div className="mission-control-board mt-4">
-          <aside className="mc-slot mc-slot-metrics">
+        <Stagger className="mt-4 flex flex-col gap-3 pb-2">
+          <StaggerItem>
             <MetricsRail
               healthPct={healthPct}
               working={working}
@@ -228,21 +210,51 @@ function MissionControlInner({ site }: { site: SitePayload }) {
               dataUpdatedAt={dataUpdatedAt}
               relayError={relayError}
             />
-          </aside>
+          </StaggerItem>
+          <StaggerItem>
+            <ThroughputPanel chartData={chartData} hasLiveData={hasLiveData} />
+          </StaggerItem>
+          <StaggerItem>
+            <StatusHeatmap games={games} className="min-h-[200px]" />
+          </StaggerItem>
+          <StaggerItem>
+            <ServiceGraph games={games} sync={data?.sync} embedded className="min-h-[260px]" />
+          </StaggerItem>
+          <StaggerItem>
+            <GameStatusStream games={games} embedded className="min-h-[260px]" />
+          </StaggerItem>
+          <StaggerItem>
+            <EventTimeline events={timeline} embedded className="min-h-[260px]" />
+          </StaggerItem>
+        </Stagger>
+      ) : (
+        <Stagger className="mission-control-board mt-4">
+          <StaggerItem className="mc-slot mc-slot-metrics">
+            <MetricsRail
+              healthPct={healthPct}
+              working={working}
+              total={total}
+              history={history}
+              sync={data?.sync}
+              online={online}
+              dataUpdatedAt={dataUpdatedAt}
+              relayError={relayError}
+            />
+          </StaggerItem>
 
-          <div className="mc-slot mc-slot-main">
+          <StaggerItem className="mc-slot mc-slot-main">
             <ThroughputPanel chartData={chartData} hasLiveData={hasLiveData} />
             <div className="mc-insights">
               <StatusHeatmap games={games} className="self-start" />
               <ServiceGraph games={games} sync={data?.sync} embedded className="h-full min-h-[280px]" />
             </div>
-          </div>
+          </StaggerItem>
 
-          <aside className="mc-slot mc-slot-feed">
+          <StaggerItem className="mc-slot mc-slot-feed">
             <GameStatusStream games={games} embedded className="h-full min-h-0" />
             <EventTimeline events={timeline} embedded className="h-full min-h-0" />
-          </aside>
-        </div>
+          </StaggerItem>
+        </Stagger>
       )}
 
       <footer className="mt-4 flex flex-wrap gap-2 border-t border-border/60 pt-3 font-mono text-[10px] text-muted-2">

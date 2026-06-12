@@ -2,6 +2,7 @@
 
 import clsx from "clsx";
 import { useEffect, useMemo, useState } from "react";
+import { motion } from "motion/react";
 import { fetchWeao } from "@/lib/api";
 import { resolveResourceUrl } from "@/lib/sanitize";
 import type { SitePayload, WeaoExploit } from "@/lib/types";
@@ -10,6 +11,8 @@ import { Badge } from "@/components/ui/Form";
 import { Input } from "@/components/ui/Form";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { MetricTile, Panel } from "@/components/ui/Panel";
+import { Stagger, StaggerItem } from "@/components/motion/Reveal";
+import { spring } from "@/lib/motion/config";
 
 const FILTERS = ["all", "working", "not_working", "recommended", "detected", "outdated", "free"] as const;
 
@@ -48,13 +51,13 @@ export function ToolsView({ site }: { site: SitePayload }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <MetricTile label="Tracked" value={<AnimatedNumber value={summary.total || 0} />} />
-        <MetricTile label="Working" value={<AnimatedNumber value={summary.working || 0} />} accent="green" />
-        <MetricTile label="Not working" value={<AnimatedNumber value={summary.notWorking || 0} />} accent="red" />
-        <MetricTile label="Detected" value={<AnimatedNumber value={summary.detected || 0} />} accent="yellow" />
-        <MetricTile label="Recommended" value={<AnimatedNumber value={summary.recommended || 0} />} accent="violet" />
-      </div>
+      <Stagger className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <StaggerItem><MetricTile label="Tracked" value={<AnimatedNumber value={summary.total || 0} />} /></StaggerItem>
+        <StaggerItem><MetricTile label="Working" value={<AnimatedNumber value={summary.working || 0} />} accent="green" /></StaggerItem>
+        <StaggerItem><MetricTile label="Not working" value={<AnimatedNumber value={summary.notWorking || 0} />} accent="red" /></StaggerItem>
+        <StaggerItem><MetricTile label="Detected" value={<AnimatedNumber value={summary.detected || 0} />} accent="yellow" /></StaggerItem>
+        <StaggerItem><MetricTile label="Recommended" value={<AnimatedNumber value={summary.recommended || 0} />} accent="violet" /></StaggerItem>
+      </Stagger>
 
       <Panel padding="md">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -68,15 +71,23 @@ export function ToolsView({ site }: { site: SitePayload }) {
         </div>
         <div className="mb-3 flex flex-wrap gap-2">
           {FILTERS.map((f) => (
-            <Button key={f} size="sm" variant={filter === f ? "primary" : "ghost"} onClick={() => setFilter(f)} className="capitalize">
-              {f.replace("_", " ")}
-            </Button>
+            <motion.div key={f} whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={spring.snappy}>
+              <Button size="sm" variant={filter === f ? "primary" : "ghost"} onClick={() => setFilter(f)} className="capitalize">
+                {f.replace("_", " ")}
+              </Button>
+            </motion.div>
           ))}
         </div>
         <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search executors…" className="mb-4 max-w-sm" />
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {list.length ? list.map((ex) => <ExecutorCard key={ex.slug || ex.title} ex={ex} />) : <p className="text-sm text-muted">{data ? "No matches." : "Loading WEAO…"}</p>}
-        </div>
+        <Stagger className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {list.length ? list.map((ex) => (
+            <StaggerItem key={ex.slug || ex.title}>
+              <ExecutorCard ex={ex} />
+            </StaggerItem>
+          )) : (
+            <p className="text-sm text-muted">{data ? "No matches." : "Loading WEAO…"}</p>
+          )}
+        </Stagger>
       </Panel>
 
       <Panel padding="md">
@@ -108,7 +119,11 @@ function ExecutorCard({ ex }: { ex: WeaoExploit }) {
   const live = ex.live || "working";
   const tone = live === "working" ? "green" : live === "not_working" ? "red" : live === "detected" ? "yellow" : "neutral";
   return (
-    <article className="rounded-xl border border-border bg-white/[0.02] p-4 transition hover:border-accent/20">
+    <motion.article
+      whileHover={{ y: -3, scale: 1.01 }}
+      transition={spring.soft}
+      className="rounded-xl border border-border bg-white/[0.02] p-4 transition hover:border-accent/20"
+    >
       <div className="mb-2 flex items-center gap-3">
         {ex.logo ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -124,6 +139,6 @@ function ExecutorCard({ ex }: { ex: WeaoExploit }) {
         </div>
       </div>
       {ex.liveDetail ? <p className="text-xs text-muted">{ex.liveDetail}</p> : null}
-    </article>
+    </motion.article>
   );
 }

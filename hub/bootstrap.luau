@@ -1,8 +1,8 @@
--- Alleral Bootstrap v1.0.4
+-- Alleral Bootstrap v1.0.5
 -- Save this loadstring once in your executor — it always fetches the latest loader from GitHub.
 -- One-liner: loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=" .. tick(), true))()
 
-local BOOTSTRAP_VERSION = "1.0.4"
+local BOOTSTRAP_VERSION = "1.0.5"
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
 local GITHUB_RAW = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH
@@ -487,7 +487,26 @@ local function purgeAlleralWorkspace(fullScan)
 	return removed
 end
 
-local function runLoaderSource(src, label)
+local function hashAttest(placeId, jobId, at, commit)
+	local text = "AlleralBootstrapGate-v5"
+		.. "|"
+		.. tostring(placeId)
+		.. "|"
+		.. tostring(jobId)
+		.. "|"
+		.. tostring(at)
+		.. "|"
+		.. tostring(commit or "")
+	local h1, h2 = 5381, 0
+	for i = 1, #text do
+		local byte = string.byte(text, i)
+		h1 = (h1 * 33 + byte) % 2147483647
+		h2 = (h2 * 31 + byte * (i % 7 + 1)) % 2147483647
+	end
+	return string.format("ab_%x_%x", h1, h2)
+end
+
+local function runLoaderSource(src, label, meta)
 	local fn, err = loadStringFn(src, label or "Alleral/loader")
 	if not fn then
 		return false, "compile: " .. tostring(err)
@@ -495,9 +514,13 @@ local function runLoaderSource(src, label)
 	if setfenv then
 		pcall(setfenv, fn, ENV)
 	end
+	local at = tick()
 	ENV._Alleral_BootstrapVersion = BOOTSTRAP_VERSION
 	ENV._Alleral_Bootstrapped = true
-	ENV._Alleral_BootstrapAt = tick()
+	ENV._Alleral_BootstrapAt = at
+	ENV._Alleral_BootstrapCommit = meta and meta.commit or nil
+	ENV._Alleral_BootstrapToken = hashAttest(game.PlaceId, game.JobId, at, meta and meta.commit)
+	ENV._Alleral_BootstrapTokenAt = at
 	local ok, runErr = pcall(fn)
 	if not ok then
 		return false, "runtime: " .. tostring(runErr)
@@ -563,7 +586,7 @@ local function Alleral_Bootstrap(reason)
 			.. "]"
 	)
 
-	local ok, err = runLoaderSource(src, "Alleral/loader@" .. remoteVer)
+	local ok, err = runLoaderSource(src, "Alleral/loader@" .. remoteVer, meta)
 	ENV._Alleral_BootstrapRunning = false
 	if not ok then
 		warn("[Alleral Bootstrap] " .. tostring(err))

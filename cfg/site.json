@@ -7,7 +7,7 @@
   "coreVersion": "2.9.4",
   "uiLibrary": "Syde",
   "uiVersion": "4.0.0-syde",
-  "sydePatch": 20,
+  "sydePatch": 24,
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",
@@ -288,16 +288,12 @@
   "links": {
     "website": "https://alleral-telemetry-production.up.railway.app/",
     "mirror": "https://evanbackup1256-ship-it.github.io/kick/",
-    "github": "https://github.com/evanbackup1256-ship-it/kick",
-    "loaderRaw": "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau",
     "relay": "https://alleral-telemetry-production.up.railway.app",
     "admin": "https://alleral-telemetry-production.up.railway.app/admin"
   },
   "executors": [],
   "resources": [
     { "title": "WEAO — Live executors", "desc": "WhatExpsAre.Online status feed (same data as Tools)", "url": "https://whatexpsare.online/", "icon": "pulse" },
-    { "title": "Loader source", "desc": "Raw loader.luau on GitHub", "urlKey": "loaderRaw", "icon": "code" },
-    { "title": "Repository", "desc": "Full project + game scripts", "urlKey": "github", "icon": "github" },
     { "title": "Sync status", "desc": "Live GitHub auto-sync JSON", "url": "/api/sync/status", "icon": "sync" },
     { "title": "Health check", "desc": "Relay uptime + commit hash", "url": "/health", "icon": "pulse" }
   ],

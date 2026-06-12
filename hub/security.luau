@@ -64,18 +64,25 @@ local function hashText(text)
 end
 
 local function executorSlug()
+	local caps = ENV.Alleral_LoaderCapabilities
+	if type(caps) == "table" then
+		local slug = trim(caps.executorSlug or caps.executor or "")
+		if slug ~= "" then
+			slug = slug:lower():gsub("synapse%s*z", "synapsez"):gsub("awp%.?gg?", "volt"):gsub("[^a-z0-9]+", "")
+			return slug
+		end
+	end
 	local core = ENV.Alleral_Core
 	if type(core) == "table" and type(core.executorProfile) == "function" then
 		local ok, profile = pcall(function()
 			return core.executorProfile()
 		end)
 		if ok and type(profile) == "table" then
-			return trim(profile.name or profile.displayName)
+			local slug = trim(profile.name or profile.slug or profile.displayName or "")
+			if slug ~= "" then
+				return slug:lower():gsub("[^a-z0-9]+", "")
+			end
 		end
-	end
-	local caps = ENV.Alleral_LoaderCapabilities
-	if type(caps) == "table" then
-		return trim(caps.executorSlug or caps.executor)
 	end
 	return "unknown"
 end

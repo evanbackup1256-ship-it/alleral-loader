@@ -37,7 +37,7 @@ local RELEASE_FALLBACK = {
 	helpers = "1.0",
 	weao = "1.1",
 	security = "1.3",
-	access = "1.0",
+	access = "1.1",
 	commit = "d019f9f",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
 	autoUpdate = true,
@@ -755,9 +755,12 @@ local CAPABILITIES = {
 	executor = EXECUTOR.name,
 	executorSlug = EXECUTOR.slug,
 	weaoVerified = EXECUTOR.weaoVerified == true,
+	weao = EXECUTOR.weao,
 	loadstring = loadStringFn ~= nil,
+	http = #HTTP_TRANSPORTS > 0,
 	readfile = readFile ~= nil,
 }
+ENV.Alleral_LoaderCapabilities = CAPABILITIES
 
 local function httpGet(url, minBytes)
 	minBytes = minBytes or 0
@@ -1264,6 +1267,65 @@ local function formatRuntimeError(runErr, chunkName)
 		trace = trace .. "\n(chunk: " .. chunkName .. ")"
 	end
 	return trace
+end
+
+local function hashBootstrapAttest(placeId, jobId, at, commit)
+	local text = "AlleralBootstrapGate-v5"
+		.. "|"
+		.. tostring(placeId)
+		.. "|"
+		.. tostring(jobId)
+		.. "|"
+		.. tostring(at)
+		.. "|"
+		.. tostring(commit or "")
+	local h1, h2 = 5381, 0
+	for i = 1, #text do
+		local byte = string.byte(text, i)
+		h1 = (h1 * 33 + byte) % 2147483647
+		h2 = (h2 * 31 + byte * (i % 7 + 1)) % 2147483647
+	end
+	return string.format("ab_%x_%x", h1, h2)
+end
+
+local function verifyBootstrapAttestation()
+	if ENV._Alleral_BootstrapVerified == true then
+		return true
+	end
+	if ENV._Alleral_Bootstrapped ~= true then
+		return false, "Direct loader access is disabled. Run the bootstrap loadstring only."
+	end
+	local token = ENV._Alleral_BootstrapToken
+	local at = tonumber(ENV._Alleral_BootstrapTokenAt)
+	if type(token) ~= "string" or #token < 8 or not at then
+		return false, "Missing bootstrap attestation — re-run the bootstrap loadstring."
+	end
+	if (tick() - at) > 120 then
+		return false, "Bootstrap attestation expired — re-run the bootstrap loadstring."
+	end
+	local expected = hashBootstrapAttest(game.PlaceId, game.JobId, at, ENV._Alleral_BootstrapCommit)
+	if token ~= expected then
+		return false, "Invalid bootstrap attestation."
+	end
+	ENV._Alleral_BootstrapVerified = true
+	ENV._Alleral_BootstrapToken = nil
+	return true
+end
+
+local function enforceExecutorPolicy()
+	loadAccessConfig()
+	if type(ENV.Alleral_Access) ~= "table" then
+		pcall(loadModule, { HUB .. "/access.luau", "core/access.luau" }, HUB .. "/access.luau", "Alleral_Access", "Alleral/access")
+	end
+	local access = ENV.Alleral_Access
+	if type(access) == "table" and type(access.checkExecutor) == "function" then
+		local ok, reason = access.checkExecutor({ executor = EXECUTOR, stage = "loader" })
+		if not ok then
+			return false, tostring(reason or "Executor not allowed")
+		end
+		return true
+	end
+	return true
 end
 
 local function compileAndRun(source, chunkName, runEnv)
@@ -2412,9 +2474,11 @@ local function grantPublicAccess()
 		ENV.SCRIPT_KEY = "PUBLIC"
 		return true
 	end
-	local ok, mode = access.ensureAccess({ stage = "loader" })
+	local ok, mode = access.ensureAccess({ stage = "loader", executor = EXECUTOR })
 	if ok then
-		log("Access granted (" .. tostring(mode or "public") .. ")")
+		log("Access granted (" .. tostring(mode or "public") .. ", " .. EXECUTOR.slug .. ")")
+	else
+		log("Access denied: " .. tostring(mode or "unknown"), true)
 	end
 	return ok ~= false
 end
@@ -3628,6 +3692,22 @@ local function main()
 	end
 	ENV.Alleral_LoaderRunning = true
 	ENV._Alleral_LoaderVersion = LOADER_VERSION
+
+	local bootOk, bootErr = verifyBootstrapAttestation()
+	if not bootOk then
+		notify("Alleral", tostring(bootErr), 10)
+		log(tostring(bootErr), true)
+		ENV.Alleral_LoaderRunning = false
+		return
+	end
+
+	local execOk, execErr = enforceExecutorPolicy()
+	if not execOk then
+		notify("Alleral", tostring(execErr), 10)
+		log(tostring(execErr), true)
+		ENV.Alleral_LoaderRunning = false
+		return
+	end
 
 	if not loadStringFn then
 		notify("Alleral", "This executor needs loadstring.", 8)

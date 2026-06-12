@@ -1,6 +1,7 @@
 "use client";
 
 import clsx from "clsx";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Menu, Search } from "lucide-react";
 import { Button, Kbd } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Form";
@@ -8,6 +9,7 @@ import { FreshnessChip } from "@/components/observability/FreshnessChip";
 import { StatusPill } from "@/components/observability/StatusPill";
 import { resolveRelayStatus } from "@/lib/status/resolve";
 import { usePlatformStore, VIEW_META, type WorkspacePreset } from "@/lib/store/platform";
+import { spring } from "@/lib/motion/config";
 
 const WORKSPACE_OPTIONS: { value: WorkspacePreset; label: string }[] = [
   { value: "default", label: "Default workspace" },
@@ -30,6 +32,8 @@ export function TopBar({
   const setWorkspace = usePlatformStore((s) => s.setWorkspace);
   const preset = (WORKSPACE_OPTIONS.some((o) => o.value === workspace) ? workspace : "default") as WorkspacePreset;
   const relayKind = resolveRelayStatus(online);
+  const reduce = useReducedMotion();
+  const meta = VIEW_META[activeView];
 
   return (
     <header className="glass-panel z-20 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-3 md:h-[3.75rem] md:px-5">
@@ -37,9 +41,20 @@ export function TopBar({
         <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation">
           <Menu className="h-4 w-4" />
         </Button>
-        <div className="min-w-0">
+        <div className="min-w-0 overflow-hidden">
           <p className="obs-kicker !text-[10px] hidden sm:block">Workspace · {preset}</p>
-          <h1 className="truncate text-sm font-semibold tracking-tight md:text-base">{VIEW_META[activeView].label}</h1>
+          <AnimatePresence mode="wait">
+            <motion.h1
+              key={activeView}
+              initial={reduce ? false : { opacity: 0, y: 8, filter: "blur(6px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={reduce ? undefined : { opacity: 0, y: -6, filter: "blur(4px)" }}
+              transition={spring.soft}
+              className="truncate text-sm font-semibold tracking-tight md:text-base"
+            >
+              {meta.label}
+            </motion.h1>
+          </AnimatePresence>
         </div>
       </div>
 

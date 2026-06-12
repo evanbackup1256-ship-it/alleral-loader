@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
@@ -31,9 +31,19 @@ const StatusView = dynamic(
 
 function ViewSkeleton({ label }: { label: string }) {
   return (
-    <div className="glass-panel rounded-2xl p-8">
-      <p className="text-sm text-muted">Loading {label}…</p>
-    </div>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="glass-panel rounded-2xl p-8"
+    >
+      <motion.p
+        animate={{ opacity: [0.45, 1, 0.45] }}
+        transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+        className="text-sm text-muted"
+      >
+        Loading {label}…
+      </motion.p>
+    </motion.div>
   );
 }
 

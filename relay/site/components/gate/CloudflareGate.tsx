@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { mountTurnstileWidget, resolveTurnstileSiteKey, verifyGateToken } from "@/lib/turnstile";
+import { spring } from "@/lib/motion/config";
 
 const STORAGE_KEY = "alleral_gate_ok";
 const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
@@ -30,6 +32,7 @@ export function CloudflareGate({ children }: { children: React.ReactNode }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<{ remove: () => void; reset: () => void } | null>(null);
   const verifiedRef = useRef(false);
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     setPassed(readSessionPassed());
@@ -148,8 +151,23 @@ export function CloudflareGate({ children }: { children: React.ReactNode }) {
 
   if (passed === false) {
     return (
-      <div className="cf-gate-backdrop" role="dialog" aria-modal="true" aria-label="Security check">
-        <div className="cf-gate-card glass">
+      <AnimatePresence>
+        <motion.div
+          key="cf-gate"
+          className="cf-gate-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Security check"
+          initial={reduce ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="cf-gate-card glass"
+            initial={reduce ? false : { opacity: 0, y: 24, scale: 0.96, filter: "blur(8px)" }}
+            animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+            transition={spring.panel}
+          >
           <p className="text-sm text-muted mb-2">Alleral Hub</p>
           <h2 className="text-xl font-semibold mb-2">Verify you&apos;re human</h2>
           <p className="text-sm text-muted mb-4">Quick check before loading the hub.</p>
@@ -170,8 +188,9 @@ export function CloudflareGate({ children }: { children: React.ReactNode }) {
               </button>
             </div>
           ) : null}
-        </div>
-      </div>
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
     );
   }
 
