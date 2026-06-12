@@ -1505,7 +1505,7 @@ Core.makeSupervisor(state, loops, loopControllers, "Freecam", 0.5, function()
 	end
 end)
 
-local window = Core.buildUiWindow(ui, Core.premiumUiSettings({
+local window = Core.buildUiWindow(ui, Core.uiWindowSettings({
 	Subtitle = "Slime RNG · v" .. VERSION,
 	Icon = "droplet",
 	Theme = "Private",
@@ -1516,7 +1516,7 @@ if not window or not window._rawWindow then
 	return
 end
 local section = Core.buildUiSection(window)
-Core.buildPremiumExploitHub(section, {
+Core.buildExploitHub(section, {
 	window = window,
 	ui = ui,
 	state = state,

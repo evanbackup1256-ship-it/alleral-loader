@@ -21,10 +21,17 @@ if ($alleralUi -match 'Alleral UI layer') {
     Fail "alleral_ui missing Alleral UI layer marker"
 }
 
-if ($alleralUi -match 'MACLIB_URL') {
-    Pass "alleral_ui loads Maclib from release URL"
+if ($alleralUi -match 'loadSyde') {
+    Pass "alleral_ui loads Syde UI library"
 } else {
-    Fail "alleral_ui missing Maclib URL bootstrap"
+    Fail "alleral_ui missing loadSyde bootstrap"
+}
+
+$sydeSource = Join-Path $root "ui/syde/source.luau"
+if (Test-Path $sydeSource) {
+    Pass "ui/syde source present"
+} else {
+    Fail "ui/syde/source.luau missing"
 }
 
 if ($alleralUi -match 'function Core\.loadUi') {
@@ -45,24 +52,6 @@ if ($alleralUi -match 'function Core\.createWindUiGroupbox') {
     Fail "alleral_ui missing createWindUiGroupbox adapter"
 }
 
-if (Test-Path (Join-Path $root "hub/ui_spr.luau")) {
-    Pass "ui_spr spring module present"
-} else {
-    Fail "hub/ui_spr.luau missing"
-}
-
-if (Test-Path (Join-Path $root "hub/ui_motion.luau")) {
-    Pass "ui_motion animation layer present"
-} else {
-    Fail "hub/ui_motion.luau missing"
-}
-
-if ($alleralUi -match 'ui_motion\.luau') {
-    Pass "alleral_ui loads ui_motion layer"
-} else {
-    Fail "alleral_ui missing ui_motion bootstrap"
-}
-
 if ($loader -match 'purgeLegacyHubUiFiles') {
     Pass "loader purges legacy hub/ui workspace files"
 } else {
@@ -73,6 +62,12 @@ if (-not (Test-Path (Join-Path $root "hub/ui"))) {
     Pass "legacy hub/ui tree removed from repo"
 } else {
     Fail "hub/ui still exists - remove vendored UI stack"
+}
+
+if (-not (Test-Path (Join-Path $root "ui/alleral_maclib"))) {
+    Pass "legacy alleral_maclib tree removed"
+} else {
+    Fail "ui/alleral_maclib still exists"
 }
 
 if ($failed.Count -gt 0) {

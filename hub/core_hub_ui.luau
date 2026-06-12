@@ -1063,7 +1063,7 @@ function Core.setupHubKeybinds(options)
 	local panicKey = options.panicKey or Enum.KeyCode.Delete
 	local uiKey = options.uiKey or Enum.KeyCode.RightControl
 	local insertKey = options.insertKey or Enum.KeyCode.Insert
-	local maclibUi = Core.UI_LIBRARY == "Maclib"
+	local sydeUi = Core.UI_LIBRARY == "Syde"
 	ENV._Alleral_KeybindConn = UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or input.UserInputType ~= Enum.UserInputType.Keyboard then
 			return
@@ -1071,7 +1071,7 @@ function Core.setupHubKeybinds(options)
 		if input.KeyCode == panicKey then
 			Core.stateHubStop()
 			Core.notify("Alleral", "everything stopped", 4)
-		elseif input.KeyCode == insertKey or (not maclibUi and input.KeyCode == uiKey) then
+		elseif input.KeyCode == insertKey or (not sydeUi and input.KeyCode == uiKey) then
 			if Core.toggleUiVisibility() then
 				Core.notify("Alleral", "UI toggled.", 2)
 			end
@@ -1328,7 +1328,7 @@ function Core.buildCustomizationStudioGroup(tab, options)
 	local group = Core.buildUiGroup(tab, "Customization V2", column, nil, nil, "CustomizationV2")
 
 	if not windUi or type(windUi.SetMotionProfile) ~= "function" then
-		group:CreateLabel("Maclib UI layer unavailable — re-run the loader.")
+		group:CreateLabel("Syde UI layer unavailable — re-run the loader.")
 		return group
 	end
 
@@ -1887,17 +1887,21 @@ function Core.bindExploitMenuKey(window)
 	})
 end
 
-function Core.premiumUiSettings(options)
+function Core.uiWindowSettings(options)
 	options = type(options) == "table" and options or {}
 	local base = Core.gameUiSettings(options)
-	base.Theme = options.Theme or "Private"
+	local theme = options.Theme or "Default"
+	if theme == "Private" then
+		theme = "Maclib"
+	end
+	base.Theme = theme
 	base.Size = options.Size or UDim2.fromOffset(860, 580)
 	base.Acrylic = options.Acrylic ~= false
 	base.Subtitle = options.Subtitle
 	return base
 end
 
-function Core.buildPremiumExploitHub(section, options)
+function Core.buildExploitHub(section, options)
 	options = type(options) == "table" and options or {}
 	local state = options.state or ENV.Alleral_State or {}
 

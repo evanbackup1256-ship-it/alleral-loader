@@ -1832,7 +1832,7 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoOptimizePets", 10, funct
 	end
 end)
 
-local window = Core.buildUiWindow(ui, Core.premiumUiSettings({
+local window = Core.buildUiWindow(ui, Core.uiWindowSettings({
 	Subtitle = "Build A Ring Farm · v" .. VERSION,
 	Icon = "leaf",
 	Theme = "Private",
@@ -1843,7 +1843,7 @@ if not window or not window._rawWindow then
 	return
 end
 local section = Core.buildUiSection(window)
-Core.buildPremiumExploitHub(section, {
+Core.buildExploitHub(section, {
 	window = window,
 	ui = ui,
 	state = state,

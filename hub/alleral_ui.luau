@@ -1,12 +1,22 @@
 return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "3.0.3-maclib"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "4.0.0-syde"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
-	Core.UI_LIBRARY = "Maclib"
+	Core.UI_LIBRARY = "Syde"
 
-	local MACLIB_URL = "https://github.com/biggaboy212/Maclib/releases/download/9.Maclib/maclib.txt"
-	local MACLIB_FALLBACK = "https://raw.githubusercontent.com/biggaboy212/Maclib/main/maclib.txt"
+	local SYDE_SOURCE_PATH = "ui/syde/source.luau"
+	local SYDE_RAW_URL = "https://raw.githubusercontent.com/essencejs/syde/main/source"
+
+	local THEME_ACCENTS = {
+		Maclib = Color3.fromRGB(83, 252, 18),
+		Private = Color3.fromRGB(83, 252, 18),
+		Default = Color3.fromRGB(255, 151, 227),
+		Dark = Color3.fromRGB(120, 120, 255),
+		Light = Color3.fromRGB(0, 122, 255),
+		Linoria = Color3.fromRGB(170, 85, 235),
+		Obsidian = Color3.fromRGB(255, 120, 80),
+	}
 
 	local function genv()
 		local ok, env = pcall(function()
@@ -16,144 +26,82 @@ return function(Core)
 	end
 	local ENV = genv()
 
-	local HUB_RAW_BASE = "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/"
-
-	local function loadHubSource(filename)
-		local rel = "hub/" .. filename
-		local src = Core.readFile and Core.readFile(rel)
-		if type(src) ~= "string" or #src < 100 then
-			local url = HUB_RAW_BASE .. filename .. "?t=" .. tostring(tick())
-			if type(Core.httpGet) == "function" then
-				src = Core.httpGet(url)
-			end
-		end
-		return type(src) == "string" and #src >= 100 and src or nil
-	end
-
-	local function loadHubModule(filename)
-		local src = loadHubSource(filename)
-		if not src then
-			return nil
-		end
-		local loadFn = Core.loadStringFn()
-		if not loadFn then
-			return nil
-		end
-		local chunk, err = loadFn(src, "@Alleral/" .. filename)
-		if not chunk then
-			Core.logWarn("Hub module compile failed: " .. filename .. " " .. tostring(err))
-			return nil
-		end
-		local ok, result = pcall(chunk)
-		if not ok then
-			Core.logWarn("Hub module runtime failed: " .. filename .. " " .. tostring(result))
-			return nil
-		end
-		return result
-	end
-
-	local UiSpr = loadHubModule("ui_spr.luau")
-	local UiMotion = nil
-	if UiSpr then
-		local motionFactory = loadHubModule("ui_motion.luau")
-		if type(motionFactory) == "function" then
-			UiMotion = motionFactory(Core, UiSpr)
-		end
-	end
-	ENV.Alleral_UiMotion = UiMotion
-
 	local function iconImage(icon)
 		if type(icon) == "number" then
-			return "rbxassetid://" .. tostring(icon)
+			return tostring(icon)
 		end
 		local text = tostring(icon or "")
-		if text:find("rbxassetid", 1, true) then
+		if text:match("^%d+$") then
 			return text
 		end
-		if text:match("^%d+$") then
-			return "rbxassetid://" .. text
-		end
 		local mapped = Core.windUiIcon and Core.windUiIcon(icon)
-		if type(mapped) == "string" and mapped ~= "" then
-			if mapped:find("rbxassetid", 1, true) then
-				return mapped
-			end
-			if mapped:match("^%d+$") then
-				return "rbxassetid://" .. mapped
-			end
-		end
-		return "rbxassetid://18821914323"
-	end
-
-	local function fetchMaclibSource()
-		local urls = {
-			MACLIB_URL,
-			MACLIB_URL .. "?t=" .. tostring(tick()),
-			MACLIB_FALLBACK,
-		}
-		for _, url in ipairs(urls) do
-			local body = type(Core.httpGet) == "function" and Core.httpGet(url)
-			if type(body) ~= "string" or #body < 5000 then
-				local http = ENV.Alleral_HTTP
-				if type(http) == "table" and type(http.get) == "function" then
-					body = http.get(url, 5000)
-				end
-			end
-			if type(body) == "string" and #body >= 5000 and not body:find("<!DOCTYPE", 1, true) then
-				return body, url
-			end
+		if type(mapped) == "string" and mapped:match("^%d+$") then
+			return mapped
 		end
 		return nil
 	end
 
-	local function loadMaclib()
-		local cached = ENV._AlleralMaclib
-		if type(cached) == "table" and type(cached.Window) == "function" then
+	local function readSydeSource()
+		local src = Core.readFile and Core.readFile(SYDE_SOURCE_PATH)
+		if type(src) ~= "string" or #src < 5000 then
+			local url = SYDE_RAW_URL .. "?t=" .. tostring(tick())
+			if type(Core.httpGet) == "function" then
+				src = Core.httpGet(url)
+			end
+			if type(src) ~= "string" or #src < 5000 then
+				local http = ENV.Alleral_HTTP
+				if type(http) == "table" and type(http.get) == "function" then
+					src = http.get(url, 8000)
+				end
+			end
+		end
+		return type(src) == "string" and #src >= 5000 and not src:find("<!DOCTYPE", 1, true) and src or nil
+	end
+
+	local function loadSyde()
+		local cached = ENV._AlleralSyde
+		if type(cached) == "table" and type(cached.Init) == "function" then
 			return cached
 		end
-		local source, label = fetchMaclibSource()
+		local source = readSydeSource()
 		if not source then
-			return nil, "Maclib download failed"
+			return nil, "Syde source missing"
 		end
 		local loadFn = Core.loadStringFn()
 		if not loadFn then
 			return nil, "load unavailable"
 		end
-		local chunk, err = loadFn(source, "@Maclib/" .. tostring(label))
+		local chunk, err = loadFn(source, "@Syde/source")
 		if not chunk then
-			return nil, tostring(err or "Maclib compile failed")
+			return nil, tostring(err or "Syde compile failed")
 		end
-		local ok, MacLib = pcall(chunk)
-		if not ok or type(MacLib) ~= "table" then
-			return nil, tostring(MacLib or "Maclib runtime failed")
+		local ok, Syde = pcall(chunk)
+		if not ok or type(Syde) ~= "table" or type(Syde.Init) ~= "function" then
+			return nil, tostring(Syde or "Syde runtime failed")
 		end
-		ENV._AlleralMaclib = MacLib
-		pcall(function()
-			MacLib:SetFolder("Alleral_Maclib")
-		end)
-		return MacLib
+		ENV._AlleralSyde = Syde
+		return Syde
 	end
 
-	local function wrapLibrary(MacLib)
-		local themes = { "Maclib", "Default", "Dark", "Light" }
-		local motionProfiles = { "fluid", "snappy", "bouncy", "cinematic", "reduced" }
-		local layoutProfiles = { "auto", "desktop", "mobile", "compact" }
-		local activeTheme = "Maclib"
-		local motionProfile = "fluid"
-		local glassIntensity = 0.55
-		local chromeDepth = 0.65
-		local tooltipStyle = "rich"
-		local notificationStyle = "glass"
-		local ambientGlow = true
-		local tabAurora = true
-		local sectionLift = true
+	local function applyAccent(Syde, themeName)
+		local accent = THEME_ACCENTS[themeName] or THEME_ACCENTS.Default
+		if type(Syde.UpdateTheme) == "function" then
+			pcall(Syde.UpdateTheme, Syde, {
+				Accent = accent,
+				HitBox = accent,
+			})
+		end
+		return accent
+	end
+
+	local function wrapLibrary(Syde)
+		local themes = { "Default", "Maclib", "Private", "Dark", "Light", "Linoria", "Obsidian" }
+		local activeTheme = "Default"
 		local activeWindow = nil
 		local notificationsEnabled = true
-		local notifyLower = false
 
 		local Library = {
-			MacLib = MacLib,
-			Holder = nil,
+			Syde = Syde,
 			Window = nil,
 			Version = Core.ALLERAL_UI_VERSION,
 			ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION,
@@ -164,14 +112,16 @@ return function(Core)
 			},
 		}
 
-		local function flushPendingNotifies(targetWindow)
-			targetWindow = targetWindow or activeWindow or Library.Window
-			if not targetWindow or type(targetWindow.Notify) ~= "function" then
-				return
-			end
+		local function flushPendingNotifies()
 			while #Library._pendingNotifies > 0 do
 				local payload = table.remove(Library._pendingNotifies, 1)
-				pcall(targetWindow.Notify, targetWindow, payload)
+				pcall(function()
+					Syde:Notify({
+						Title = payload.Title or "Alleral",
+						Content = payload.Description or "",
+						Duration = payload.Lifetime or 4,
+					})
+				end)
 			end
 		end
 
@@ -182,12 +132,17 @@ return function(Core)
 				Description = info.Description or info.Content or info.Text or "",
 				Lifetime = info.Lifetime or info.Duration or info.Time or 4,
 			}
-			local win = activeWindow or Library.Window
-			if win and type(win.Notify) == "function" and notificationsEnabled then
-				if type(win.GetNotificationsState) == "function" and not win:GetNotificationsState() then
-					return
-				end
-				pcall(win.Notify, win, payload)
+			if not notificationsEnabled then
+				return
+			end
+			if activeWindow then
+				pcall(function()
+					Syde:Notify({
+						Title = payload.Title,
+						Content = payload.Description,
+						Duration = payload.Lifetime,
+					})
+				end)
 				return
 			end
 			table.insert(Library._pendingNotifies, payload)
@@ -214,28 +169,18 @@ return function(Core)
 		end
 
 		function Library:ClearNotifications()
-			local win = activeWindow or Library.Window
-			if win and type(win.ClearNotifications) == "function" then
-				local ok, cleared = pcall(win.ClearNotifications, win)
-				if ok and type(cleared) == "number" then
-					return cleared
-				end
-			end
 			Library._pendingNotifies = {}
 			return 0
 		end
 
-		function Library:SetNotificationLower(enabled)
-			notifyLower = enabled == true
-			ENV.Alleral_NotifyLower = notifyLower
+		function Library:SetNotificationLower(_enabled)
+			return true
 		end
 
 		function Library:RepairWindow(window)
 			window = window or activeWindow or Library.Window
-			if UiMotion and window and type(UiMotion.repair) == "function" then
-				pcall(UiMotion.repair, window)
-			end
 			if window and type(window.Toggle) == "function" then
+				pcall(window.Toggle, window)
 				pcall(window.Toggle, window)
 			end
 			return true
@@ -247,9 +192,8 @@ return function(Core)
 
 		function Library:SetTheme(name)
 			activeTheme = tostring(name or activeTheme)
-			if activeWindow and type(activeWindow.SetTheme) == "function" then
-				pcall(activeWindow.SetTheme, activeWindow, activeTheme)
-			end
+			ENV.Alleral_ActiveTheme = activeTheme
+			applyAccent(Syde, activeTheme)
 		end
 
 		function Library:CycleTheme(step)
@@ -267,92 +211,79 @@ return function(Core)
 		end
 
 		function Library:ListMotionProfiles()
-			return motionProfiles
+			return { "fluid", "reduced" }
 		end
 
 		function Library:GetMotionProfile()
-			return motionProfile
+			return "fluid"
 		end
 
-		function Library:SetMotionProfile(name)
-			motionProfile = tostring(name or motionProfile)
-			ENV.Alleral_MotionProfile = motionProfile
-			if UiMotion and type(UiMotion.setProfile) == "function" then
-				pcall(UiMotion.setProfile, motionProfile)
-			end
+		function Library:SetMotionProfile(_name)
+			return true
 		end
 
-		function Library:SetSpringMotion(enabled)
-			ENV.Alleral_UiSpringMotion = enabled ~= false
+		function Library:SetSpringMotion(_enabled)
+			return true
 		end
 
-		function Library:SetReducedMotion(enabled)
-			ENV.Alleral_UiReducedMotion = enabled == true
+		function Library:SetReducedMotion(_enabled)
+			return true
 		end
 
 		function Library:GetSpringMotion()
-			return ENV.Alleral_UiSpringMotion ~= false
+			return true
 		end
 
 		function Library:ListProfiles()
-			return layoutProfiles
+			return { "auto", "desktop" }
 		end
 
-		function Library:ApplyProfile(name)
-			ENV.Alleral_UiProfile = tostring(name or "auto")
+		function Library:ApplyProfile(_name)
+			return true
 		end
 
 		function Library:GetGlassIntensity()
-			return glassIntensity
+			return 0.55
 		end
 
-		function Library:SetGlassIntensity(value)
-			glassIntensity = tonumber(value) or glassIntensity
-			if activeWindow and type(activeWindow.SetAcrylicBlurState) == "function" then
-				pcall(activeWindow.SetAcrylicBlurState, activeWindow, glassIntensity > 0.2)
-			end
+		function Library:SetGlassIntensity(_value)
+			return true
 		end
 
-		function Library:SetChromeDepth(value)
-			chromeDepth = tonumber(value) or chromeDepth
-			ENV.Alleral_ChromeDepth = chromeDepth
+		function Library:SetChromeDepth(_value)
+			return true
 		end
 
 		function Library:GetTooltipStyle()
-			return tooltipStyle
+			return "rich"
 		end
 
-		function Library:SetTooltipStyle(style)
-			tooltipStyle = tostring(style or tooltipStyle)
+		function Library:SetTooltipStyle(_style)
+			return true
 		end
 
 		function Library:GetNotificationStyle()
-			return notificationStyle
+			return "glass"
 		end
 
-		function Library:SetNotificationStyle(style)
-			notificationStyle = tostring(style or notificationStyle)
+		function Library:SetNotificationStyle(_style)
+			return true
 		end
 
-		function Library:SetAmbientGlow(enabled)
-			ambientGlow = enabled == true
-			ENV.Alleral_AmbientGlow = ambientGlow
+		function Library:SetAmbientGlow(_enabled)
+			return true
 		end
 
-		function Library:SetTabAurora(enabled)
-			tabAurora = enabled == true
-			ENV.Alleral_TabAurora = tabAurora
+		function Library:SetTabAurora(_enabled)
+			return true
 		end
 
-		function Library:SetSectionLift(enabled)
-			sectionLift = enabled == true
-			ENV.Alleral_SectionLift = sectionLift
+		function Library:SetSectionLift(_enabled)
+			return true
 		end
 
-		function Library:ApplyAccentPreset(_name)
-			if type(Core.applyThemeAccent) == "function" then
-				pcall(Core.applyThemeAccent, Library, Color3.fromHex("#53fc18"))
-			end
+		function Library:ApplyAccentPreset(name)
+			Library:SetTheme(name or activeTheme)
 		end
 
 		function Library:FlashAccent()
@@ -361,71 +292,35 @@ return function(Core)
 
 		function Library:CreateWindow(settings)
 			settings = type(settings) == "table" and settings or {}
-			local Players = game:GetService("Players")
-			local lp = Players.LocalPlayer
-			local playerLabel = lp and ((lp.DisplayName ~= "" and lp.DisplayName) or lp.Name) or ""
 			local menuKey = settings.Keybind or ENV.Alleral_UiKeybind or Enum.KeyCode.RightControl
 			ENV.Alleral_UiKeybind = menuKey
-			local window = MacLib:Window({
+
+			local themeName = settings.Theme or activeTheme
+			activeTheme = themeName
+			applyAccent(Syde, themeName)
+
+			local sydeWindow = Syde:Init({
 				Title = settings.Title or settings.Name or "Alleral",
-				Subtitle = settings.Subtitle or settings.SubName or playerLabel,
-				Size = settings.Size or UDim2.fromOffset(868, 650),
-				DragStyle = 1,
-				ShowUserInfo = true,
+				SubText = settings.Subtitle or settings.SubName or "",
+				Home = { Enabled = false },
 				Keybind = menuKey,
-				AcrylicBlur = settings.Acrylic ~= false,
 			})
-			activeWindow = window
-			Library.Window = window
-			window._macTabGroup = window:TabGroup()
-			window._macTabs = {}
 
-			if type(window.GlobalSetting) == "function" then
-				pcall(function()
-					window:GlobalSetting({
-						Name = "UI Blur",
-						Default = type(window.GetAcrylicBlurState) == "function" and window:GetAcrylicBlurState()
-							or settings.Acrylic ~= false,
-						Callback = function(enabled)
-							if type(window.SetAcrylicBlurState) == "function" then
-								window:SetAcrylicBlurState(enabled == true)
-							end
-						end,
-					})
-				end)
-				pcall(function()
-					window:GlobalSetting({
-						Name = "Notifications",
-						Default = type(window.GetNotificationsState) == "function" and window:GetNotificationsState()
-							or true,
-						Callback = function(enabled)
-							notificationsEnabled = enabled == true
-							if type(window.SetNotificationsState) == "function" then
-								window:SetNotificationsState(enabled == true)
-							end
-						end,
-					})
-				end)
-				pcall(function()
-					window:GlobalSetting({
-						Name = "Show User Info",
-						Default = type(window.GetUserInfoState) == "function" and window:GetUserInfoState() or true,
-						Callback = function(enabled)
-							if type(window.SetUserInfoState) == "function" then
-								window:SetUserInfoState(enabled == true)
-							end
-						end,
-					})
-				end)
+			if not sydeWindow then
+				return nil
 			end
 
-			flushPendingNotifies(window)
-			if UiMotion and type(UiMotion.attachWindow) == "function" then
-				task.defer(function()
-					pcall(UiMotion.attachWindow, window)
-				end)
-			end
-			return window
+			sydeWindow._sydeTabGroup = {
+				Tab = function(_, opts)
+					opts = type(opts) == "table" and opts or { Name = tostring(opts or "Tab") }
+					return sydeWindow:InitTab({ Title = opts.Name or "Tab" })
+				end,
+			}
+
+			activeWindow = sydeWindow
+			Library.Window = sydeWindow
+			flushPendingNotifies()
+			return sydeWindow
 		end
 
 		return Library
@@ -454,13 +349,13 @@ return function(Core)
 			ENV.Alleral_UI = nil
 		end
 
-		local MacLib, err = loadMaclib()
-		if not MacLib then
-			Core.logWarn("Alleral UI load failed: " .. tostring(err or "Maclib missing"))
-			return nil, err or "Maclib missing"
+		local Syde, err = loadSyde()
+		if not Syde then
+			Core.logWarn("Alleral UI load failed: " .. tostring(err or "Syde missing"))
+			return nil, err or "Syde missing"
 		end
 
-		local Library = wrapLibrary(MacLib)
+		local Library = wrapLibrary(Syde)
 		ENV._AlleralUiLibrary = Library
 		Core.clearUiStateBindings()
 
@@ -468,7 +363,7 @@ return function(Core)
 			Library = Library,
 			Alleral = Library,
 			WindUI = Library,
-			MacLib = MacLib,
+			Syde = Syde,
 			CreateWindow = function(_, settings)
 				return Library:CreateWindow(settings)
 			end,
@@ -476,7 +371,7 @@ return function(Core)
 				Library:Notification(info)
 			end,
 		}
-		Core.say("Alleral UI " .. tostring(Library:GetAlleralVersion()) .. " (Maclib)")
+		Core.say("Alleral UI " .. tostring(Library:GetAlleralVersion()) .. " (Syde)")
 		return cacheUi(bundle)
 	end
 
@@ -486,6 +381,7 @@ return function(Core)
 
 	Core.releaseAlleralRuntime = function()
 		ENV._AlleralUiLibrary = nil
+		ENV._AlleralSyde = nil
 		ENV._AlleralMaclib = nil
 	end
 
@@ -493,11 +389,11 @@ return function(Core)
 		if type(bundle) ~= "table" then
 			return nil
 		end
-		return bundle.Alleral or bundle.Library or bundle.MacLib
+		return bundle.Alleral or bundle.Library or bundle.Syde
 	end
 
-	function Core.createWindUiGroupbox(rawSection, uiBundle)
-		rawSection = rawSection or {}
+	function Core.createWindUiGroupbox(sydeTab, uiBundle)
+		sydeTab = sydeTab or {}
 		uiBundle = uiBundle or {}
 		local serial = 0
 
@@ -545,20 +441,18 @@ return function(Core)
 		local groupbox = {}
 
 		function groupbox:CreateToggle(settings, id)
-			local handle = rawSection:Toggle({
-				Name = settings.Name,
-				Default = settings.CurrentValue == true,
-				Callback = settings.Callback or function() end,
-			}, nextFlag(settings.Name, id))
+			local handle = sydeTab:Toggle({
+				Title = settings.Name,
+				Value = settings.CurrentValue == true,
+				CallBack = settings.Callback or function() end,
+			})
 			return wrapElement(function(nextSettings)
 				if nextSettings.CurrentValue == nil or not handle then
 					return
 				end
 				local value = nextSettings.CurrentValue == true
-				if type(handle.UpdateState) == "function" then
-					pcall(handle.UpdateState, handle, value)
-				elseif handle.Set then
-					pcall(handle.Set, handle, value)
+				if type(handle.Set) == "function" then
+					pcall(handle.Set, handle, value, true)
 				end
 			end, {
 				raw = handle,
@@ -571,30 +465,26 @@ return function(Core)
 			local range = settings.Range or { 0, 100 }
 			local minValue, maxValue = range[1], range[2]
 			local increment = tonumber(settings.Increment) or Core.sliderIncrement(minValue, maxValue, settings.Increment)
-			local precision = 0
-			if increment and increment < 1 then
-				local text = tostring(increment)
-				local dot = text:find("%.")
-				precision = dot and (#text - dot) or 1
-			end
-			local handle = rawSection:Slider({
-				Name = settings.Name,
-				Default = tonumber(settings.CurrentValue) or minValue,
-				Minimum = minValue,
-				Maximum = maxValue,
-				Precision = precision,
-				DisplayMethod = "Value",
-				Callback = settings.Callback or function() end,
-			}, nextFlag(settings.Name, id))
+			local handle = sydeTab:Slider({
+				Title = settings.Name,
+				Description = settings.Description or "",
+				Sliders = {
+					{
+						Title = settings.Name or "Value",
+						Range = { minValue, maxValue },
+						Increment = increment,
+						StarterValue = tonumber(settings.CurrentValue) or minValue,
+						CallBack = settings.Callback or function() end,
+					},
+				},
+			})
 			return wrapElement(function(nextSettings)
-				if nextSettings.CurrentValue == nil or not handle then
+				if nextSettings.CurrentValue == nil then
 					return
 				end
-				local value = tonumber(nextSettings.CurrentValue) or minValue
-				if type(handle.UpdateValue) == "function" then
-					pcall(handle.UpdateValue, handle, value)
-				elseif handle.Set then
-					pcall(handle.Set, handle, value)
+				-- Syde slider handles are internal; best-effort via stored slider row if present
+				if handle and type(handle.Set) == "function" then
+					pcall(handle.Set, handle, tonumber(nextSettings.CurrentValue))
 				end
 			end, {
 				raw = handle,
@@ -604,35 +494,26 @@ return function(Core)
 		end
 
 		function groupbox:CreateButton(settings, id)
-			local handle = rawSection:Button({
-				Name = settings.Name,
-				Callback = settings.Callback or function() end,
-			}, nextFlag(settings.Name, id))
-			return wrapElement(function(nextSettings)
-				if nextSettings.Name and handle and type(handle.UpdateName) == "function" then
-					pcall(handle.UpdateName, handle, nextSettings.Name)
-				end
-			end, {
-				raw = handle,
+			sydeTab:Button({
+				Title = settings.Name,
+				Description = settings.Description or "",
+				CallBack = settings.Callback or function() end,
 			})
+			return wrapElement(function() end, {})
 		end
 
 		function groupbox:CreateInput(settings, id)
-			local handle = rawSection:Input({
-				Name = settings.Name,
-				Placeholder = settings.PlaceholderText or settings.Placeholder or "",
-				Default = settings.CurrentValue or settings.Default or "",
-				AcceptedCharacters = settings.AcceptedCharacters or "All",
-				Callback = settings.Callback or function() end,
-				onChanged = settings.onChanged,
-			}, nextFlag(settings.Name, id))
+			local handle = sydeTab:TextInput({
+				Title = settings.Name,
+				PlaceHolder = settings.PlaceholderText or settings.Placeholder or "",
+				NumberOnly = settings.AcceptedCharacters == "Numeric",
+				CallBack = settings.Callback or function() end,
+			})
 			return wrapElement(function(nextSettings)
 				if nextSettings.CurrentValue == nil then
 					return
 				end
-				if handle and type(handle.UpdateText) == "function" then
-					pcall(handle.UpdateText, handle, tostring(nextSettings.CurrentValue))
-				elseif handle and handle.Set then
+				if handle and type(handle.Set) == "function" then
 					pcall(handle.Set, handle, tostring(nextSettings.CurrentValue))
 				end
 			end, {
@@ -646,22 +527,13 @@ return function(Core)
 			local values = settings.Options or settings.Values or {}
 			local multi = settings.MultipleOptions == true or settings.Multi == true
 			local current = dropdownDefault(values, settings.CurrentOption, multi)
-			local defaultIndex = 1
-			if not multi then
-				for i, value in ipairs(values) do
-					if tostring(value) == tostring(current) then
-						defaultIndex = i
-						break
-					end
-				end
-			end
-			local handle = rawSection:Dropdown({
-				Name = settings.Name,
+			local starter = multi and current or tostring(current or values[1] or "")
+			local handle = sydeTab:Dropdown({
+				Title = settings.Name,
 				Options = values,
-				Default = multi and current or defaultIndex,
+				StarterOption = starter,
 				Multi = multi,
-				Search = settings.Searchable == true,
-				Callback = function(selection)
+				CallBack = function(selection)
 					local userCallback = settings.Callback or function() end
 					if multi then
 						userCallback(Core.normalizeMultiSelection(selection))
@@ -669,18 +541,13 @@ return function(Core)
 						userCallback(Core.normalizeDropdownValue(selection, values[1]))
 					end
 				end,
-			}, nextFlag(settings.Name, id))
+			})
 			return wrapElement(function(nextSettings)
-				if not handle then
-					return
-				end
 				local pick = nextSettings.CurrentOption or nextSettings.CurrentOptions
-				if pick == nil then
+				if pick == nil or not handle then
 					return
 				end
-				if type(handle.UpdateSelection) == "function" then
-					pcall(handle.UpdateSelection, handle, pick)
-				elseif handle.Set then
+				if type(handle.Set) == "function" then
 					pcall(handle.Set, handle, pick)
 				end
 			end, {
@@ -692,23 +559,20 @@ return function(Core)
 
 		function groupbox:CreateLabel(settings, id)
 			local text = type(settings) == "table" and (settings.Name or settings.Text) or tostring(settings or "")
-			local label = rawSection:Label({ Text = text })
+			local handle = sydeTab:Paragraph({
+				Title = "",
+				Content = text,
+			})
 			return {
-				_raw = label,
+				_raw = handle,
 				Set = function(_, nextSettings)
 					local nextText = type(nextSettings) == "table" and (nextSettings.Name or nextSettings.Text)
 						or tostring(nextSettings or "")
-					if label and type(label.UpdateName) == "function" then
-						pcall(label.UpdateName, label, nextText)
-					elseif label and label.Set then
-						pcall(label.Set, label, nextText)
+					if handle and type(handle.Set) == "function" then
+						pcall(handle.Set, handle, nextText, "")
 					end
 				end,
-				SetVisible = function(_, visible)
-					if label and type(label.SetVisibility) == "function" then
-						pcall(label.SetVisibility, label, visible == true)
-					end
-				end,
+				SetVisible = function() end,
 			}
 		end
 
@@ -742,24 +606,14 @@ return function(Core)
 					row:Set({ Name = tostring(text or "") })
 				end
 			end
-			function status:SetVisible(visible)
-				local show = visible == true
-				self.Visible = show
-				for _, row in pairs(self.Labels) do
-					if row and type(row.SetVisible) == "function" then
-						row:SetVisible(show)
-					elseif row and row._raw and type(row._raw.SetVisibility) == "function" then
-						pcall(row._raw.SetVisibility, row._raw, show)
-					end
-				end
+			function status:SetVisible(_visible)
+				self.Visible = _visible == true
 			end
 			return status
 		end
 
 		function groupbox:CreateDivider()
-			if type(rawSection.Divider) == "function" then
-				rawSection:Divider()
-			end
+			groupbox:CreateLabel({ Name = "────────────" })
 			return {}
 		end
 
@@ -770,6 +624,7 @@ return function(Core)
 
 	function Core.wrapUiTab(rawTab, uiBundle, window)
 		local tab = {
+			_sydeTab = rawTab,
 			_macTab = rawTab,
 			_ui = uiBundle,
 			_window = window,
@@ -780,34 +635,29 @@ return function(Core)
 		function tab:CreateGroupbox(settings)
 			settings = settings or {}
 			local name = settings.Name or "Group"
-			local column = math.clamp(tonumber(settings.Column) or 1, 1, 2)
-			local side = column == 2 and "Right" or "Left"
 			if not rawTab or type(rawTab.Section) ~= "function" then
 				Core.logWarn("CreateGroupbox skipped — tab missing for " .. tostring(name))
 				return Core.createStubUiGroup(name)
 			end
-			local section = rawTab:Section({ Side = side })
-			if name ~= "" and type(section.Header) == "function" then
-				pcall(function()
-					section:Header({ Name = name })
-				end)
-			end
-			return Core.createWindUiGroupbox(section, uiBundle)
+			pcall(function()
+				rawTab:Section(name, iconImage(settings.Icon))
+			end)
+			return Core.createWindUiGroupbox(rawTab, uiBundle)
 		end
 
 		function tab:BuildThemeGroupbox(column)
 			local group = Core.buildUiGroup(tab, "Appearance", column or 1)
 			local lib = Core.uiLibrary(uiBundle)
 			local themes = (lib and type(lib.ListThemeNames) == "function" and lib:ListThemeNames())
-				or { "Maclib", "Default", "Dark", "Light" }
-			local current = ENV.Alleral_ActiveTheme or "Maclib"
+				or { "Default", "Maclib", "Linoria", "Obsidian" }
+			local current = ENV.Alleral_ActiveTheme or "Default"
 			group:CreateDropdown("Theme preset", themes, current, function(selected)
 				if lib and type(lib.SetTheme) == "function" then
 					pcall(lib.SetTheme, lib, selected)
 				end
 				ENV.Alleral_ActiveTheme = selected
 				Core.notify("Theme", "Applied " .. tostring(selected), 2, "success")
-			end, "Maclib interface themes.")
+			end, "Syde accent themes.")
 			group:CreateButton("Next theme", function()
 				if lib and type(lib.CycleTheme) == "function" then
 					local ok, nextTheme = pcall(function()
@@ -838,35 +688,36 @@ return function(Core)
 		end
 		local rawWindow = lib:CreateWindow(settings)
 		if not rawWindow then
-			Core.logWarn("Maclib window create failed")
+			Core.logWarn("Syde window create failed")
 			return nil
 		end
 		local window = {
 			_rawWindow = rawWindow,
 			_nlWindow = rawWindow,
-			_premiumWindow = rawWindow,
 			_ui = ui,
 			_library = lib,
 			_initialized = false,
-			_tabGroup = rawWindow._macTabGroup,
+			_tabGroup = rawWindow._sydeTabGroup or rawWindow._macTabGroup,
 		}
 		Core.registerUiWindow(window)
 		Core.flushPendingNotifications()
-		ENV.Alleral_MaclibKeybind = ENV.Alleral_UiKeybind or Enum.KeyCode.RightControl
+
 		function window:AddTab(name, icon)
-			if not self._tabGroup or type(self._tabGroup.Tab) ~= "function" then
+			local tabGroup = self._tabGroup
+			if not tabGroup or type(tabGroup.Tab) ~= "function" then
 				return nil
 			end
-			return self._tabGroup:Tab({
-				Name = name,
-				Image = iconImage(icon),
-			})
+			return tabGroup:Tab({ Name = name, Image = icon })
 		end
+
 		function window:Toggle()
 			if self._rawWindow and type(self._rawWindow.Toggle) == "function" then
 				pcall(self._rawWindow.Toggle, self._rawWindow)
+			elseif self._rawWindow and type(self._rawWindow.SetState) == "function" then
+				pcall(self._rawWindow.SetState, self._rawWindow, not self._rawWindow:GetState())
 			end
 		end
+
 		return window
 	end
 
@@ -877,15 +728,12 @@ return function(Core)
 			Core.logWarn("buildUiTab skipped — window missing")
 			return Core.wrapUiTab(nil, type(section) == "table" and section._ui or nil, window)
 		end
-		local tabGroup = window._tabGroup or window._rawWindow._macTabGroup
+		local tabGroup = window._tabGroup or window._rawWindow._sydeTabGroup
 		if not tabGroup or type(tabGroup.Tab) ~= "function" then
 			Core.logWarn("buildUiTab skipped — tab group missing")
 			return Core.wrapUiTab(nil, window._ui, window)
 		end
-		local rawTab = tabGroup:Tab({
-			Name = name,
-			Image = iconImage(icon),
-		})
+		local rawTab = tabGroup:Tab({ Name = name, Image = icon })
 		local wrapped = Core.wrapUiTab(rawTab, window._ui or (type(section) == "table" and section._ui) or nil, window)
 		wrapped._columnCount = math.max(1, tonumber(columns) or 2)
 		if not window._defaultTab then
@@ -927,7 +775,7 @@ return function(Core)
 			pcall(Core.setupHubKeybinds, {
 				window = window,
 				ui = ui or window._ui or ENV.Alleral_UI,
-				uiKey = ENV.Alleral_UiKeybind or ENV.Alleral_MaclibKeybind,
+				uiKey = ENV.Alleral_UiKeybind,
 			})
 		end
 		if type(Core.registerExploitCommandPalette) == "function" then

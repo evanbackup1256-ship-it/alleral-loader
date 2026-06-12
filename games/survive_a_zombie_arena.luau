@@ -623,7 +623,7 @@ track(LocalPlayer.CharacterAdded:Connect(function(character)
 	end
 end))
 
-local window = Core.buildUiWindow(ui, Core.premiumUiSettings({
+local window = Core.buildUiWindow(ui, Core.uiWindowSettings({
 	Subtitle = "Survive a Zombie Arena · v" .. VERSION,
 	Icon = "skull",
 	Theme = "Obsidian",
@@ -634,7 +634,7 @@ if not window or not window._rawWindow then
 	return
 end
 local section = Core.buildUiSection(window)
-Core.buildPremiumExploitHub(section, {
+Core.buildExploitHub(section, {
 	window = window,
 	ui = ui,
 	state = state,

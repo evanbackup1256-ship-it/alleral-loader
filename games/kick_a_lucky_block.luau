@@ -3122,7 +3122,7 @@ local function loggedCallback(label, callback)
 	end
 end
 
-local uiWindow = Core.buildUiWindow(ui, Core.premiumUiSettings({
+local uiWindow = Core.buildUiWindow(ui, Core.uiWindowSettings({
 	Subtitle = "Kick a Lucky Block · v" .. VERSION,
 	Icon = "zap",
 	Theme = "Private",
@@ -3217,7 +3217,7 @@ local diagnosticsStatus = diagnosticsGroup:CreateStatus("Live stats", {
 	Log         = appendFile and logFile or "n/a",
 })
 
-Core.buildPremiumExploitHub(uiSection, {
+Core.buildExploitHub(uiSection, {
 	window = uiWindow,
 	ui = ui,
 	state = state,

@@ -24,9 +24,9 @@ local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
 local RELEASE_FALLBACK = {
 	loader = "8.2.10",
 	core = "2.9.4",
-	ui = "Maclib",
-	windui = "3.0.3-maclib",
-	alleral = "3.0.3-maclib",
+	ui = "Syde",
+	windui = "4.0.0-syde",
+	alleral = "4.0.0-syde",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",
@@ -1273,13 +1273,10 @@ local function alleralUiValid(src)
 	if not src:find("Alleral UI layer", 1, true) then
 		return false
 	end
-	if not src:find("Maclib", 1, true) then
+	if not src:find("Syde", 1, true) then
 		return false
 	end
-	if not src:find("loadMaclib", 1, true) then
-		return false
-	end
-	if not src:find("MACLIB_URL", 1, true) then
+	if not src:find("loadSyde", 1, true) then
 		return false
 	end
 	if compileCoreSource(src, "Alleral/alleral_ui") then
@@ -1399,11 +1396,11 @@ local function alleralUiRejectReason(src)
 	if not src:find("Alleral UI layer", 1, true) then
 		return "missing Alleral UI layer marker"
 	end
-	if not src:find("Maclib", 1, true) then
-		return "missing Maclib integration"
+	if not src:find("Syde", 1, true) then
+		return "missing Syde integration"
 	end
-	if not src:find("loadMaclib", 1, true) then
-		return "missing loadMaclib bootstrap"
+	if not src:find("loadSyde", 1, true) then
+		return "missing loadSyde bootstrap"
 	end
 	if not looksLikeLua(src) then
 		return "invalid lua body"
@@ -2618,6 +2615,27 @@ local function buildManagedFiles()
 			expectedKey = "alleral",
 			extract = "alleral",
 			isValid = alleralUiValid,
+		},
+		{
+			paths = {
+				UI .. "/syde/source.luau",
+				".alleral/cache/" .. UI .. "/syde/source.luau",
+			},
+			expectedKey = "alleral",
+			extract = "alleral",
+		},
+		{
+			paths = {
+				UI .. "/alleral_maclib/init.luau",
+				UI .. "/alleral_maclib/util.luau",
+				UI .. "/alleral_maclib/theme.luau",
+				UI .. "/alleral_maclib/notify.luau",
+				UI .. "/alleral_maclib/elements.luau",
+				UI .. "/alleral_maclib/section.luau",
+				UI .. "/alleral_maclib/window.luau",
+				".alleral/cache/" .. UI .. "/alleral_maclib/init.luau",
+			},
+			alwaysDelete = true,
 		},
 		{
 			paths = {
