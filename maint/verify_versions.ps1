@@ -8,6 +8,35 @@ function Pass($msg) { Write-Host "OK: $msg" -ForegroundColor Green }
 $release = Get-Content (Join-Path $root "cfg/release.json") -Raw | ConvertFrom-Json
 $manifest = Get-Content (Join-Path $root "cfg/scripts_manifest.json") -Raw | ConvertFrom-Json
 $loader = Get-Content (Join-Path $root "loader.luau") -Raw
+$HashBumpMessagePattern = '^Update release commit hash'
+
+$head = (git -C $root rev-parse --short HEAD).Trim()
+$parent = ""
+$parentOut = git -C $root rev-parse --short HEAD~1 2>$null
+if ($LASTEXITCODE -eq 0 -and $parentOut) {
+    $parent = $parentOut.Trim()
+}
+$lastMsg = (git -C $root log -1 --pretty=%s).Trim()
+
+if ($release.commit -eq $head) {
+    Pass "release commit $head matches HEAD"
+} elseif ($parent -and $release.commit -eq $parent -and $lastMsg -match $HashBumpMessagePattern) {
+    Pass "release commit $parent matches HEAD~1 (hash bump on $head)"
+} else {
+    Fail "release.json commit ($($release.commit)) out of sync with HEAD ($head) - run maint/sync_repo.ps1"
+}
+
+$commitMatch = [regex]::Match($loader, '(?m)^\tcommit = "([^"]+)"')
+if ($commitMatch.Success) {
+    $fallbackCommit = $commitMatch.Groups[1].Value
+    if ($fallbackCommit -ne $release.commit) {
+        Fail "loader RELEASE_FALLBACK.commit ($fallbackCommit) != release.json ($($release.commit))"
+    } else {
+        Pass "loader RELEASE_FALLBACK.commit $($release.commit)"
+    }
+} else {
+    Fail "loader.luau missing RELEASE_FALLBACK.commit"
+}
 
 if ($loader -match 'LOADER_VERSION = "([^"]+)"') {
     $loaderVer = $Matches[1]
@@ -218,11 +247,11 @@ foreach ($rel in $forbiddenFiles) {
     }
 }
 
-$rootLuau = @(Get-ChildItem -Path $root -Filter "*.luau" -File | ForEach-Object { $_.Name })
+$rootLuau = @(git -C $root ls-files | Where-Object { $_ -match '^[^/]+\.luau$' } | ForEach-Object { Split-Path $_ -Leaf } | Sort-Object -Unique)
 if ($rootLuau.Count -ne 1 -or $rootLuau[0] -ne "loader.luau") {
-    Fail "repo root must contain only loader.luau (found: $($rootLuau -join ', '))"
+    Fail "tracked repo root must contain only loader.luau (found: $($rootLuau -join ', '))"
 } else {
-    Pass "single root entry loader.luau"
+    Pass "single tracked root entry loader.luau"
 }
 
 $legacyPatterns = @(

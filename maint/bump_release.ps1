@@ -14,29 +14,55 @@ function Copy-IfChanged([string]$Source, [string]$Dest) {
     Copy-Item $Source $Dest -Force
 }
 
+$HashBumpMessagePattern = '^Update release commit hash'
+
 $releasePath = Join-Path $root "cfg/release.json"
-$commit = (git -C $root rev-parse --short HEAD).Trim()
+$head = (git -C $root rev-parse --short HEAD).Trim()
+$parent = ""
+$parentOut = git -C $root rev-parse --short HEAD~1 2>$null
+if ($LASTEXITCODE -eq 0 -and $parentOut) {
+    $parent = $parentOut.Trim()
+}
+$lastMsg = (git -C $root log -1 --pretty=%s).Trim()
 $updatedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss'Z'")
 $release = Get-Content $releasePath -Raw | ConvertFrom-Json
-$release.commit = $commit
-$release.updatedAt = $updatedAt
-Write-Utf8NoBom $releasePath (($release | ConvertTo-Json -Depth 6) + "`n")
-Write-Host "release.json -> commit=$commit updatedAt=$updatedAt"
 
-$loaderPath = Join-Path $root "loader.luau"
-$loaderRaw = Get-Content $loaderPath -Raw -Encoding UTF8
-$commitRx = [regex]::new('(?m)^\tcommit = "[^"]+"')
-$loaderRaw = $commitRx.Replace($loaderRaw, ("`tcommit = `"$commit`""), 1)
-Write-Utf8NoBom $loaderPath $loaderRaw
-Write-Host "loader.luau RELEASE_FALLBACK.commit -> $commit"
+$hashBumpNeeded = $true
+if ($release.commit -eq $head) {
+    $hashBumpNeeded = $false
+    Write-Host "release.commit already matches HEAD ($head) - hash bump skipped"
+} elseif ($parent -and $release.commit -eq $parent -and $lastMsg -match $HashBumpMessagePattern) {
+    $hashBumpNeeded = $false
+    Write-Host "release.commit already matches HEAD~1 ($parent) after hash bump - hash bump skipped"
+}
+
+$commit = $release.commit
+if ($hashBumpNeeded) {
+    $commit = $head
+    $release.commit = $commit
+    $release.updatedAt = $updatedAt
+    Write-Utf8NoBom $releasePath (($release | ConvertTo-Json -Depth 6) + "`n")
+    Write-Host "release.json -> commit=$commit updatedAt=$updatedAt"
+
+    $loaderPath = Join-Path $root "loader.luau"
+    $loaderRaw = Get-Content $loaderPath -Raw -Encoding UTF8
+    $commitRx = [regex]::new('(?m)^\tcommit = "[^"]+"')
+    $loaderRaw = $commitRx.Replace($loaderRaw, ("`tcommit = `"$commit`""), 1)
+    Write-Utf8NoBom $loaderPath $loaderRaw
+    Write-Host "loader.luau RELEASE_FALLBACK.commit -> $commit"
+} else {
+    Write-Host "release.json commit remains $commit"
+}
 
 $manifestSrc = Join-Path $root "cfg/scripts_manifest.json"
 $siteSrc = Join-Path $root "cfg/site.json"
-$siteRaw = Get-Content $siteSrc -Raw -Encoding UTF8
-$siteRaw = [regex]::Replace($siteRaw, '"loaderVersion"\s*:\s*"[^"]*"', ('"loaderVersion": "' + $release.loader + '"'))
-$siteRaw = [regex]::Replace($siteRaw, '"coreVersion"\s*:\s*"[^"]*"', ('"coreVersion": "' + $release.core + '"'))
-$siteRaw = [regex]::Replace($siteRaw, '"updatedAt"\s*:\s*"[^"]*"', ('"updatedAt": "' + $updatedAt + '"'))
-Write-Utf8NoBom $siteSrc $siteRaw
+if ($hashBumpNeeded) {
+    $siteRaw = Get-Content $siteSrc -Raw -Encoding UTF8
+    $siteRaw = [regex]::Replace($siteRaw, '"loaderVersion"\s*:\s*"[^"]*"', ('"loaderVersion": "' + $release.loader + '"'))
+    $siteRaw = [regex]::Replace($siteRaw, '"coreVersion"\s*:\s*"[^"]*"', ('"coreVersion": "' + $release.core + '"'))
+    $siteRaw = [regex]::Replace($siteRaw, '"updatedAt"\s*:\s*"[^"]*"', ('"updatedAt": "' + $updatedAt + '"'))
+    Write-Utf8NoBom $siteSrc $siteRaw
+}
 
 Copy-IfChanged $manifestSrc (Join-Path $root "relay/scripts_manifest.json")
 Copy-IfChanged $siteSrc (Join-Path $root "relay/site.json")
@@ -59,13 +85,15 @@ function Sync-Tree($src, $dest) {
 }
 Sync-Tree (Join-Path $relayDir "site") (Join-Path $backendDir "site")
 
-$generatedMarker = @"
-GENERATED — do not edit files in backend/ directly.
+if ($hashBumpNeeded) {
+    $generatedMarker = @"
+GENERATED - do not edit files in backend/ directly.
 Edit relay/ and cfg/, then run: maint/sync_repo.ps1
 Synced at: $updatedAt
 Commit: $commit
 "@
-Write-Utf8NoBom (Join-Path $backendDir "GENERATED.txt") ($generatedMarker + "`n")
+    Write-Utf8NoBom (Join-Path $backendDir "GENERATED.txt") ($generatedMarker + "`n")
+}
 
 $rootRailway = Join-Path $root "railway.toml"
 if (Test-Path $rootRailway) {

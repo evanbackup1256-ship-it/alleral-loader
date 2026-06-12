@@ -13,10 +13,10 @@
 ## Before you push
 
 ```powershell
-./maint/sync_repo.ps1
+./maint/sync_repo.ps1 -AutoCommit -Push
 ```
 
-That bumps the release stamp, copies `cfg/` → `relay/` → `backend/`, and runs version checks.
+That bumps the release stamp (once per code change — re-runs are idempotent), copies `cfg/` → `relay/` → `backend/`, verifies versions, then commits and pushes sync files when `-AutoCommit` is set.
 
 ## Deploy
 
