@@ -25,8 +25,8 @@ local RELEASE_FALLBACK = {
 	loader = "8.2.10",
 	core = "2.9.4",
 	ui = "Maclib",
-	windui = "3.0.5-premium",
-	alleral = "3.0.5-premium",
+	windui = "3.0.3-maclib",
+	alleral = "3.0.3-maclib",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",
@@ -55,6 +55,15 @@ local LOADER_LOCAL_PATHS = {
 	"kick/kick/loader.luau",
 	"Alleral/loader.luau",
 }
+local BOOTSTRAP_REMOTE_PATH = "bootstrap.luau"
+local BOOTSTRAP_LOCAL_PATHS = {
+	"bootstrap.luau",
+	"kick/bootstrap.luau",
+	"kick/kick/bootstrap.luau",
+	"alleral_bootstrap.luau",
+}
+local BOOTSTRAP_LOADSTRING =
+	"loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?t=\" .. tick(), true))()"
 local LEGACY_LOADER_MARKERS = {
 	"[Alleral Loader v",
 	"Alleral loader 3.",
@@ -146,8 +155,7 @@ local PREVIOUS_LOADER_VERSION = ENV._Alleral_LoaderVersion or ENV.Alleral_Loader
 ENV._Alleral_LoaderVersion = LOADER_VERSION
 ENV.Alleral_LoaderRunning = false
 
-local LOADSTRING_HINT =
-	"loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau?t=\" .. tick(), true))()"
+local LOADSTRING_HINT = BOOTSTRAP_LOADSTRING
 
 local function publishConsoleApi(name, fn)
 	ENV[name] = fn
@@ -172,6 +180,7 @@ local function notLoadedApi(name)
 end
 
 for _, apiName in ipairs({
+	"Alleral_Bootstrap",
 	"Alleral_Load",
 	"Alleral_PurgeCache",
 	"Alleral_CheckUpdate",
@@ -965,16 +974,8 @@ local function expectedGameVersion(profile)
 	return profile.version
 end
 
-local function syncWorkspaceLoaderFromRemote()
-	if type(writeFileFn) ~= "function" then
-		return false
-	end
-	local body, via = httpGet(GITHUB_RAW .. "/loader.luau?t=" .. tostring(tick()), 500)
-	if type(body) ~= "string" or #body < 500 then
-		return false
-	end
-	local remoteVer = extractFileVersion(body, "loader")
-	if type(remoteVer) ~= "string" or remoteVer == "" then
+local function cacheLoaderSource(src)
+	if type(writeFileFn) ~= "function" or type(src) ~= "string" then
 		return false
 	end
 	if makeFolderFn then
@@ -982,8 +983,59 @@ local function syncWorkspaceLoaderFromRemote()
 		pcall(makeFolderFn, ".alleral")
 	end
 	for _, path in ipairs(LOADER_LOCAL_PATHS) do
-		pcall(writeFileFn, path, body)
+		pcall(writeFileFn, path, src)
 	end
+	return true
+end
+
+local function fetchRemoteLoaderSource()
+	local body, via = httpGet(GITHUB_RAW .. "/loader.luau?t=" .. tostring(tick()), 500)
+	if type(body) == "string" and #body >= 500 then
+		return body, via
+	end
+	return nil, via or "remote loader fetch failed"
+end
+
+local function readFreshLocalLoaderSource()
+	if not isFile or not readFile then
+		return nil, nil
+	end
+	local expectedLoader = ENV._Alleral_ExpectedVersions and ENV._Alleral_ExpectedVersions.loader
+	for _, path in ipairs(LOADER_LOCAL_PATHS) do
+		for _, root in ipairs(WORKSPACE_ROOTS) do
+			local fullPath = root .. path
+			local okExists, exists = pcall(isFile, fullPath)
+			if okExists and exists then
+				local okRead, src = pcall(readFile, fullPath)
+				if okRead and type(src) == "string" and #src >= 500 then
+					local ver = extractFileVersion(src, "loader")
+					if type(ver) ~= "string" or ver == "" then
+						continue
+					end
+					if type(expectedLoader) == "string" and expectedLoader ~= "" and versionLt(ver, expectedLoader) then
+						continue
+					end
+					if versionLt(ver, LOADER_VERSION) then
+						continue
+					end
+					return src, fullPath, ver
+				end
+			end
+		end
+	end
+	return nil, nil, nil
+end
+
+local function syncWorkspaceLoaderFromRemote()
+	local body, via = fetchRemoteLoaderSource()
+	if type(body) ~= "string" or #body < 500 then
+		return false
+	end
+	local remoteVer = extractFileVersion(body, "loader")
+	if type(remoteVer) ~= "string" or remoteVer == "" then
+		return false
+	end
+	cacheLoaderSource(body)
 	log("Cached remote loader v" .. remoteVer .. " to workspace (" .. tostring(via) .. ")")
 	return true
 end
@@ -1230,9 +1282,6 @@ local function alleralUiValid(src)
 	if not src:find("MACLIB_URL", 1, true) then
 		return false
 	end
-	if not src:find("ui_premium.luau", 1, true) then
-		return false
-	end
 	if compileCoreSource(src, "Alleral/alleral_ui") then
 		return true
 	end
@@ -1377,6 +1426,7 @@ local VERSION_PATTERNS = {
 	security = 'Security%.VERSION%s*=%s*"([%d%.]+)"',
 	access = 'Access%.VERSION%s*=%s*"([%d%.]+)"',
 	loader = 'LOADER_VERSION%s*=%s*"([%d%.]+)"',
+	bootstrap = 'BOOTSTRAP_VERSION%s*=%s*"([%d%.]+)"',
 	windui = 'ALLERAL_UI_VERSION%s*=%s*"([^"]+)"',
 	alleral = 'ALLERAL_UI_VERSION%s*=%s*"([^"]+)"',
 	game = 'local VERSION%s*=%s*"([%d%.]+)"',
@@ -1393,6 +1443,10 @@ local function extractFileVersion(src, kind)
 	if kind == "hub_ui" then
 		return src:match('HUB_UI_LAYER_VERSION%s*=%s*"([^"]+)"')
 			or src:match("hub_ui_layer=([%w%.%-]+)")
+	end
+	if kind == "bootstrap" then
+		return src:match('BOOTSTRAP_VERSION%s*=%s*"([%d%.]+)"')
+			or src:match("Alleral Bootstrap v([%d%.]+)")
 	end
 	local pattern = VERSION_PATTERNS[kind]
 	if not pattern then
@@ -1615,9 +1669,6 @@ local function purgeStaleHubPaths()
 	local hubPaths = {
 		{ paths = { HUB .. "/alleral_ui.luau", CORE_ALLERAL_UI_PATH }, valid = alleralUiValid, kind = "alleral" },
 		{ paths = { HUB .. "/core_base.luau", CORE_BASE_PATH }, valid = coreBaseValid, kind = "core" },
-		{ paths = { HUB .. "/ui_spr.luau", ".alleral/cache/" .. HUB .. "/ui_spr.luau" }, kind = "hub_ui" },
-		{ paths = { HUB .. "/ui_motion.luau", ".alleral/cache/" .. HUB .. "/ui_motion.luau" }, kind = "hub_ui" },
-		{ paths = { HUB .. "/ui_premium.luau", ".alleral/cache/" .. HUB .. "/ui_premium.luau" }, kind = "hub_ui" },
 	}
 	for _, entry in ipairs(hubPaths) do
 		for _, path in ipairs(entry.paths) do
@@ -1626,10 +1677,9 @@ local function purgeStaleHubPaths()
 				if okExists and exists then
 					local okRead, src = pcall(readFile, path)
 					if okRead and type(src) == "string" and src ~= "" then
-						local versionKind = entry.kind == "hub_ui" and "hub_ui" or entry.kind
-						local expectedVersion = expectedVersionForKind(expected, versionKind == "hub_ui" and "alleral" or entry.kind)
+						local expectedVersion = expectedVersionForKind(expected, entry.kind)
 						if (entry.valid and not entry.valid(src))
-							or sourceVersionStale(src, versionKind, expectedVersion)
+							or sourceVersionStale(src, entry.kind, expectedVersion)
 						then
 							log("Removing outdated hub file " .. path, true)
 							deleteWorkspaceFile(path)
@@ -2571,27 +2621,10 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
-				HUB .. "/ui_spr.luau",
-				".alleral/cache/" .. HUB .. "/ui_spr.luau",
-			},
-			expectedKey = "alleral",
-			extract = "hub_ui",
-		},
-		{
-			paths = {
-				HUB .. "/ui_motion.luau",
-				".alleral/cache/" .. HUB .. "/ui_motion.luau",
-			},
-			expectedKey = "alleral",
-			extract = "hub_ui",
-		},
-		{
-			paths = {
 				HUB .. "/ui_premium.luau",
 				".alleral/cache/" .. HUB .. "/ui_premium.luau",
 			},
-			expectedKey = "alleral",
-			extract = "hub_ui",
+			alwaysDelete = true,
 		},
 		{
 			paths = {
@@ -2691,15 +2724,22 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
+				BOOTSTRAP_REMOTE_PATH,
+				"kick/" .. BOOTSTRAP_REMOTE_PATH,
+				".alleral/cache/" .. BOOTSTRAP_REMOTE_PATH,
+			},
+			expectedKey = "bootstrap",
+			extract = "bootstrap",
+		},
+		{
+			paths = {
 				"load.luau",
 				"kick/load.luau",
 				"kick/kick/load.luau",
 				"launch.luau",
-				"bootstrap.luau",
 				"run.luau",
 				"autoexec/load.luau",
 				"autoexec/launch.luau",
-				"autoexec/bootstrap.luau",
 				"autoexec/run.luau",
 				"Autoexec/load.luau",
 			},
