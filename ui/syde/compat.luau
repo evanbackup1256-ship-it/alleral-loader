@@ -1,7 +1,7 @@
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 18
+local ALLERAL_SYDE_PATCH = 19
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -81,6 +81,13 @@ local function sydeButtonLabel(button)
 		return nil
 	end
 	return sydeFindChild(button, "TextLabel", "text", "title")
+end
+
+local function sydeSliderLabel(slider)
+	if not slider then
+		return nil
+	end
+	return sydeFindChild(slider, "title", "Title")
 end
 
 local function sydeButtonStroke(button)

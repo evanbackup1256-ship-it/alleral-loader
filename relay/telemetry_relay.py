@@ -30,6 +30,39 @@ except ImportError:
     raise
 
 try:
+    from security import (
+        AdminLoginInput,
+        BugReportInput,
+        FaqFeedbackInput,
+        FeatureRequestInput,
+        SupportInput,
+        apply_security_headers,
+        assert_browser_origin,
+        configure_logging,
+        issue_jwt,
+        parse_model,
+        sanitize_text,
+        validate_env,
+        verify_jwt,
+    )
+except ImportError:
+    from relay.security import (  # type: ignore
+        AdminLoginInput,
+        BugReportInput,
+        FaqFeedbackInput,
+        FeatureRequestInput,
+        SupportInput,
+        apply_security_headers,
+        assert_browser_origin,
+        configure_logging,
+        issue_jwt,
+        parse_model,
+        sanitize_text,
+        validate_env,
+        verify_jwt,
+    )
+
+try:
     import fcntl
 except ImportError:
     fcntl = None  # type: ignore
@@ -252,6 +285,12 @@ except ImportError:
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES
+configure_logging()
+_ENV_REPORT = validate_env()
+for _warn in _ENV_REPORT.warnings:
+    print(f"[security] warning: {_warn}", file=sys.stderr)
+for _err in _ENV_REPORT.errors:
+    print(f"[security] error: {_err}", file=sys.stderr)
 
 
 @app.after_request
@@ -259,7 +298,8 @@ def apply_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Alleral-Key, X-Admin-Key, X-Admin-Token, X-Dev-Token, X-Ban-Api-Key, X-Ban-Partner-Key, X-Alleral-Ban-Key, Authorization"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
-    return response
+    api_only = request.path.startswith("/api/") or request.path.startswith("/ingest")
+    return apply_security_headers(response, api_only=api_only)
 
 
 @app.route("/api/bootstrap", methods=["OPTIONS"])
@@ -569,8 +609,8 @@ def admin_enabled() -> bool:
 
 
 def admin_issue_token(*, remember: bool = False) -> tuple[str, str]:
-    token = secrets.token_urlsafe(48)
     ttl = ADMIN_REMEMBER_TTL_SEC if remember else ADMIN_SESSION_TTL_SEC
+    token = issue_jwt("admin", ttl_sec=ttl, claims={"remember": remember})
     expiry = time.time() + ttl
     ADMIN_SESSIONS[token] = expiry
     return token, datetime.fromtimestamp(expiry, tz=timezone.utc).replace(microsecond=0).isoformat()
@@ -579,6 +619,8 @@ def admin_issue_token(*, remember: bool = False) -> tuple[str, str]:
 def admin_token_valid(token: str) -> bool:
     if not token:
         return False
+    if verify_jwt(token, subject="admin"):
+        return True
     expiry = ADMIN_SESSIONS.get(token)
     if not expiry or time.time() > expiry:
         ADMIN_SESSIONS.pop(token, None)
@@ -874,6 +916,43 @@ def payload_fingerprint(payload: dict) -> str:
 
 def utc_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def form_origin_ok() -> tuple[bool, str | None]:
+    host = (request.headers.get("Host") or "").split(":")[0]
+    allowed: set[str] = set()
+    if host:
+        allowed.add(host.lower())
+
+    for env_key in ("PUBLIC_BASE_URL", "SITE_ORIGIN"):
+        val = os.environ.get(env_key, "").strip()
+        if not val:
+            continue
+        try:
+            from urllib.parse import urlparse
+
+            netloc = urlparse(val).netloc.split(":")[0].lower()
+            if netloc:
+                allowed.add(netloc)
+        except Exception:
+            pass
+
+    extra = os.environ.get("ALLOWED_FORM_ORIGINS", "").strip()
+    if extra:
+        from urllib.parse import urlparse
+
+        for part in extra.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            netloc = urlparse(part).netloc.split(":")[0].lower() if "://" in part else part.lower()
+            if netloc:
+                allowed.add(netloc)
+
+    # Default GitHub Pages mirror when env is not configured.
+    allowed.add("evanbackup1256-ship-it.github.io")
+
+    return assert_browser_origin(request, allowed_hosts=list(allowed))
 
 
 def clip(text: object, limit: int = 1000) -> str:
@@ -2313,25 +2392,28 @@ def public_bug_report():
     if not public_allow_ip(client_ip, BUG_IP_HITS, BUG_RATE_PER_MIN):
         return jsonify({"ok": False, "error": "rate_limited"}), 429
 
-    body = request.get_json(silent=True)
-    if not isinstance(body, dict):
-        return jsonify({"ok": False, "error": "bad_request"}), 400
+    origin_ok, origin_err = form_origin_ok()
+    if not origin_ok:
+        return jsonify({"ok": False, "error": origin_err or "invalid_origin"}), 403
 
-    ok_captcha, captcha_err = verify_form_turnstile(body, client_ip)
+    body = request.get_json(silent=True)
+    parsed, err_body, err_status = parse_model(BugReportInput, body)
+    if err_body:
+        return jsonify(err_body), err_status or 400
+    assert isinstance(parsed, BugReportInput)
+
+    ok_captcha, captcha_err = verify_form_turnstile(body if isinstance(body, dict) else {}, client_ip)
     if not ok_captcha:
         return jsonify({"ok": False, "error": captcha_err or "captcha_failed"}), 403
 
-    description = clip(body.get("description") or body.get("message"), 1800)
-    if len(description) < 8:
-        return jsonify({"ok": False, "error": "description_too_short"}), 400
-
-    category = clip(body.get("category") or "Other", 64)
-    game = clip(body.get("game") or body.get("gameId") or "Unknown", 120)
-    roblox_user = clip(body.get("robloxUser") or body.get("username") or "Anonymous", 64)
-    executor = clip(body.get("executor") or "Unknown", 64)
-    contact = clip(body.get("contact") or "", 120)
-    steps = clip(body.get("steps") or "", 1200)
-    severity = clip(body.get("severity") or "normal", 32)
+    category = parsed.category or "Other"
+    game = parsed.game or "Unknown"
+    roblox_user = parsed.username or "Anonymous"
+    executor = parsed.executor or "Unknown"
+    contact = parsed.contact or ""
+    steps = parsed.steps or ""
+    severity = parsed.severity or "normal"
+    description = parsed.description
 
     fields = [
         {"name": "Category", "value": category, "inline": True},
@@ -2418,22 +2500,26 @@ def public_feature_request():
     if not public_allow_ip(client_ip, BUG_IP_HITS, BUG_RATE_PER_MIN):
         return jsonify({"ok": False, "error": "rate_limited"}), 429
 
-    body = request.get_json(silent=True)
-    if not isinstance(body, dict):
-        return jsonify({"ok": False, "error": "bad_request"}), 400
+    origin_ok, origin_err = form_origin_ok()
+    if not origin_ok:
+        return jsonify({"ok": False, "error": origin_err or "invalid_origin"}), 403
 
-    ok_captcha, captcha_err = verify_form_turnstile(body, client_ip)
+    body = request.get_json(silent=True)
+    parsed, err_body, err_status = parse_model(FeatureRequestInput, body)
+    if err_body:
+        return jsonify(err_body), err_status or 400
+    assert isinstance(parsed, FeatureRequestInput)
+
+    ok_captcha, captcha_err = verify_form_turnstile(body if isinstance(body, dict) else {}, client_ip)
     if not ok_captcha:
         return jsonify({"ok": False, "error": captcha_err or "captcha_failed"}), 403
 
-    idea = clip(body.get("idea") or body.get("description"), 1800)
-    if len(idea) < 8:
-        return jsonify({"ok": False, "error": "idea_too_short"}), 400
+    idea = parsed.idea
 
     fields = [
-        {"name": "Roblox user", "value": clip(body.get("robloxUser") or "Anonymous", 64), "inline": True},
-        {"name": "Game", "value": clip(body.get("game") or "Any", 120), "inline": True},
-        {"name": "Contact", "value": clip(body.get("contact") or "—", 120), "inline": True},
+        {"name": "Roblox user", "value": parsed.username or "Anonymous", "inline": True},
+        {"name": "Game", "value": parsed.game or "Any", "inline": True},
+        {"name": "Contact", "value": parsed.contact or "—", "inline": True},
         {"name": "Idea", "value": idea, "inline": False},
     ]
     fields.extend(submission_meta(body, client_ip))
@@ -2458,22 +2544,26 @@ def public_support_question():
     if not public_allow_ip(client_ip, BUG_IP_HITS, BUG_RATE_PER_MIN):
         return jsonify({"ok": False, "error": "rate_limited"}), 429
 
-    body = request.get_json(silent=True)
-    if not isinstance(body, dict):
-        return jsonify({"ok": False, "error": "bad_request"}), 400
+    origin_ok, origin_err = form_origin_ok()
+    if not origin_ok:
+        return jsonify({"ok": False, "error": origin_err or "invalid_origin"}), 403
 
-    ok_captcha, captcha_err = verify_form_turnstile(body, client_ip)
+    body = request.get_json(silent=True)
+    parsed, err_body, err_status = parse_model(SupportInput, body)
+    if err_body:
+        return jsonify(err_body), err_status or 400
+    assert isinstance(parsed, SupportInput)
+
+    ok_captcha, captcha_err = verify_form_turnstile(body if isinstance(body, dict) else {}, client_ip)
     if not ok_captcha:
         return jsonify({"ok": False, "error": captcha_err or "captcha_failed"}), 403
 
-    question = clip(body.get("question") or body.get("message"), 1800)
-    if len(question) < 8:
-        return jsonify({"ok": False, "error": "question_too_short"}), 400
+    question = parsed.question
 
     fields = [
-        {"name": "Roblox user", "value": clip(body.get("robloxUser") or "Anonymous", 64), "inline": True},
-        {"name": "Topic", "value": clip(body.get("topic") or "General", 64), "inline": True},
-        {"name": "Contact", "value": clip(body.get("contact") or "—", 120), "inline": True},
+        {"name": "Roblox user", "value": parsed.username or "Anonymous", "inline": True},
+        {"name": "Topic", "value": parsed.topic or "General", "inline": True},
+        {"name": "Contact", "value": parsed.contact or "—", "inline": True},
         {"name": "Question", "value": question, "inline": False},
     ]
     fields.extend(submission_meta(body, client_ip))
@@ -2486,7 +2576,7 @@ def public_support_question():
     if not ok:
         return jsonify({"ok": False, "error": detail}), 503
     if MANAGE is not None:
-        MANAGE.push_hub_event("support.question", {"topic": clip(body.get("topic") or "General", 64)})
+        MANAGE.push_hub_event("support.question", {"topic": parsed.topic or "General"})
     return jsonify({"ok": True, "status": "sent"})
 
 
@@ -2498,17 +2588,21 @@ def public_faq_feedback():
     if not public_allow_ip(client_ip, BUG_IP_HITS, BUG_RATE_PER_MIN):
         return jsonify({"ok": False, "error": "rate_limited"}), 429
 
+    origin_ok, origin_err = form_origin_ok()
+    if not origin_ok:
+        return jsonify({"ok": False, "error": origin_err or "invalid_origin"}), 403
+
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         return jsonify({"ok": False, "error": "bad_request"}), 400
+    try:
+        parsed = FaqFeedbackInput.from_body(body)
+    except Exception:
+        return jsonify({"ok": False, "error": "validation_failed"}), 400
 
-    helpful = body.get("helpful")
-    if helpful not in {True, False, "yes", "no", 1, 0}:
-        return jsonify({"ok": False, "error": "bad_request"}), 400
-    is_helpful = helpful in {True, "yes", 1}
-
-    question = clip(body.get("question") or body.get("faq") or "FAQ item", 400)
-    comment = clip(body.get("comment") or "", 800)
+    is_helpful = parsed.helpful
+    question = parsed.question or "FAQ item"
+    comment = parsed.comment
     verdict = "Helpful" if is_helpful else "Not helpful"
 
     fields = [
@@ -2554,10 +2648,13 @@ def admin_login():
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         return jsonify({"ok": False, "error": "bad_request"}), 400
-    provided = str(body.get("key") or body.get("adminKey") or "").strip()
-    if not provided or not secure_compare(provided, ADMIN_API_KEY):
+    try:
+        login = AdminLoginInput.from_body(body)
+    except Exception:
+        return jsonify({"ok": False, "error": "validation_failed"}), 400
+    if not login.key or not secure_compare(login.key, ADMIN_API_KEY):
         return jsonify({"ok": False, "error": "unauthorized"}), 401
-    remember = bool(body.get("remember"))
+    remember = login.remember
     token, expires_at = admin_issue_token(remember=remember)
     manage_audit("admin.login", {"ip": resolve_client_ip(request), "remember": remember}, actor="admin")
     return jsonify({"ok": True, "token": token, "expiresAt": expires_at, "remember": remember})

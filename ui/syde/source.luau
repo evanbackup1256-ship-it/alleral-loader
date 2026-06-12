@@ -101,7 +101,7 @@ local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 18
+local ALLERAL_SYDE_PATCH = 19
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -181,6 +181,13 @@ local function sydeButtonLabel(button)
 		return nil
 	end
 	return sydeFindChild(button, "TextLabel", "text", "title")
+end
+
+local function sydeSliderLabel(slider)
+	if not slider then
+		return nil
+	end
+	return sydeFindChild(slider, "title", "Title")
 end
 
 local function sydeButtonStroke(button)
@@ -5733,7 +5740,7 @@ function syde:Init(library)
 					}
 
 					Slider.Name = Options.Title
-					Slider.Title.Text = Options.Title
+					do local _sliderTitle = sydeSliderLabel(Slider); if _sliderTitle then _sliderTitle.Text = Options.Title end end
 					Options.Value = Options.StarterValue
 
 					local dragging = false
@@ -5877,7 +5884,7 @@ function syde:Init(library)
 							Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", newValue, Options.Range[2])
 
 
-							tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+							tweenservice:Create(sydeSliderLabel(Slider), TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
 							local success, errorMsg = pcall(function()
 								Options.CallBack(newValue)
@@ -5901,7 +5908,7 @@ function syde:Init(library)
 					syde:AddConnection(userinput.InputEnded, function(input, processed)
 						if input.UserInputType == Enum.UserInputType.MouseButton1  or input.UserInputType == Enum.UserInputType.Touch then
 							dragging = false
-							tweenservice:Create(Slider.Title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
+							tweenservice:Create(sydeSliderLabel(Slider), TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
 						end
 					end)
 
@@ -5965,7 +5972,7 @@ function syde:Init(library)
 						)
 
 						-- Tween title appearance
-						tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
+						tweenservice:Create(sydeSliderLabel(Slider), TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
 							TextTransparency = 0
 						}):Play()
 
@@ -7904,7 +7911,7 @@ function syde:Init(library)
 				}
 
 				Slider.Name = Options.Title
-				Slider.Title.Text = Options.Title
+				do local _sliderTitle = sydeSliderLabel(Slider); if _sliderTitle then _sliderTitle.Text = Options.Title end end
 				Options.Value = Options.StarterValue
 
 				local dragging = false
@@ -8052,7 +8059,7 @@ function syde:Init(library)
 						-- Update the displayed value
 						Slider.v.Text = string.format("<font size='14'>%d</font><font color='#434343'>/%d</font>", newValue, Options.Range[2])
 
-						tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+						tweenservice:Create(sydeSliderLabel(Slider), TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
 						local success, errorMsg = pcall(function()
 							Options.CallBack(newValue)
@@ -8080,7 +8087,7 @@ function syde:Init(library)
 				syde:AddConnection(userinput.InputEnded, function(input, processed)
 					if input.UserInputType == Enum.UserInputType.MouseButton1  or input.UserInputType == Enum.UserInputType.Touch then
 						dragging = false
-						tweenservice:Create(Slider.Title, TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
+						tweenservice:Create(sydeSliderLabel(Slider), TweenInfo.new( 0.5, Enum.EasingStyle.Exponential ), { TextTransparency = 0.6 }):Play()
 					end
 				end)
 
@@ -8131,7 +8138,7 @@ function syde:Init(library)
 					Slider.v.Text = string.format("<font size='14'>%d</font><font color='#434343'>/%d</font>", tostring(NewVal), Options.Range[2])
 
 					-- Tween title appearance
-					tweenservice:Create(Slider.Title, TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
+					tweenservice:Create(sydeSliderLabel(Slider), TweenInfo.new(0.55, Enum.EasingStyle.Exponential), {
 						TextTransparency = 0
 					}):Play()
 

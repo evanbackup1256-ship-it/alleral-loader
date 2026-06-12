@@ -106,6 +106,19 @@ def silence_syde_logging(text: str) -> str:
     return text
 
 
+def patch_slider_labels(text: str) -> str:
+    text = text.replace(
+        "Slider.Title.Text = Options.Title",
+        "do local _sliderTitle = sydeSliderLabel(Slider); if _sliderTitle then _sliderTitle.Text = Options.Title end end",
+    )
+    text = re.sub(
+        r"tweenservice:Create\(Slider\.Title,",
+        "tweenservice:Create(sydeSliderLabel(Slider),",
+        text,
+    )
+    return text
+
+
 def main() -> None:
     upstream = read(UPSTREAM)
     compat = read(COMPAT)
@@ -221,6 +234,7 @@ return syde
     body = replace_from(body, footer_start, end_patch)
 
     body = silence_syde_logging(body)
+    body = patch_slider_labels(body)
     OUT.write_text(body, encoding="utf-8")
     print(f"Wrote {OUT} ({len(body)} bytes, {body.count(chr(10)) + 1} lines)")
 
