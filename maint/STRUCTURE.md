@@ -3,6 +3,7 @@
 | Path | What it is |
 |------|------------|
 | `loader.luau` | Entry point — boot, updates, game routing |
+| `hub/bootstrap.luau` | Small stable loadstring entry (pulls `loader.luau` from GitHub) |
 | `hub/` | Core runtime (`core_base`, `core_ui`, `alleral_ui`, telemetry, security, …) |
 | `games/` | Per-game scripts |
 | `cfg/` | Versions, manifests, site copy, telemetry/security JSON |
