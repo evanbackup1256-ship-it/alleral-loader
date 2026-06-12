@@ -13,6 +13,5 @@ backend/data/
 .alleral/
 runtime_secrets.json
 
-# Editor / local debug
-.cursor/*.log
-.cursor/maclib_sample.txt
+# Cursor IDE — local debug logs, agent sessions, temp dumps (never commit)
+.cursor/
