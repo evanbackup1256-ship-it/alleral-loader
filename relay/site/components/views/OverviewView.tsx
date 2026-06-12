@@ -7,7 +7,7 @@ import { MetricCard } from "@/components/observability/MetricCard";
 import { StatusPill } from "@/components/observability/StatusPill";
 import { FreshnessChip } from "@/components/observability/FreshnessChip";
 import { HealthRing } from "@/components/observability/HealthRing";
-import { useHubStatus } from "@/lib/hooks/useHubStatus";
+import { useLiveSyncMeta } from "@/lib/queries/hooks";
 import { resolveRelayStatus, resolveSyncStatus } from "@/lib/status/resolve";
 import { reveal, spring, stagger } from "@/lib/motion/config";
 import type { SitePayload } from "@/lib/types";
@@ -23,7 +23,7 @@ export function OverviewView({
   onCopy: () => void;
 }) {
   const setView = usePlatformStore((s) => s.setView);
-  const { data: live, dataUpdatedAt } = useHubStatus();
+  const { data: live, dataUpdatedAt } = useLiveSyncMeta();
   const games = Object.values(site.games || {});
   const working = live?.games?.working ?? games.filter((g) => (g.status || "working").toLowerCase() === "working").length;
   const total = live?.games?.total ?? games.length;

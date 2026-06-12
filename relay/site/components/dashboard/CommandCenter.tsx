@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { memo, useMemo } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { Activity, Gamepad2, Layers, Radio } from "lucide-react";
-import { useHubStatus } from "@/lib/hooks/useHubStatus";
+import { useLiveSyncMeta } from "@/lib/queries/hooks";
 import { useMetricHistory, historyToSeries } from "@/lib/hooks/useMetricHistory";
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import { resolveRelayStatus } from "@/lib/status/resolve";
@@ -72,7 +72,7 @@ function ChartBlock({ chartData }: { chartData: { value: number; label: string }
 
 function CommandCenterInner({ site }: { site: SitePayload }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
-  const { data, error, dataUpdatedAt, loading } = useHubStatus();
+  const { data, error, dataUpdatedAt, loading } = useLiveSyncMeta();
   const online = !error && data?.ok !== false;
   const relayKind = resolveRelayStatus(online, error ? error.message : null);
 

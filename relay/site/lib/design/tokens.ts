@@ -1,15 +1,3 @@
-export const depth = {
-  bg: 0,
-  mesh: 1,
-  nav: 20,
-  surface: 10,
-  panel: 15,
-  chart: 18,
-  tooltip: 100,
-  modal: 200,
-  toast: 250,
-} as const;
-
 export const status = {
   healthy: { label: "Healthy", color: "#34d399", glow: "rgba(52,211,153,0.45)" },
   online: { label: "Online", color: "#22d3ee", glow: "rgba(34,211,238,0.4)" },

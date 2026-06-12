@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { fetchThumbnails } from "@/lib/api";
-import { useHubStatus } from "@/lib/hooks/useHubStatus";
+import { useLiveSyncMeta } from "@/lib/queries/hooks";
 import { spring } from "@/lib/motion/config";
 import type { GameEntry, SitePayload } from "@/lib/types";
 import { FreshnessChip } from "@/components/observability/FreshnessChip";
@@ -20,7 +20,7 @@ export function GamesView({ site }: { site: SitePayload }) {
   const [query, setQuery] = useState("");
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [modal, setModal] = useState<{ id: string; game: GameEntry } | null>(null);
-  const { data: live, dataUpdatedAt } = useHubStatus();
+  const { data: live, dataUpdatedAt } = useLiveSyncMeta();
 
   const liveStatus = useMemo(() => {
     const map: Record<string, string> = {};

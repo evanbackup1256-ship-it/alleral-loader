@@ -8,12 +8,6 @@ export const spring = {
   status: { type: "spring" as const, stiffness: 420, damping: 32, mass: 0.7 },
 };
 
-export const ease = {
-  out: [0.16, 1, 0.3, 1] as [number, number, number, number],
-  inOut: [0.65, 0, 0.35, 1] as [number, number, number, number],
-  expo: [0.19, 1, 0.22, 1] as [number, number, number, number],
-};
-
 export const stagger = {
   fast: 0.035,
   base: 0.055,
@@ -25,16 +19,4 @@ export const reveal = {
   initial: { opacity: 0, y: 16 },
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -10 },
-};
-
-export const scaleReveal = {
-  initial: { opacity: 0, scale: 0.98 },
-  animate: { opacity: 1, scale: 1 },
-  exit: { opacity: 0, scale: 0.99 },
-};
-
-export const slidePanel = {
-  initial: { opacity: 0, x: -16 },
-  animate: { opacity: 1, x: 0 },
-  exit: { opacity: 0, x: 12 },
 };

@@ -87,24 +87,6 @@ export function Button({
   );
 }
 
-export function IconButton({
-  children,
-  className,
-  label,
-  onClick,
-}: {
-  children: ReactNode;
-  className?: string;
-  label: string;
-  onClick?: () => void;
-}) {
-  return (
-    <Button variant="ghost" size="sm" aria-label={label} className={clsx("!px-2.5", className)} onClick={onClick}>
-      {children}
-    </Button>
-  );
-}
-
 export function Kbd({ children }: { children: ReactNode }) {
   return (
     <kbd className="rounded-md border border-border bg-bg-2 px-1.5 py-0.5 font-mono text-[10px] text-muted">{children}</kbd>

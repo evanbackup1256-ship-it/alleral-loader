@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { fetchLiveStatus, fetchSite } from "@/lib/api";
 
 export const siteQueryKey = ["site"] as const;
@@ -41,9 +41,4 @@ export function useLiveSyncMeta() {
     refresh: query.refetch,
     online: query.isSuccess && query.data?.ok !== false,
   };
-}
-
-export function useInvalidateLive() {
-  const client = useQueryClient();
-  return () => client.invalidateQueries({ queryKey: liveStatusQueryKey });
 }

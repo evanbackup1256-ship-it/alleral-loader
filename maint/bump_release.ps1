@@ -128,7 +128,17 @@ function Sync-Tree($src, $dest) {
     if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
     Copy-Item $src $dest -Recurse -Force
 }
-Sync-Tree (Join-Path $relayDir "site") (Join-Path $backendDir "site")
+
+$siteDir = Join-Path $relayDir "site"
+Push-Location $siteDir
+try {
+    $env:SKIP_BACKEND_SYNC = "1"
+    npm run build | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw "relay/site build failed" }
+} finally {
+    Pop-Location
+}
+Sync-Tree (Join-Path $siteDir "out") (Join-Path $backendDir "site")
 
 if ($hashBumpNeeded) {
     $generatedMarker = @"

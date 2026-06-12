@@ -8,7 +8,7 @@ import type { SitePayload, WeaoExploit } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Form";
 import { Input } from "@/components/ui/Form";
-import { AnimatedNumber } from "@/components/ui/DataViz";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { MetricTile, Panel } from "@/components/ui/Panel";
 
 const FILTERS = ["all", "working", "not_working", "recommended", "detected", "outdated", "free"] as const;

@@ -32,18 +32,6 @@ export function Panel({
   );
 }
 
-export function CardHeader({ title, desc, action }: { title: string; desc?: string; action?: React.ReactNode }) {
-  return (
-    <div className="mb-4 flex items-start justify-between gap-3">
-      <div>
-        <h3 className="text-sm font-semibold tracking-tight text-text">{title}</h3>
-        {desc ? <p className="mt-1 text-xs text-muted">{desc}</p> : null}
-      </div>
-      {action}
-    </div>
-  );
-}
-
 export function MetricTile({
   label,
   value,
