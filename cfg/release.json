@@ -5,7 +5,7 @@
     "ui":  "Syde",
     "windui":  "4.0.0-syde",
     "alleral":  "4.0.0-syde",
-    "commit":  "e12c90d",
+    "commit":  "203df02",
     "updatedAt":  "2026-06-12T23:30:00Z",
     "updatePollSeconds":  120,
     "autoUpdate":  true,
