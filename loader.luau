@@ -1807,6 +1807,13 @@ local function purgeStaleHubPaths()
 	end
 end
 
+local function uiModuleCompileOk(body, chunkName)
+	if not loadStringFn or type(body) ~= "string" then
+		return true
+	end
+	return compileCoreSource(body, chunkName or "Alleral/ui-check")
+end
+
 local function fetchUiModuleBody(rel, minBytes)
 	minBytes = minBytes or 50
 	for _, base in ipairs(CORE_REMOTE_BASES) do
@@ -1826,7 +1833,7 @@ local function ensureUiWorkspaceFile(rel, minBytes)
 			local okExists, exists = pcall(isFile, path)
 			if okExists and exists then
 				local okRead, src = pcall(readFile, path)
-				if okRead and uiModuleSourceValid(src, minBytes) then
+				if okRead and uiModuleSourceValid(src, minBytes) and uiModuleCompileOk(src, "@Alleral/" .. rel) then
 					return src, path
 				end
 				deleteWorkspaceFile(path)
@@ -1837,7 +1844,7 @@ local function ensureUiWorkspaceFile(rel, minBytes)
 		return nil
 	end
 	local body, via = fetchUiModuleBody(rel, minBytes)
-	if body then
+	if body and uiModuleCompileOk(body, "@Alleral/" .. rel) then
 		cacheRemote(rel, body)
 		cacheRemote(".alleral/cache/" .. rel, body)
 		-- #region agent log

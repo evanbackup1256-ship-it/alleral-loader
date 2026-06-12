@@ -106,7 +106,7 @@ return function(deps)
 		if leaf and leaf:lower() ~= leaf then
 			table.insert(candidates, (path:gsub(leaf .. "$", leaf:lower())))
 		elseif leaf then
-			table.insert(candidates, (path:gsub(leaf .. "$", leaf:sub(1, 1):upper() .. leaf:sub(2)))
+			table.insert(candidates, (path:gsub(leaf .. "$", leaf:sub(1, 1):upper() .. leaf:sub(2))))
 		end
 		for _, candidatePath in ipairs(candidates) do
 			local direct = readSource(candidatePath)
