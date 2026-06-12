@@ -646,7 +646,7 @@ function Telemetry:_buildEmbed(payload)
 		end
 	end
 
-	if payload.notes and event ~= "log" and event ~= "milestone" then
+	if payload.notes and event ~= "log" and event ~= "milestone" and event ~= "place_updated" then
 		fields[#fields + 1] = embedField("Note", payload.notes, false)
 	end
 
