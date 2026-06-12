@@ -18,7 +18,7 @@ local UI = "ui"
 local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-local SYDE_PATCH_VERSION = 21
+local SYDE_PATCH_VERSION = 24
 local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
 local CORE_BASE_PATH = HUB .. "/core_base.luau"
 local CORE_BASE_LEGACY_PATH = HUB .. "/core.luau"
@@ -1218,6 +1218,54 @@ local function syncWorkspaceLoaderFromRemote()
 	return false
 end
 
+local function instancePathFromMemberError(errMsg)
+	local msg = tostring(errMsg)
+	if not msg:find(" is not a valid member of ", 1, true) then
+		return nil
+	end
+	local className, instName = msg:match('member of (%w+) "([^"]+)"')
+	if not className or not instName then
+		return nil
+	end
+	local paths = {}
+	local function collect(root)
+		if not root then
+			return
+		end
+		for _, desc in ipairs(root:GetDescendants()) do
+			if desc.Name == instName and desc.ClassName == className then
+				table.insert(paths, desc:GetFullName())
+			end
+		end
+	end
+	local players = game:GetService("Players")
+	local localPlayer = players.LocalPlayer
+	if localPlayer then
+		collect(localPlayer:FindFirstChildOfClass("PlayerGui"))
+	end
+	collect(game:GetService("CoreGui"))
+	if #paths == 0 then
+		return nil
+	end
+	if #paths == 1 then
+		return paths[1]
+	end
+	return paths[1] .. " (+" .. tostring(#paths - 1) .. " matches)"
+end
+
+local function formatRuntimeError(runErr, chunkName)
+	local msg = tostring(runErr)
+	local instPath = instancePathFromMemberError(msg)
+	if instPath then
+		msg = msg .. " @ " .. instPath
+	end
+	local trace = debug.traceback(msg, 2)
+	if chunkName and chunkName ~= "" then
+		trace = trace .. "\n(chunk: " .. chunkName .. ")"
+	end
+	return trace
+end
+
 local function compileAndRun(source, chunkName, runEnv)
 	if not loadStringFn then
 		return false, "loadstring unavailable"
@@ -1235,7 +1283,9 @@ local function compileAndRun(source, chunkName, runEnv)
 	if setfenv then
 		pcall(setfenv, fn, runEnv)
 	end
-	local ok, runErr = pcall(fn)
+	local ok, runErr = xpcall(fn, function(err)
+		return formatRuntimeError(err, chunkName)
+	end)
 	if not ok then
 		return false, "Runtime: " .. tostring(runErr)
 	end

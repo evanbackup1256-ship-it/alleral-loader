@@ -101,7 +101,7 @@ local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 21
+local ALLERAL_SYDE_PATCH = 24
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -188,6 +188,60 @@ local function sydeSliderLabel(slider)
 		return nil
 	end
 	return sydeFindChild(slider, "title", "Title")
+end
+
+local function sydeOptionLabel(option)
+	if not option then
+		return nil
+	end
+	return sydeFindChild(option, "title", "Title", "TextLabel", "text")
+end
+
+local function sydeTitleLabel(instance)
+	return sydeOptionLabel(instance)
+end
+
+local function sydeOptionText(option)
+	local label = sydeOptionLabel(option)
+	return label and label.Text or ""
+end
+
+local function sydeLoaderProfileLabel(loaderGui)
+	local root = loaderGui or Loader
+	if not root then
+		return nil
+	end
+	local loaderFrame = sydeFindChild(root, "loader")
+	local profile = loaderFrame and sydeFindChild(loaderFrame, "profile")
+	return profile and sydeTitleLabel(profile)
+end
+
+local function sydeBindUi(root)
+	root = root or Library
+	local main = sydeFindChild(root, "main", "Main")
+	local render = sydeFindChild(root, "Render", "render")
+	local toastholder = sydeFindChild(root, "toastholder", "Toastholder", "ToastHolder")
+	local bound = {
+		_root = root,
+		main = main,
+		Main = main,
+		Render = render,
+		render = render,
+		toastholder = toastholder,
+		Toastholder = toastholder,
+	}
+	return setmetatable(bound, {
+		__index = function(_, key)
+			local value = rawget(bound, key)
+			if value ~= nil then
+				return value
+			end
+			if key == "main" or key == "Main" then
+				return main
+			end
+			return root[key]
+		end,
+	})
 end
 
 local function sydeButtonStroke(button)
@@ -1325,8 +1379,8 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 			resizing = true
 			startPosition = getInputPos(input)
 			startSize = Object.AbsoluteSize
-			tweenservice:Create(Library.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 15,0, 15)}):Play()
-			tweenservice:Create(Library.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+			tweenservice:Create(window.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 15,0, 15)}):Play()
+			tweenservice:Create(window.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 		end
 	end
 
@@ -1364,8 +1418,8 @@ function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
 			isResizing = false
 			resizing = false
 			startPosition, startSize = nil, nil
-			tweenservice:Create(Library.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 20,0, 20)}):Play()
-			tweenservice:Create(Library.main.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(53, 53, 53)}):Play()
+			tweenservice:Create(window.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 20,0, 20)}):Play()
+			tweenservice:Create(window.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {ImageColor3 = Color3.fromRGB(53, 53, 53)}):Play()
 		end
 	end
 
@@ -1669,9 +1723,9 @@ do
 		Config.Accent = Config.Accent or syde.theme.Accent
 		Config.HitBox = Config.HitBox or syde.theme.HitBox
 
-		LOADER.loader.profile.Title.TextTransparency = 1
+		do local _profileTitle = sydeLoaderProfileLabel(LOADER); if _profileTitle then _profileTitle.TextTransparency = 1 end end
 		LOADER.loader.profile.ImageTransparency = 1
-		LOADER.loader.profile.Title.Text = Config.Name
+		do local _profileTitle = sydeLoaderProfileLabel(LOADER); if _profileTitle then _profileTitle.Text = Config.Name end end
 		--	LOADER.load.logo.stroke.UIStroke.Transparency = 1
 
 		local LoaderConfig = {
@@ -1686,7 +1740,7 @@ do
 
 		if LoaderConfig.Status == false then
 			--	LOADER.load.logo.stroke.UIStroke.Color = Color3.fromRGB(24, 24, 24)
-			LOADER.loader.profile.Title.Text = LoaderConfig.Name
+			do local _profileTitle = sydeLoaderProfileLabel(LOADER); if _profileTitle then _profileTitle.Text = LoaderConfig.Name end end
 		end
 
 		local statusColors = {
@@ -1816,9 +1870,7 @@ do
 			end
 
 			-- Set Text (change if your text label has different name)
-			if clone:FindFirstChild("Title") then
-				clone.Title.Text = value
-			end
+			do local _cloneTitle = sydeTitleLabel(clone); if _cloneTitle then _cloneTitle.Text = value end end
 
 			clone.interact.MouseButton1Click:Connect(function()
 				if value ~= '' then
@@ -1852,7 +1904,7 @@ do
 		tweenservice:Create(logo, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
 		--	tweenservice:Create(logo, TweenInfo.new(1, Enum.EasingStyle.Quint), {Position = UDim2.new(0.5, 0,0, 105)}):Play()
 
-		tweenservice:Create(logo.Title, TweenInfo.new(2, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+		do local _logoTitle = sydeTitleLabel(logo); if _logoTitle then tweenservice:Create(_logoTitle, TweenInfo.new(0.45, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end end
 		task.wait(1)
 
 
@@ -2200,11 +2252,15 @@ end
 
 
 --@UiSetup
-local ui = Library
+local ui = sydeBindUi(Library)
 local window = ui.main
-local top = window.top
-local tabs = window.tabs.tab
-local pages = window.pages
+if not window then
+	sydeWarn("[Syde] Library missing main frame")
+end
+local top = window and sydeFindChild(window, "top", "Top")
+local tabsContainer = window and sydeFindChild(window, "tabs", "Tabs")
+local tabs = tabsContainer and sydeFindChild(tabsContainer, "tab", "Tab", "tb", "Tb")
+local pages = window and sydeFindChild(window, "pages", "Pages")
 
 --
 
@@ -2222,7 +2278,7 @@ local uitoggle = Enum.KeyCode.RightShift
 
 function applyLayout(isMobile)
 	--	Library.lib.Size = isMobile and UDim2.new(0, 543,0, 321) or UDim2.new(0, 715, 0, 575)
-	tweenservice:Create(Library.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {Size = isMobile and UDim2.new(0, 543,0, 321) or UDim2.new(0, 715, 0, 575)}):Play()
+	tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {Size = isMobile and UDim2.new(0, 543,0, 321) or UDim2.new(0, 715, 0, 575)}):Play()
 	local shadow = window:FindFirstChild("Shadow")
 	if shadow then
 		shadow.Visible = not isMobile 
@@ -2240,7 +2296,7 @@ end
 local notifications = {}
 local notificationSpacing = 10
 
-local tweenInfo = TweenInfo.new(0.7, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+local tweenInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
 function updatePositions()
 	local screenHeight = workspace.CurrentCamera.ViewportSize.Y - 200
@@ -2277,8 +2333,9 @@ function syde:Notify(Notification)
 
 		local Notification = Library.Notification.Default:Clone()
 		Notification.Visible = true
+		local notificationTitle = sydeTitleLabel(Notification)
 		Notification.Parent = Library.Notification
-		Notification.Title.Text = NotifData.Title
+		if notificationTitle then notificationTitle.Text = NotifData.Title end
 		Notification.Content.Text = NotifData.Content
 		Notification.Content.Size = UDim2.new(0, 200,0, Notification.Content.TextBounds.Y )
 		Notification.icon.Image = 'rbxassetid://'..NotifData.Icon
@@ -2308,7 +2365,7 @@ function syde:Notify(Notification)
 		end
 
 		if NotifData.Animation == 'Wiggle' then
-			syde:WiggleText(Notification.Title)
+			if notificationTitle then syde:WiggleText(notificationTitle) end
 		end
 
 		if NotifData.Varient == 'Options' then
@@ -2344,7 +2401,7 @@ function syde:Notify(Notification)
 		task.wait(0.45)
 
 		if NotifData.Icon ~= '' then
-			tweenservice:Create(Notification.Title, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 40,0, 10)}):Play()
+			if notificationTitle then tweenservice:Create(notificationTitle, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 40,0, 10)}):Play() end
 			task.wait(0.035)
 			tweenservice:Create(Notification.Content, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 40,0, 30)}):Play()
 
@@ -2388,14 +2445,16 @@ function syde:Modal(Modal)
 			ConfirmCallBack = Modal.ConfimCallBack
 		}
 
-		local ModalInstance = ui.main and ui.main.modal and ui.main.modal:Clone()
-		if not ModalInstance or not ui.main then
+		local modalTemplate = window and sydeFindChild(window, "modal", "Modal")
+		local ModalInstance = modalTemplate and modalTemplate:Clone()
+		if not ModalInstance or not window then
 			return
 		end
 		sydeSanitizeUiClone(ModalInstance)
 		ModalInstance.Visible = true
-		ModalInstance.Parent = ui.main
+		ModalInstance.Parent = window
 		local modalParts = sydeResolveModal(ModalInstance)
+		local dimOverlay = window and sydeFindChild(window, "dim", "Dim")
 		if modalParts.Title then
 			modalParts.Title.Text = ModalData.Title
 			modalParts.Title.TextTransparency = 1
@@ -2426,7 +2485,7 @@ function syde:Modal(Modal)
 			if modalParts.Content then
 				tweenservice:Create(
 					modalParts.Content,
-					TweenInfo.new(0.75, Enum.EasingStyle.Quint),
+					TweenInfo.new(0.35, Enum.EasingStyle.Quint),
 					{ Size = UDim2.new(1, modalParts.Content.Size.X.Offset, 1, modalParts.Content.TextBounds.Y) }
 				):Play()
 			end
@@ -2434,33 +2493,33 @@ function syde:Modal(Modal)
 			local contentHeight = modalParts.Content and modalParts.Content.TextBounds.Y or 0
 			tweenservice:Create(
 				ModalInstance,
-				TweenInfo.new(0.65, Enum.EasingStyle.Quint),
+				TweenInfo.new(0.32, Enum.EasingStyle.Quint),
 				{ Size = UDim2.new(0, 350, 0, contentHeight + 150) }
 			):Play()
-			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+			tweenservice:Create(ModalInstance, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
 			if modalParts.UIStroke then
-				tweenservice:Create(modalParts.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
+				tweenservice:Create(modalParts.UIStroke, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
 			end
 			if modalParts.Title then
-				tweenservice:Create(modalParts.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+				tweenservice:Create(modalParts.Title, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 			end
 			if modalParts.Content then
-				tweenservice:Create(modalParts.Content, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+				tweenservice:Create(modalParts.Content, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 			end
 			if modalParts.Confirm then
-				tweenservice:Create(modalParts.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.5 }):Play()
+				tweenservice:Create(modalParts.Confirm, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.5 }):Play()
 			end
 			if modalParts.ConfirmLabel then
-				tweenservice:Create(modalParts.ConfirmLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+				tweenservice:Create(modalParts.ConfirmLabel, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 			end
 			if modalParts.Cancel then
-				tweenservice:Create(modalParts.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				tweenservice:Create(modalParts.Cancel, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
 			end
 			if modalParts.CancelLabel then
-				tweenservice:Create(modalParts.CancelLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+				tweenservice:Create(modalParts.CancelLabel, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 			end
 			if modalParts.CancelStroke then
-				tweenservice:Create(modalParts.CancelStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
+				tweenservice:Create(modalParts.CancelStroke, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
 			end
 		end
 		openModal()
@@ -2469,41 +2528,41 @@ function syde:Modal(Modal)
 			activeModals -= 1
 			sydeSetInteractable(modalParts.Cancel, false)
 			sydeSetInteractable(modalParts.Confirm, false)
-			tweenservice:Create(ModalInstance, TweenInfo.new(0.75, Enum.EasingStyle.Quint), { Size = UDim2.new(0, 350, 0, 147) }):Play()
-			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+			tweenservice:Create(ModalInstance, TweenInfo.new(0.3, Enum.EasingStyle.Quint), { Size = UDim2.new(0, 350, 0, 147) }):Play()
+			tweenservice:Create(ModalInstance, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
 			if modalParts.Title then
-				tweenservice:Create(modalParts.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+				tweenservice:Create(modalParts.Title, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
 			end
 			if modalParts.UIStroke then
-				tweenservice:Create(modalParts.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+				tweenservice:Create(modalParts.UIStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
 			end
 			if modalParts.Content then
-				tweenservice:Create(modalParts.Content, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+				tweenservice:Create(modalParts.Content, TweenInfo.new(0.2, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
 			end
 			if modalParts.Confirm then
-				tweenservice:Create(modalParts.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				tweenservice:Create(modalParts.Confirm, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
 			end
 			if modalParts.ConfirmLabel then
-				tweenservice:Create(modalParts.ConfirmLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+				tweenservice:Create(modalParts.ConfirmLabel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
 			end
 			if modalParts.Cancel then
-				tweenservice:Create(modalParts.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				tweenservice:Create(modalParts.Cancel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
 			end
 			if modalParts.CancelLabel then
-				tweenservice:Create(modalParts.CancelLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+				tweenservice:Create(modalParts.CancelLabel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
 			end
 			if modalParts.CancelStroke then
-				tweenservice:Create(modalParts.CancelStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+				tweenservice:Create(modalParts.CancelStroke, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
 			end
-			task.wait(0.45)
+			task.wait(0.22)
 			ModalInstance:Destroy()
 		end
 
 
 
-		if activeModals == 1 and ui.main and ui.main.dim then
-			ui.main.dim.Visible = true
-			tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+		if activeModals == 1 and dimOverlay then
+			dimOverlay.Visible = true
+			tweenservice:Create(dimOverlay, TweenInfo.new(0.32, Enum.EasingStyle.Exponential), {
 				BackgroundTransparency = 0.3
 			}):Play()
 		end
@@ -2515,29 +2574,28 @@ function syde:Modal(Modal)
 
 			closeModal()
 
-			if activeModals == 0 and ui.main and ui.main.dim then
-				tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+			if activeModals == 0 and dimOverlay then
+				tweenservice:Create(dimOverlay, TweenInfo.new(0.32, Enum.EasingStyle.Exponential), {
 					BackgroundTransparency = 1
 				}):Play()
-				task.wait(0.7)
-				ui.main.dim.Visible = false
+				task.wait(0.25)
+				dimOverlay.Visible = false
 			end
 		end)
 
 		sydeConnectClick(modalParts.Cancel, function()
 			closeModal()
-			if ui.main and ui.main.dim then
-				tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+			if dimOverlay then
+				tweenservice:Create(dimOverlay, TweenInfo.new(0.32, Enum.EasingStyle.Exponential), {
 					BackgroundTransparency = 1
 				}):Play()
-				task.wait(0.7)
-				ui.main.dim.Visible = false
+				task.wait(0.25)
+				dimOverlay.Visible = false
 			end
 		end)
 
 	end)
 end
-
 
 --@@Toast
 local toasts = {}
@@ -5430,12 +5488,13 @@ function syde:Init(library)
 			end
 				drop.Container.Option.Visible = false
 				drop.Container.Visible = false
-				tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
+				tweenservice:Create(drop.Container, TweenInfo.new(0.32, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
 				sydeSetDropSelectedText(drop, data.PlaceHolder) 
 
 				local DropOpen = false
 				local DeBounce = false
 				local OptionButton = drop.Container.Option
+					sydeSanitizeUiClone(OptionButton)
 				local SelectedOptions = {}
 				local SelectedOrder = {}
 
@@ -5443,7 +5502,7 @@ function syde:Init(library)
 					local yOffset = 0
 					for _, option in ipairs(drop.Container:GetChildren()) do
 						if option:IsA("Frame") and option.Visible then
-							tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
+							tweenservice:Create(option, TweenInfo.new(0.22, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
 							yOffset = yOffset + option.Size.Y.Offset + 7
 						end
 					end
@@ -5454,35 +5513,35 @@ function syde:Init(library)
 					drop.Container.Visible = true
 					drop.search.Visible = true
 
-					tweenservice:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
+					tweenservice:Create(dropdown, TweenInfo.new(0.38, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
 					tweenservice:Create(drop.UICorner, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(0, 20) }):Play()
-					tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-					tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+					tweenservice:Create(drop.Container, TweenInfo.new(0.32, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
+					tweenservice:Create(drop.v0, TweenInfo.new(0.38, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
 					tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
 
-					tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-					tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-					tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-					tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-					tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+					tweenservice:Create(drop.search, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
+					tweenservice:Create(drop.search.UIStroke, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
+					tweenservice:Create(drop.search.TextBox, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+					tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
+					tweenservice:Create(drop.search.icon, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
 
 				end
 
 				local function CloseDrop()
 					DropOpen = false
-					tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
+					tweenservice:Create(dropdown, TweenInfo.new(0.32, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
 					tweenservice:Create(drop.UICorner, TweenInfo.new(1, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(1,0) }):Play()
-					tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-					tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+					tweenservice:Create(drop.Container, TweenInfo.new(0.32, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
+					tweenservice:Create(drop.v0, TweenInfo.new(0.38, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
 					tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
 
-					tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-					tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-					tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-					tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+					tweenservice:Create(drop.search, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+					tweenservice:Create(drop.search.UIStroke, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+					tweenservice:Create(drop.search.TextBox, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+					tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+					tweenservice:Create(drop.search.icon, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
 
-					task.wait(0.6)
+					task.wait(0.22)
 					drop.Container.Visible = false
 					drop.search.Visible = false
 
@@ -5498,7 +5557,7 @@ function syde:Init(library)
 						OpenDrop()
 					end
 
-					task.delay(1.2, function()
+					task.delay(0.45, function()
 						DeBounce = false
 					end)
 				end)
@@ -5581,9 +5640,9 @@ function syde:Init(library)
 									-- Visually update the dropdown list
 									for _, opt in ipairs(drop.Container:GetChildren()) do
 										if opt:IsA("Frame") and opt.Name == option then
-											tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-											tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-											tweenservice:Create(opt.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+											tweenservice:Create(opt, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
+											tweenservice:Create(opt, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
+											do local _optionLabel = sydeOptionLabel(opt); if _optionLabel then tweenservice:Create(_optionLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end end
 											tweenservice:Create(opt.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
 											tweenservice:Create(opt.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
 										end
@@ -5625,31 +5684,33 @@ function syde:Init(library)
 					local searchText = drop.search.TextBox.Text:lower()
 
 					for _, option in ipairs(drop.Container:GetChildren()) do
-						if option:IsA("Frame") and option:FindFirstChild("Title") then
-							local optionText = option.Title.Text:lower()
+						local optionLabel = sydeOptionLabel(option)
+
+						if option:IsA("Frame") and optionLabel then
+							local optionText = optionLabel.Text:lower()
 							local isTemplate = option.Name == "Option"
-							local shouldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[option.Title.Text])
+							local shouldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[optionLabel.Text])
 
 							if shouldShow then
 								option.Visible = true
-								if SelectedOptions[option.Title.Text] then
-									tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-									tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-									tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+								if SelectedOptions[optionLabel.Text] then
+									tweenservice:Create(option, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
+									tweenservice:Create(option, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
+									if optionLabel then tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end
 									tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 									tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
 								else
-									tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-									tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-									tweenservice:Create(option.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+									tweenservice:Create(option, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
+									tweenservice:Create(option, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
+									if optionLabel then tweenservice:Create(optionLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end
 									tweenservice:Create(option.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
 									tweenservice:Create(option.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
 								end
 							else
 								-- Hide with animation, but wait before setting Visible = false
-								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-								tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+								tweenservice:Create(option, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+								tweenservice:Create(option, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
+								if optionLabel then tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play() end
 								tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
 								option.Visible = false
@@ -5666,14 +5727,18 @@ function syde:Init(library)
 					local starterSet = false
 					for _, OptionText in ipairs(data.Options) do
 						local option = OptionButton:Clone()
-						option.Title.Text = OptionText
+						sydeSanitizeUiClone(option)
+						local optionLabel = sydeOptionLabel(option)
+						if optionLabel then
+							optionLabel.Text = OptionText
+						end
 						option.Parent = drop.Container
 						option.Visible = true
 						option.Name = OptionText
 
 						if OptionText == data.StarterOption and not starterSet then
 							starterSet = true
-							drop.Selected.Text = OptionText
+							sydeSetDropSelectedText(drop, OptionText)
 							SelectedOptions = {[OptionText] = true}
 							SelectedOrder = {OptionText}
 
@@ -5681,7 +5746,7 @@ function syde:Init(library)
 							tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
 						end
 
-						option.Interact.MouseButton1Click:Connect(function()
+						sydeConnectClick(option, function()
 							if data.Multi then
 								if SelectedOptions[OptionText] then
 									RemoveFromSelected(OptionText)
@@ -7230,7 +7295,7 @@ function syde:Init(library)
 
 
 
-		local Pages = ui.main.pages
+		local Pages = pages
 		local Results = window.search.Container
 		local Template = Results.option
 
@@ -7271,7 +7336,7 @@ function syde:Init(library)
 
 				closesearch()
 
-				local openedPage = ui.main.pages:FindFirstChild(page.Name)
+				local openedPage = pages:FindFirstChild(page.Name)
 				if not openedPage or not openedPage:IsA("ScrollingFrame") then return end
 
 				-- Optional: switch tab visuals (if SwitchToTab does this)
@@ -8458,7 +8523,8 @@ function syde:Init(library)
 			local EnchancedView = sydeClonePageTemplate(pages.page, "3DView")
 			EnchancedView.Visible = true
 			EnchancedView.Parent = Page
-			EnchancedView.Title.Text = Viewdata.Title
+			local viewTitle = sydeTitleLabel(EnchancedView)
+			if viewTitle then viewTitle.Text = Viewdata.Title end
 			EnchancedView:SetAttribute("Searchable", true)
 
 			local Viewport = EnchancedView.ViewFrame.ViewportFrame
@@ -8798,13 +8864,14 @@ function syde:Init(library)
 
 			local Section =  sydeClonePageTemplate(pages.page, "Section")
 			Section.Visible = true
-			Section.Title.Text = Title
+			local sectionTitle = sydeTitleLabel(Section)
+			if sectionTitle then sectionTitle.Text = Title end
 			Section.Parent = Page
-			Section.Title.Position = UDim2.new(0, 0,0, 0)
+			if sectionTitle then sectionTitle.Position = UDim2.new(0, 0,0, 0) end
 
 			if Icon then
 				Section.icon.Image = 'rbxassetid://'..Icon
-				Section.Title.Position = UDim2.new(0, 25,0, 0)
+				if sectionTitle then sectionTitle.Position = UDim2.new(0, 25,0, 0) end
 			else
 				Section.icon.Visible = false
 			end
@@ -8833,13 +8900,14 @@ function syde:Init(library)
 			end
 			drop.Container.Option.Visible = false
 			drop.Container.Visible = false
-			tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
+			tweenservice:Create(drop.Container, TweenInfo.new(0.32, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
 			sydeSetDropSelectedText(drop, data.PlaceHolder) 
 			dropdown:SetAttribute("Searchable", true)
 
 			local DropOpen = false
 			local DeBounce = false
 			local OptionButton = drop.Container.Option
+					sydeSanitizeUiClone(OptionButton)
 			local SelectedOptions = {}
 			local SelectedOrder = {}
 
@@ -8847,7 +8915,7 @@ function syde:Init(library)
 				local yOffset = 0
 				for _, option in ipairs(drop.Container:GetChildren()) do
 					if option:IsA("Frame") and option.Visible then
-						tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
+						tweenservice:Create(option, TweenInfo.new(0.22, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
 						yOffset = yOffset + option.Size.Y.Offset + 7
 					end
 				end
@@ -8858,33 +8926,33 @@ function syde:Init(library)
 				drop.Container.Visible = true
 				drop.search.Visible = true
 
-				tweenservice:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
-				tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-				tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+				tweenservice:Create(dropdown, TweenInfo.new(0.38, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
+				tweenservice:Create(drop.Container, TweenInfo.new(0.32, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
+				tweenservice:Create(drop.v0, TweenInfo.new(0.38, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
 				tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
 
-				tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-				tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-				tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-				tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-				tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+				tweenservice:Create(drop.search, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
+				tweenservice:Create(drop.search.UIStroke, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
+				tweenservice:Create(drop.search.TextBox, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+				tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
+				tweenservice:Create(drop.search.icon, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
 
 			end
 
 			local function CloseDrop()
 				DropOpen = false
-				tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-				tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-				tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				tweenservice:Create(dropdown, TweenInfo.new(0.32, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
+				tweenservice:Create(drop.Container, TweenInfo.new(0.32, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
+				tweenservice:Create(drop.v0, TweenInfo.new(0.38, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
 				tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
 
-				tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-				tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-				tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-				tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+				tweenservice:Create(drop.search, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+				tweenservice:Create(drop.search.UIStroke, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+				tweenservice:Create(drop.search.TextBox, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+				tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+				tweenservice:Create(drop.search.icon, TweenInfo.new(0.28, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
 
-				task.wait(0.6)
+				task.wait(0.22)
 				drop.Container.Visible = false
 				drop.search.Visible = false
 
@@ -8900,7 +8968,7 @@ function syde:Init(library)
 					OpenDrop()
 				end
 
-				task.delay(1.2, function()
+				task.delay(0.45, function()
 					DeBounce = false
 				end)
 			end)
@@ -8983,9 +9051,9 @@ function syde:Init(library)
 								-- Visually update the dropdown list
 								for _, opt in ipairs(drop.Container:GetChildren()) do
 									if opt:IsA("Frame") and opt.Name == option then
-										tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-										tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-										tweenservice:Create(opt.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+										tweenservice:Create(opt, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
+										tweenservice:Create(opt, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
+										do local _optionLabel = sydeOptionLabel(opt); if _optionLabel then tweenservice:Create(_optionLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end end
 										tweenservice:Create(opt.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
 										tweenservice:Create(opt.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
 									end
@@ -9027,31 +9095,33 @@ function syde:Init(library)
 				local searchText = drop.search.TextBox.Text:lower()
 
 				for _, option in ipairs(drop.Container:GetChildren()) do
-					if option:IsA("Frame") and option:FindFirstChild("Title") then
-						local optionText = option.Title.Text:lower()
+					local optionLabel = sydeOptionLabel(option)
+
+					if option:IsA("Frame") and optionLabel then
+						local optionText = optionLabel.Text:lower()
 						local isTemplate = option.Name == "Option"
-						local shouldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[option.Title.Text])
+						local shouldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[optionLabel.Text])
 
 						if shouldShow then
 							option.Visible = true
-							if SelectedOptions[option.Title.Text] then
-								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-								tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+							if SelectedOptions[optionLabel.Text] then
+								tweenservice:Create(option, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
+								tweenservice:Create(option, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
+								if optionLabel then tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end
 								tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
 							else
-								tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-								tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-								tweenservice:Create(option.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+								tweenservice:Create(option, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
+								tweenservice:Create(option, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
+								if optionLabel then tweenservice:Create(optionLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end
 								tweenservice:Create(option.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
 								tweenservice:Create(option.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
 							end
 						else
 							-- Hide with animation, but wait before setting Visible = false
-							tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-							tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-							tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+							tweenservice:Create(option, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+							tweenservice:Create(option, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
+							if optionLabel then tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play() end
 							tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 							tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
 							option.Visible = false
@@ -9068,14 +9138,18 @@ function syde:Init(library)
 				local starterSet = false
 				for _, OptionText in ipairs(data.Options) do
 					local option = OptionButton:Clone()
-					option.Title.Text = OptionText
+					sydeSanitizeUiClone(option)
+					local optionLabel = sydeOptionLabel(option)
+					if optionLabel then
+						optionLabel.Text = OptionText
+					end
 					option.Parent = drop.Container
 					option.Visible = true
 					option.Name = OptionText
 
 					if OptionText == data.StarterOption and not starterSet then
 						starterSet = true
-						drop.Selected.Text = OptionText
+						sydeSetDropSelectedText(drop, OptionText)
 						SelectedOptions = {[OptionText] = true}
 						SelectedOrder = {OptionText}
 
@@ -9083,7 +9157,7 @@ function syde:Init(library)
 						tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
 					end
 
-					option.Interact.MouseButton1Click:Connect(function()
+					sydeConnectClick(option, function()
 						if data.Multi then
 							if SelectedOptions[OptionText] then
 								RemoveFromSelected(OptionText)

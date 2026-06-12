@@ -63,40 +63,71 @@ def convert_dropdown_block(block: str, page_expr: str, return_name: str) -> str:
 
 
 def adapt_modal(block: str) -> str:
-    block = block.replace(
-        "local ModalInstance = modalTemplate and modalTemplate:Clone()",
-        "local ModalInstance = ui.main and ui.main.modal and ui.main.modal:Clone()",
-    )
-    block = block.replace("if not ModalInstance or not window then", "if not ModalInstance or not ui.main then")
-    block = block.replace("ModalInstance.Parent = window", "ModalInstance.Parent = ui.main")
-    block = block.replace(
-        "if activeModals == 1 and dimOverlay then",
-        "if activeModals == 1 and ui.main and ui.main.dim then",
-    )
-    block = block.replace("dimOverlay.Visible = true", "ui.main.dim.Visible = true")
-    block = block.replace(
-        "tweenservice:Create(dimOverlay, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {",
-        "tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {",
-    )
-    block = block.replace(
-        "if activeModals == 0 and dimOverlay then",
-        "if activeModals == 0 and ui.main and ui.main.dim then",
-    )
-    block = block.replace("dimOverlay.Visible = false", "ui.main.dim.Visible = false")
-    block = block.replace("if dimOverlay then", "if ui.main and ui.main.dim then")
-    if "sydeSanitizeUiClone(ModalInstance)" not in block:
-        block = block.replace(
-            "ModalInstance.Visible = true\n",
-            "ModalInstance.Visible = true\n\t\tsydeSanitizeUiClone(ModalInstance)\n",
-            1,
-        )
-    if "sydeResolveModal(ModalInstance)" not in block:
-        block = block.replace(
-            "ModalInstance.Parent = ui.main\n",
-            "ModalInstance.Parent = ui.main\n\t\tlocal modalParts = sydeResolveModal(ModalInstance)\n",
-            1,
-        )
     return block
+
+
+def patch_ui_setup(text: str) -> str:
+    old = """--@UiSetup
+local ui = Library
+local window = ui.main
+local top = window.top
+local tabs = window.tabs.tab
+local pages = window.pages"""
+    new = """--@UiSetup
+local ui = sydeBindUi(Library)
+local window = ui.main
+if not window then
+\tsydeWarn("[Syde] Library missing main frame")
+end
+local top = window and sydeFindChild(window, "top", "Top")
+local tabsContainer = window and sydeFindChild(window, "tabs", "Tabs")
+local tabs = tabsContainer and sydeFindChild(tabsContainer, "tab", "Tab", "tb", "Tb")
+local pages = window and sydeFindChild(window, "pages", "Pages")"""
+    if old not in text:
+        raise RuntimeError("Syde UI setup anchor missing")
+    return text.replace(old, new, 1)
+
+
+def patch_dropdown_template(text: str) -> str:
+    return text.replace(
+        "local OptionButton = drop.Container.Option\n",
+        "local OptionButton = drop.Container.Option\n\t\t\t\t\tsydeSanitizeUiClone(OptionButton)\n",
+    )
+
+
+def patch_dropdown_animations(text: str) -> str:
+    replacements = [
+        ("TweenInfo.new(1.34, Enum.EasingStyle.Quint)", "TweenInfo.new(0.38, Enum.EasingStyle.Quint)"),
+        ("TweenInfo.new(1.34, Enum.EasingStyle.Exponential)", "TweenInfo.new(0.38, Enum.EasingStyle.Exponential)"),
+        ("tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint)", "tweenservice:Create(dropdown, TweenInfo.new(0.32, Enum.EasingStyle.Quint)"),
+        ("tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint)", "tweenservice:Create(drop.Container, TweenInfo.new(0.32, Enum.EasingStyle.Quint)"),
+        ("tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential)", "tweenservice:Create(drop.search, TweenInfo.new(0.28, Enum.EasingStyle.Exponential)"),
+        ("tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential)", "tweenservice:Create(drop.search.UIStroke, TweenInfo.new(0.28, Enum.EasingStyle.Exponential)"),
+        ("tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential)", "tweenservice:Create(drop.search.TextBox, TweenInfo.new(0.28, Enum.EasingStyle.Exponential)"),
+        ("tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential)", "tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(0.28, Enum.EasingStyle.Exponential)"),
+        ("tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential)", "tweenservice:Create(drop.search.icon, TweenInfo.new(0.28, Enum.EasingStyle.Exponential)"),
+        ("tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential)", "tweenservice:Create(option, TweenInfo.new(0.25, Enum.EasingStyle.Exponential)"),
+        ("tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential)", "tweenservice:Create(option, TweenInfo.new(0.3, Enum.EasingStyle.Exponential)"),
+        ("tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint)", "tweenservice:Create(option, TweenInfo.new(0.22, Enum.EasingStyle.Quint)"),
+        ("tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential)", "tweenservice:Create(opt, TweenInfo.new(0.3, Enum.EasingStyle.Exponential)"),
+        ("task.delay(1.2, function()", "task.delay(0.45, function()"),
+        ("task.wait(0.6)\n\t\t\t\t\tdrop.Container.Visible = false", "task.wait(0.22)\n\t\t\t\t\tdrop.Container.Visible = false"),
+        ("task.wait(0.6)\n\t\t\t\tdrop.Container.Visible = false", "task.wait(0.22)\n\t\t\t\tdrop.Container.Visible = false"),
+        ("local tweenInfo = TweenInfo.new(0.7, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)", "local tweenInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)"),
+    ]
+    for old, new in replacements:
+        text = text.replace(old, new)
+    return text
+
+
+def patch_ui_main_access(text: str) -> str:
+    text = text.replace("Library.main", "window")
+    text = text.replace("ui.main.pages", "pages")
+    text = text.replace(
+        "tweenservice:Create(logo.Title, TweenInfo.new(2, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()",
+        "do local _logoTitle = sydeTitleLabel(logo); if _logoTitle then tweenservice:Create(_logoTitle, TweenInfo.new(0.45, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end end",
+    )
+    return text
 
 
 def silence_syde_logging(text: str) -> str:
@@ -179,6 +210,141 @@ def patch_slider_drag(text: str) -> str:
         )
 
     return pattern.sub(repl, text)
+
+
+def wrap_option_tween(source: str, target: str, var_name: str) -> str:
+    prefix = f"tweenservice:Create({target},"
+    play_suffix = ":Play()"
+    out: list[str] = []
+    i = 0
+    while i < len(source):
+        idx = source.find(prefix, i)
+        if idx == -1:
+            out.append(source[i:])
+            break
+        out.append(source[i:idx])
+        paren_start = source.find("(", idx)
+        if paren_start == -1:
+            out.append(source[idx:])
+            break
+        depth = 0
+        j = paren_start
+        while j < len(source):
+            ch = source[j]
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            j += 1
+        if j >= len(source) or source[j + 1 : j + 1 + len(play_suffix)] != play_suffix:
+            out.append(source[idx : idx + len(prefix)])
+            i = idx + len(prefix)
+            continue
+        args = source[idx + len(prefix) : j]
+        out.append(
+            f"do local _optionLabel = sydeOptionLabel({var_name}); "
+            f"if _optionLabel then tweenservice:Create(_optionLabel,{args}):Play() end end"
+        )
+        i = j + 1 + len(play_suffix)
+    return "".join(out)
+
+
+def patch_option_labels(text: str) -> str:
+    text = re.sub(
+        r"(local option = OptionButton:Clone\(\)\n)(\s+)(option\.Title\.Text = OptionText)",
+        r"\1\2sydeSanitizeUiClone(option)\n\2local optionLabel = sydeOptionLabel(option)\n\2if optionLabel then\n\2\toptionLabel.Text = OptionText\n\2end",
+        text,
+    )
+    text = re.sub(
+        r'(\s+)if option:IsA\("Frame"\) and option:FindFirstChild\("Title"\) then',
+        r'\1local optionLabel = sydeOptionLabel(option)\n\1if option:IsA("Frame") and optionLabel then',
+        text,
+    )
+    text = text.replace(
+        "local optionText = option.Title.Text:lower()",
+        "local optionText = optionLabel.Text:lower()",
+    )
+    text = text.replace(
+        "SelectedOptions[option.Title.Text]",
+        "SelectedOptions[optionLabel.Text]",
+    )
+    for target, var_name in (("option.Title", "option"), ("opt.Title", "opt")):
+        text = wrap_option_tween(text, target, var_name)
+    text = text.replace(
+        "do local _optionLabel = sydeOptionLabel(option); if _optionLabel then tweenservice:Create(_optionLabel,",
+        "if optionLabel then tweenservice:Create(optionLabel,",
+    )
+    text = re.sub(
+        r"(if optionLabel then tweenservice:Create\(optionLabel,[^\n]+\):Play\(\)) end end",
+        r"\1 end",
+        text,
+    )
+    return text
+
+
+def patch_option_clicks(text: str) -> str:
+    return text.replace(
+        "option.Interact.MouseButton1Click:Connect(function()",
+        "sydeConnectClick(option, function()",
+    )
+
+
+def patch_normalized_labels(text: str) -> str:
+    text = text.replace(
+        "LOADER.loader.profile.Title.TextTransparency = 1",
+        "do local _profileTitle = sydeLoaderProfileLabel(LOADER); if _profileTitle then _profileTitle.TextTransparency = 1 end end",
+    )
+    text = text.replace(
+        "LOADER.loader.profile.Title.Text = Config.Name",
+        "do local _profileTitle = sydeLoaderProfileLabel(LOADER); if _profileTitle then _profileTitle.Text = Config.Name end end",
+    )
+    text = text.replace(
+        "LOADER.loader.profile.Title.Text = LoaderConfig.Name",
+        "do local _profileTitle = sydeLoaderProfileLabel(LOADER); if _profileTitle then _profileTitle.Text = LoaderConfig.Name end end",
+    )
+    text = text.replace(
+        'if clone:FindFirstChild("Title") then\n\t\t\t\tclone.Title.Text = value\n\t\t\tend',
+        "do local _cloneTitle = sydeTitleLabel(clone); if _cloneTitle then _cloneTitle.Text = value end end",
+    )
+    notif_anchor = "\t\tlocal Notification = Library.Notification.Default:Clone()\n\t\tNotification.Visible = true"
+    notif_insert = notif_anchor + "\n\t\tlocal notificationTitle = sydeTitleLabel(Notification)"
+    if notif_anchor in text and "local notificationTitle = sydeTitleLabel(Notification)" not in text:
+        text = text.replace(notif_anchor, notif_insert, 1)
+    text = text.replace(
+        "Notification.Title.Text = NotifData.Title",
+        "if notificationTitle then notificationTitle.Text = NotifData.Title end",
+    )
+    text = text.replace(
+        "syde:WiggleText(Notification.Title)",
+        "if notificationTitle then syde:WiggleText(notificationTitle) end",
+    )
+    text = text.replace(
+        "tweenservice:Create(Notification.Title, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 40,0, 10)}):Play()",
+        "if notificationTitle then tweenservice:Create(notificationTitle, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 40,0, 10)}):Play() end",
+    )
+    text = text.replace(
+        '\t\t\tlocal Section =  sydeClonePageTemplate(pages.page, "Section")\n\t\t\tSection.Visible = true\n\t\t\tSection.Title.Text = Title',
+        '\t\t\tlocal Section =  sydeClonePageTemplate(pages.page, "Section")\n\t\t\tSection.Visible = true\n\t\t\tlocal sectionTitle = sydeTitleLabel(Section)\n\t\t\tif sectionTitle then sectionTitle.Text = Title end',
+    )
+    text = text.replace(
+        "Section.Title.Position = UDim2.new(0, 0,0, 0)",
+        "if sectionTitle then sectionTitle.Position = UDim2.new(0, 0,0, 0) end",
+    )
+    text = text.replace(
+        "Section.Title.Position = UDim2.new(0, 25,0, 0)",
+        "if sectionTitle then sectionTitle.Position = UDim2.new(0, 25,0, 0) end",
+    )
+    text = text.replace(
+        '\t\t\tlocal EnchancedView = sydeClonePageTemplate(pages.page, "3DView")\n\t\t\tEnchancedView.Visible = true\n\t\t\tEnchancedView.Parent = Page\n\t\t\tEnchancedView.Title.Text = Viewdata.Title',
+        '\t\t\tlocal EnchancedView = sydeClonePageTemplate(pages.page, "3DView")\n\t\t\tEnchancedView.Visible = true\n\t\t\tEnchancedView.Parent = Page\n\t\t\tlocal viewTitle = sydeTitleLabel(EnchancedView)\n\t\t\tif viewTitle then viewTitle.Text = Viewdata.Title end',
+    )
+    text = text.replace(
+        "drop.Selected.Text = OptionText",
+        "sydeSetDropSelectedText(drop, OptionText)",
+    )
+    return text
 
 
 def main() -> None:
@@ -296,8 +462,15 @@ return syde
     body = replace_from(body, footer_start, end_patch)
 
     body = silence_syde_logging(body)
+    body = patch_ui_setup(body)
     body = patch_slider_labels(body)
     body = patch_slider_drag(body)
+    body = patch_option_labels(body)
+    body = patch_option_clicks(body)
+    body = patch_normalized_labels(body)
+    body = patch_dropdown_template(body)
+    body = patch_dropdown_animations(body)
+    body = patch_ui_main_access(body)
     OUT.write_text(body, encoding="utf-8")
     print(f"Wrote {OUT} ({len(body)} bytes, {body.count(chr(10)) + 1} lines)")
 

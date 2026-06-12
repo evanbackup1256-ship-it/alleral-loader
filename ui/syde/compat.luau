@@ -1,7 +1,7 @@
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 21
+local ALLERAL_SYDE_PATCH = 24
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -88,6 +88,60 @@ local function sydeSliderLabel(slider)
 		return nil
 	end
 	return sydeFindChild(slider, "title", "Title")
+end
+
+local function sydeOptionLabel(option)
+	if not option then
+		return nil
+	end
+	return sydeFindChild(option, "title", "Title", "TextLabel", "text")
+end
+
+local function sydeTitleLabel(instance)
+	return sydeOptionLabel(instance)
+end
+
+local function sydeOptionText(option)
+	local label = sydeOptionLabel(option)
+	return label and label.Text or ""
+end
+
+local function sydeLoaderProfileLabel(loaderGui)
+	local root = loaderGui or Loader
+	if not root then
+		return nil
+	end
+	local loaderFrame = sydeFindChild(root, "loader")
+	local profile = loaderFrame and sydeFindChild(loaderFrame, "profile")
+	return profile and sydeTitleLabel(profile)
+end
+
+local function sydeBindUi(root)
+	root = root or Library
+	local main = sydeFindChild(root, "main", "Main")
+	local render = sydeFindChild(root, "Render", "render")
+	local toastholder = sydeFindChild(root, "toastholder", "Toastholder", "ToastHolder")
+	local bound = {
+		_root = root,
+		main = main,
+		Main = main,
+		Render = render,
+		render = render,
+		toastholder = toastholder,
+		Toastholder = toastholder,
+	}
+	return setmetatable(bound, {
+		__index = function(_, key)
+			local value = rawget(bound, key)
+			if value ~= nil then
+				return value
+			end
+			if key == "main" or key == "Main" then
+				return main
+			end
+			return root[key]
+		end,
+	})
 end
 
 local function sydeButtonStroke(button)
