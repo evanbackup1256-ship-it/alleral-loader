@@ -18,8 +18,8 @@ local UI = "ui"
 local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-local SYDE_PATCH_VERSION = 8
-local SYDE_PATCH_REQUIRED_FN = "sydeEnsureDropholderDropFrame"
+local SYDE_PATCH_VERSION = 9
+local SYDE_PATCH_REQUIRED_FN = "sydeUnwrapDropFrame"
 local CORE_BASE_PATH = HUB .. "/core_base.luau"
 local CORE_BASE_LEGACY_PATH = HUB .. "/core.luau"
 local CORE_UI_PATH = HUB .. "/core_ui.luau"
@@ -914,33 +914,63 @@ local function ensureSydeSource()
 	local cachePaths = {
 		".alleral/cache/" .. SYDE_SOURCE_PATH,
 	}
-	local src, path = readLocal(localPaths, SYDE_SOURCE_MIN_BYTES)
-	if src and sydeSourceValid(src) then
+
+	local function adoptSyde(src, label)
+		if not src or not sydeSourceValid(src) then
+			return nil
+		end
 		cacheRemote(SYDE_SOURCE_PATH, src)
 		cacheRemote(".alleral/cache/" .. SYDE_SOURCE_PATH, src)
 		local patch = sydePatchFromSource(src)
-		return true, "local:" .. tostring(path) .. ", patch v" .. tostring(patch or "?")
+		return true, label .. ", patch v" .. tostring(patch or "?")
 	end
+
+	local remoteSrc, remoteVia = fetchRemote(SYDE_SOURCE_PATH, SYDE_SOURCE_MIN_BYTES)
+	local remotePatch = sydePatchFromSource(remoteSrc)
+	local remoteOk = remoteSrc and sydeSourceValid(remoteSrc)
+
+	local localSrc, localPath = readLocal(localPaths, SYDE_SOURCE_MIN_BYTES)
+	local localPatch = sydePatchFromSource(localSrc)
+	local localOk = localSrc and sydeSourceValid(localSrc)
+
+	if remoteOk then
+		if localOk and (localPatch or 0) >= (remotePatch or 0) then
+			return adoptSyde(localSrc, "local:" .. tostring(localPath))
+		end
+		if localOk and localPath then
+			log(
+				"Replacing stale Syde source (local v"
+					.. tostring(localPatch or "?")
+					.. " < remote v"
+					.. tostring(remotePatch or "?")
+					.. ")",
+				true
+			)
+			deleteWorkspaceFile(localPath)
+		end
+		for _, rel in ipairs(localPaths) do
+			if rel ~= localPath then
+				deleteWorkspaceFile(rel)
+			end
+		end
+		return adoptSyde(remoteSrc, "remote:" .. tostring(remoteVia or "github"))
+	end
+
+	if localOk then
+		return adoptSyde(localSrc, "local:" .. tostring(localPath))
+	end
+
 	for _, rel in ipairs(localPaths) do
 		deleteWorkspaceFile(rel)
 	end
 	for _, rel in ipairs(cachePaths) do
 		deleteWorkspaceFile(rel)
 	end
-	src, path = readLocal(cachePaths, SYDE_SOURCE_MIN_BYTES)
-	if src and sydeSourceValid(src) then
-		cacheRemote(SYDE_SOURCE_PATH, src)
-		local patch = sydePatchFromSource(src)
-		return true, "cache:" .. tostring(path) .. ", patch v" .. tostring(patch or "?")
+	local cacheSrc, cachePath = readLocal(cachePaths, SYDE_SOURCE_MIN_BYTES)
+	if cacheSrc and sydeSourceValid(cacheSrc) then
+		return adoptSyde(cacheSrc, "cache:" .. tostring(cachePath))
 	end
-	src, path = fetchRemote(SYDE_SOURCE_PATH, SYDE_SOURCE_MIN_BYTES)
-	if src and sydeSourceValid(src) then
-		cacheRemote(SYDE_SOURCE_PATH, src)
-		cacheRemote(".alleral/cache/" .. SYDE_SOURCE_PATH, src)
-		local patch = sydePatchFromSource(src)
-		return true, "remote, patch v" .. tostring(patch or "?")
-	end
-	return false, path or "patched Syde source unavailable"
+	return false, "patched Syde source unavailable (need v" .. tostring(SYDE_PATCH_VERSION) .. "+)"
 end
 
 local function usesLegacyHttpHash(src)
@@ -1356,7 +1386,7 @@ local function alleralUiValid(src)
 	if not src:find("loadSyde", 1, true) then
 		return false
 	end
-	if not src:find("SYDE_PATCH_VERSION%s*=%s*8", 1, false) then
+	if not src:find("SYDE_PATCH_VERSION%s*=%s*" .. tostring(SYDE_PATCH_VERSION), 1, false) then
 		return false
 	end
 	if compileCoreSource(src, "Alleral/alleral_ui") then
@@ -1512,6 +1542,9 @@ local VERSION_PATTERNS = {
 local function extractFileVersion(src, kind)
 	if type(src) ~= "string" then
 		return nil
+	end
+	if kind == "syde" then
+		return src:match("ALLERAL_SYDE_PATCH%s*=%s*(%d+)")
 	end
 	if kind == "alleral" then
 		return src:match('Core%.ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
@@ -2708,8 +2741,8 @@ local function buildManagedFiles()
 				UI .. "/syde/source.luau",
 				".alleral/cache/" .. UI .. "/syde/source.luau",
 			},
-			expectedKey = "alleral",
-			extract = "alleral",
+			expectedKey = "syde",
+			extract = "syde",
 			isValid = sydeSourceValid,
 		},
 		{
@@ -2873,12 +2906,14 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 	elseif entry.purgeOnLoaderChange then
 		local installedLoader = installedManifest and installedManifest.loader
 		return type(installedLoader) == "string" and installedLoader ~= expected.loader
+	elseif entry.extract == "syde" then
+		expectedVersion = tostring(SYDE_PATCH_VERSION)
 	else
 		expectedVersion = expected[entry.expectedKey]
 	end
 
 	if type(expectedVersion) ~= "string" or expectedVersion == "" then
-		return false
+		return entry.extract == "syde" or false
 	end
 
 	if type(src) ~= "string" or src == "" then
@@ -2889,13 +2924,18 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 		return true
 	end
 
-	local foundVersion = extractFileVersion(src, entry.extract)
-	if type(foundVersion) == "string" and foundVersion ~= "" and type(expectedVersion) == "string" and expectedVersion ~= "" then
-		return foundVersion ~= expectedVersion
-	end
-
 	if entry.isValid and not entry.isValid(src) then
 		return true
+	end
+
+	local foundVersion = extractFileVersion(src, entry.extract)
+	if type(foundVersion) == "string" and foundVersion ~= "" and type(expectedVersion) == "string" and expectedVersion ~= "" then
+		if entry.extract == "syde" then
+			local foundPatch = tonumber(foundVersion) or 0
+			local needPatch = tonumber(expectedVersion) or SYDE_PATCH_VERSION
+			return foundPatch < needPatch
+		end
+		return foundVersion ~= expectedVersion
 	end
 
 	if not foundVersion then

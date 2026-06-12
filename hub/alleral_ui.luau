@@ -13,8 +13,8 @@ return function(Core)
 		"kick/kick/ui/syde/source.luau",
 	}
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-	local SYDE_PATCH_VERSION = 8
-	local SYDE_PATCH_REQUIRED_FN = "sydeEnsureDropholderDropFrame"
+	local SYDE_PATCH_VERSION = 9
+	local SYDE_PATCH_REQUIRED_FN = "sydeUnwrapDropFrame"
 	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
 		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/syde/source.luau",
@@ -175,12 +175,22 @@ return function(Core)
 	end
 
 	local function readSydeSource()
+		local bestSrc, bestLabel, bestPatch = nil, nil, -1
+
+		local function consider(src, label)
+			if not sydeSourceValid(src) then
+				return
+			end
+			local patch = sydePatchFromSource(src) or 0
+			if patch > bestPatch then
+				bestSrc, bestLabel, bestPatch = src, label, patch
+			end
+		end
+
 		for _, path in ipairs(SYDE_SOURCE_PATHS) do
 			purgeInvalidSydeFile(path)
 			local src, label = tryReadSydePath(path)
-			if src then
-				return src, label
-			end
+			consider(src, label)
 		end
 
 		for _, baseUrl in ipairs(sydeRawUrls()) do
@@ -195,16 +205,19 @@ return function(Core)
 					src = http.get(url, 8000)
 				end
 			end
-			if sydeSourceValid(src) then
-				if type(Core.writeFile) == "function" then
-					pcall(Core.writeFile, SYDE_SOURCE_PATH, src)
-					pcall(Core.writeFile, ".alleral/cache/" .. SYDE_SOURCE_PATH, src)
-				end
-				return src, "remote:" .. baseUrl
-			end
+			consider(src, "remote:" .. baseUrl)
 		end
 
-		return nil, nil
+		if not bestSrc or bestPatch < SYDE_PATCH_VERSION then
+			return nil, nil
+		end
+
+		if bestLabel and bestLabel:find("^remote:", 1, false) and type(Core.writeFile) == "function" then
+			pcall(Core.writeFile, SYDE_SOURCE_PATH, bestSrc)
+			pcall(Core.writeFile, ".alleral/cache/" .. SYDE_SOURCE_PATH, bestSrc)
+		end
+
+		return bestSrc, bestLabel
 	end
 
 	local function loadSyde()
