@@ -65,6 +65,44 @@ return function(deps)
 		function section:Colorpicker(o) return Components.Colorpicker(innerCtx, o) end
 		function section:StatusCard(o) return Components.StatusCard(innerCtx, o) end
 
+		function section:CreateStatus(label, fields)
+			local card = Components.StatusCard(innerCtx, {
+				Name = label,
+				Summary = "",
+			})
+			local status = {
+				LastValues = {},
+				Visible = true,
+				_card = card,
+			}
+			local function refreshSummary()
+				local parts = {}
+				for key, value in pairs(status.LastValues) do
+					table.insert(parts, tostring(key) .. ": " .. tostring(value))
+				end
+				table.sort(parts)
+				card:SetSummary(table.concat(parts, " | "))
+			end
+			for key, value in pairs(fields or {}) do
+				status.LastValues[key] = tostring(value)
+			end
+			refreshSummary()
+			function status:Update(key, value)
+				self.LastValues[key] = tostring(value)
+				refreshSummary()
+			end
+			function status:SetSummary(text)
+				card:SetSummary(tostring(text or ""))
+			end
+			function status:SetVisible(visible)
+				self.Visible = visible == true
+				if card.SetVisible then
+					card:SetVisible(self.Visible)
+				end
+			end
+			return status
+		end
+
 		section.CreateToggle = section.Toggle
 		section.CreateSlider = section.Slider
 		section.CreateButton = section.Button

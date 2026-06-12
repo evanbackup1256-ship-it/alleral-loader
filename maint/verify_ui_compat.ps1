@@ -85,7 +85,7 @@ $uiModules = @(
     "Maid.luau", "Spring.luau", "Utils.luau", "Icons.luau", "Theme.luau",
     "Motion.luau", "Config.luau", "Tooltip.luau", "Notification.luau", "Modal.luau",
     "CommandPalette.luau", "Components.luau", "Section.luau", "Page.luau",
-    "Navigation.luau", "Window.luau", "Library.luau"
+    "Navigation.luau", "Window.luau", "Library.luau", "ModuleLoader.luau", "Vendor.luau"
 )
 $missing = @()
 foreach ($name in $uiModules) {

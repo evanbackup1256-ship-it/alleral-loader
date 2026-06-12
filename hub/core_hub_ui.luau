@@ -362,7 +362,7 @@ function Core.releaseUiWindow()
 		end)
 	end
 	local ui = ENV.Alleral_UI
-	local lib = ui and (ui.Neverlose or ui.Library or ui.WindUI)
+	local lib = ui and (ui.Library or ui.Alleral or ui.WindUI)
 	if type(lib) == "table" and type(lib.ReleaseWindow) == "function" then
 		pcall(function()
 			lib:ReleaseWindow(lib.Window)

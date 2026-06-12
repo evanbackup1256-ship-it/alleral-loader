@@ -1,23 +1,6 @@
 return function(Core)
 	local HttpService = game:GetService("HttpService")
 	local StarterGui = game:GetService("StarterGui")
-	local WINDUI_MIRROR_URLS = {
-		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/windui/",
-		"https://github.com/evanbackup1256-ship-it/kick/raw/main/ui/windui/",
-		"https://github.com/Footagesus/WindUI/releases/download/1.6.64-fix/",
-		"https://raw.githubusercontent.com/Footagesus/WindUI/1.6.64-fix/dist/",
-	}
-	local WINDUI_LOCAL_ROOTS = {
-		".alleral/cache/ui/windui/",
-		"ui/windui/",
-		"kick/ui/windui/",
-		"kick/kick/ui/windui/",
-		"windui/",
-	}
-	local WINDUI_FILE = "main.lua"
-	local WINDUI_PATCH_FILE = "arrrel.luau"
-	local WINDUI_PATCH_FALLBACK = "aller.luau"
-	local WINDUI_MIN_BYTES = 50000
 	local ALLERAL_ACCENT = Color3.fromHex("#53fc18")
 	local ALLERAL_ACCENT_ALT = Color3.fromHex("#30ff6a")
 	local function genv()
@@ -29,459 +12,72 @@ return function(Core)
 	local ENV = genv()
 	local agentDebug = ENV._AlleralAgentDebug or function() end
 
-local function uiOk(bundle)
-	return type(bundle) == "table"
-		and type(bundle.Library) == "table"
-		and type(bundle.CreateWindow) == "function"
-end
+	local function uiOk(bundle)
+		return type(bundle) == "table"
+			and type(bundle.Library) == "table"
+			and type(bundle.CreateWindow) == "function"
+	end
 
-local function stampUi(bundle)
-	if type(bundle) ~= "table" then
+	local function stampUi(bundle)
+		if type(bundle) ~= "table" then
+			return bundle
+		end
+		bundle.InterfaceBuild = Core.UI_LIBRARY
+		bundle.UI_LIBRARY = Core.UI_LIBRARY
 		return bundle
 	end
-	bundle.InterfaceBuild = Core.UI_LIBRARY
-	bundle.UI_LIBRARY = Core.UI_LIBRARY
-	return bundle
-end
 
-local function windUiSourceValid(body)
-	if type(body) ~= "string" or body == "" then
-		return false
-	end
-	if #body < WINDUI_MIN_BYTES then
-		return false
-	end
-	return body:find("CreateWindow", 1, true) ~= nil or body:find("WindUI", 1, true) ~= nil
-end
-
-local function compileWindUiModule(source, label)
-	local loadStringFn = Core.loadStringFn()
-	if not loadStringFn or not source or source == "" then
-		return nil, "Empty WindUI source"
-	end
-	local cacheKey = tostring(#source) .. ":" .. tostring(label)
-	local cache = ENV._AlleralWindUiCompileCache
-	if cache and cache.key == cacheKey and type(cache.module) == "table" then
-		return cache.module
-	end
-	if not windUiSourceValid(source) then
-		return nil, "WindUI source invalid (" .. tostring(#source) .. " bytes)"
-	end
-	local compiled, compileErr = loadStringFn(source, label)
-	if not compiled and type(load) == "function" and load ~= loadStringFn then
-		compiled, compileErr = load(source, label)
-	end
-	if not compiled then
-		return nil, tostring(compileErr)
-	end
-	local ok, result = pcall(compiled)
-	if ok and type(result) == "table" and type(result.CreateWindow) == "function" then
-		ENV.Alleral_WindUiLastGood = result
-		ENV._AlleralWindUiCompileCache = {
-			key = tostring(#source) .. ":" .. tostring(label),
-			module = result,
-		}
-		return result
-	end
-	if not ok then
-		Core.logWarn("Alleral UI compile error: " .. tostring(result))
-	end
-	if ENV.Alleral_WindUiLastGood and type(ENV.Alleral_WindUiLastGood.CreateWindow) == "function" then
-		Core.logWarn("Alleral UI compile failed, using last good copy")
-		return ENV.Alleral_WindUiLastGood
-	end
-	return nil, ok and "Invalid WindUI module" or tostring(result)
-end
-
-local function readWindUiLocal(relativePath)
-	local cacheKey = "_AlleralWindPath_" .. tostring(relativePath):gsub("[^%w]", "_")
-	local cachedPath = ENV[cacheKey]
-	if type(cachedPath) == "string" then
-		local cachedSource = Core.readFile(cachedPath)
-		if cachedSource then
-			return cachedSource, cachedPath
-		end
-	end
-
-	local roots = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
-	for _, vendorRoot in ipairs(WINDUI_LOCAL_ROOTS) do
-		for _, root in ipairs(roots) do
-			local fullPath = root .. vendorRoot .. relativePath
-			local source = Core.readFile(fullPath)
-			if source then
-				ENV[cacheKey] = fullPath
-				return source, fullPath
+	local function cacheUi(bundle)
+		stampUi(bundle)
+		ENV.Alleral_UI = bundle
+		if getgenv then
+			local g = getgenv()
+			if type(g) == "table" then
+				g.Alleral_UI = bundle
 			end
 		end
-	end
-	return nil
-end
-
-local function fetchWindUiRemote(relativePath)
-	for _, base in ipairs(WINDUI_MIRROR_URLS) do
-		local url = base .. relativePath
-		local body = Core.httpGet(url)
-		if windUiSourceValid(body) then
-			return body, url
-		end
-	end
-	return nil
-end
-
-local function patchSourceValid(body)
-	return type(body) == "string"
-		and #body > 400
-		and (body:find("ARRREL_UI_VERSION", 1, true) ~= nil or body:find("ALLERAL_UI_VERSION", 1, true) ~= nil)
-		and body:find("return function", 1, true) ~= nil
-end
-
-local function extractPatchVersion(body)
-	if type(body) ~= "string" then
-		return nil
-	end
-	return body:match('ARRREL_UI_VERSION%s*=%s*"([^"]+)"')
-		or body:match('ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
-end
-
-local function expectedPatchVersion()
-	return Core.ALLERAL_UI_VERSION or "2.0.4-alleral-v2"
-end
-
-local function patchVersionCurrent(body)
-	local version = extractPatchVersion(body)
-	return version ~= nil and version == expectedPatchVersion()
-end
-
-local function patchApplied(windUi)
-	return type(windUi) == "table" and windUi._AlleralPatchComplete == true
-end
-
-local function bootstrapSourceValid(body)
-	return type(body) == "string"
-		and #body > 200
-		and body:find("return function", 1, true) ~= nil
-end
-
-local function applyAlleralWindUiPatch(windUi)
-	if type(windUi) ~= "table" or patchApplied(windUi) then
-		return windUi
+		return bundle
 	end
 
-	local loadStringFn = Core.loadStringFn()
-	if type(loadStringFn) ~= "function" then
-		return windUi
-	end
-
-	local function runPatchLoader(source, label)
-		if not source then
-			return false
-		end
-		local chunk, compileErr = loadStringFn(source, label)
-		if not chunk then
-			Core.logWarn("UI loader compile: " .. tostring(compileErr))
-			return false
-		end
-		local ok, loader = pcall(chunk)
-		if not ok or type(loader) ~= "function" then
-			Core.logWarn("UI loader: " .. tostring(loader))
-			return false
-		end
-		local applied, applyErr = pcall(loader, windUi)
-		if not applied then
-			Core.logWarn("UI patch: " .. tostring(applyErr))
-			return false
-		end
-		return patchApplied(windUi)
-	end
-
-	local bootstrapSource, bootstrapPath = readWindUiLocal("bootstrap.lua")
-	if bootstrapSource and bootstrapSourceValid(bootstrapSource) and patchVersionCurrent(bootstrapSource) and runPatchLoader(bootstrapSource, "@Arrrel/bootstrap:" .. tostring(bootstrapPath or "local")) then
-		return windUi
-	end
-
-	for _, base in ipairs(WINDUI_MIRROR_URLS) do
-		local body = Core.httpGet(base .. "bootstrap.lua")
-		if bootstrapSourceValid(body) and patchVersionCurrent(body) and runPatchLoader(body, "@Arrrel/bootstrap:remote") then
-			return windUi
-		end
-	end
-
-	local patchSource, patchPath = readWindUiLocal(WINDUI_PATCH_FILE)
-	if not patchSource then
-		patchSource, patchPath = readWindUiLocal(WINDUI_PATCH_FALLBACK)
-	end
-	if patchSource and patchSourceValid(patchSource) and patchVersionCurrent(patchSource) then
-		local chunk, compileErr = loadStringFn(patchSource, "@Arrrel/patch:" .. tostring(patchPath))
-		if chunk then
-			local ok, patchFn = pcall(chunk)
-			if ok and type(patchFn) == "function" then
-				pcall(patchFn, windUi)
-				if patchApplied(windUi) then
-					return windUi
-				end
-			end
-		else
-			Core.logWarn("UI patch compile: " .. tostring(compileErr))
-		end
-	end
-
-	for _, patchName in ipairs({ WINDUI_PATCH_FILE, WINDUI_PATCH_FALLBACK }) do
-		for _, base in ipairs(WINDUI_MIRROR_URLS) do
-			local body = Core.httpGet(base .. patchName)
-			if patchSourceValid(body) then
-				local chunk, compileErr = loadStringFn(body, "@Arrrel/patch:remote:" .. patchName)
-				if chunk then
-					local ok, patchFn = pcall(chunk)
-					if ok and type(patchFn) == "function" then
-						pcall(patchFn, windUi)
-						if patchApplied(windUi) then
-							return windUi
-						end
-					end
-				else
-					Core.logWarn("UI patch compile: " .. tostring(compileErr))
-				end
-			end
-		end
-	end
-
-	return windUi
-end
-
-local function loadWindUiModule()
-	if ENV.Alleral_WindUiLastGood and type(ENV.Alleral_WindUiLastGood.CreateWindow) == "function" then
-		local cache = ENV._AlleralWindUiCompileCache
-		if cache and type(cache.module) == "table" then
-			return applyAlleralWindUiPatch(cache.module)
-		end
-	end
-
-	local localSource, localPath = readWindUiLocal(WINDUI_FILE)
-	if localSource then
-		local module, err = compileWindUiModule(localSource, "@WindUI/local:" .. localPath)
-		if module then
-			return applyAlleralWindUiPatch(module)
-		end
-		Core.logWarn("local Alleral UI failed (" .. tostring(localPath) .. "): " .. tostring(err))
-	end
-	local remoteSource, remoteUrl = fetchWindUiRemote(WINDUI_FILE)
-	if remoteSource then
-		local module, err = compileWindUiModule(remoteSource, "@WindUI/remote:" .. tostring(remoteUrl))
-		if module then
-			Core.say("Alleral UI pulled from " .. tostring(remoteUrl))
-			return applyAlleralWindUiPatch(module)
-		end
-		Core.logWarn("remote WindUI failed: " .. tostring(err))
-	end
-	localSource = readWindUiLocal(WINDUI_FILE)
-	if localSource then
-		return applyAlleralWindUiPatch(compileWindUiModule(localSource, "@WindUI/local"))
-	end
-	return nil, "WindUI download failed for " .. WINDUI_FILE
-end
-
-local function listUiThemes(windUi)
-	local names = {}
-	if type(windUi) == "table" and type(windUi.GetThemes) == "function" then
-		local ok, themes = pcall(function()
-			return windUi:GetThemes()
-		end)
-		if ok and type(themes) == "table" then
-			for name in pairs(themes) do
-				table.insert(names, name)
-			end
-			table.sort(names)
-		end
-	end
-	if #names == 0 then
-		return {
-			"Arrrel",
-			"ArrrelNeon",
-			"ArrrelMidnight",
-			"ArrrelAurora",
-			"ArrrelObsidian",
-			"ArrrelSynth",
-			"ArrrelOcean",
-			"ArrrelEmber",
-			"ArrrelStealth",
-			"ArrrelPaper",
-			"ArrrelVoid",
-			"Dark",
-			"Light",
-		}
-	end
-	return names
-end
-
-local function applyAlleralTheme(bundle)
-	if type(bundle) ~= "table" then
-		return
-	end
-	local windUi = bundle.WindUI or bundle.Library
-	if type(windUi) ~= "table" or type(windUi.SetTheme) ~= "function" then
-		return
-	end
-	pcall(function()
-		windUi:SetTheme("Arrrel")
-	end)
-end
-
-local function cacheUi(bundle)
-	stampUi(bundle)
-	ENV.Alleral_UI = bundle
-	if getgenv then
-		local g = getgenv()
-		if type(g) == "table" then
-			g.Alleral_UI = bundle
-		end
-	end
-	return bundle
-end
-
-function Core.loadUi()
-	local cached = ENV.Alleral_UI
-	if uiOk(cached) then
-		return cacheUi(cached)
-	end
-	ENV.Alleral_UI = nil
-
-	local loadStringFn = Core.loadStringFn()
-	if not loadStringFn then
-		return nil, "loadstring unavailable"
-	end
-
-	local WindUI, libErr = loadWindUiModule()
-	if not WindUI and ENV.Alleral_WindUiLastGood then
-		WindUI = ENV.Alleral_WindUiLastGood
-		libErr = nil
-		Core.say("using cached Alleral UI")
-	end
-	if not WindUI then
-		return nil, libErr or "Alleral UI missing"
-	end
-
-	ENV.Alleral_WindUiLastGood = WindUI
-
-	Core.clearUiStateBindings()
-
-	local bundle = {
-		Alleral = WindUI,
-		Library = WindUI,
-		WindUI = WindUI,
-		CreateWindow = function(_, settings)
-			return Core.safeCall("UI:CreateWindow", function()
-				return WindUI:CreateWindow(settings)
-			end)
-		end,
-		Notify = function(_, info)
-			Core.safeCall("UI:Notify", function()
-				if type(info) == "table" then
-					WindUI:Notify({
-						Title = info.Title,
-						Content = info.Content or info.Description or info.Text or "",
-						Duration = info.Duration or info.Time or 4,
-						Type = info.Type or info.Level,
-						Icon = info.Icon,
-					})
-				else
-					WindUI:Notify({
-						Title = "Alleral",
-						Content = tostring(info or ""),
-						Duration = 4,
-						Type = "info",
-					})
-				end
-			end)
-		end,
-	}
-	applyAlleralTheme(bundle)
-	bundle.ThemeNames = listUiThemes(WindUI)
-	if ENV.Alleral_UiReducedMotion == true and type(WindUI.SetReducedMotion) == "function" then
-		WindUI:SetReducedMotion(true)
-	end
-	if ENV.Alleral_UiSpringMotion == false and type(WindUI.SetSpringMotion) == "function" then
-		pcall(function()
-			WindUI:SetSpringMotion(false)
-		end)
-	end
-	if ENV.Alleral_UiStartup == false and type(WindUI.SetStartupEffect) == "function" then
-		pcall(function()
-			WindUI:SetStartupEffect(false)
-		end)
-	elseif ENV.Alleral_UiStartup == true and type(WindUI.SetStartupEffect) == "function" then
-		pcall(function()
-			WindUI:SetStartupEffect(true)
-		end)
-	end
-	if ENV.Alleral_UiTouchFeedback == false and type(WindUI.SetTouchFeedback) == "function" then
-		pcall(function()
-			WindUI:SetTouchFeedback(false)
-		end)
-	end
-	if ENV.Alleral_NotifyDedupe == false and type(WindUI.SetNotifyDedupe) == "function" then
-		pcall(function()
-			WindUI:SetNotifyDedupe(false)
-		end)
-	end
-	if ENV.Alleral_NotifyLower == true and type(WindUI.SetNotificationLower) == "function" then
-		pcall(function()
-			WindUI:SetNotificationLower(true)
-		end)
-	end
-	if ENV.Alleral_NotifyCompact == true and type(WindUI.SetNotificationCompact) == "function" then
-		pcall(function()
-			WindUI:SetNotificationCompact(true)
-		end)
-	end
-	if type(WindUI.ApplyProfile) == "function" then
-		pcall(function()
-			WindUI:ApplyProfile(ENV.Alleral_UiProfile or "auto")
-		end)
-	end
-	registerUiScaleHooks(WindUI)
-	if ENV.Alleral_UiScale and type(WindUI.SetUiScale) == "function" then
-		pcall(function()
-			WindUI:SetUiScale(ENV.Alleral_UiScale)
-		end)
-	end
-	if ENV.Alleral_UiHaptics == true and type(WindUI.SetHaptics) == "function" then
-		pcall(function()
-			WindUI:SetHaptics(true)
-		end)
-	end
-	Core.say("Alleral " .. tostring(WindUI.GetArrrelVersion and WindUI:GetArrrelVersion() or WindUI.GetAlleralVersion and WindUI:GetAlleralVersion() or Core.ALLERAL_UI_VERSION) .. " loaded")
-	task.defer(function()
-		if type(WindUI.Preload) == "function" then
+	local function applyAlleralTheme(bundle)
+		local lib = type(bundle) == "table" and (bundle.Library or bundle.Alleral)
+		if type(lib) == "table" and type(lib.SetTheme) == "function" then
 			pcall(function()
-				WindUI:Preload()
+				lib:SetTheme("Private")
 			end)
 		end
-	end)
-	return cacheUi(bundle)
-end
-
-function Core.preloadUi()
-	local cached = ENV.Alleral_UI
-	if uiOk(cached) then
-		return cacheUi(cached)
 	end
-	if ENV._AlleralUiPreloadRunning == true then
-		local started = tick()
-		while ENV._AlleralUiPreloadRunning == true and tick() - started < 15 do
-			task.wait()
-		end
-		cached = ENV.Alleral_UI
+
+	function Core.loadUi()
+		local cached = ENV.Alleral_UI
 		if uiOk(cached) then
 			return cacheUi(cached)
 		end
+		return nil, "Alleral UI layer missing — sync hub/alleral_ui.luau and hub/ui/ to your executor workspace"
 	end
-	ENV._AlleralUiPreloadRunning = true
-	local bundle, err = Core.loadUi()
-	ENV._AlleralUiPreloadRunning = false
-	return bundle, err
-end
 
-function Core.httpGet(url)
+	function Core.preloadUi()
+		local cached = ENV.Alleral_UI
+		if uiOk(cached) then
+			return cacheUi(cached)
+		end
+		if ENV._AlleralUiPreloadRunning == true then
+			local started = tick()
+			while ENV._AlleralUiPreloadRunning == true and tick() - started < 15 do
+				task.wait()
+			end
+			cached = ENV.Alleral_UI
+			if uiOk(cached) then
+				return cacheUi(cached)
+			end
+		end
+		ENV._AlleralUiPreloadRunning = true
+		local bundle, err = Core.loadUi()
+		ENV._AlleralUiPreloadRunning = false
+		return bundle, err
+	end
+
+	function Core.httpGet(url)
 	if type(url) ~= "string" or url == "" then
 		return nil
 	end
@@ -1628,7 +1224,7 @@ function Core.prepareGame(state)
 		agentDebug("H5", "core_ui:prepareGame", "UI boot failed", {
 			err = msg,
 			coreVersion = core and core.VERSION,
-			neverloseUiVersion = core and core.NEVERLOSE_UI_VERSION,
+			alleralUiVersion = core and core.ALLERAL_UI_VERSION,
 		})
 		-- #endregion
 		signalBootFailure(msg)

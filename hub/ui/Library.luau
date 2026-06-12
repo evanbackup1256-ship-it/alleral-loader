@@ -1,6 +1,6 @@
 return function(deps)
 	deps = type(deps) == "table" and deps or {}
-	local ALLERAL_UI_VERSION = "2.1.0-private"
+	local ALLERAL_UI_VERSION = "2.2.0-vendor"
 
 	local Maid = deps.Maid
 	local Spring = deps.Spring
@@ -14,6 +14,7 @@ return function(deps)
 	local Modal = deps.Modal
 	local CommandPalette = deps.CommandPalette
 	local Components = deps.Components
+	local Vendor = deps.Vendor
 	local Section = deps.Section
 	local Page = deps.Page
 	local Navigation = deps.Navigation
@@ -34,6 +35,7 @@ return function(deps)
 		CommandPalette = CommandPalette,
 		Tooltip = Tooltip,
 		Components = Components,
+		Vendor = Vendor,
 		Holder = nil,
 		_windows = {},
 		LibRef = LibRef,
@@ -44,10 +46,6 @@ return function(deps)
 	LibRef.Motion = Motion
 
 	function Library.GetAlleralVersion()
-		return ALLERAL_UI_VERSION
-	end
-
-	function Library:GetNeverloseVersion()
 		return ALLERAL_UI_VERSION
 	end
 
@@ -118,6 +116,14 @@ return function(deps)
 		return Config and Config.exportJson() or "{}"
 	end
 
+	function Library:ListThemeNames()
+		return Theme and Theme.list() or { "Private" }
+	end
+
+	function Library:GetCurrentTheme()
+		return Theme and Theme.Current and Theme.Current.Name or "Private"
+	end
+
 	function Library:SetTheme(name)
 		if not Theme then
 			return
@@ -132,8 +138,34 @@ return function(deps)
 		end
 	end
 
+	function Library:CycleTheme(step)
+		step = tonumber(step) or 1
+		local names = Library:ListThemeNames()
+		if #names == 0 then
+			return nil
+		end
+		local current = Library:GetCurrentTheme()
+		local index = 1
+		for i, name in ipairs(names) do
+			if name == current then
+				index = i
+				break
+			end
+		end
+		local nextIndex = ((index - 1 + step) % #names) + 1
+		local nextName = names[nextIndex]
+		Library:SetTheme(nextName)
+		return { Name = nextName }
+	end
+
 	function Library:ApplyProfile(name)
-		Library:SetTheme(name == "graphite" and "Graphite" or "Midnight")
+		local map = {
+			graphite = "Graphite",
+			midnight = "Midnight",
+			auto = "Private",
+			neon = "Neon",
+		}
+		Library:SetTheme(map[name] or name or "Private")
 	end
 
 	function Library:SetMotionProfile() end

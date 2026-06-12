@@ -10,8 +10,8 @@ local CORE_UI_MIN_BYTES = 50000
 local CORE_UI_MAX_BYTES = 90000
 local CORE_HUB_UI_MIN_BYTES = 60000
 local CORE_HUB_UI_MAX_BYTES = 75000
-local CORE_NEVERLOSE_UI_MIN_BYTES = 28000
-local CORE_NEVERLOSE_UI_MAX_BYTES = 40000
+local CORE_ALLERAL_UI_MIN_BYTES = 15000
+local CORE_ALLERAL_UI_MAX_BYTES = 50000
 local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
@@ -21,15 +21,13 @@ local CORE_BASE_LEGACY_PATH = HUB .. "/core.luau"
 local CORE_UI_PATH = HUB .. "/core_ui.luau"
 local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
-local CORE_NEVERLOSE_UI_PATH = CORE_ALLERAL_UI_PATH
 
 local RELEASE_FALLBACK = {
 	loader = "8.0.0",
 	core = "2.8.8",
 	ui = "Alleral",
-	neverlose = "2.1.0-private",
-	windui = "2.1.0-private",
-	alleral = "2.1.0-private",
+	windui = "2.2.0-vendor",
+	alleral = "2.2.0-vendor",
 	analytics = "1.2",
 	telemetry = "3.2",
 	helpers = "1.0",
@@ -158,8 +156,15 @@ local function getHttpRequestFn()
 end
 
 -- #region agent log
-local AGENT_DEBUG_SESSION = "2b507f"
-local AGENT_DEBUG_PATHS = { "debug-2b507f.log", "kick/debug-2b507f.log", ".alleral/debug-2b507f.log" }
+local AGENT_DEBUG_SESSION = "8ad4ab"
+local AGENT_DEBUG_PATHS = {
+	"debug-8ad4ab.log",
+	"kick/debug-8ad4ab.log",
+	".alleral/debug-8ad4ab.log",
+	"debug-2b507f.log",
+	"kick/debug-2b507f.log",
+	".alleral/debug-2b507f.log",
+}
 local AGENT_DEBUG_ENDPOINT = "http://127.0.0.1:7711/ingest/a1d7fbba-2153-4950-a2ea-2c45ed3c7b92"
 local AgentHttpService = pcall(function()
 	return game:GetService("HttpService")
@@ -222,7 +227,7 @@ local function agentDebug(hypothesisId, location, message, data)
 			)
 		end)
 	end
-	warn("[DBG-2b507f] " .. payload.hypothesisId .. " | " .. payload.location .. " | " .. payload.message)
+	warn("[DBG-8ad4ab] " .. payload.hypothesisId .. " | " .. payload.location .. " | " .. payload.message)
 end
 
 ENV._AlleralAgentDebug = agentDebug
@@ -1241,10 +1246,8 @@ local function coreBaseValid(src)
 		return false
 	end
 	local alleralVer = src:match('Core%.ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
-		or src:match('Core%.NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"')
-	local expectedAlleral = (ENV._Alleral_ExpectedVersions and (ENV._Alleral_ExpectedVersions.alleral or ENV._Alleral_ExpectedVersions.neverlose))
+	local expectedAlleral = (ENV._Alleral_ExpectedVersions and ENV._Alleral_ExpectedVersions.alleral)
 		or RELEASE_FALLBACK.alleral
-		or RELEASE_FALLBACK.neverlose
 	if type(alleralVer) == "string" and type(expectedAlleral) == "string" and alleralVer ~= expectedAlleral then
 		return false
 	end
@@ -1284,7 +1287,7 @@ local function coreHubUiValid(src)
 end
 
 local function alleralUiValid(src)
-	if type(src) ~= "string" or #src < CORE_NEVERLOSE_UI_MIN_BYTES then
+	if type(src) ~= "string" or #src < CORE_ALLERAL_UI_MIN_BYTES then
 		return false
 	end
 	if not src:find("return function%(Core%)", 1, false) then
@@ -1311,8 +1314,6 @@ local function alleralUiValid(src)
 	return looksLikeLua(src)
 end
 
-local neverloseUiValid = alleralUiValid
-
 local function alleralLibraryValid(src)
 	if type(src) ~= "string" or #src < 3000 then
 		return false
@@ -1332,8 +1333,6 @@ local function alleralLibraryValid(src)
 	end
 	return true
 end
-
-local neverloseLibraryValid = alleralLibraryValid
 
 local function coreValid(src)
 	return coreMonolithValid(src) or coreBaseValid(src)
@@ -1424,15 +1423,15 @@ local function coreHubUiRejectReason(src)
 	return "unknown"
 end
 
-local function neverloseUiRejectReason(src)
+local function alleralUiRejectReason(src)
 	if type(src) ~= "string" or src == "" then
 		return "empty response"
 	end
-	if neverloseUiValid(src) then
+	if alleralUiValid(src) then
 		return "valid"
 	end
-	if #src < CORE_NEVERLOSE_UI_MIN_BYTES then
-		return tostring(#src) .. "b, need " .. tostring(CORE_NEVERLOSE_UI_MIN_BYTES) .. "b+"
+	if #src < CORE_ALLERAL_UI_MIN_BYTES then
+		return tostring(#src) .. "b, need " .. tostring(CORE_ALLERAL_UI_MIN_BYTES) .. "b+"
 	end
 	if not src:find("function Core.loadUi", 1, true) then
 		return "missing loadUi override"
@@ -1441,7 +1440,7 @@ local function neverloseUiRejectReason(src)
 		return "missing return function(Core) wrapper"
 	end
 	if not src:find("createWindUiGroupbox", 1, true) or not src:find("buildUiWindow", 1, true) then
-		return "missing Neverlose UI helpers"
+		return "missing Alleral UI helpers"
 	end
 	if not src:find("Alleral UI layer", 1, true) then
 		return "missing Alleral UI layer marker"
@@ -1453,7 +1452,7 @@ local function neverloseUiRejectReason(src)
 		return "invalid lua body"
 	end
 	if loadStringFn then
-		local ok, err = compileCoreSource(src, "Alleral/neverlose_ui-check")
+		local ok, err = compileCoreSource(src, "Alleral/alleral_ui-check")
 		if not ok then
 			return "compile failed: " .. tostring(err)
 		end
@@ -1470,7 +1469,6 @@ local VERSION_PATTERNS = {
 	security = 'Security%.VERSION%s*=%s*"([%d%.]+)"',
 	access = 'Access%.VERSION%s*=%s*"([%d%.]+)"',
 	loader = 'LOADER_VERSION%s*=%s*"([%d%.]+)"',
-	neverlose = 'ALLERAL_UI_VERSION%s*=%s*"([^"]+)"',
 	windui = 'ALLERAL_UI_VERSION%s*=%s*"([^"]+)"',
 	alleral = 'ALLERAL_UI_VERSION%s*=%s*"([^"]+)"',
 	game = 'local VERSION%s*=%s*"([%d%.]+)"',
@@ -1495,8 +1493,8 @@ local function expectedVersionForKind(expected, kind)
 	if type(expected) ~= "table" then
 		return nil
 	end
-	if kind == "neverlose" or kind == "windui" or kind == "alleral" then
-		return expected.alleral or expected.neverlose or expected.windui
+	if kind == "windui" or kind == "alleral" then
+		return expected.alleral or expected.windui
 	end
 	return expected[kind] or expected.core
 end
@@ -1504,11 +1502,6 @@ end
 local function sourceVersionStale(src, kind, expectedVersion)
 	if type(src) ~= "string" or type(expectedVersion) ~= "string" or expectedVersion == "" then
 		return false
-	end
-	if kind == "neverlose" then
-		local neverloseVer = src:match('Core%.NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"')
-			or extractFileVersion(src, "neverlose")
-		return type(neverloseVer) == "string" and neverloseVer ~= expectedVersion
 	end
 	local found = extractFileVersion(src, kind or "core")
 	return type(found) == "string" and found ~= expectedVersion
@@ -1523,9 +1516,22 @@ end
 local function fetchRemoteCoreFile(relativePath, validFn, rejectReasonFn, minBytes)
 	minBytes = minBytes or CORE_BASE_MIN_BYTES
 	local lastReason = "no response"
+	local debugAlleralUi = relativePath == CORE_ALLERAL_UI_PATH
 	for attempt = 1, 2 do
 		for _, base in ipairs(CORE_REMOTE_BASES) do
 			local body, via = httpGet(base .. "/" .. relativePath, minBytes)
+			-- #region agent log
+			if debugAlleralUi then
+				pcall(agentDebug, "H2", "loader:fetchRemoteCoreFile", "alleral ui remote attempt", {
+					attempt = attempt,
+					base = base,
+					minBytes = minBytes,
+					bodyBytes = type(body) == "string" and #body or 0,
+					via = via,
+					lastReason = lastReason,
+				})
+			end
+			-- #endregion
 			if type(body) == "string" and #body >= minBytes then
 				if validFn(body) then
 					cacheRemote(relativePath, body)
@@ -1582,6 +1588,21 @@ local function resolveCoreSource(localPaths, cachePaths, remotePath, validFn, re
 	local expected = ENV._Alleral_ExpectedVersions or fetchExpectedVersions()
 	local expectedVersion = opts.expectedVersion or expectedVersionForKind(expected, versionKind)
 	local src, path = readLocal(localPaths, minBytes)
+	-- #region agent log
+	if versionKind == "alleral" then
+		local rawSrc, rawPath = readLocal(localPaths, 0)
+		pcall(agentDebug, "H1", "loader:resolveCoreSource", "alleral ui local probe", {
+			rawBytes = rawSrc and #rawSrc or 0,
+			rawPath = rawPath,
+			minBytes = minBytes,
+			belowMin = rawSrc and #rawSrc < minBytes,
+			valid = rawSrc and validFn(rawSrc),
+			stale = rawSrc and sourceVersionStale(rawSrc, versionKind, expectedVersion),
+			expectedVersion = expectedVersion,
+			version = rawSrc and extractFileVersion(rawSrc, "alleral"),
+		})
+	end
+	-- #endregion
 	local label
 	if src then
 		if not validFn(src) or sourceVersionStale(src, versionKind, expectedVersion) then
@@ -1622,6 +1643,15 @@ local function resolveCoreSource(localPaths, cachePaths, remotePath, validFn, re
 	else
 		src, label = fetchRemoteCoreFile(remotePath, validFn, rejectReasonFn, minBytes)
 		if not src then
+			-- #region agent log
+			if versionKind == "alleral" then
+				pcall(agentDebug, "H3", "loader:resolveCoreSource", "alleral ui remote failed", {
+					label = label,
+					minBytes = minBytes,
+					remotePath = remotePath,
+				})
+			end
+			-- #endregion
 			return nil, label
 		end
 	end
@@ -1631,7 +1661,7 @@ local function resolveCoreSource(localPaths, cachePaths, remotePath, validFn, re
 		path = path,
 		versionKind = versionKind,
 		expectedVersion = expectedVersion,
-		version = src and (extractFileVersion(src, versionKind) or src:match('Core%.NEVERLOSE_UI_VERSION%s*=%s*"([^"]+)"')) or nil,
+		version = src and extractFileVersion(src, versionKind) or nil,
 		bytes = src and #src or 0,
 		remotePath = remotePath,
 	})
@@ -1682,7 +1712,7 @@ local function purgeStaleHubPaths()
 		expected = fetchExpectedVersions()
 	end
 	local hubPaths = {
-		{ paths = { HUB .. "/alleral_ui.luau", HUB .. "/neverlose_ui.luau", CORE_ALLERAL_UI_PATH }, valid = alleralUiValid, kind = "alleral" },
+		{ paths = { HUB .. "/alleral_ui.luau", CORE_ALLERAL_UI_PATH }, valid = alleralUiValid, kind = "alleral" },
 		{ paths = { HUB .. "/core_base.luau", CORE_BASE_PATH }, valid = coreBaseValid, kind = "core" },
 		{ paths = {
 			HUB .. "/ui/Library.luau",
@@ -1741,13 +1771,13 @@ local function loadCore()
 		coreHubUiRejectReason,
 		CORE_HUB_UI_MIN_BYTES,
 	}
-	local neverloseArgs = {
-		{ CORE_ALLERAL_UI_PATH, HUB .. "/alleral_ui.luau", HUB .. "/neverlose_ui.luau" },
+	local alleralUiArgs = {
+		{ CORE_ALLERAL_UI_PATH, HUB .. "/alleral_ui.luau" },
 		{ ".alleral/cache/" .. CORE_ALLERAL_UI_PATH },
 		CORE_ALLERAL_UI_PATH,
 		alleralUiValid,
-		neverloseUiRejectReason,
-		CORE_NEVERLOSE_UI_MIN_BYTES,
+		alleralUiRejectReason,
+		CORE_ALLERAL_UI_MIN_BYTES,
 	}
 
 	local function resolveArgs(args, versionKind)
@@ -1758,7 +1788,7 @@ local function loadCore()
 
 	local baseSrc, baseLabel = resolveArgs(baseArgs, "core")
 	local uiSrc, uiLabel = resolveArgs(uiArgs, "core")
-	local neverloseUiSrc, neverloseUiLabel = resolveArgs(neverloseArgs, "neverlose")
+	local alleralUiSrc, alleralUiLabel = resolveArgs(alleralUiArgs, "alleral")
 	local hubUiSrc, hubUiLabel = resolveArgs(hubArgs, "core")
 	if not baseSrc then
 		return false, baseLabel or "core_base download failed"
@@ -1792,9 +1822,9 @@ local function loadCore()
 		return false, uiLabel or "Core UI download failed"
 	end
 
-	if not neverloseUiSrc then
+	if not alleralUiSrc then
 		ENV.Alleral_Core = nil
-		return false, neverloseUiLabel or "Alleral UI layer download failed"
+		return false, alleralUiLabel or "Alleral UI layer download failed"
 	end
 
 	if not hubUiSrc then
@@ -1808,7 +1838,7 @@ local function loadCore()
 		return false, applyErr or "Core UI layer failed"
 	end
 
-	applied, applyErr = ENV.Alleral_Core.applyUiLayer(neverloseUiSrc, neverloseUiLabel or "@Alleral/alleral_ui")
+	applied, applyErr = ENV.Alleral_Core.applyUiLayer(alleralUiSrc, alleralUiLabel or "@Alleral/alleral_ui")
 	if not applied then
 		ENV.Alleral_Core = nil
 		return false, applyErr or "Alleral UI layer failed"
@@ -1829,8 +1859,8 @@ local function loadCore()
 	cacheRemote(".alleral/cache/" .. CORE_BASE_PATH, baseSrc)
 	cacheRemote(CORE_UI_PATH, uiSrc)
 	cacheRemote(".alleral/cache/" .. CORE_UI_PATH, uiSrc)
-	cacheRemote(CORE_NEVERLOSE_UI_PATH, neverloseUiSrc)
-	cacheRemote(".alleral/cache/" .. CORE_NEVERLOSE_UI_PATH, neverloseUiSrc)
+	cacheRemote(CORE_ALLERAL_UI_PATH, alleralUiSrc)
+	cacheRemote(".alleral/cache/" .. CORE_ALLERAL_UI_PATH, alleralUiSrc)
 	cacheRemote(CORE_HUB_UI_PATH, hubUiSrc)
 	cacheRemote(".alleral/cache/" .. CORE_HUB_UI_PATH, hubUiSrc)
 	log(
@@ -1841,16 +1871,16 @@ local function loadCore()
 			.. " + "
 			.. tostring(uiLabel)
 			.. " + "
-			.. tostring(neverloseUiLabel)
+			.. tostring(alleralUiLabel)
 			.. " + "
 			.. tostring(hubUiLabel)
 	)
 	-- #region agent log
 	agentDebug("H1", "loader:loadCore", "core stack loaded", {
 		coreVersion = ENV.Alleral_Core and ENV.Alleral_Core.VERSION,
-		neverloseUiVersion = ENV.Alleral_Core and ENV.Alleral_Core.NEVERLOSE_UI_VERSION,
+		alleralUiVersion = ENV.Alleral_Core and ENV.Alleral_Core.ALLERAL_UI_VERSION,
 		baseLabel = baseLabel,
-		neverloseUiLabel = neverloseUiLabel,
+		alleralUiLabel = alleralUiLabel,
 		hasLoadUi = ENV.Alleral_Core and type(ENV.Alleral_Core.loadUi) == "function",
 	})
 	-- #endregion
@@ -2373,8 +2403,8 @@ local function fetchExpectedVersionsFast()
 		telemetry = RELEASE_FALLBACK.telemetry,
 		helpers = RELEASE_FALLBACK.helpers,
 		weao = RELEASE_FALLBACK.weao,
-		neverlose = RELEASE_FALLBACK.neverlose,
-		windui = RELEASE_FALLBACK.neverlose,
+		alleral = RELEASE_FALLBACK.alleral,
+		windui = RELEASE_FALLBACK.windui,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
@@ -2420,8 +2450,8 @@ fetchExpectedVersions = function(forceRefresh)
 		telemetry = RELEASE_FALLBACK.telemetry,
 		helpers = RELEASE_FALLBACK.helpers,
 		weao = RELEASE_FALLBACK.weao,
-		neverlose = RELEASE_FALLBACK.neverlose,
-		windui = RELEASE_FALLBACK.neverlose,
+		alleral = RELEASE_FALLBACK.alleral,
+		windui = RELEASE_FALLBACK.windui,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
@@ -2442,8 +2472,8 @@ fetchExpectedVersions = function(forceRefresh)
 		expected.telemetry = release.telemetry or expected.telemetry
 		expected.helpers = release.helpers or expected.helpers
 		expected.weao = release.weao or expected.weao
-		expected.neverlose = release.neverlose or release.windui or expected.neverlose
-		expected.windui = expected.neverlose
+		expected.alleral = release.alleral or release.windui or expected.alleral
+		expected.windui = release.windui or expected.alleral or expected.windui
 		expected.commit = release.commit or expected.commit
 		expected.updatedAt = release.updatedAt or expected.updatedAt
 		expected.minLoader = release.minLoader or expected.minLoader
@@ -2636,7 +2666,6 @@ local function buildManagedFiles()
 			paths = {
 				CORE_ALLERAL_UI_PATH,
 				HUB .. "/alleral_ui.luau",
-				HUB .. "/neverlose_ui.luau",
 				".alleral/cache/" .. CORE_ALLERAL_UI_PATH,
 			},
 			expectedKey = "alleral",
@@ -2692,12 +2721,15 @@ local function buildManagedFiles()
 				HUB .. "/ui/Theme.luau",
 				HUB .. "/ui/Components.luau",
 				HUB .. "/ui/Window.luau",
+				HUB .. "/ui/ModuleLoader.luau",
+				HUB .. "/ui/Vendor.luau",
 				".alleral/cache/" .. HUB .. "/ui/Library.luau",
 				UI .. "/neverlose/library.lua",
 				".alleral/cache/" .. UI .. "/neverlose/library.lua",
 			},
-			expectedKey = "neverlose",
-			extract = "neverlose",
+			expectedKey = "alleral",
+			extract = "alleral",
+			alwaysDelete = true,
 			isValid = function(src)
 				if type(src) ~= "string" then
 					return false
@@ -2985,12 +3017,11 @@ local function clearLegacySession()
 	if type(ENV.Alleral_Core) == "table" and type(ENV.Alleral_Core.releaseUiWindow) == "function" then
 		pcall(ENV.Alleral_Core.releaseUiWindow)
 	end
-	local lib = ENV._NeverloseLibrary
+	local lib = ENV._AlleralUiLibrary
 	if type(lib) == "table" and type(lib.Unload) == "function" then
 		pcall(lib.Unload, lib)
 	end
-	ENV._NeverloseLibrary = nil
-	ENV._NeverloseMotion = nil
+	ENV._AlleralUiLibrary = nil
 	if getgenv().Library then
 		getgenv().Library = nil
 	end

@@ -2,28 +2,11 @@ local Core = {}
 Core.VERSION = "2.8.8"
 Core._CORE_ARTIFACT = "base"
 Core.UI_LIBRARY = "Alleral"
-Core.ALLERAL_UI_VERSION = "2.1.0-private"
-Core.NEVERLOSE_UI_VERSION = Core.ALLERAL_UI_VERSION
+Core.ALLERAL_UI_VERSION = "2.2.0-vendor"
 Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
-local WINDUI_MIRROR_URLS = {
-	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/windui/",
-	"https://github.com/evanbackup1256-ship-it/kick/raw/main/ui/windui/",
-	"https://github.com/Footagesus/WindUI/releases/download/1.6.64-fix/",
-	"https://raw.githubusercontent.com/Footagesus/WindUI/1.6.64-fix/dist/",
-}
-local WINDUI_LOCAL_ROOTS = {
-	"ui/windui/",
-	"kick/ui/windui/",
-	"kick/kick/ui/windui/",
-	"windui/",
-}
-local WINDUI_FILE = "main.lua"
-local WINDUI_PATCH_FILE = "arrrel.luau"
-local WINDUI_PATCH_FALLBACK = "aller.luau"
-local WINDUI_MIN_BYTES = 50000
 local function safeHex(hex, fallback)
 	fallback = fallback or Color3.fromRGB(83, 252, 24)
 	if Color3.fromHex then
@@ -289,7 +272,7 @@ function Core.getWindUi()
 	if type(ui) ~= "table" then
 		return nil
 	end
-	return ui.WindUI or ui.Library
+	return ui.Library or ui.Alleral
 end
 
 function Core.notifyWindUi(payload)

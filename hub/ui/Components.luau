@@ -569,6 +569,7 @@ return function(deps)
 		})
 		Motion.to(card, { BackgroundTransparency = 0.02 }, "open")
 		return {
+			_frame = card,
 			SetSummary = function(_, text)
 				summary.Text = tostring(text or "")
 			end,
@@ -580,6 +581,9 @@ return function(deps)
 					end
 					summary.Text = table.concat(parts, " · ")
 				end
+			end,
+			SetVisible = function(_, visible)
+				card.Visible = visible == true
 			end,
 		}
 	end

@@ -1,8 +1,7 @@
 return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "2.1.0-private"
-	Core.NEVERLOSE_UI_VERSION = Core.ALLERAL_UI_VERSION
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "2.2.0-vendor"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 	Core.UI_LIBRARY = "Alleral"
 
@@ -125,8 +124,43 @@ return function(Core)
 	end
 
 	local function loadUiLibrary()
+		local moduleLoaderFactory = loadUiModule("ModuleLoader.luau")
+		local vendorFactory = loadUiModule("Vendor.luau")
+		if not moduleLoaderFactory or not vendorFactory then
+			return nil, "Alleral UI vendor loader missing"
+		end
+		local readVendorSource = function(rel)
+			rel = tostring(rel or ""):gsub("\\", "/")
+			local body = readLocal(rel)
+			if body then
+				return body
+			end
+			return readLocal("vendor/" .. rel:gsub("^vendor/", ""))
+		end
+		local loadChunk = function(source, name)
+			local loadFn = Core.loadStringFn()
+			if not loadFn then
+				error("load unavailable", 0)
+			end
+			local chunk, err = loadFn(sanitizeLuauSource(source), name)
+			if not chunk then
+				error(tostring(err), 0)
+			end
+			return chunk
+		end
+		local ModuleLoader = moduleLoaderFactory({
+			readSource = readVendorSource,
+			loadChunk = loadChunk,
+			root = "vendor",
+		})
+		local Vendor = vendorFactory({ ModuleLoader = ModuleLoader })
+		if not Vendor or not Vendor.spr or not Vendor.Fusion then
+			return nil, "Alleral UI vendor stack incomplete"
+		end
+
 		local Maid = loadUiModule("Maid.luau")
-		local Spring = loadUiModule("Spring.luau")
+		local springFactory = loadUiModule("Spring.luau")
+		local Spring = springFactory and springFactory({ Vendor = Vendor }) or nil
 		local Utils = loadUiModule("Utils.luau")
 		local Icons = loadUiModule("Icons.luau")
 		local Theme = loadUiModule("Theme.luau")
@@ -144,6 +178,7 @@ return function(Core)
 			Maid = Maid,
 			Icons = Icons,
 			Config = Config,
+			Vendor = Vendor,
 		}
 		local TooltipFactory = loadUiModule("Tooltip.luau")
 		local NotificationFactory = loadUiModule("Notification.luau")
@@ -253,7 +288,6 @@ return function(Core)
 		local bundle = {
 			Library = Library,
 			Alleral = Library,
-			Neverlose = Library,
 			WindUI = Library,
 			CreateWindow = function(_, settings)
 				return Library.CreateWindow(Library, settings)
@@ -283,14 +317,13 @@ return function(Core)
 		return Core.loadUi()
 	end
 
-	Core.releaseNeverloseRuntime = releaseUiRuntime
 	Core.releaseAlleralRuntime = releaseUiRuntime
 
 	function Core.uiLibrary(bundle)
 		if type(bundle) ~= "table" then
 			return nil
 		end
-		return bundle.Alleral or bundle.Library or bundle.Neverlose
+		return bundle.Alleral or bundle.Library
 	end
 
 	function Core.createWindUiGroupbox(rawSection, uiBundle)
@@ -485,6 +518,50 @@ return function(Core)
 			}
 		end
 
+		function groupbox:CreateStatus(label, fields)
+			if type(rawSection.CreateStatus) == "function" then
+				return rawSection:CreateStatus(label, fields)
+			end
+			local status = {
+				Labels = {},
+				LastValues = {},
+				Visible = true,
+			}
+			for key, value in pairs(fields or {}) do
+				status.LastValues[key] = tostring(value)
+				status.Labels[key] = groupbox:CreateLabel({
+					Name = tostring(key) .. ": " .. tostring(value),
+				}, nextFlag(label .. "_" .. tostring(key)))
+			end
+			status.Labels.Summary = groupbox:CreateLabel({ Name = "" }, nextFlag(label .. "_summary"))
+			function status:Update(key, value)
+				local rendered = tostring(value)
+				if self.LastValues[key] == rendered then
+					return
+				end
+				self.LastValues[key] = rendered
+				local row = self.Labels[key]
+				if row and row.Set then
+					row:Set({ Name = tostring(key) .. ": " .. rendered })
+				end
+			end
+			function status:SetSummary(text)
+				local row = self.Labels.Summary
+				if row and row.Set then
+					row:Set({ Name = tostring(text or "") })
+				end
+			end
+			function status:SetVisible(visible)
+				self.Visible = visible == true
+				for _, row in pairs(self.Labels) do
+					if type(row) == "table" and row._raw and row._raw._frame then
+						row._raw._frame.Visible = self.Visible
+					end
+				end
+			end
+			return status
+		end
+
 		function groupbox:CreateDivider()
 			if type(rawSection.Space) == "function" then
 				rawSection:Space({ Size = 10 })
@@ -527,7 +604,28 @@ return function(Core)
 		end
 
 		function tab:BuildThemeGroupbox(column)
-			return Core.buildUiGroup(tab, "Appearance", column or 1)
+			local group = Core.buildUiGroup(tab, "Appearance", column or 1)
+			local lib = Core.uiLibrary(uiBundle)
+			local themes = (lib and type(lib.ListThemeNames) == "function" and lib:ListThemeNames())
+				or { "Private", "Obsidian", "Graphite", "Midnight", "Neon", "Linoria" }
+			local current = (lib and type(lib.GetCurrentTheme) == "function" and lib:GetCurrentTheme()) or "Private"
+			group:CreateDropdown("Theme preset", themes, current, function(selected)
+				if lib and type(lib.SetTheme) == "function" then
+					pcall(lib.SetTheme, lib, selected)
+				end
+				Core.notify("Theme", "Applied " .. tostring(selected), 2, "success")
+			end, "Dark presets tuned for exploit menus.")
+			group:CreateButton("Next theme", function()
+				if lib and type(lib.CycleTheme) == "function" then
+					local ok, nextTheme = pcall(function()
+						return lib:CycleTheme(1)
+					end)
+					if ok and type(nextTheme) == "table" and nextTheme.Name then
+						Core.notify("Theme", "Applied " .. tostring(nextTheme.Name), 2, "success")
+					end
+				end
+			end, "Cycle through theme presets.")
+			return group
 		end
 
 		return tab
