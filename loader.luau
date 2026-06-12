@@ -18,7 +18,7 @@ local UI = "ui"
 local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-local SYDE_PATCH_VERSION = 7
+local SYDE_PATCH_VERSION = 8
 local SYDE_PATCH_REQUIRED_FN = "sydeEnsureDropholderDropFrame"
 local CORE_BASE_PATH = HUB .. "/core_base.luau"
 local CORE_BASE_LEGACY_PATH = HUB .. "/core.luau"
@@ -1356,7 +1356,7 @@ local function alleralUiValid(src)
 	if not src:find("loadSyde", 1, true) then
 		return false
 	end
-	if not src:find("SYDE_PATCH_VERSION%s*=%s*7", 1, false) then
+	if not src:find("SYDE_PATCH_VERSION%s*=%s*8", 1, false) then
 		return false
 	end
 	if compileCoreSource(src, "Alleral/alleral_ui") then

@@ -13,7 +13,7 @@ return function(Core)
 		"kick/kick/ui/syde/source.luau",
 	}
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-	local SYDE_PATCH_VERSION = 7
+	local SYDE_PATCH_VERSION = 8
 	local SYDE_PATCH_REQUIRED_FN = "sydeEnsureDropholderDropFrame"
 	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "kick/kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {

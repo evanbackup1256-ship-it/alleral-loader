@@ -97,7 +97,7 @@ if update then return end
 local Library =         game:GetObjects("rbxassetid://123800669522471")[1]
 local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 
-local ALLERAL_SYDE_PATCH = 7
+local ALLERAL_SYDE_PATCH = 8
 
 -- Alleral: tolerate Roblox template renames (Title/title, Buttons/buttons, etc.)
 local function sydeFindChild(parent, ...)
@@ -326,7 +326,8 @@ local function sydeBindDropFrame(drop)
 	local search = sydeFindChild(drop, "search", "Search")
 	local down = sydeFindChild(drop, "down", "Down")
 	local v0 = sydeFindChild(drop, "v0", "V0")
-	return setmetatable({
+	local bound = {
+		_drop = drop,
 		selected = selectedLabel,
 		Selected = selectedLabel,
 		selectContainer = selectContainer,
@@ -339,16 +340,40 @@ local function sydeBindDropFrame(drop)
 		Down = down,
 		v0 = v0,
 		V0 = v0,
-	}, {
-		__index = drop,
+	}
+	return setmetatable(bound, {
+		__index = function(_, key)
+			if key == "_drop" then
+				return drop
+			end
+			local value = rawget(bound, key)
+			if value ~= nil then
+				return value
+			end
+			local instValue = drop[key]
+			if type(instValue) == "function" then
+				return function(_, ...)
+					return instValue(drop, ...)
+				end
+			end
+			return instValue
+		end,
 		__newindex = function(_, key, value)
 			drop[key] = value
 		end,
 	})
 end
 
+local function sydeUnwrapDropFrame(drop)
+	if type(drop) == "table" and drop._drop then
+		return drop._drop
+	end
+	return drop
+end
+
 local function sydeSetDropSelectedText(drop, text)
-	local label = drop and (drop.selected or sydeDropSelectedLabel(drop))
+	local frame = sydeUnwrapDropFrame(drop)
+	local label = drop and (drop.selected or sydeDropSelectedLabel(frame))
 	if label then
 		label.Text = tostring(text or "")
 	end
@@ -414,6 +439,10 @@ local function sydeResolveDropFrame(dropholder)
 	return nil
 end
 
+local function sydeDropHasContainer(dropFrame)
+	return dropFrame ~= nil and sydeFindChild(dropFrame, "Container", "container") ~= nil
+end
+
 local function sydePrepareDropdownDrop(dropdown)
 	if not dropdown then
 		return nil
@@ -428,10 +457,26 @@ local function sydePrepareDropdownDrop(dropdown)
 			end
 		end
 	end
-	if not holder then
-		return nil
+	local dropFrame = nil
+	if holder then
+		dropFrame = sydeEnsureDropholderDropFrame(holder) or sydeResolveDropFrame(holder)
 	end
-	local dropFrame = sydeEnsureDropholderDropFrame(holder) or sydeResolveDropFrame(holder)
+	if not sydeDropHasContainer(dropFrame) then
+		local altDrop = sydeFindChild(dropdown, "drop", "Drop")
+		if sydeDropHasContainer(altDrop) then
+			dropFrame = altDrop
+		else
+			for _, child in ipairs(dropdown:GetChildren()) do
+				if child ~= holder then
+					local resolved = sydeResolveDropFrame(child)
+					if sydeDropHasContainer(resolved) then
+						dropFrame = resolved
+						break
+					end
+				end
+			end
+		end
+	end
 	if not dropFrame then
 		return nil
 	end
@@ -5326,6 +5371,7 @@ function syde:Init(library)
 				}
 
 				local dropdown = window.settings.pages.page.Dropdown:Clone()
+				sydeSanitizeUiClone(dropdown)
 				dropdown.Visible = true
 				dropdown.Parent = Page
 				dropdown.title.Text = data.Title
@@ -8816,6 +8862,7 @@ function syde:Init(library)
 			}
 
 			local dropdown = pages.page.Dropdown:Clone()
+			sydeSanitizeUiClone(dropdown)
 			dropdown.Visible = true
 			dropdown.Parent = Page
 			dropdown.title.Text = data.Title
