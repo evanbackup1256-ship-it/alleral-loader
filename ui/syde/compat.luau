@@ -1,7 +1,7 @@
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 17
+local ALLERAL_SYDE_PATCH = 18
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -242,11 +242,25 @@ local function sydeSanitizeAssetRoot(root)
 	end
 end
 
+local function sydeShouldSkipNormalize(instance)
+	local current = instance
+	while current do
+		if current.Name == "Render" then
+			return true
+		end
+		current = current.Parent
+	end
+	return false
+end
+
 local function sydeNormalizeTemplateNames(root)
 	if not root then
 		return
 	end
 	for _, desc in ipairs(root:GetDescendants()) do
+		if sydeShouldSkipNormalize(desc) then
+			continue
+		end
 		local canonical = SYDE_CANONICAL_NAMES[desc.Name]
 		if canonical and canonical ~= desc.Name then
 			pcall(function()

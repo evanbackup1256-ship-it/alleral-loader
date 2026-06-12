@@ -156,14 +156,41 @@ class TelemetryStatsStore:
                     """
                 )
                 conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS telemetry_feed (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ts REAL NOT NULL,
+                        event TEXT NOT NULL,
+                        game_id TEXT,
+                        player_name TEXT,
+                        player_id TEXT,
+                        executor TEXT,
+                        loader_version TEXT,
+                        place_version TEXT,
+                        previous_place_version TEXT,
+                        message TEXT,
+                        details TEXT
+                    )
+                    """
+                )
+                conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_telemetry_game_ts ON telemetry_events(game_id, ts)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_telemetry_feed_ts ON telemetry_feed(ts DESC)"
                 )
                 conn.commit()
             finally:
                 conn.close()
 
     def record(self, game_id: str, event: str) -> None:
-        if not game_id or event not in {"inject_loaded", "inject_failed", "error"}:
+        if not game_id or event not in {
+            "inject_loaded",
+            "inject_failed",
+            "error",
+            "place_updated",
+            "milestone",
+        }:
             return
         with self._lock:
             conn = self._connect()
@@ -208,6 +235,156 @@ class TelemetryStatsStore:
             "total_injects": total,
             "success_rate": (loaded / total) if total else None,
             "last_event_at": datetime.fromtimestamp(last_ts, timezone.utc).isoformat() if last_ts else None,
+        }
+
+    def record_feed(self, payload: dict[str, Any]) -> None:
+        event = str(payload.get("event") or "")
+        if event not in {
+            "inject_loaded",
+            "inject_failed",
+            "error",
+            "place_updated",
+            "milestone",
+            "session_start",
+        }:
+            return
+        context = payload.get("context") if isinstance(payload.get("context"), dict) else {}
+        player = payload.get("player") if isinstance(payload.get("player"), dict) else {}
+        error = payload.get("error") if isinstance(payload.get("error"), dict) else {}
+        game_id = str(
+            context.get("gameId")
+            or context.get("gameName")
+            or payload.get("gameId")
+            or payload.get("gameName")
+            or ""
+        ).strip()
+        message = str(error.get("message") or payload.get("notes") or event)
+        details_parts = [
+            error.get("details"),
+            error.get("stack"),
+            error.get("recentActions"),
+        ]
+        details = "\n".join(str(part) for part in details_parts if part)
+        with self._lock:
+            conn = self._connect()
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO telemetry_feed (
+                        ts, event, game_id, player_name, player_id, executor,
+                        loader_version, place_version, previous_place_version, message, details
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        time.time(),
+                        event,
+                        game_id.lower() if game_id else None,
+                        str(player.get("name") or ""),
+                        str(player.get("userId") or ""),
+                        str(context.get("executor") or ""),
+                        str(context.get("loaderVersion") or ""),
+                        str(context.get("placeVersion") or ""),
+                        str(context.get("previousPlaceVersion") or ""),
+                        message[:900],
+                        details[:4000] if details else None,
+                    ),
+                )
+                cutoff = time.time() - (7 * 86400)
+                conn.execute("DELETE FROM telemetry_feed WHERE ts < ?", (cutoff,))
+                # Nested subquery materializes ORDER BY + LIMIT (SQLite ignores ORDER BY in flat NOT IN subqueries).
+                conn.execute(
+                    """
+                    DELETE FROM telemetry_feed
+                    WHERE id NOT IN (
+                        SELECT id FROM (
+                            SELECT id FROM telemetry_feed ORDER BY ts DESC LIMIT 500
+                        )
+                    )
+                    """
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+    def recent_feed(self, limit: int = 40) -> list[dict[str, Any]]:
+        with self._lock:
+            conn = self._connect()
+            try:
+                rows = conn.execute(
+                    """
+                    SELECT ts, event, game_id, player_name, player_id, executor,
+                           loader_version, place_version, previous_place_version, message, details
+                    FROM telemetry_feed
+                    ORDER BY ts DESC
+                    LIMIT ?
+                    """,
+                    (max(1, min(limit, 100)),),
+                ).fetchall()
+            finally:
+                conn.close()
+        items: list[dict[str, Any]] = []
+        for row in rows:
+            items.append(
+                {
+                    "at": datetime.fromtimestamp(float(row["ts"]), timezone.utc).isoformat(),
+                    "event": row["event"],
+                    "gameId": row["game_id"],
+                    "playerName": row["player_name"],
+                    "playerId": row["player_id"],
+                    "executor": row["executor"],
+                    "loaderVersion": row["loader_version"],
+                    "placeVersion": row["place_version"],
+                    "previousPlaceVersion": row["previous_place_version"],
+                    "message": row["message"],
+                    "details": row["details"],
+                }
+            )
+        return items
+
+    def global_summary(self, window_hours: int = 48) -> dict[str, Any]:
+        cutoff = time.time() - (window_hours * 3600)
+        with self._lock:
+            conn = self._connect()
+            try:
+                rows = conn.execute(
+                    """
+                    SELECT event, COUNT(*) AS c
+                    FROM telemetry_events
+                    WHERE ts >= ?
+                    GROUP BY event
+                    """,
+                    (cutoff,),
+                ).fetchall()
+                place_updates = conn.execute(
+                    """
+                    SELECT COUNT(*) AS c
+                    FROM telemetry_feed
+                    WHERE ts >= ? AND event = 'place_updated'
+                    """,
+                    (cutoff,),
+                ).fetchone()
+                recent_errors = conn.execute(
+                    """
+                    SELECT COUNT(*) AS c
+                    FROM telemetry_feed
+                    WHERE ts >= ? AND event IN ('error', 'inject_failed')
+                    """,
+                    (cutoff,),
+                ).fetchone()
+            finally:
+                conn.close()
+        counts = {row["event"]: int(row["c"]) for row in rows}
+        loaded = counts.get("inject_loaded", 0)
+        failed = counts.get("inject_failed", 0)
+        total = loaded + failed
+        return {
+            "windowHours": window_hours,
+            "inject_loaded": loaded,
+            "inject_failed": failed,
+            "errors": counts.get("error", 0),
+            "place_updated": int(place_updates["c"]) if place_updates else 0,
+            "feed_errors": int(recent_errors["c"]) if recent_errors else 0,
+            "success_rate": (loaded / total) if total else None,
         }
 
 
@@ -303,6 +480,7 @@ class AutoSyncEngine:
         )
         if game_id:
             self.stats.record(str(game_id), event)
+        self.stats.record_feed(payload)
 
     def start(self) -> None:
         if not self.enabled or self._started:

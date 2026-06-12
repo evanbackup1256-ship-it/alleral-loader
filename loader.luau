@@ -1,4 +1,4 @@
-local LOADER_VERSION = "8.2.20"
+local LOADER_VERSION = "8.2.23"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -18,7 +18,7 @@ local UI = "ui"
 local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-local SYDE_PATCH_VERSION = 17
+local SYDE_PATCH_VERSION = 18
 local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
 local CORE_BASE_PATH = HUB .. "/core_base.luau"
 local CORE_BASE_LEGACY_PATH = HUB .. "/core.luau"
@@ -27,13 +27,13 @@ local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
 local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.20",
+	loader = "8.2.23",
 	core = "2.9.4",
 	ui = "Syde",
 	windui = "4.0.0-syde",
 	alleral = "4.0.0-syde",
 	analytics = "1.2",
-	telemetry = "3.2",
+	telemetry = "3.3",
 	helpers = "1.0",
 	weao = "1.1",
 	security = "1.3",
@@ -879,6 +879,17 @@ local function cacheRemote(relativePath, src)
 	pcall(writeFileFn, relativePath, src)
 end
 
+local function requiredSydePatch()
+	local expected = ENV._Alleral_ExpectedVersions
+	if type(expected) == "table" then
+		local patch = tonumber(expected.sydePatch)
+		if patch then
+			return patch
+		end
+	end
+	return SYDE_PATCH_VERSION
+end
+
 local function sydePatchFromSource(src)
 	if type(src) ~= "string" then
 		return nil
@@ -897,7 +908,8 @@ local function sydeSourceValid(src)
 		return false
 	end
 	local patch = sydePatchFromSource(src)
-	return type(patch) == "number" and patch >= SYDE_PATCH_VERSION
+	local need = requiredSydePatch()
+	return type(patch) == "number" and patch == need
 end
 
 local function sydeSourceRejectReason(src)
@@ -923,8 +935,9 @@ local function sydeSourceRejectReason(src)
 		return "missing " .. SYDE_PATCH_REQUIRED_FN
 	end
 	local patch = sydePatchFromSource(src)
-	if type(patch) ~= "number" or patch < SYDE_PATCH_VERSION then
-		return "patch v" .. tostring(patch or "?") .. " < v" .. tostring(SYDE_PATCH_VERSION)
+	local need = requiredSydePatch()
+	if type(patch) ~= "number" or patch ~= need then
+		return "patch v" .. tostring(patch or "?") .. " != required v" .. tostring(need)
 	end
 	return "ok"
 end
@@ -974,7 +987,7 @@ local function clearStaleSydeRuntime()
 		return
 	end
 	local patch = env._AlleralSyde.__AlleralPatch
-	if type(patch) ~= "number" or patch < SYDE_PATCH_VERSION then
+	if type(patch) ~= "number" or patch < requiredSydePatch() then
 		env._AlleralSyde = nil
 		env._AlleralSydeSourceKey = nil
 	end
@@ -1048,7 +1061,7 @@ local function ensureSydeSource()
 	end
 
 	local fetchDetail = type(remoteVia) == "string" and remoteVia or sydeSourceRejectReason(remoteSrc)
-	return false, "patched Syde source unavailable (need v" .. tostring(SYDE_PATCH_VERSION) .. "+): " .. tostring(fetchDetail)
+	return false, "patched Syde source unavailable (need v" .. tostring(requiredSydePatch()) .. "): " .. tostring(fetchDetail)
 end
 
 local function usesLegacyHttpHash(src)
@@ -2414,7 +2427,15 @@ local function wireTelemetry(profile)
 	telemetry:ReportSessionStart({
 		gameId = profile and profile.id,
 		scriptVersion = profile and profile.version,
+		bootstrapVersion = ENV._Alleral_BootstrapVersion,
+		releaseCommit = (ENV._Alleral_ExpectedVersions or {}).commit,
 	})
+	if ENV._Alleral_PlaceVersionChange and ENV._Alleral_PlaceVersionChange.changed then
+		if type(telemetry.ReportPlaceUpdate) == "function" then
+			telemetry:ReportPlaceUpdate(ENV._Alleral_PlaceVersionChange)
+		end
+		ENV._Alleral_PlaceVersionChange = nil
+	end
 	telemetry:StartHeartbeat()
 end
 
@@ -2692,6 +2713,7 @@ fetchExpectedVersions = function(forceRefresh)
 		expected.windui = release.windui or expected.alleral or expected.windui
 		expected.commit = release.commit or expected.commit
 		expected.updatedAt = release.updatedAt or expected.updatedAt
+		expected.sydePatch = tonumber(release.sydePatch) or expected.sydePatch
 		expected.minLoader = release.minLoader or expected.minLoader
 		expected.minCore = release.minCore or expected.minCore
 		if type(release.updatePollSeconds) == "number" then
@@ -2747,6 +2769,7 @@ local function buildUpdateFingerprint(expected, profile)
 		"helpers=" .. tostring(expected.helpers or ""),
 		"weao=" .. tostring(expected.weao or ""),
 		"weaoCfg=" .. tostring((ENV.Alleral_WeaoConfig or {}).version or ""),
+		"sydePatch=" .. tostring(expected.sydePatch or SYDE_PATCH_VERSION),
 	}
 	if profile and profile.id then
 		table.insert(parts, "game=" .. tostring(profile.id) .. "@" .. tostring(expected.games and expected.games[profile.id] or profile.version or ""))
@@ -3032,7 +3055,7 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.2.20"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.2.23"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
@@ -3409,6 +3432,8 @@ local function checkForRemoteUpdate(profile, quiet)
 		reason = "commit " .. tostring(expected.commit)
 	elseif expected.loader and not previous:find("loader=" .. tostring(expected.loader), 1, true) then
 		reason = "loader v" .. tostring(expected.loader)
+	elseif expected.sydePatch and not previous:find("sydePatch=" .. tostring(expected.sydePatch), 1, true) then
+		reason = "syde patch v" .. tostring(expected.sydePatch)
 	elseif profile and expected.games and expected.games[profile.id] then
 		reason = profile.name .. " v" .. tostring(expected.games[profile.id])
 	end
@@ -3637,6 +3662,39 @@ local function main()
 		end)
 		return
 	end
+	if expectedVersions.commit and expectedVersions.commit ~= "" and expectedVersions.commit ~= RELEASE_FALLBACK.commit then
+		log(
+			"Embedded commit "
+				.. tostring(RELEASE_FALLBACK.commit)
+				.. " != release "
+				.. tostring(expectedVersions.commit)
+				.. " — auto-updating via bootstrap"
+		)
+		ENV.Alleral_LoaderRunning = false
+		task.defer(function()
+			if type(ENV._Alleral_RelaunchViaBootstrap) == "function" then
+				ENV._Alleral_RelaunchViaBootstrap("commit-sync")
+			end
+		end)
+		return
+	end
+	local needSydePatch = tonumber(expectedVersions.sydePatch) or SYDE_PATCH_VERSION
+	if needSydePatch ~= SYDE_PATCH_VERSION then
+		log(
+			"Embedded syde patch v"
+				.. tostring(SYDE_PATCH_VERSION)
+				.. " != release v"
+				.. tostring(needSydePatch)
+				.. " — auto-updating via bootstrap"
+		)
+		ENV.Alleral_LoaderRunning = false
+		task.defer(function()
+			if type(ENV._Alleral_RelaunchViaBootstrap) == "function" then
+				ENV._Alleral_RelaunchViaBootstrap("syde-patch-sync")
+			end
+		end)
+		return
+	end
 
 	task.spawn(function()
 		pcall(loadWeaoStack)
@@ -3815,6 +3873,8 @@ local function main()
 		profile = profile.id,
 		source = label,
 		scriptVersion = profile.version,
+		bootstrapVersion = ENV._Alleral_BootstrapVersion,
+		releaseCommit = (ENV._Alleral_ExpectedVersions or {}).commit,
 	}
 	publishBridge()
 	src = ENV_BRIDGE .. "\n" .. src

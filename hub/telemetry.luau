@@ -1,5 +1,5 @@
 local Telemetry = {}
-Telemetry.Version = "3.2"
+Telemetry.Version = "3.3"
 
 local ALLERAL_GREEN = 5489688
 local ALLERAL_SOFT = 3197370
@@ -16,6 +16,7 @@ local EVENT_META = {
 	session_end = { title = "Offline", color = 9936031 },
 	milestone = { title = "Milestone", color = ALLERAL_MILESTONE },
 	log = { title = "Log", color = 7506394 },
+	place_updated = { title = "Game updated", color = ALLERAL_MILESTONE },
 }
 
 local HttpService = game:GetService("HttpService")
@@ -129,6 +130,48 @@ local function clip(text, limit)
 		return text
 	end
 	return text:sub(1, limit - 3) .. "..."
+end
+
+local function formatDetails(details)
+	if details == nil then
+		return nil
+	end
+	if type(details) == "string" then
+		return clip(details, 1500)
+	end
+	if type(details) == "table" then
+		local parts = {}
+		for key, value in pairs(details) do
+			table.insert(parts, tostring(key) .. "=" .. tostring(value))
+		end
+		table.sort(parts)
+		return clip(table.concat(parts, "; "), 1500)
+	end
+	return clip(tostring(details), 1500)
+end
+
+local function recentEventSummary(eventLog, limit)
+	limit = limit or 6
+	if type(eventLog) ~= "table" or #eventLog == 0 then
+		return nil
+	end
+	local lines = {}
+	local startIndex = math.max(1, #eventLog - limit + 1)
+	for index = startIndex, #eventLog do
+		local entry = eventLog[index]
+		if type(entry) == "table" then
+			table.insert(
+				lines,
+				string.format(
+					"[%s] %s: %s",
+					tostring(entry.at or "?"),
+					tostring(entry.kind or "?"),
+					tostring(entry.summary or "?")
+				)
+			)
+		end
+	end
+	return clip(table.concat(lines, "\n"), 1500)
 end
 
 local function mergeConfig(base, extra)
@@ -266,6 +309,7 @@ local function serverInfo()
 		universeId = universeId,
 		jobId = tostring(game.JobId),
 		privateServer = privateServer,
+		placeVersion = tonumber(game.PlaceVersion) or 0,
 	}
 end
 
@@ -434,6 +478,9 @@ function Telemetry:_context(extra)
 	local stats = liveStats()
 	local identity = ENV.Alleral_DeviceIdentity
 	local core = ENV.Alleral_Core
+	local expected = ENV._Alleral_ExpectedVersions or {}
+	local placeChange = ENV._Alleral_PlaceVersionChange
+	local placeVersion = tonumber(game.PlaceVersion) or 0
 	local context = {
 		sessionId = self:EnsureSession(),
 		executor = exec.name,
@@ -441,10 +488,15 @@ function Telemetry:_context(extra)
 		executorVersion = exec.version,
 		executorProfile = exec,
 		loaderVersion = loaderMeta.version or ENV.Alleral_LoaderVersion,
-		coreVersion = type(core) == "table" and core.VERSION or nil,
+		bootstrapVersion = ENV._Alleral_BootstrapVersion,
+		bootstrapReason = ENV._Alleral_BootstrapReason,
+		telemetryVersion = Telemetry.Version,
+		releaseCommit = loaderMeta.releaseCommit or expected.commit,
+		coreVersion = type(core) == "table" and core.VERSION or expected.core,
 		windUiVersion = type(core) == "table" and (core.ALLERAL_UI_VERSION or core.WINDUI_VERSION) or nil,
 		alleralUiVersion = type(core) == "table" and core.ALLERAL_UI_VERSION or nil,
-		uiLibrary = type(core) == "table" and core.UI_LIBRARY or nil,
+		uiLibrary = type(core) == "table" and core.UI_LIBRARY or expected.ui,
+		sydePatch = expected.sydePatch,
 		gameId = loaderMeta.profile,
 		gameName = placeName,
 		scriptName = loaderMeta.profile,
@@ -452,6 +504,9 @@ function Telemetry:_context(extra)
 		placeId = srv.placeId,
 		universeId = srv.universeId,
 		jobId = srv.jobId,
+		placeVersion = placeVersion > 0 and placeVersion or srv.placeVersion,
+		previousPlaceVersion = placeChange and placeChange.previousPlaceVersion or nil,
+		gameRecentlyUpdated = ENV._Alleral_GameRecentlyUpdated == true,
 		privateServer = srv.privateServer,
 		joinUrl = joinUrl(srv.placeId, srv.jobId),
 		robloxJoinUrl = robloxJoinUrl(srv.placeId, srv.jobId),
@@ -503,6 +558,44 @@ function Telemetry:_buildEmbed(payload)
 		),
 	}
 
+	if context.loaderVersion or context.bootstrapVersion or context.releaseCommit then
+		fields[#fields + 1] = embedField(
+			"Stack",
+			string.format(
+				"loader v%s · bootstrap v%s · commit %s · telemetry v%s",
+				tostring(context.loaderVersion or "?"),
+				tostring(context.bootstrapVersion or "?"),
+				tostring(context.releaseCommit or "?"),
+				tostring(context.telemetryVersion or Telemetry.Version)
+			),
+			false
+		)
+	end
+
+	if context.placeVersion then
+		local buildText = tostring(context.placeVersion)
+		if context.previousPlaceVersion then
+			buildText = tostring(context.previousPlaceVersion) .. " -> " .. buildText
+		end
+		if context.gameRecentlyUpdated then
+			buildText = buildText .. " (updated)"
+		end
+		fields[#fields + 1] = embedField("Place build", buildText, true)
+	end
+
+	if context.coreVersion or context.uiLibrary then
+		fields[#fields + 1] = embedField(
+			"Hub",
+			string.format(
+				"core v%s · %s v%s",
+				tostring(context.coreVersion or "?"),
+				tostring(context.uiLibrary or "UI"),
+				tostring(context.alleralUiVersion or context.windUiVersion or "?")
+			),
+			true
+		)
+	end
+
 	if stats.pingMs or stats.fps or stats.uptimeSec then
 		fields[#fields + 1] = embedField(
 			"Live",
@@ -533,6 +626,12 @@ function Telemetry:_buildEmbed(payload)
 		if errorInfo.stack then
 			fields[#fields + 1] = embedField("Stack", errorInfo.stack, false)
 		end
+		if errorInfo.details then
+			fields[#fields + 1] = embedField("Details", errorInfo.details, false)
+		end
+		if errorInfo.recentActions then
+			fields[#fields + 1] = embedField("Recent actions", errorInfo.recentActions, false)
+		end
 		if errorInfo.count then
 			fields[#fields + 1] = embedField("Count", tostring(errorInfo.count), true)
 		end
@@ -541,7 +640,7 @@ function Telemetry:_buildEmbed(payload)
 		end
 	elseif event == "heartbeat" or event == "session_end" then
 		fields[#fields + 1] = embedField("JobId", context.jobId, false)
-	elseif event == "log" or event == "milestone" then
+	elseif event == "log" or event == "milestone" or event == "place_updated" then
 		if payload.notes then
 			fields[#fields + 1] = embedField("Detail", payload.notes, false)
 		end
@@ -717,7 +816,9 @@ function Telemetry:ReportInject(phase, extra)
 	if type(extra) == "table" and extra.error then
 		errorInfo = {
 			scope = "Loader",
-			message = clip(extra.error, 900),
+			message = clip(extra.error, 1200),
+			stack = captureStack(2),
+			details = formatDetails(extra),
 		}
 		contextExtra = {}
 		for key, value in pairs(extra) do
@@ -731,11 +832,12 @@ function Telemetry:ReportInject(phase, extra)
 	end)
 end
 
-local function captureStack()
+local function captureStack(level)
+	level = level or 2
 	if type(debug) == "table" and type(debug.trace) == "function" then
-		local ok, trace = pcall(debug.trace, nil, 2)
+		local ok, trace = pcall(debug.trace, nil, level)
 		if ok and type(trace) == "string" then
-			return clip(trace, 1200)
+			return clip(trace, 1800)
 		end
 	end
 	return nil
@@ -755,14 +857,41 @@ function Telemetry:ReportError(scope, err, details)
 		return
 	end
 	self._errorLastSent[signature] = now
+	self:_appendLog("error", tostring(scope or "Runtime"), tostring(err))
 	task.spawn(function()
-		self:_send("error", nil, {
+		self:_send("error", {
+			placeVersion = tonumber(game.PlaceVersion) or nil,
+		}, {
 			scope = tostring(scope or "Runtime"),
-			message = clip(err, 900),
-			details = details and clip(details, 500) or nil,
-			stack = captureStack(),
+			message = clip(err, 1200),
+			details = formatDetails(details),
+			stack = captureStack(3),
+			recentActions = recentEventSummary(self._eventLog, 8),
 			count = count,
 		})
+	end)
+end
+
+function Telemetry:ReportPlaceUpdate(change)
+	if not self:IsEnabled() or type(change) ~= "table" then
+		return
+	end
+	local previous = change.previousPlaceVersion
+	local current = change.placeVersion
+	local note = string.format(
+		"Place build changed: %s -> %s (PlaceId %s)",
+		tostring(previous or "?"),
+		tostring(current or "?"),
+		tostring(change.placeId or game.PlaceId)
+	)
+	self:_appendLog("place_updated", note)
+	task.spawn(function()
+		self:_send("place_updated", {
+			placeId = change.placeId or game.PlaceId,
+			placeVersion = current,
+			previousPlaceVersion = previous,
+			gameRecentlyUpdated = true,
+		}, nil, note)
 	end)
 end
 

@@ -194,10 +194,29 @@ function Core.installErrorLogHook()
 	end
 	ENV._Alleral_ErrorLogHooked = true
 	local previous = ENV.Alleral_ReportError
+	local function buildTelemetryDetails(scope, err, details)
+		local parts = {}
+		if details ~= nil then
+			table.insert(parts, tostring(details))
+		end
+		table.insert(parts, "placeVersion=" .. tostring(game.PlaceVersion))
+		table.insert(parts, "placeId=" .. tostring(game.PlaceId))
+		local log = ENV.Alleral_ErrorLog or {}
+		for index = 1, math.min(3, #log) do
+			local entry = log[index]
+			if type(entry) == "table" then
+				table.insert(
+					parts,
+					string.format("[%s] %s: %s", entry.at or "?", entry.scope or "?", (entry.message or "?"):sub(1, 120))
+				)
+			end
+		end
+		return table.concat(parts, " | ")
+	end
 	ENV.Alleral_ReportError = function(scope, err, details)
 		Core.pushErrorLog(scope, err, details)
 		if type(previous) == "function" then
-			pcall(previous, scope, err, details)
+			pcall(previous, scope, err, buildTelemetryDetails(scope, err, details))
 		end
 	end
 	getgenv().Alleral_ReportError = ENV.Alleral_ReportError

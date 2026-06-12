@@ -1,8 +1,8 @@
--- Alleral Bootstrap v1.0.2
+-- Alleral Bootstrap v1.0.3
 -- Save this loadstring once in your executor — it always fetches the latest loader from GitHub.
 -- One-liner: loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=" .. tick(), true))()
 
-local BOOTSTRAP_VERSION = "1.0.2"
+local BOOTSTRAP_VERSION = "1.0.3"
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
 local GITHUB_RAW = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH
@@ -120,7 +120,47 @@ local function parseReleaseJson(src)
 	return {
 		loader = src:match('"loader"%s*:%s*"([^"]+)"'),
 		commit = src:match('"commit"%s*:%s*"([^"]+)"'),
+		sydePatch = tonumber(src:match('"sydePatch"%s*:%s*(%d+)')),
 	}
+end
+
+local function loaderCommitFromSource(src)
+	if type(src) ~= "string" then
+		return nil
+	end
+	return src:match('commit = "([^"]+)"')
+end
+
+local function loaderSydePatchFromSource(src)
+	if type(src) ~= "string" then
+		return nil
+	end
+	return tonumber(src:match("local SYDE_PATCH_VERSION = (%d+)"))
+end
+
+local function loaderMatchesRelease(src, meta)
+	if type(src) ~= "string" or type(meta) ~= "table" then
+		return false, "invalid loader body"
+	end
+	local remoteVer = loaderVersionFromSource(src)
+	if type(meta.loader) == "string" and meta.loader ~= "" then
+		if remoteVer ~= meta.loader then
+			return false, "loader v" .. tostring(remoteVer or "?") .. " != release v" .. meta.loader
+		end
+	end
+	if type(meta.commit) == "string" and meta.commit ~= "" then
+		local embedded = loaderCommitFromSource(src)
+		if embedded ~= meta.commit then
+			return false, "embedded commit " .. tostring(embedded or "?") .. " != release " .. meta.commit
+		end
+	end
+	if type(meta.sydePatch) == "number" then
+		local patch = loaderSydePatchFromSource(src)
+		if patch ~= meta.sydePatch then
+			return false, "syde patch v" .. tostring(patch or "?") .. " != release v" .. tostring(meta.sydePatch)
+		end
+	end
+	return true, remoteVer
 end
 
 local function fetchReleaseMeta()
@@ -138,7 +178,6 @@ local function buildLoaderUrls(meta)
 	return {
 		"https://raw.githubusercontent.com/" .. REPO .. "/" .. commit .. "/loader.luau" .. bust,
 		JSDELIVR .. "@" .. commit .. "/loader.luau" .. bust,
-		GITHUB_RAW .. "/loader.luau" .. bust,
 	}
 end
 
@@ -339,6 +378,12 @@ local function checkGamePlaceUpdate()
 		warn("[Alleral Bootstrap] " .. msg)
 		ENV._Alleral_GameRecentlyUpdated = true
 		ENV._Alleral_GameUpdateMessage = msg
+		ENV._Alleral_PlaceVersionChange = {
+			placeId = placeId,
+			previousPlaceVersion = previous,
+			placeVersion = placeVersion,
+			changed = true,
+		}
 	end
 	known[key] = placeVersion
 	savePlaceVersionMap(writeFileFn, makeFolderFn, known)
@@ -442,6 +487,7 @@ local function Alleral_Bootstrap(reason)
 		return false, "bootstrap already running"
 	end
 	ENV._Alleral_BootstrapRunning = true
+	ENV._Alleral_BootstrapReason = reason
 
 	pcall(checkGamePlaceUpdate)
 
@@ -454,19 +500,21 @@ local function Alleral_Bootstrap(reason)
 	local expectedLoader = meta.loader
 	local urls = buildLoaderUrls(meta)
 	local src, via = nil, metaVia
+	local lastReject = "no matching loader"
 	for _, url in ipairs(urls) do
 		local body, transport = httpGet(url, 500)
 		if type(body) == "string" and #body >= 500 then
-			local remoteVer = loaderVersionFromSource(body)
-			if not expectedLoader or not remoteVer or remoteVer == expectedLoader then
+			local ok, detail = loaderMatchesRelease(body, meta)
+			if ok then
 				src, via = body, transport
 				break
 			end
+			lastReject = tostring(detail) .. " (" .. tostring(#body) .. "b via " .. tostring(transport) .. ")"
 		end
 	end
 	if type(src) ~= "string" or #src < 500 then
 		ENV._Alleral_BootstrapRunning = false
-		return false, "remote loader failed (" .. tostring(via) .. ")"
+		return false, "remote loader failed (" .. tostring(via) .. "; " .. lastReject .. ")"
 	end
 
 	local remoteVer = loaderVersionFromSource(src) or "unknown"

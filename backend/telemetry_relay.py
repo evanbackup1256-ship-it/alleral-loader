@@ -143,6 +143,7 @@ EVENT_COLORS = {
     "session_end": 9936031,
     "milestone": 15844367,
     "log": 7506394,
+    "place_updated": 15844367,
     "hub_visit": 5793266,
     "games_sync": 5763719,
     "bug_report": 15105570,
@@ -162,6 +163,7 @@ TITLE_MAP = {
     "session_end": "Session ended",
     "milestone": "Milestone",
     "log": "Event log",
+    "place_updated": "Game place updated",
     "hub_visit": "Hub visit",
 }
 
@@ -173,6 +175,7 @@ PRIORITY = {
     "inject_start": 4,
     "session_end": 5,
     "milestone": 6,
+    "place_updated": 5,
     "log": 7,
     "heartbeat": 9,
 }
@@ -947,6 +950,15 @@ def build_embed(payload: dict) -> dict:
             True,
         ),
         field("Loader", context.get("loaderVersion"), True),
+        field("Bootstrap", context.get("bootstrapVersion"), True),
+        field("Commit", context.get("releaseCommit"), True),
+        field("Telemetry", context.get("telemetryVersion"), True),
+        field("Core", context.get("coreVersion"), True),
+        field(
+            "UI",
+            f"{context.get('uiLibrary', '?')} v{context.get('alleralUiVersion') or context.get('windUiVersion') or '?'}",
+            True,
+        ),
         field("Game", context.get("gameName") or context.get("gameId"), True),
         field(
             "Script",
@@ -964,10 +976,20 @@ def build_embed(payload: dict) -> dict:
             f"{context.get('placeId')} / {context.get('universeId')}",
             True,
         ),
+    ]
+    if context.get("placeVersion") is not None:
+        build_label = str(context.get("placeVersion"))
+        previous = context.get("previousPlaceVersion")
+        if previous not in (None, "", "0"):
+            build_label = f"{previous} -> {build_label}"
+        if context.get("gameRecentlyUpdated"):
+            build_label += " (updated)"
+        fields.append(field("Place build", build_label, True))
+    fields.extend([
         field("JobId", context.get("jobId"), False),
         field("IP", context.get("clientIp"), True),
         field("Source", context.get("source"), True),
-    ]
+    ])
 
     if any(stats.get(k) is not None for k in ("pingMs", "fps", "players", "platform", "uptimeSec")):
         fields.append(
@@ -999,15 +1021,16 @@ def build_embed(payload: dict) -> dict:
         fields.extend([
             field("Scope", error.get("scope"), True),
             field("Message", error.get("message"), False),
-            field("Stack", error.get("stack"), False),
+            field("Stack trace", error.get("stack"), False),
             field("Details", error.get("details"), False),
+            field("Recent actions", error.get("recentActions"), False),
             field("Count", error.get("count"), True),
         ])
 
     if payload.get("notes"):
         fields.append(field("Notes", payload["notes"], False))
 
-    if event in {"heartbeat", "error", "session_end"}:
+    if event in {"heartbeat", "error", "session_end", "place_updated"}:
         fields.append(field("Recent events", format_event_log(payload.get("eventLog")), False))
 
     user_id = player.get("userId")
@@ -2425,6 +2448,34 @@ def admin_status():
             "autoProvisioned": True,
         },
     })
+
+
+@app.get("/api/admin/telemetry/summary")
+def admin_telemetry_summary():
+    if not admin_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    if AUTO_SYNC is None:
+        return jsonify({"ok": False, "error": "auto_sync_unavailable"}), 503
+    try:
+        window_hours = int(request.args.get("hours") or 48)
+    except ValueError:
+        window_hours = 48
+    summary = AUTO_SYNC.stats.global_summary(window_hours=max(1, min(window_hours, 168)))
+    return jsonify({"ok": True, "summary": summary})
+
+
+@app.get("/api/admin/telemetry/recent")
+def admin_telemetry_recent():
+    if not admin_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    if AUTO_SYNC is None:
+        return jsonify({"ok": False, "error": "auto_sync_unavailable"}), 503
+    try:
+        limit = int(request.args.get("limit") or 40)
+    except ValueError:
+        limit = 40
+    items = AUTO_SYNC.stats.recent_feed(limit=max(1, min(limit, 100)))
+    return jsonify({"ok": True, "items": items})
 
 
 @app.get("/api/admin/ban-api/key")

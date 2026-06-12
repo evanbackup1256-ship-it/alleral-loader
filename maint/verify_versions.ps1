@@ -49,6 +49,31 @@ if ($loader -match 'LOADER_VERSION = "([^"]+)"') {
     Fail "loader.luau missing LOADER_VERSION"
 }
 
+if ($release.sydePatch) {
+    if ($loader -match 'local SYDE_PATCH_VERSION = (\d+)') {
+        $sydePatch = [int]$Matches[1]
+        if ($sydePatch -ne [int]$release.sydePatch) {
+            Fail "loader SYDE_PATCH_VERSION ($sydePatch) != release.json ($($release.sydePatch))"
+        } else {
+            Pass "loader syde patch $sydePatch"
+        }
+    } else {
+        Fail "loader.luau missing SYDE_PATCH_VERSION"
+    }
+}
+
+foreach ($field in @("telemetry", "analytics", "helpers", "security", "access", "weao", "core", "alleral", "windui", "ui")) {
+    $expected = $release.$field
+    if (-not $expected) { continue }
+    $pattern = "(?m)^\t$field = `"([^`"]+)`""
+    if ($loader -match $pattern) {
+        $val = $Matches[1]
+        if ($val -ne $expected) {
+            Fail "loader RELEASE_FALLBACK.$field ($val) != release.json ($expected)"
+        }
+    }
+}
+
 $corePath = Join-Path $root "hub/core_base.luau"
 $core = Get-Content $corePath -Raw
 if ($core -match 'Core\.VERSION = "([^"]+)"') {

@@ -3,11 +3,11 @@
   "updatedAt": "2026-06-12T19:31:56Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without babysitting.",
-  "loaderVersion": "8.2.20",
+  "loaderVersion": "8.2.23",
   "coreVersion": "2.9.4",
   "uiLibrary": "Syde",
   "uiVersion": "4.0.0-syde",
-  "sydePatch": 17,
+  "sydePatch": 18,
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",
@@ -52,6 +52,32 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-12",
+      "title": "Loader 8.2.23 — version lock + relay fixes",
+      "items": [
+        "Bootstrap v1.0.3 — commit-pinned loader only; rejects version/commit/syde patch mismatch",
+        "Loader syncs SYDE_PATCH + RELEASE_FALLBACK from release.json; exact syde patch required",
+        "Fix telemetry_feed retention SQL and admin telemetry endpoints when auto_sync is unavailable"
+      ]
+    },
+    {
+      "date": "2026-06-12",
+      "title": "Syde patch 18 — fix empty UI / toggle keybind crash",
+      "items": [
+        "Loader 8.2.22 · Syde patch 18 — stop renaming Render subtree (ToggleConfiguration KeyBind.Title)",
+        "Fixes blank hub with no tabs when a toggle uses keybind configuration"
+      ]
+    },
+    {
+      "date": "2026-06-12",
+      "title": "Telemetry v3.3 — richer Discord + admin feed",
+      "items": [
+        "Loader 8.2.21 · telemetry 3.3 — place update events, bootstrap/commit/build context on every payload",
+        "Errors now include stack trace, recent session actions, place build, and longer detail text",
+        "Admin Stats tab shows 48h inject/error/update counts plus a live telemetry feed"
+      ]
+    },
     {
       "date": "2026-06-12",
       "title": "Loader 8.2.20 — commit sync, game update notice, legacy purge",

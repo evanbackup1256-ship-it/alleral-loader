@@ -41,6 +41,33 @@ $loaderPath = Join-Path $root "loader.luau"
 $loaderRaw = Get-Content $loaderPath -Raw -Encoding UTF8
 $loaderRaw = [regex]::Replace($loaderRaw, 'local LOADER_VERSION = "[^"]+"', ('local LOADER_VERSION = "' + $release.loader + '"'))
 $loaderRaw = [regex]::Replace($loaderRaw, '(?m)^\tloader = "[^"]+"', ("`tloader = `"$($release.loader)`""), 1)
+if ($null -ne $release.sydePatch) {
+    $sydePatchVal = [int]$release.sydePatch
+    $loaderRaw = [regex]::Replace($loaderRaw, 'local SYDE_PATCH_VERSION = \d+', ('local SYDE_PATCH_VERSION = ' + $sydePatchVal))
+}
+$fallbackFields = @(
+    @{ Key = "core"; Prop = "core" },
+    @{ Key = "telemetry"; Prop = "telemetry" },
+    @{ Key = "analytics"; Prop = "analytics" },
+    @{ Key = "helpers"; Prop = "helpers" },
+    @{ Key = "weao"; Prop = "weao" },
+    @{ Key = "security"; Prop = "security" },
+    @{ Key = "access"; Prop = "access" },
+    @{ Key = "alleral"; Prop = "alleral" },
+    @{ Key = "windui"; Prop = "windui" },
+    @{ Key = "ui"; Prop = "ui" }
+)
+foreach ($field in $fallbackFields) {
+    $val = $release.($field.Prop)
+    if ($null -ne $val -and "$val" -ne "") {
+        $loaderRaw = [regex]::Replace(
+            $loaderRaw,
+            ('(?m)^\t' + [regex]::Escape($field.Key) + ' = "[^"]+"'),
+            ("`t$($field.Key) = `"$val`""),
+            1
+        )
+    }
+}
 if ($hashBumpNeeded) {
     $commit = $head
     $release.commit = $commit

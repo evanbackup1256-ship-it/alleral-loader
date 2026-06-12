@@ -661,27 +661,64 @@
 
   async function loadStats() {
     const root = $("#statsGrid");
+    const feedRoot = $("#telemetryFeed");
     root.innerHTML = '<p class="empty">Loading stats…</p>';
+    if (feedRoot) feedRoot.innerHTML = '<p class="empty">Loading telemetry…</p>';
     const base = apiBase();
     try {
-      const [health, banStatus, site, sync] = await Promise.all([
+      const [health, banStatus, site, sync, telemetrySummary, telemetryRecent] = await Promise.all([
         fetch(`${base}/health`).then((r) => r.json()),
         fetch(`${base}/api/ban/status`).then((r) => r.json()),
         fetch(`${base}/api/site`).then((r) => r.json()),
         fetch(`${base}/api/sync/status`).then((r) => r.json()),
+        fetch(`${base}/api/admin/telemetry/summary`, { headers: headers(), cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
+        fetch(`${base}/api/admin/telemetry/recent?limit=30`, { headers: headers(), cache: "no-store" }).then((r) => r.json()).catch(() => ({ ok: false })),
       ]);
       const games = Object.values(site.games || {});
       const working = games.filter((g) => (g.status || "").toLowerCase() === "working").length;
+      const summary = telemetrySummary.ok ? telemetrySummary.summary || {} : {};
+      const successRate = summary.success_rate != null ? `${Math.round(summary.success_rate * 100)}%` : "—";
       root.innerHTML = `
         <article class="stat-card card-enter"><span class="stat-card-label">Relay Version</span><strong>v${esc(health.version || "?")}</strong></article>
         <article class="stat-card card-enter" style="animation-delay:0.05s"><span class="stat-card-label">GitHub Commit</span><strong>${esc(sync.commit || health.githubCommit || "—")}</strong></article>
         <article class="stat-card card-enter" style="animation-delay:0.1s"><span class="stat-card-label">Last Auto Sync</span><strong>${sync.lastSyncAt ? new Date(sync.lastSyncAt).toLocaleTimeString() : "—"}</strong></article>
         <article class="stat-card card-enter" style="animation-delay:0.15s"><span class="stat-card-label">Active Bans</span><strong>${banStatus.activeBans ?? health.bans ?? 0}</strong></article>
-        <article class="stat-card card-enter" style="animation-delay:0.2s"><span class="stat-card-label">Games Listed</span><strong>${games.length}</strong></article>
-        <article class="stat-card card-enter" style="animation-delay:0.25s"><span class="stat-card-label">Working Scripts</span><strong>${working}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.2s"><span class="stat-card-label">48h Injects OK</span><strong>${summary.inject_loaded ?? "—"}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.25s"><span class="stat-card-label">48h Inject Fail</span><strong>${summary.inject_failed ?? "—"}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.3s"><span class="stat-card-label">48h Errors</span><strong>${summary.errors ?? summary.feed_errors ?? "—"}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.35s"><span class="stat-card-label">48h Game Updates</span><strong>${summary.place_updated ?? "—"}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.4s"><span class="stat-card-label">Inject Success</span><strong>${successRate}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.45s"><span class="stat-card-label">Games Listed</span><strong>${games.length}</strong></article>
+        <article class="stat-card card-enter" style="animation-delay:0.5s"><span class="stat-card-label">Working Scripts</span><strong>${working}</strong></article>
       `;
+      if (feedRoot) {
+        const items = telemetryRecent.ok ? telemetryRecent.items || [] : [];
+        if (!items.length) {
+          feedRoot.innerHTML = '<p class="empty">No recent telemetry events yet.</p>';
+        } else {
+          feedRoot.innerHTML = items.map((item) => {
+            const build = item.previousPlaceVersion
+              ? `build ${esc(item.previousPlaceVersion)} → ${esc(item.placeVersion || "?")}`
+              : (item.placeVersion ? `build ${esc(item.placeVersion)}` : "");
+            return `
+              <article class="telemetry-feed-item">
+                <div class="telemetry-feed-head">
+                  <strong>${esc(item.event || "?")}</strong>
+                  <span>${item.at ? new Date(item.at).toLocaleString() : "—"}</span>
+                </div>
+                <div class="telemetry-feed-meta">
+                  ${esc(item.playerName || "?")} · ${esc(item.gameId || "?")} · ${esc(item.executor || "?")} · loader ${esc(item.loaderVersion || "?")}
+                  ${build ? ` · ${build}` : ""}
+                </div>
+                <div class="telemetry-feed-message">${esc(item.message || "")}</div>
+                ${item.details ? `<pre class="telemetry-feed-details">${esc(item.details)}</pre>` : ""}
+              </article>`;
+          }).join("");
+        }
+      }
     } catch (e) {
       root.innerHTML = `<p class="empty">${esc(e.message)}</p>`;
+      if (feedRoot) feedRoot.innerHTML = "";
     }
   }
 
