@@ -7599,11 +7599,11 @@ function syde:Init(library)
 					StarterValue = Options.StarterValue or 16;
 					CallBack = Options.CallBack;
 					Flag = Options.Flag;
-				}
+									}
 
-				Slider.Name = Options.Title
-				Slider.title.Text = Options.Title
-				Options.Value = Options.StarterValue
+									Slider.Name = Options.Title
+									do local _sliderTitle = sydeSliderLabel(Slider); if _sliderTitle then _sliderTitle.Text = Options.Title end end
+									Options.Value = Options.StarterValue
 
 				local dragging = false
 				Slider.Visible = true
