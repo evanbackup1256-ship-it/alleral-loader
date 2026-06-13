@@ -2074,15 +2074,16 @@ function syde:Modal(Modal)
 		local buttons = ModalInstance:FindFirstChild("Buttons") or ModalInstance:FindFirstChild("buttons") or Instance.new("Frame")
 		local confirmBtn = buttons and (buttons:FindFirstChild("Confirm") or buttons:FindFirstChild("confirm"))
 		local cancelBtn = buttons and (buttons:FindFirstChild("Cancel") or buttons:FindFirstChild("cancel"))
+		local modalTitle = ModalInstance:FindFirstChild("Title") or ModalInstance:FindFirstChild("title")
+		local modalContent = ModalInstance:FindFirstChild("Content") or ModalInstance:FindFirstChild("content")
 		ModalInstance.Visible = true
 		ModalInstance.Parent = ui.main
-		ModalInstance.title.Text = ModalData.Title
-		ModalInstance.Content.Text = ModalData.Content
-		--	ModalInstance.Content.Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)
+		if modalTitle then modalTitle.Text = ModalData.Title end
+		if modalTitle then modalTitle.TextTransparency = 1 end
+		if modalContent then modalContent.Text = ModalData.Content end
 		ModalInstance.Size = UDim2.new(0, 350,0, 144)
 		ModalInstance.BackgroundTransparency = 1
-		ModalInstance.title.TextTransparency = 1
-		ModalInstance.Content.TextTransparency = 1
+		if modalContent then modalContent.TextTransparency = 1 end
 
 		if confirmBtn then
 			confirmBtn.BackgroundTransparency = 1
@@ -2104,10 +2105,10 @@ function syde:Modal(Modal)
 
 			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
 			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-			tweenservice:Create(ModalInstance.title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			tweenservice:Create(ModalInstance.Content, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+			tweenservice:Create(modalTitle, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+						tweenservice:Create(modalContent, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
-			if confirmBtn then
+						if confirmBtn then
 				tweenservice:Create(confirmBtn, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
 				tweenservice:Create(confirmBtn.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 				--	tweenservice:Create(confirmBtn.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
@@ -2132,9 +2133,9 @@ function syde:Modal(Modal)
 			if confirmBtn then confirmBtn.Interactable = false end
 			tweenservice:Create(ModalInstance, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0, 147)}):Play()
 			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+						tweenservice:Create(modalTitle, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+						tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+						tweenservice:Create(modalContent, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 
 			if buttonsFrame then
 				local cBtn = buttonsFrame:FindFirstChild("Confirm") or buttonsFrame:FindFirstChild("confirm")
