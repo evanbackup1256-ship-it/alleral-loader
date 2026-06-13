@@ -2644,7 +2644,8 @@ function syde:Init(library)
 	Data.Home.hSubText = Data.Home.hSubText or Data.SubText
 	Data.Home.profileImage = Data.Home.profileImage or Data.profileImage
 
-	local Minihome = ui.minihome
+	local Minihome = ui:FindFirstChild("Minihome") or ui:FindFirstChild("minihome")
+	local Clipframe = window:FindFirstChild("Clipframe") or window:FindFirstChild("clipframe")
 
 	local MinihomeData = {
 		QuickActions = library.QuickActions or false;
