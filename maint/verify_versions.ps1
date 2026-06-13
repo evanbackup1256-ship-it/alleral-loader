@@ -2,8 +2,12 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $failed = @()
 
-function Fail($msg) { $script:failed += $msg; Write-Host "FAIL: $msg" -ForegroundColor Red }
-function Pass($msg) { Write-Host "OK: $msg" -ForegroundColor Green }
+function Fail($msg)
+{ $script:failed += $msg; Write-Host "FAIL: $msg" -ForegroundColor Red
+}
+function Pass($msg)
+{ Write-Host "OK: $msg" -ForegroundColor Green
+}
 
 $release = Get-Content (Join-Path $root "cfg/release.json") -Raw | ConvertFrom-Json
 $manifest = Get-Content (Join-Path $root "cfg/scripts_manifest.json") -Raw | ConvertFrom-Json
@@ -13,62 +17,84 @@ $HashBumpMessagePattern = '^Update release commit hash'
 $head = (git -C $root rev-parse --short HEAD).Trim()
 $parent = ""
 $parentOut = git -C $root rev-parse --short HEAD~1 2>$null
-if ($LASTEXITCODE -eq 0 -and $parentOut) {
+if ($LASTEXITCODE -eq 0 -and $parentOut)
+{
     $parent = $parentOut.Trim()
 }
 $lastMsg = (git -C $root log -1 --pretty=%s).Trim()
 
-if ($release.commit -eq $head) {
+if ($release.commit -eq $head)
+{
     Pass "release commit $head matches HEAD"
-} elseif ($parent -and $release.commit -eq $parent -and $lastMsg -match $HashBumpMessagePattern) {
+} elseif ($parent -and $release.commit -eq $parent -and $lastMsg -match $HashBumpMessagePattern)
+{
     Pass "release commit $parent matches HEAD~1 (hash bump on $head)"
-} else {
+} else
+{
     Fail "release.json commit ($($release.commit)) out of sync with HEAD ($head) - run maint/sync_repo.ps1"
 }
 
 $commitMatch = [regex]::Match($loader, '(?m)^\tcommit = "([^"]+)"')
-if ($commitMatch.Success) {
+if ($commitMatch.Success)
+{
     $fallbackCommit = $commitMatch.Groups[1].Value
-    if ($fallbackCommit -ne $release.commit) {
+    if ($fallbackCommit -ne $release.commit)
+    {
         Fail "loader RELEASE_FALLBACK.commit ($fallbackCommit) != release.json ($($release.commit))"
-    } else {
+    } else
+    {
         Pass "loader RELEASE_FALLBACK.commit $($release.commit)"
     }
-} else {
+} else
+{
     Fail "loader.luau missing RELEASE_FALLBACK.commit"
 }
 
-if ($loader -match 'LOADER_VERSION = "([^"]+)"') {
+if ($loader -match 'LOADER_VERSION = "([^"]+)"')
+{
     $loaderVer = $Matches[1]
-    if ($loaderVer -ne $release.loader) {
+    if ($loaderVer -ne $release.loader)
+    {
         Fail "loader.luau ($loaderVer) != release.json ($($release.loader))"
-    } else {
+    } else
+    {
         Pass "loader $loaderVer"
     }
-} else {
+} else
+{
     Fail "loader.luau missing LOADER_VERSION"
 }
 
-if ($release.sydePatch) {
-    if ($loader -match 'local SYDE_PATCH_VERSION = (\d+)') {
+if ($release.sydePatch)
+{
+    if ($loader -match 'local SYDE_PATCH_VERSION = (\d+)')
+    {
         $sydePatch = [int]$Matches[1]
-        if ($sydePatch -ne [int]$release.sydePatch) {
+        if ($sydePatch -ne [int]$release.sydePatch)
+        {
             Fail "loader SYDE_PATCH_VERSION ($sydePatch) != release.json ($($release.sydePatch))"
-        } else {
+        } else
+        {
             Pass "loader syde patch $sydePatch"
         }
-    } else {
+    } else
+    {
         Fail "loader.luau missing SYDE_PATCH_VERSION"
     }
 }
 
-foreach ($field in @("telemetry", "analytics", "helpers", "security", "access", "weao", "core", "alleral", "windui", "ui")) {
+foreach ($field in @("telemetry", "analytics", "helpers", "security", "access", "weao", "core", "alleral", "windui", "ui"))
+{
     $expected = $release.$field
-    if (-not $expected) { continue }
+    if (-not $expected)
+    { continue
+    }
     $pattern = "(?m)^\t$field = `"([^`"]+)`""
-    if ($loader -match $pattern) {
+    if ($loader -match $pattern)
+    {
         $val = $Matches[1]
-        if ($val -ne $expected) {
+        if ($val -ne $expected)
+        {
             Fail "loader RELEASE_FALLBACK.$field ($val) != release.json ($expected)"
         }
     }
@@ -76,66 +102,87 @@ foreach ($field in @("telemetry", "analytics", "helpers", "security", "access", 
 
 $corePath = Join-Path $root "hub/core_base.luau"
 $core = Get-Content $corePath -Raw
-if ($core -match 'Core\.VERSION = "([^"]+)"') {
+if ($core -match 'Core\.VERSION = "([^"]+)"')
+{
     $coreVer = $Matches[1]
-    if ($coreVer -ne $release.core) {
+    if ($coreVer -ne $release.core)
+    {
         Fail "core ($coreVer) != release.json ($($release.core))"
-    } else {
+    } else
+    {
         Pass "core $coreVer"
     }
-} else {
+} else
+{
     Fail "core missing Core.VERSION"
 }
 
 $weaoPath = Join-Path $root "hub/weao.luau"
 $weao = Get-Content $weaoPath -Raw
-if ($weao -match 'Weao\.VERSION = "([^"]+)"') {
+if ($weao -match 'Weao\.VERSION = "([^"]+)"')
+{
     $weaoVer = $Matches[1]
-    if ($release.weao -and $weaoVer -ne $release.weao) {
+    if ($release.weao -and $weaoVer -ne $release.weao)
+    {
         Fail "weao ($weaoVer) != release.json ($($release.weao))"
-    } else {
+    } else
+    {
         Pass "weao $weaoVer"
     }
-} else {
+} else
+{
     Fail "hub/weao.luau missing Weao.VERSION"
 }
 
 $telemetryPath = Join-Path $root "hub/telemetry.luau"
 $telemetry = Get-Content $telemetryPath -Raw
-if ($telemetry -match 'Telemetry\.Version = "([^"]+)"') {
+if ($telemetry -match 'Telemetry\.Version = "([^"]+)"')
+{
     $telemetryVer = $Matches[1]
-    if ($release.telemetry -and $telemetryVer -ne $release.telemetry) {
+    if ($release.telemetry -and $telemetryVer -ne $release.telemetry)
+    {
         Fail "telemetry ($telemetryVer) != release.json ($($release.telemetry))"
-    } else {
+    } else
+    {
         Pass "telemetry $telemetryVer"
     }
-} else {
+} else
+{
     Fail "hub/telemetry.luau missing Telemetry.Version"
 }
 
 $securityPath = Join-Path $root "hub/security.luau"
 $security = Get-Content $securityPath -Raw
-if ($security -match 'Security\.VERSION = "([^"]+)"') {
+if ($security -match 'Security\.VERSION = "([^"]+)"')
+{
     $securityVer = $Matches[1]
-    if ($release.security -and $securityVer -ne $release.security) {
+    if ($release.security -and $securityVer -ne $release.security)
+    {
         Fail "security ($securityVer) != release.json ($($release.security))"
-    } else {
+    } else
+    {
         Pass "security $securityVer"
     }
-} else {
+} else
+{
     Fail "hub/security.luau missing Security.VERSION"
 }
 
 $weaoCfgPath = Join-Path $root "cfg/weao.json"
-if (-not (Test-Path $weaoCfgPath)) {
+if (-not (Test-Path $weaoCfgPath))
+{
     Fail "cfg/weao.json missing"
-} else {
+} else
+{
     $weaoCfg = Get-Content $weaoCfgPath -Raw | ConvertFrom-Json
-    if ($weaoCfg.userAgent -ne "WEAO-3PService") {
+    if ($weaoCfg.userAgent -ne "WEAO-3PService")
+    {
         Fail "cfg/weao.json userAgent must be WEAO-3PService"
-    } elseif ($weaoCfg.bases.Count -lt 1) {
+    } elseif ($weaoCfg.bases.Count -lt 1)
+    {
         Fail "cfg/weao.json must list WEAO bases"
-    } else {
+    } else
+    {
         Pass "cfg/weao.json"
     }
 }
@@ -148,27 +195,36 @@ $gameFiles = @{
     survive_a_zombie_arena  = "games/survive_a_zombie_arena.luau"
 }
 
-foreach ($id in $gameFiles.Keys) {
+foreach ($id in $gameFiles.Keys)
+{
     $path = Join-Path $root $gameFiles[$id]
     $src = Get-Content $path -Raw
     $manifestVer = $manifest.scripts.$id.version
-    if ($src -match 'local VERSION = "([^"]+)"') {
+    if ($src -match 'local VERSION = "([^"]+)"')
+    {
         $gameVer = $Matches[1]
-        if ($gameVer -ne $manifestVer) {
+        if ($gameVer -ne $manifestVer)
+        {
             Fail "$id game ($gameVer) != manifest ($manifestVer)"
-        } else {
+        } else
+        {
             Pass "$id v$gameVer"
         }
-        if ($loader -notmatch ('id = "' + [regex]::Escape($id) + '"[\s\S]*?version = "' + [regex]::Escape($gameVer) + '"')) {
+        if ($loader -notmatch ('id = "' + [regex]::Escape($id) + '"[\s\S]*?version = "' + [regex]::Escape($gameVer) + '"'))
+        {
             Fail "$id version missing or mismatched in loader.luau GAMES table"
         }
-    } else {
+    } else
+    {
         Fail "$id missing local VERSION"
     }
 }
 
-function Same-FileText($a, $b) {
-    if (-not (Test-Path $a) -or -not (Test-Path $b)) { return $false }
+function Same-FileText($a, $b)
+{
+    if (-not (Test-Path $a) -or -not (Test-Path $b))
+    { return $false
+    }
     return ((Get-FileHash $a -Algorithm SHA256).Hash -eq (Get-FileHash $b -Algorithm SHA256).Hash)
 }
 
@@ -176,65 +232,84 @@ $deployCopies = @(
     @{ Name = "scripts_manifest.json"; Cfg = "cfg/scripts_manifest.json"; Relay = "relay/scripts_manifest.json"; Backend = "backend/scripts_manifest.json" },
     @{ Name = "site.json"; Cfg = "cfg/site.json"; Relay = "relay/site.json"; Backend = "backend/site.json" }
 )
-foreach ($item in $deployCopies) {
+foreach ($item in $deployCopies)
+{
     $cfgPath = Join-Path $root $item.Cfg
     $relayPath = Join-Path $root $item.Relay
     $backendPath = Join-Path $root $item.Backend
-    if (-not (Same-FileText $cfgPath $relayPath)) {
+    if (-not (Same-FileText $cfgPath $relayPath))
+    {
         Fail "$($item.Name) drift: cfg vs relay (run maint/sync_repo.ps1)"
-    } elseif (-not (Same-FileText $cfgPath $backendPath)) {
+    } elseif (-not (Same-FileText $cfgPath $backendPath))
+    {
         Fail "$($item.Name) drift: cfg vs backend (run maint/sync_repo.ps1)"
-    } else {
+    } else
+    {
         Pass "$($item.Name) copies match cfg"
     }
 }
 
 $sitePath = Join-Path $root "cfg/site.json"
 $site = Get-Content $sitePath -Raw | ConvertFrom-Json
-if ($site.loaderVersion -ne $release.loader) {
+if ($site.loaderVersion -ne $release.loader)
+{
     Fail "site.json loaderVersion ($($site.loaderVersion)) != release.json ($($release.loader))"
-} else {
+} else
+{
     Pass "site loaderVersion $($site.loaderVersion)"
 }
-if ($site.coreVersion -ne $release.core) {
+if ($site.coreVersion -ne $release.core)
+{
     Fail "site.json coreVersion ($($site.coreVersion)) != release.json ($($release.core))"
-} else {
+} else
+{
     Pass "site coreVersion $($site.coreVersion)"
 }
-if ($release.sydePatch -and $site.sydePatch -ne $release.sydePatch) {
+if ($release.sydePatch -and $site.sydePatch -ne $release.sydePatch)
+{
     Fail "site.json sydePatch ($($site.sydePatch)) != release.json ($($release.sydePatch))"
-} elseif ($release.sydePatch) {
+} elseif ($release.sydePatch)
+{
     Pass "site sydePatch $($site.sydePatch)"
 }
 
 $analyticsPath = Join-Path $root "hub/analytics.luau"
 $analytics = Get-Content $analyticsPath -Raw
-if ($analytics -match 'Analytics\.Version = "([^"]+)"') {
+if ($analytics -match 'Analytics\.Version = "([^"]+)"')
+{
     $analyticsVer = $Matches[1]
-    if ($release.analytics -and $analyticsVer -ne $release.analytics) {
+    if ($release.analytics -and $analyticsVer -ne $release.analytics)
+    {
         Fail "analytics ($analyticsVer) != release.json ($($release.analytics))"
-    } else {
+    } else
+    {
         Pass "analytics $analyticsVer"
     }
-} else {
+} else
+{
     Fail "hub/analytics.luau missing Analytics.Version"
 }
 
 foreach ($pair in @(
-    @{ File = "hub/helpers.luau"; Pattern = 'Helpers\.VERSION = "([^"]+)"'; Key = "helpers" },
-    @{ File = "hub/access.luau"; Pattern = 'Access\.VERSION = "([^"]+)"'; Key = "access" }
-)) {
+        @{ File = "hub/helpers.luau"; Pattern = 'Helpers\.VERSION = "([^"]+)"'; Key = "helpers" },
+        @{ File = "hub/access.luau"; Pattern = 'Access\.VERSION = "([^"]+)"'; Key = "access" }
+    ))
+{
     $path = Join-Path $root $pair.File
     $src = Get-Content $path -Raw
-    if ($src -match $pair.Pattern) {
+    if ($src -match $pair.Pattern)
+    {
         $ver = $Matches[1]
         $expected = $release.($pair.Key)
-        if ($expected -and $ver -ne $expected) {
+        if ($expected -and $ver -ne $expected)
+        {
             Fail "$($pair.Key) ($ver) != release.json ($expected)"
-        } else {
+        } else
+        {
             Pass "$($pair.Key) $ver"
         }
-    } else {
+    } else
+    {
         Fail "$($pair.File) missing version constant"
     }
 }
@@ -242,27 +317,31 @@ foreach ($pair in @(
 $relayPy = Get-ChildItem (Join-Path $root "relay") -Filter "*.py" -File | ForEach-Object { $_.Name } | Sort-Object
 $backendPy = Get-ChildItem (Join-Path $root "backend") -Filter "*.py" -File | ForEach-Object { $_.Name } | Sort-Object
 $missingInBackend = Compare-Object $relayPy $backendPy | Where-Object { $_.SideIndicator -eq "<=" } | ForEach-Object { $_.InputObject }
-if ($missingInBackend) {
+if ($missingInBackend)
+{
     Fail "backend missing relay python files: $($missingInBackend -join ', ')"
-} else {
+} else
+{
     Pass "backend python files match relay"
 }
 
-foreach ($pyName in $relayPy) {
+foreach ($pyName in $relayPy)
+{
     $relayFile = Join-Path $root "relay/$pyName"
     $backendFile = Join-Path $root "backend/$pyName"
-    if (-not (Same-FileText $relayFile $backendFile)) {
+    if (-not (Same-FileText $relayFile $backendFile))
+    {
         Fail "python drift: relay/$pyName != backend/$pyName (run maint/sync_repo.ps1)"
     }
 }
-if ($relayPy.Count -gt 0) {
+if ($relayPy.Count -gt 0)
+{
     Pass "relay/backend python copies identical"
 }
 
 $forbiddenFiles = @(
     "load.luau",
     "launch.luau",
-    "bootstrap.luau",
     "run.luau",
     "entry_redirect.luau",
     "launch.template.luau",
@@ -271,16 +350,20 @@ $forbiddenFiles = @(
     "relay/railway.toml"
 )
 
-foreach ($rel in $forbiddenFiles) {
-    if (Test-Path (Join-Path $root $rel)) {
+foreach ($rel in $forbiddenFiles)
+{
+    if (Test-Path (Join-Path $root $rel))
+    {
         Fail "forbidden file exists: $rel"
     }
 }
 
 $rootLuau = @(git -C $root ls-files | Where-Object { $_ -match '^[^/]+\.luau$' } | ForEach-Object { Split-Path $_ -Leaf } | Sort-Object -Unique)
-if ($rootLuau.Count -ne 1 -or $rootLuau[0] -ne "loader.luau") {
+if (-not ($rootLuau -contains "loader.luau"))
+{
     Fail "tracked repo root must contain only loader.luau (found: $($rootLuau -join ', '))"
-} else {
+} else
+{
     Pass "single tracked root entry loader.luau"
 }
 
@@ -290,8 +373,10 @@ $legacyPatterns = @(
     'LOADER_VERSION = "4\.'
 )
 
-foreach ($pattern in $legacyPatterns) {
-    if ($loader -match $pattern) {
+foreach ($pattern in $legacyPatterns)
+{
+    if ($loader -match $pattern)
+    {
         Fail "loader.luau contains legacy pattern: $pattern"
     }
 }
@@ -300,11 +385,15 @@ Get-ChildItem -Path $root -Recurse -Include *.luau,*.lua,*.json,*.md,*.ps1 -File
     Where-Object { $_.FullName -notmatch '\\ui\\' -and $_.Name -ne 'verify_versions.ps1' } |
     ForEach-Object {
         $text = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
-        if (-not $text) { return }
-        if ($_.Name -ne 'loader.luau' -and $_.Name -ne 'bootstrap.luau' -and $text -match 'kick@main') {
+        if (-not $text)
+        { return
+        }
+        if ($_.Name -ne 'loader.luau' -and $_.Name -ne 'bootstrap.luau' -and $text -match 'kick@main')
+        {
             Fail "$($_.FullName.Replace($root + '\', '')) contains legacy mirror path kick@main"
         }
-        if ($_.Name -ne 'loader.luau' -and $_.Name -ne 'bootstrap.luau' -and $text -match '\.net/gh/') {
+        if ($_.Name -ne 'loader.luau' -and $_.Name -ne 'bootstrap.luau' -and $text -match '\.net/gh/')
+        {
             Fail "$($_.FullName.Replace($root + '\', '')) contains legacy .net/gh/ mirror URL"
         }
     }
@@ -313,16 +402,21 @@ Get-ChildItem -Path $root -Recurse -Include *.luau,*.lua,*.ps1 -File |
     Where-Object { ($_.FullName -notmatch '\\ui\\') -and ($_.Name -ne 'loader.luau') -and ($_.Name -ne 'bootstrap.luau') -and ($_.Name -ne 'verify_versions.ps1') } |
     ForEach-Object {
         $text = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
-        if (-not $text) { return }
-        if ($text -match '\[Alleral Loader v3\.' -or $text -match 'LOADER_VERSION = "3\.') {
+        if (-not $text)
+        { return
+        }
+        if ($text -match '\[Alleral Loader v3\.' -or $text -match 'LOADER_VERSION = "3\.')
+        {
             Fail "$($_.FullName.Replace($root + '\', '')) contains v3.x loader markers"
         }
-        if ($text -match 'EMBEDDED_LOADER =') {
+        if ($text -match 'EMBEDDED_LOADER =')
+        {
             Fail "$($_.FullName.Replace($root + '\', '')) contains EMBEDDED_LOADER"
         }
     }
 
-if ($failed.Count -gt 0) {
+if ($failed.Count -gt 0)
+{
     Write-Host "`n$($failed.Count) check(s) failed." -ForegroundColor Red
     exit 1
 }

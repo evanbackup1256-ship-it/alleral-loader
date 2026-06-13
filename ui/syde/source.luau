@@ -8734,7 +8734,7 @@ function syde:Init(library)
 						starterSet = true
 												dropdown.dropholder.drop.selected.Text = OptionText
 												SelectedOptions = {[OptionText] = true}
-												SelectedOrder = {[OptionText]}
+												SelectedOrder = {OptionText}
 
 												tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
 												tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
