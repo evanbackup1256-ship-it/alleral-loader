@@ -824,7 +824,7 @@ function Core.backupSettings(filename, jsonBody)
 	pcall(writeFile, path, jsonBody)
 	if type(listFiles) == "function" and type(deleteFile) == "function" then
 		local matches = {}
-		for _, filePath in ipairs(listFiles("Alleral_Configs/backups")) do
+		for _, filePath in ipairs(Core.safeListFiles("Alleral_Configs/backups", listFiles)) do
 			if tostring(filePath):find(base .. "_", 1, true) then
 				table.insert(matches, tostring(filePath))
 			end
@@ -1017,7 +1017,7 @@ function Core.buildSettingsBackupGroup(tab, options)
 		local names = {}
 		if type(listFiles) == "function" then
 			local base = (options.settingsFile or "settings"):gsub("%.json$", ""):gsub("[^%w%-_]", "_")
-			for _, path in ipairs(listFiles("Alleral_Configs/backups")) do
+			for _, path in ipairs(Core.safeListFiles("Alleral_Configs/backups", listFiles)) do
 				local name = tostring(path):match("([^/\\]+)$")
 				if name and name:find("^" .. base .. "_", 1, true) then
 					table.insert(names, name)
@@ -2130,7 +2130,7 @@ function Core.buildConfigProfileGroup(tab, options)
 	local function listProfiles()
 		local names = {}
 		if type(listFiles) == "function" and type(isFolder) == "function" and isFolder(profileFolder) then
-			for _, path in ipairs(listFiles(profileFolder)) do
+			for _, path in ipairs(Core.safeListFiles(profileFolder, listFiles)) do
 				local name = tostring(path):match("([^/\\]+)%.json$")
 				if name then
 					table.insert(names, name)

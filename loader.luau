@@ -37,7 +37,7 @@ local CP = {
 
 local RELEASE_FALLBACK = {
 	loader = "8.2.25",
-	core = "2.9.4",
+	core = "2.9.5",
 	ui = "Syde",
 	windui = "4.0.0-syde",
 	alleral = "4.0.0-syde",
@@ -47,7 +47,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "3cc9fec",
+	commit = "28298cb",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
 	autoUpdate = true,
 }

@@ -1,5 +1,5 @@
 local Core = {}
-Core.VERSION = "2.9.4"
+Core.VERSION = "2.9.5"
 Core._CORE_ARTIFACT = "base"
 Core.UI_LIBRARY = "Alleral"
 Core.ALLERAL_UI_VERSION = "4.0.0-syde"
@@ -183,6 +183,18 @@ function Core.coerceSettingsTable(decoded, keys, defaults)
 	return output
 end
 
+function Core.safeListFiles(path, listFiles)
+	listFiles = listFiles or Core.execFunction("listfiles")
+	if type(listFiles) ~= "function" then
+		return {}
+	end
+	local ok, files = pcall(listFiles, path)
+	if not ok or type(files) ~= "table" then
+		return {}
+	end
+	return files
+end
+
 function Core.restoreSettingsFromBackup(filename, state, keys, defaults)
 	local listFiles = Core.execFunction("listfiles")
 	local readFile = Core.execFunction("readfile")
@@ -192,7 +204,7 @@ function Core.restoreSettingsFromBackup(filename, state, keys, defaults)
 	end
 	local base = tostring(filename or "settings.json"):gsub("%.json$", ""):gsub("[^%w%-_]", "_")
 	local matches = {}
-	for _, filePath in ipairs(listFiles("Alleral_Configs/backups")) do
+	for _, filePath in ipairs(Core.safeListFiles("Alleral_Configs/backups", listFiles)) do
 		local name = tostring(filePath):match("([^/\\]+)$")
 		if name and name:find("^" .. base .. "_", 1, true) then
 			table.insert(matches, tostring(filePath))
