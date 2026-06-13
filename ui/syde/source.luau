@@ -131,7 +131,7 @@ local syde = {
 	SettingsFlags = {};
 }
 
--- Alleral compat helpers (required for loader validation)
+-- v26: Normalization re-enabled, proxy removed, modal nil-safe, relaunch guards
 local function sydeFindChild(parent, ...)
 	if not parent then return nil end
 	for i = 1, select("#", ...) do
