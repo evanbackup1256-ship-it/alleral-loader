@@ -17,6 +17,8 @@ local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
 local SYDE_PATCH_VERSION = 26 -- Includes Dropdown/ Slider/ Modal robustness fixes (Selected/title casing + safe button access)
+local MAX_RELAUNCHES = 3
+local RELAUNCH_COOLDOWN = 15
 local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
 local SYDE_PATCHED_OVERRIDE_PATHS = {
 	"syde_patched.luau",
@@ -45,7 +47,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "de2b694",
+	commit = "2b0a922",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
 	autoUpdate = true,
 }
@@ -3797,6 +3799,14 @@ local function main()
 		)
 		ENV.Alleral_LoaderRunning = false
 		task.defer(function()
+			local count = tonumber(ENV._Alleral_RelaunchCount) or 0
+			local last = tonumber(ENV._Alleral_LastRelaunch) or 0
+			if count >= MAX_RELAUNCHES or os.time() - last < RELAUNCH_COOLDOWN then
+				warn("[Alleral v" .. LOADER_VERSION .. "] Skipping relaunch (count=" .. count .. ")")
+				return
+			end
+			ENV._Alleral_RelaunchCount = count + 1
+			ENV._Alleral_LastRelaunch = os.time()
 			if type(ENV._Alleral_RelaunchViaBootstrap) == "function" then
 				ENV._Alleral_RelaunchViaBootstrap("loader-version-sync")
 			end
@@ -3813,12 +3823,16 @@ local function main()
 		)
 		ENV.Alleral_LoaderRunning = false
 		task.defer(function()
-			if type(ENV._Alleral_RelaunchViaBootstrap) == "function" then
-				ENV._Alleral_RelaunchViaBootstrap("min-loader-sync")
+					local count = tonumber(ENV._Alleral_RelaunchCount) or 0
+					local last = tonumber(ENV._Alleral_LastRelaunch) or 0
+					if count >= MAX_RELAUNCHES or os.time() - last < RELAUNCH_COOLDOWN then return end
+					ENV._Alleral_RelaunchCount = count + 1
+					ENV._Alleral_LastRelaunch = os.time()
+					if type(ENV._Alleral_RelaunchViaBootstrap) == "function" then
+						ENV._Alleral_RelaunchViaBootstrap("min-loader-sync")
+					end
+				end)
 			end
-		end)
-		return
-	end
 	if expectedVersions.commit and expectedVersions.commit ~= "" and expectedVersions.commit ~= RELEASE_FALLBACK.commit then
 		log(
 			"Embedded commit "
@@ -3839,6 +3853,14 @@ local function main()
 		)
 		ENV.Alleral_LoaderRunning = false
 		task.defer(function()
+			local count = tonumber(ENV._Alleral_RelaunchCount) or 0
+			local last = tonumber(ENV._Alleral_LastRelaunch) or 0
+			if count >= MAX_RELAUNCHES or os.time() - last < RELAUNCH_COOLDOWN then
+				warn("[Alleral v" .. LOADER_VERSION .. "] Skipping syde-patch relaunch (count=" .. count .. ")")
+				return
+			end
+			ENV._Alleral_RelaunchCount = count + 1
+			ENV._Alleral_LastRelaunch = os.time()
 			if type(ENV._Alleral_RelaunchViaBootstrap) == "function" then
 				ENV._Alleral_RelaunchViaBootstrap("syde-patch-sync")
 			end
