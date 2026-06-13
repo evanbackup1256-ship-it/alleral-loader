@@ -165,6 +165,14 @@ local function sydeFindChild(parent, ...)
 	local function sydeNormalizeTemplateNames(root)
 		if not root then return end
 		for _, desc in ipairs(root:GetDescendants()) do
+			-- Skip Render namespace (uses PascalCase by design)
+			local current = desc
+			local skip = false
+			while current do
+				if current.Name == "Render" then skip = true break end
+				current = current.Parent
+			end
+			if skip then continue end
 			local canonical = SYDE_CANONICAL_NAMES[desc.Name]
 			if canonical and canonical ~= desc.Name then
 				pcall(function() desc.Name = canonical end)
