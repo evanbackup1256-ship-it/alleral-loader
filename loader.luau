@@ -7,11 +7,8 @@ local COMPILE_VALIDATE_CACHE = {}
 local CORE_BASE_MIN_BYTES = 30000
 local CORE_BASE_MAX_BYTES = 45000
 local CORE_UI_MIN_BYTES = 50000
-local _CORE_UI_MAX_BYTES = 90000
 local CORE_HUB_UI_MIN_BYTES = 60000
-local _CORE_HUB_UI_MAX_BYTES = 75000
 local CORE_ALLERAL_UI_MIN_BYTES = 12000
-local _CORE_ALLERAL_UI_MAX_BYTES = 45000
 local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
@@ -21,11 +18,13 @@ local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
 local SYDE_PATCH_VERSION = 24
 local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
-local CORE_BASE_PATH = HUB .. "/core_base.luau"
-local CORE_BASE_LEGACY_PATH = HUB .. "/core.luau"
-local CORE_UI_PATH = HUB .. "/core_ui.luau"
-local CORE_HUB_UI_PATH = HUB .. "/core_hub_ui.luau"
-local CORE_ALLERAL_UI_PATH = HUB .. "/alleral_ui.luau"
+local CP = {
+	base = HUB .. "/core_base.luau",
+	legacy = HUB .. "/core.luau",
+	ui = HUB .. "/core_ui.luau",
+	hub = HUB .. "/core_hub_ui.luau",
+	alleral = HUB .. "/alleral_ui.luau",
+}
 
 local RELEASE_FALLBACK = {
 	loader = "8.2.24",
@@ -1928,10 +1927,10 @@ local function purgeStaleCorePaths()
 	end
 	local expectedCore = type(expected) == "table" and expected.core or nil
 	local stalePaths = {
-		CORE_BASE_LEGACY_PATH,
-		".alleral/cache/" .. CORE_BASE_LEGACY_PATH,
-		CORE_BASE_PATH,
-		".alleral/cache/" .. CORE_BASE_PATH,
+		CP.legacy,
+		".alleral/cache/" .. CP.legacy,
+		CP.base,
+		".alleral/cache/" .. CP.base,
 	}
 	for _, path in ipairs(stalePaths) do
 		if isFile and readFile then
@@ -1964,8 +1963,8 @@ local function purgeStaleHubPaths()
 		expected = fetchExpectedVersions()
 	end
 	local hubPaths = {
-		{ paths = { HUB .. "/alleral_ui.luau", CORE_ALLERAL_UI_PATH }, valid = alleralUiValid, kind = "alleral" },
-		{ paths = { HUB .. "/core_base.luau", CORE_BASE_PATH }, valid = coreBaseValid, kind = "core" },
+		{ paths = { HUB .. "/alleral_ui.luau", CP.alleral }, valid = alleralUiValid, kind = "alleral" },
+		{ paths = { HUB .. "/core_base.luau", CP.base }, valid = coreBaseValid, kind = "core" },
 	}
 	for _, entry in ipairs(hubPaths) do
 		for _, path in ipairs(entry.paths) do
@@ -2035,33 +2034,33 @@ local function loadCore()
 	pcall(purgeLegacyHubUiFiles)
 
 	local baseArgs = {
-		{ CORE_BASE_PATH, CORE_BASE_LEGACY_PATH, "core/alleral_core.luau", "alleral_core.luau" },
-		{ ".alleral/cache/" .. CORE_BASE_PATH, ".alleral/cache/" .. CORE_BASE_LEGACY_PATH },
-		CORE_BASE_PATH,
+		{ CP.base, CP.legacy, "core/alleral_core.luau", "alleral_core.luau" },
+		{ ".alleral/cache/" .. CP.base, ".alleral/cache/" .. CP.legacy },
+		CP.base,
 		coreValid,
 		coreRejectReason,
 		CORE_BASE_MIN_BYTES,
 	}
 	local uiArgs = {
-		{ CORE_UI_PATH, HUB .. "/core_ui.luau" },
-		{ ".alleral/cache/" .. CORE_UI_PATH },
-		CORE_UI_PATH,
+		{ CP.ui, HUB .. "/core_ui.luau" },
+		{ ".alleral/cache/" .. CP.ui },
+		CP.ui,
 		coreUiValid,
 		coreUiRejectReason,
 		CORE_UI_MIN_BYTES,
 	}
 	local hubArgs = {
-		{ CORE_HUB_UI_PATH, HUB .. "/core_hub_ui.luau" },
-		{ ".alleral/cache/" .. CORE_HUB_UI_PATH },
-		CORE_HUB_UI_PATH,
+		{ CP.hub, HUB .. "/core_hub_ui.luau" },
+		{ ".alleral/cache/" .. CP.hub },
+		CP.hub,
 		coreHubUiValid,
 		coreHubUiRejectReason,
 		CORE_HUB_UI_MIN_BYTES,
 	}
 	local alleralUiArgs = {
-		{ CORE_ALLERAL_UI_PATH, HUB .. "/alleral_ui.luau" },
-		{ ".alleral/cache/" .. CORE_ALLERAL_UI_PATH },
-		CORE_ALLERAL_UI_PATH,
+		{ CP.alleral, HUB .. "/alleral_ui.luau" },
+		{ ".alleral/cache/" .. CP.alleral },
+		CP.alleral,
 		alleralUiValid,
 		alleralUiRejectReason,
 		CORE_ALLERAL_UI_MIN_BYTES,
@@ -2108,8 +2107,8 @@ local function loadCore()
 		if type(ENV.Alleral_Core.loadUi) ~= "function" then
 			return false, "Monolithic core missing loadUi"
 		end
-		cacheRemote(CORE_BASE_PATH, baseSrc)
-		cacheRemote(".alleral/cache/" .. CORE_BASE_PATH, baseSrc)
+		cacheRemote(CP.base, baseSrc)
+		cacheRemote(".alleral/cache/" .. CP.base, baseSrc)
 		log("Core v" .. tostring(ENV.Alleral_Core.VERSION) .. " (monolith) from " .. tostring(baseLabel))
 		return true
 	end
@@ -2167,14 +2166,14 @@ local function loadCore()
 		return false, "Core UI layers incomplete"
 	end
 
-	cacheRemote(CORE_BASE_PATH, baseSrc)
-	cacheRemote(".alleral/cache/" .. CORE_BASE_PATH, baseSrc)
-	cacheRemote(CORE_UI_PATH, uiSrc)
-	cacheRemote(".alleral/cache/" .. CORE_UI_PATH, uiSrc)
-	cacheRemote(CORE_ALLERAL_UI_PATH, alleralUiSrc)
-	cacheRemote(".alleral/cache/" .. CORE_ALLERAL_UI_PATH, alleralUiSrc)
-	cacheRemote(CORE_HUB_UI_PATH, hubUiSrc)
-	cacheRemote(".alleral/cache/" .. CORE_HUB_UI_PATH, hubUiSrc)
+	cacheRemote(CP.base, baseSrc)
+	cacheRemote(".alleral/cache/" .. CP.base, baseSrc)
+	cacheRemote(CP.ui, uiSrc)
+	cacheRemote(".alleral/cache/" .. CP.ui, uiSrc)
+	cacheRemote(CP.alleral, alleralUiSrc)
+	cacheRemote(".alleral/cache/" .. CP.alleral, alleralUiSrc)
+	cacheRemote(CP.hub, hubUiSrc)
+	cacheRemote(".alleral/cache/" .. CP.hub, hubUiSrc)
 
 	ENV.Alleral_HTTP = ENV.Alleral_HTTP or {}
 	ENV.Alleral_HTTP.get = httpGet
@@ -2906,12 +2905,12 @@ local function buildManagedFiles()
 	local managed = {
 		{
 			paths = {
-				CORE_BASE_PATH,
-				CORE_BASE_LEGACY_PATH,
+				CP.base,
+				CP.legacy,
 				"core/alleral_core.luau",
 				"alleral_core.luau",
-				".alleral/cache/" .. CORE_BASE_PATH,
-				".alleral/cache/" .. CORE_BASE_LEGACY_PATH,
+				".alleral/cache/" .. CP.base,
+				".alleral/cache/" .. CP.legacy,
 			},
 			expectedKey = "core",
 			extract = "core",
@@ -2919,9 +2918,9 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
-				CORE_UI_PATH,
+				CP.ui,
 				HUB .. "/core_ui.luau",
-				".alleral/cache/" .. CORE_UI_PATH,
+				".alleral/cache/" .. CP.ui,
 			},
 			expectedKey = "core",
 			extract = "core",
@@ -2929,9 +2928,9 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
-				CORE_ALLERAL_UI_PATH,
+				CP.alleral,
 				HUB .. "/alleral_ui.luau",
-				".alleral/cache/" .. CORE_ALLERAL_UI_PATH,
+				".alleral/cache/" .. CP.alleral,
 			},
 			expectedKey = "alleral",
 			extract = "alleral",
@@ -2968,9 +2967,9 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
-				CORE_HUB_UI_PATH,
+				CP.hub,
 				HUB .. "/core_hub_ui.luau",
-				".alleral/cache/" .. CORE_HUB_UI_PATH,
+				".alleral/cache/" .. CP.hub,
 			},
 			expectedKey = "core",
 			extract = "core",
