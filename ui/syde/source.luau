@@ -2570,11 +2570,12 @@ function syde:Init(library)
 					local Slider = window.settings.pages.page.Slider.slideholder.slider:Clone()
 					Options = {Title = Options.Title or "Slider"; Increment = Options.Increment or 1; Range = Options.Range or {0, 100}; StarterValue = Options.StarterValue or 16; CallBack = Options.CallBack; SFlag = Options.SFlag; SettingsConfig = true}
 					Slider.Name = Options.Title
-					Slider.Title.Text = Options.Title
+					do local _sliderTitle = sydeSliderLabel(Slider); if _sliderTitle then _sliderTitle.Text = Options.Title end end
 					Options.Value = Options.StarterValue
 					local dragging = false
 					Slider.Visible = true
 					Slider.Parent = slider.slideholder
+
 					Slider.slide.Interact.MouseButton1Down:Connect(function() dragging = true end)
 					Slider.slide.Interact.MouseButton1Up:Connect(function() dragging = false end)
 					syde:AddConnection(userinput.InputEnded, function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
@@ -2868,7 +2869,7 @@ function syde:Init(library)
 				local Slider = pages.page.Slider.slideholder.slider:Clone()
 				Options = {Title = Options.Title or "Slider"; Increment = Options.Increment or 1; Range = Options.Range or {0, 100}; StarterValue = Options.StarterValue or 16; CallBack = Options.CallBack; Flag = Options.Flag}
 				Slider.Name = Options.Title
-				Slider.Title.Text = Options.Title
+				do local _sliderTitle = sydeSliderLabel(Slider); if _sliderTitle then _sliderTitle.Text = Options.Title end end
 				Options.Value = Options.StarterValue
 				local dragging = false
 				Slider.Visible = true
