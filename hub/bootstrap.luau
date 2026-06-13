@@ -1,6 +1,6 @@
 -- Alleral Bootstrap v1.0.5
 -- Save this loadstring once in your executor — it always fetches the latest loader from GitHub.
--- One-liner: loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=" .. tick(), true))()
+-- One-liner: loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?t=" .. tick(), true))()
 
 local BOOTSTRAP_VERSION = "1.0.5"
 local REPO = "evanbackup1256-ship-it/kick"

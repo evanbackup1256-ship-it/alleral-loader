@@ -68,7 +68,7 @@ local BOOTSTRAP_LOCAL_PATHS = {
 	"alleral_bootstrap.luau",
 }
 local BOOTSTRAP_LOADSTRING =
-	"loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=\" .. tick(), true))()"
+	"loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?t=\" .. tick(), true))()"
 local LEGACY_LOADER_MARKERS = {
 	"[Alleral Loader v",
 	"Alleral loader 3.",
