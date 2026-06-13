@@ -16,8 +16,15 @@ local UI = "ui"
 local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-local SYDE_PATCH_VERSION = 25
+local SYDE_PATCH_VERSION = 26 -- Includes Dropdown/ Slider/ Modal robustness fixes (Selected/title casing + safe button access)
 local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
+local SYDE_PATCHED_OVERRIDE_PATHS = {
+	"syde_patched.luau",
+	"patched_syde.luau",
+	".alleral/syde_patched.luau",
+	"kick/syde_patched.luau",
+	"workspace/syde_patched.luau",
+}
 local CP = {
 	base = HUB .. "/core_base.luau",
 	legacy = HUB .. "/core.luau",
@@ -998,6 +1005,23 @@ end
 
 local function ensureSydeSource()
 	clearStaleSydeRuntime()
+
+	-- 1. Check for user-provided patched override (highest priority for local fixes)
+	for _, overridePath in ipairs(SYDE_PATCHED_OVERRIDE_PATHS) do
+		local src, path = readLocal({ overridePath }, SYDE_SOURCE_MIN_BYTES)
+		if src and sydeSourceValid(src) then
+			local patch = sydePatchFromSource(src)
+			log("Using local patched Syde override: " .. tostring(path) .. " (patch v" .. tostring(patch or "?") .. ")")
+			ENV._AlleralSydeSource = src
+			ENV._AlleralSydeSourcePatch = patch
+			ENV._AlleralSydeSourceLabel = "override:" .. tostring(path)
+			ENV._AlleralSydeSourceReady = true
+			cacheRemote(SYDE_SOURCE_PATH, src)
+			cacheRemote(".alleral/cache/" .. SYDE_SOURCE_PATH, src)
+			return true, "override:" .. tostring(path) .. ", patch v" .. tostring(patch or "?")
+		end
+	end
+
 	local localPaths = {
 		SYDE_SOURCE_PATH,
 		"kick/" .. SYDE_SOURCE_PATH,

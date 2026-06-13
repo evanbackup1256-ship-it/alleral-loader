@@ -2066,6 +2066,7 @@ function syde:Modal(Modal)
 		}
 
 		local ModalInstance = ui.main.modal:Clone()
+		local buttons = ModalInstance:FindFirstChild("Buttons") or ModalInstance:FindFirstChild("buttons") or Instance.new("Frame")
 		ModalInstance.Visible = true
 		ModalInstance.Parent = ui.main
 		ModalInstance.Title.Text = ModalData.Title
@@ -2076,13 +2077,13 @@ function syde:Modal(Modal)
 		ModalInstance.Title.TextTransparency = 1
 		ModalInstance.Content.TextTransparency = 1
 
-		ModalInstance.Buttons.Confirm.BackgroundTransparency = 1
-		ModalInstance.Buttons.Confirm.TextLabel.TextTransparency = 1
-		--	ModalInstance.Buttons.Confirm.UIStroke.Transparency = 1
+		buttons.Confirm.BackgroundTransparency = 1
+					buttons.Confirm.TextLabel.TextTransparency = 1
+					--	buttons.Confirm.UIStroke.Transparency = 1
 
-		ModalInstance.Buttons.Cancel.BackgroundTransparency = 1
-		ModalInstance.Buttons.Cancel.TextLabel.TextTransparency = 1
-		ModalInstance.Buttons.Cancel.UIStroke.Transparency = 1
+					buttons.Cancel.BackgroundTransparency = 1
+					buttons.Cancel.TextLabel.TextTransparency = 1
+					buttons.Cancel.UIStroke.Transparency = 1
 
 		local function openModal()
 			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)}):Play()
@@ -2095,13 +2096,13 @@ function syde:Modal(Modal)
 			tweenservice:Create(ModalInstance.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 			tweenservice:Create(ModalInstance.Content, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
-			tweenservice:Create(ModalInstance.Buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			--	tweenservice:Create(ModalInstance.Buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+			tweenservice:Create(buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
+						tweenservice:Create(buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+						--	tweenservice:Create(buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
 
-			tweenservice:Create(ModalInstance.Buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+						tweenservice:Create(buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+						tweenservice:Create(buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+						tweenservice:Create(buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
 
 		end
 		openModal()
@@ -2109,21 +2110,36 @@ function syde:Modal(Modal)
 		local function closeModal()
 			activeModals -= 1
 			print(activeModals)
-			ModalInstance.Buttons.Cancel.Interactable = false
-			ModalInstance.Buttons.Confirm.Interactable = false
+			local buttonsFrame = ModalInstance:FindFirstChild("Buttons") or ModalInstance:FindFirstChild("buttons")
+			local cancelBtn = buttonsFrame and (buttonsFrame:FindFirstChild("Cancel") or buttonsFrame:FindFirstChild("cancel"))
+			local confirmBtn = buttonsFrame and (buttonsFrame:FindFirstChild("Confirm") or buttonsFrame:FindFirstChild("confirm"))
+			if cancelBtn then cancelBtn.Interactable = false end
+			if confirmBtn then confirmBtn.Interactable = false end
 			tweenservice:Create(ModalInstance, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0, 147)}):Play()
 			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
 			tweenservice:Create(ModalInstance.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 
-			tweenservice:Create(ModalInstance.Buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			--	tweenservice:Create(ModalInstance.Buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-
-			tweenservice:Create(ModalInstance.Buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+			if buttonsFrame then
+				local cBtn = buttonsFrame:FindFirstChild("Confirm") or buttonsFrame:FindFirstChild("confirm")
+				local caBtn = buttonsFrame:FindFirstChild("Cancel") or buttonsFrame:FindFirstChild("cancel")
+				if cBtn then
+					tweenservice:Create(cBtn, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+					if cBtn:FindFirstChild("TextLabel") then
+						tweenservice:Create(cBtn.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+					end
+				end
+				if caBtn then
+					tweenservice:Create(caBtn, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+					if caBtn:FindFirstChild("TextLabel") then
+						tweenservice:Create(caBtn.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+					end
+					if caBtn:FindFirstChild("UIStroke") then
+						tweenservice:Create(caBtn.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+					end
+				end
+			end
 			task.wait(0.45)
 			ModalInstance:Destroy()
 		end
@@ -2137,7 +2153,7 @@ function syde:Modal(Modal)
 			}):Play()
 		end
 
-		ModalInstance.Buttons.Confirm.MouseButton1Click:Connect(function()
+		buttons.Confirm.MouseButton1Click:Connect(function()
 			if typeof(ModalData.ConfirmCallBack) == "function" then
 				ModalData.ConfirmCallBack()
 			end
@@ -2153,7 +2169,7 @@ function syde:Modal(Modal)
 			end
 		end)
 
-		ModalInstance.Buttons.Cancel.MouseButton1Click:Connect(function()
+		buttons.Cancel.MouseButton1Click:Connect(function()
 			closeModal()
 			tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
 				BackgroundTransparency = 1
@@ -5291,7 +5307,7 @@ function syde:Init(library)
 
 						if OptionText == data.StarterOption and not starterSet then
 							starterSet = true
-							dropdown.dropholder.drop.Selected.Text = OptionText
+							dropdown.dropholder.drop.selected.Text = OptionText
 							SelectedOptions = {[OptionText] = true}
 							SelectedOrder = {OptionText}
 
@@ -5384,7 +5400,7 @@ function syde:Init(library)
 					}
 
 					Slider.Name = Options.Title
-					Slider.Title.Text = Options.Title
+					Slider.title.Text = Options.Title
 					Options.Value = Options.StarterValue
 
 					local dragging = false
@@ -8689,16 +8705,16 @@ function syde:Init(library)
 
 					if OptionText == data.StarterOption and not starterSet then
 						starterSet = true
-						dropdown.dropholder.drop.Selected.Text = OptionText
-						SelectedOptions = {[OptionText] = true}
-						SelectedOrder = {OptionText}
+												dropdown.dropholder.drop.selected.Text = OptionText
+												SelectedOptions = {[OptionText] = true}
+												SelectedOrder = {[OptionText]}
 
-						tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-						tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
-					end
+												tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
+												tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+											end
 
-					option.Interact.MouseButton1Click:Connect(function()
-						if data.Multi then
+											option.Interact.MouseButton1Click:Connect(function()
+												if data.Multi then
 							if SelectedOptions[OptionText] then
 								RemoveFromSelected(OptionText)
 								tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
