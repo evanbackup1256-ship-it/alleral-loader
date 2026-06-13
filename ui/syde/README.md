@@ -25,4 +25,4 @@ The build keeps the **original Syde library body** and applies only Alleral bug 
 - Page template clone aliases (`Button`/`button`, etc.)
 - Alleral API: `InitTab("Name")`, `Init({ Keybind })`, `Toggle()` / `GetState()` / `SetState()`, `initelement:Select()`
 
-Patch version: `ALLERAL_SYDE_PATCH` in `compat.luau` (currently **v19**).
+Patch version: `ALLERAL_SYDE_PATCH` in `compat.luau` (currently **v24**).
