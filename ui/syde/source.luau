@@ -2617,19 +2617,19 @@ function syde:Init(library)
 					if not enterPressed then return end
 					if data.CallBack then pcall(function() data.CallBack(textBox.Text) end) end
 					if data.ClearOnLost then textBox.Text = "" end
-						end
-					end
+				end)
+			end
 
-					function telement:Paragraph(Paragraph)
-						local Para = window.settings.pages.page.Paragraph:Clone()
-						Para.Visible = true
-						Para.Parent = Page
-						Para.Frame.title.Text = Paragraph.Title
-						Para.Content.Text = Paragraph.Content
-					end
+			function telement:Paragraph(Paragraph)
+				local Para = window.settings.pages.page.Paragraph:Clone()
+				Para.Visible = true
+				Para.Parent = Page
+				Para.Frame.title.Text = Paragraph.Title
+				Para.Content.Text = Paragraph.Content
+			end
 
-					return telement
-				end
+			return telement
+		end
 
 		local a = settings:inittab({Title = 'Theme'})
 		local b = settings:inittab({Title = 'Privacy'})
