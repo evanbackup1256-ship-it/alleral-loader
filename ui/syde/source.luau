@@ -2292,8 +2292,16 @@ function syde:Init(library)
 				toggleConfiguration.Size = UDim2.new(0, 75,0, 53)
 				if not data.Config then toggle.configure:Destroy() end
 				local function UpdateToggleUI(state)
-					toggle:SetAttribute("Class", "syde-toggle" .. (state and " on" or ""))
-					syde:ReapplyCSS()
+					local targetColor = state and syde.theme.HitBox or Color3.fromRGB(28, 28, 28)
+					local checkTransparency = state and 0 or 1
+					local gradientTransparency = state and 0 or 1
+					local glowTransparency = state and 0.7 or 1
+					local textTransparency = state and 0 or 0.5
+					tweenservice:Create(toggle.tog, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = targetColor}):Play()
+					tweenservice:Create(toggle.tog.check, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = checkTransparency}):Play()
+					tweenservice:Create(toggle.tog.gradfr, TweenInfo.new(0.57, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = gradientTransparency}):Play()
+					tweenservice:Create(toggle.tog.glow, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = glowTransparency, ImageColor3 = targetColor}):Play()
+					tweenservice:Create(toggle.title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = textTransparency}):Play()
 				end
 				UpdateToggleUI(data.V)
 				toggle.interact.MouseButton1Click:Connect(function()
@@ -2829,8 +2837,16 @@ function syde:Init(library)
 			toggle:SetAttribute("Searchable", true)
 			if not data.Config then toggle.configure:Destroy() end
 			local function UpdateToggleUI(state)
-				toggle:SetAttribute("Class", "syde-toggle" .. (state and " on" or ""))
-				syde:ReapplyCSS()
+				local targetColor = state and syde.theme.HitBox or Color3.fromRGB(28, 28, 28)
+				local checkTransparency = state and 0 or 1
+				local gradientTransparency = state and 0 or 1
+				local glowTransparency = state and 0.7 or 1
+				local textTransparency = state and 0 or 0.5
+				tweenservice:Create(toggle.tog, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = targetColor}):Play()
+				tweenservice:Create(toggle.tog.check, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = checkTransparency}):Play()
+				tweenservice:Create(toggle.tog.gradfr, TweenInfo.new(0.57, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = gradientTransparency}):Play()
+				tweenservice:Create(toggle.tog.glow, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = glowTransparency, ImageColor3 = targetColor}):Play()
+				tweenservice:Create(toggle.title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = textTransparency}):Play()
 			end
 			UpdateToggleUI(data.V)
 			toggle.interact.MouseButton1Click:Connect(function()
@@ -3408,7 +3424,7 @@ function syde:Init(library)
 		if state == true and uiclosed then ToggleUI()
 		elseif state == false and not uiclosed then ToggleUI() end
 	end
-	if syde.DefaultCSS then task.defer(function() syde:LoadCSS(syde.DefaultCSS) end) end
+	if syde.DefaultCSS and syde._cssEnabled then task.defer(function() syde:LoadCSS(syde.DefaultCSS) end) end
 	return tbdata
 end
 
