@@ -1884,8 +1884,8 @@ window.top.functions.close.interact.MouseButton1Click:Connect(function()
 		Content = 'Are You Sure You Want To Close This UI?',
 		ConfimCallBack = function()
 			mh = false
-			rs:Disconnect()
-			ss:Disconnect()
+			pcall(function() if rs and typeof(rs.Disconnect) == 'function' then rs:Disconnect() end end)
+			pcall(function() if ss and typeof(ss.Disconnect) == 'function' then ss:Disconnect() end end)
 			task.wait(1)
 			Library:Destroy()
 		end,
@@ -2617,10 +2617,19 @@ function syde:Init(library)
 					if not enterPressed then return end
 					if data.CallBack then pcall(function() data.CallBack(textBox.Text) end) end
 					if data.ClearOnLost then textBox.Text = "" end
-				end)
-			end
-			return telement
-		end
+						end
+					end
+
+					function telement:Paragraph(Paragraph)
+						local Para = window.settings.pages.page.Paragraph:Clone()
+						Para.Visible = true
+						Para.Parent = Page
+						Para.Frame.title.Text = Paragraph.Title
+						Para.Content.Text = Paragraph.Content
+					end
+
+					return telement
+				end
 
 		local a = settings:inittab({Title = 'Theme'})
 		local b = settings:inittab({Title = 'Privacy'})
