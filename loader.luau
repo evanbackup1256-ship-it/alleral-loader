@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.2.24"
+local LOADER_VERSION = "8.2.25"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -36,7 +36,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.24",
+	loader = "8.2.25",
 	core = "2.9.4",
 	ui = "Syde",
 	windui = "4.0.0-syde",
@@ -3198,7 +3198,7 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.2.24"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.2.25"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
@@ -3830,10 +3830,11 @@ local function main()
 					ENV._Alleral_LastRelaunch = os.time()
 					if type(ENV._Alleral_RelaunchViaBootstrap) == "function" then
 						ENV._Alleral_RelaunchViaBootstrap("min-loader-sync")
+								end
+							end)
+						return
 					end
-				end)
-			end
-	if expectedVersions.commit and expectedVersions.commit ~= "" and expectedVersions.commit ~= RELEASE_FALLBACK.commit then
+			if expectedVersions.commit and expectedVersions.commit ~= "" and expectedVersions.commit ~= RELEASE_FALLBACK.commit then
 		log(
 			"Embedded commit "
 				.. tostring(RELEASE_FALLBACK.commit)
