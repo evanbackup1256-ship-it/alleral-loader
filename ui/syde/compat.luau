@@ -1,10 +1,27 @@
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 24
+local ALLERAL_SYDE_PATCH = 27
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
+
+local function sydeGetCurrentCamera()
+	local current = workspace.CurrentCamera
+	while not current do
+		workspace:GetPropertyChangedSignal("CurrentCamera"):Wait()
+		current = workspace.CurrentCamera
+	end
+	return current
+end
+
+local function sydeSetClipboard(value)
+	if type(setclipboard) == "function" then
+		local ok = pcall(setclipboard, tostring(value or ""))
+		return ok
+	end
+	return false
+end
 
 local SYDE_CANONICAL_NAMES = {
 	Main = "main",

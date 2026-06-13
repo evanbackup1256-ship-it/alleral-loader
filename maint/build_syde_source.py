@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -347,6 +348,85 @@ def patch_normalized_labels(text: str) -> str:
     return text
 
 
+def patch_runtime_safety(text: str) -> str:
+    text = text.replace("setclipboard(", "sydeSetClipboard(")
+    text = text.replace(
+        "local screenSize =      workspace.CurrentCamera.ViewportSize",
+        "local screenSize =      sydeGetCurrentCamera().ViewportSize",
+    )
+    text = text.replace(
+        "local camera =          workspace.CurrentCamera",
+        "local camera =          sydeGetCurrentCamera()",
+    )
+    text = text.replace(
+        "local camera = workspace.CurrentCamera",
+        "local camera = sydeGetCurrentCamera()",
+    )
+    text = text.replace("RunService.RenderStepped:wait()", "RunService.RenderStepped:Wait()")
+    text = text.replace(
+        "if dragging and input.UserInputType == Enum.UserInputType.MouseMovement  or input.UserInputType == Enum.UserInputType.Touch  then",
+        "if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then",
+    )
+    text = text.replace(
+        "table.remove(notifications, table.find(notifications, Notification))",
+        "local notificationIndex = table.find(notifications, Notification)\n\t\t\t\tif notificationIndex then table.remove(notifications, notificationIndex) end",
+    )
+    text = text.replace(
+        "repeat task.wait() until graph.AbsoluteSize.X > 0",
+        "local graphDeadline = os.clock() + 5\n\t\trepeat task.wait() until graph.AbsoluteSize.X > 0 or not graph.Parent or os.clock() >= graphDeadline\n\t\tif not graph.Parent or graph.AbsoluteSize.X <= 0 then\n\t\t\twarn(\"[Syde] Latency graph did not become ready\")\n\t\telse",
+    )
+    text = text.replace(
+        "\t\tlocal bh = window.pages.home.general.Quick.QuickSettings.QuickButtons.holder",
+        "\t\tend\n\n\t\tlocal bh = window.pages.home.general.Quick.QuickSettings.QuickButtons.holder",
+        1,
+    )
+    text = text.replace(
+        "\t\t\twhile true do\n\n\t\t\t\tlocal ping = getPing()",
+        "\t\t\twhile Library and Library.Parent and graph.Parent do\n\n\t\t\t\tlocal ping = getPing()",
+        1,
+    )
+    text = text.replace(
+        "\t\t\tif not syde.ConfigEnabled then return end\n\n\t\t\tlocal data = {",
+        "\t\t\tif not syde.ConfigEnabled or type(writefile) ~= \"function\" then return end\n\n\t\t\tlocal data = {",
+        1,
+    )
+    text = text.replace(
+        "\t\t\tif not syde.ConfigEnabled then return nil end\n\t\t\tif not isfile(FILE) then return nil end",
+        "\t\t\tif not syde.ConfigEnabled or type(isfile) ~= \"function\" or type(readfile) ~= \"function\" then return nil end\n\t\t\tif not isfile(FILE) then return nil end",
+        1,
+    )
+    text = text.replace(
+        "TeleportService:Teleport(placeId)",
+        "TeleportService:Teleport(lastGame.PlaceId)",
+        1,
+    )
+    text = text.replace(
+        "\t\t\t\t\t\tOptions:Set(newValue)\n\t\t\t\t\t\tSaveConfig()",
+        "\t\t\t\t\t\tOptions.StarterValue = newValue\n\t\t\t\t\t\tSaveConfig()",
+        1,
+    )
+    text = text.replace(
+        'string.format("<font size=\'14\'>%d</font><font color=\'#434343\'>/%d</font>", tostring(NewVal), Options.Range[2])',
+        'string.format("<font size=\'14\'>%d</font><font color=\'#434343\'>/%d</font>", NewVal, Options.Range[2])',
+    )
+    text = text.replace(
+        "if isfolder and not isfolder(syde.ConfigFolder) then\n\t\tmakefolder(syde.ConfigFolder)\n\tend",
+        "if type(isfolder) ~= \"function\" or type(makefolder) ~= \"function\" or type(writefile) ~= \"function\" then return end\n\tif not isfolder(syde.ConfigFolder) then\n\t\tmakefolder(syde.ConfigFolder)\n\tend",
+        1,
+    )
+    text = text.replace(
+        "\t\t\t\tif success then\n\t\t\t\t\tsyde:Toast({\n\t\t\t\t\t\tContent = 'Loaded Save File';",
+        "\t\t\t\tif success and loaded then\n\t\t\t\t\tsyde:Toast({\n\t\t\t\t\t\tContent = 'Loaded Save File';",
+        1,
+    )
+    text = text.replace(
+        "\t\t\t\telseif not success then\n\t\t\t\t\tsydeWarn(\"[SYDE] Configurations Error \" .. tostring(result))",
+        "\t\t\t\telseif not success then\n\t\t\t\t\tsydeWarn(\"[SYDE] Configurations Error \" .. tostring(result))\n\t\t\t\telse\n\t\t\t\t\tsydeWarn(\"[SYDE] No valid save file was loaded\")",
+        1,
+    )
+    return text
+
+
 def main() -> None:
     upstream = read(UPSTREAM)
     compat = read(COMPAT)
@@ -471,6 +551,16 @@ return syde
     body = patch_dropdown_template(body)
     body = patch_dropdown_animations(body)
     body = patch_ui_main_access(body)
+    body = patch_runtime_safety(body)
+    body = "\n".join(line.rstrip() for line in body.splitlines()) + "\n"
+
+    if "--check" in sys.argv:
+        current = OUT.read_text(encoding="utf-8") if OUT.exists() else ""
+        if current != body:
+            raise SystemExit(f"{OUT} is stale; run python maint/build_syde_source.py")
+        print(f"OK: {OUT} is up to date")
+        return
+
     OUT.write_text(body, encoding="utf-8")
     print(f"Wrote {OUT} ({len(body)} bytes, {body.count(chr(10)) + 1} lines)")
 
