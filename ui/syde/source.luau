@@ -1206,9 +1206,9 @@ do
 		Config.Status = Config.Status or false
 		Config.Accent = Config.Accent or syde.theme.Accent
 		Config.HitBox = Config.HitBox or syde.theme.HitBox
-		LOADER.loader.profile.Title.TextTransparency = 1
+		do local _profileTitle = sydeLoaderProfileLabel(LOADER); if _profileTitle then _profileTitle.TextTransparency = 1 end end
 		LOADER.loader.profile.ImageTransparency = 1
-		LOADER.loader.profile.Title.Text = Config.Name
+		do local _profileTitle = sydeLoaderProfileLabel(LOADER); if _profileTitle then _profileTitle.Text = Config.Name end end
 		local LoaderConfig = {
 			Name = Config.Name;
 			Logo = 'rbxassetid://'..Config.Logo;
@@ -1219,7 +1219,7 @@ do
 			Socials = {}
 		}
 		if LoaderConfig.Status == false then
-			LOADER.loader.profile.Title.Text = LoaderConfig.Name
+			do local _profileTitle = sydeLoaderProfileLabel(LOADER); if _profileTitle then _profileTitle.Text = LoaderConfig.Name end end
 		end
 		local statusColors = {
 			Stable = { Color = Color3.fromRGB(25, 229, 22), Text = '<font color="#24bf48">Stable</font>' },
@@ -1298,7 +1298,7 @@ do
 			clone.MouseLeave:Connect(function() tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0}):Play() end)
 		end
 		tweenservice:Create(logo, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
-		tweenservice:Create(logo.Title, TweenInfo.new(2, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+		do local _logoTitle = sydeTitleLabel(logo); if _logoTitle then tweenservice:Create(_logoTitle, TweenInfo.new(2, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end end
 		task.wait(1)
 		local function TweenWorkLabel(Finish, icon, Text)
 			LOADER.loader.work.Position = UDim2.new(0.5, 0,1, -40)
@@ -1436,7 +1436,9 @@ local glow = false
 local uitoggle = Enum.KeyCode.RightShift
 
 function applyLayout(isMobile)
-	tweenservice:Create(Library.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {Size = isMobile and UDim2.new(0, 543,0, 321) or UDim2.new(0, 715, 0, 575)}):Play()
+	if window then
+		tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Quint), {Size = isMobile and UDim2.new(0, 543,0, 321) or UDim2.new(0, 715, 0, 575)}):Play()
+	end
 	local shadow = window:FindFirstChild("Shadow")
 	if shadow then shadow.Visible = not isMobile end
 end
