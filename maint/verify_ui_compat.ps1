@@ -37,7 +37,9 @@ if (Test-Path $sydeSource) {
 }
 
 $sydeContracts = @(
-    @{ Pattern = 'ALLERAL_SYDE_PATCH = 28'; Message = 'Syde patch version is 28' },
+    @{ Pattern = 'ALLERAL_SYDE_PATCH = 29'; Message = 'Syde patch version is 29' },
+    @{ Pattern = 'local Minihome = sydeFindChild\(ui\._root'; Message = 'Minihome lookup tolerates missing executor assets' },
+    @{ Pattern = 'local paraTitle, paraContent = sydeParagraphParts\(Para\)'; Message = 'paragraph templates use compatible child lookup' },
     @{ Pattern = 'function syde:DisconnectAll\(\)'; Message = 'Syde disconnects tracked runtime connections' },
     @{ Pattern = 'function data:Refresh\(options, value\)'; Message = 'dropdown handles support Refresh' },
     @{ Pattern = 'Options = sydeNormalizeSliderOptions\(Options\)'; Message = 'slider inputs are normalized' },

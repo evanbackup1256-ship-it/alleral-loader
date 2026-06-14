@@ -513,6 +513,86 @@ def patch_runtime_safety(text: str) -> str:
     return text
 
 
+def patch_minihome_contracts(text: str) -> str:
+    replacement = '''\tlocal Minihome = sydeFindChild(ui._root, "minihome", "Minihome")
+
+\tlocal MinihomeData = {
+\t\tQuickActions = library.QuickActions or false;
+\t}
+
+\tlocal miniInfo = sydeFindDescendant(Minihome, "info", "Info")
+\tlocal miniFps = miniInfo and sydeFindDescendant(miniInfo, "fps", "FPS")
+\tlocal miniTime = miniInfo and sydeFindDescendant(miniInfo, "time", "Time")
+\tlocal lastTime = tick()
+\tlocal frames = 0
+
+\tif mh and (miniFps or miniTime) then
+\t\trs = syde:AddConnection(RunService.RenderStepped, function()
+\t\t\tframes += 1
+\t\t\tlocal now = tick()
+\t\t\tif miniFps and now - lastTime >= 1 then
+\t\t\t\tlocal fps = math.floor(frames / (now - lastTime))
+\t\t\t\tlastTime = now
+\t\t\t\tframes = 0
+\t\t\t\tminiFps.Text = fps .. " FPS"
+\t\t\tend
+\t\t\tif miniTime then
+\t\t\t\tlocal hour = tonumber(os.date("%I")) or 0
+\t\t\t\tminiTime.Text = hour .. os.date(":%M")
+\t\t\tend
+\t\tend)
+\tend
+
+\tif Minihome then
+\t\tlocal miniQuick = sydeFindDescendant(Minihome, "quick", "Quick")
+\t\tif MinihomeData.QuickActions == false then
+\t\t\tif miniQuick then miniQuick.Visible = false end
+\t\t\tMinihome:TweenSize(UDim2.new(0, 150, 0, 40), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.8, true)
+\t\tend
+
+\t\tlocal miniOpen = sydeFindDescendant(Minihome, "open", "Open")
+\t\tlocal quickFunc = sydeFindDescendant(miniOpen, "quickfunc", "QuickFunc")
+\t\tlocal interact = sydeFindDescendant(quickFunc, "interact", "Interact")
+\t\tif not uiclosed and interact and interact:IsA("GuiButton") then
+\t\t\tsyde:AddConnection(interact.MouseButton1Click, ToggleUI)
+\t\tend
+\tend
+'''
+    return replace_between(text, "\tlocal Minihome = ui.minihome", "\n\t--ui elements", replacement)
+
+
+def patch_paragraph_contracts(text: str) -> str:
+    text = text.replace(
+        "Para.Frame.title.Text = ParaData.Title",
+        "local paraTitle, paraContent = sydeParagraphParts(Para)\n"
+        "\t\t\t\tif paraTitle then paraTitle.Text = tostring(ParaData.Title or \"\") end\n"
+        "\t\t\t\tif not paraContent then\n"
+        "\t\t\t\t\tPara:Destroy()\n"
+        "\t\t\t\t\treturn nil\n"
+        "\t\t\t\tend",
+        1,
+    )
+    text = text.replace(
+        "Para.Frame.title.Text = ParaData.Title",
+        "local paraTitle, paraContent = sydeParagraphParts(Para)\n"
+        "\t\t\tif paraTitle then paraTitle.Text = tostring(ParaData.Title or \"\") end\n"
+        "\t\t\tif not paraContent then\n"
+        "\t\t\t\tPara:Destroy()\n"
+        "\t\t\t\treturn nil\n"
+        "\t\t\tend",
+        1,
+    )
+    text = text.replace("Para.Content", "paraContent")
+    text = text.replace(
+        "Para.Frame.title.Text = title\n\t\t\t\t\tparaContent.Text = text",
+        "if paraTitle and title ~= nil then paraTitle.Text = tostring(title) end\n"
+        "\t\t\t\t\tparaContent.Text = tostring(text or \"\")",
+        1,
+    )
+    text = text.replace("paraContent.Text = ParaData.Content", "paraContent.Text = tostring(ParaData.Content or \"\")")
+    return text
+
+
 def patch_control_contracts(text: str) -> str:
     text = text.replace("ColorPicker.Linkable = ColorPicker.Linkable or true", "ColorPicker.Linkable = ColorPicker.Linkable ~= false")
     text = text.replace("local success, errorMsg = pcall(c)", "local success, errorMsg = pcall(data.CallBack)")
@@ -948,7 +1028,9 @@ return syde
     body = patch_dropdown_template(body)
     body = patch_ui_main_access(body)
     body = patch_runtime_safety(body)
+    body = patch_minihome_contracts(body)
     body = patch_control_contracts(body)
+    body = patch_paragraph_contracts(body)
     body = "\n".join(line.rstrip() for line in body.splitlines()) + "\n"
     validate_output(body)
 

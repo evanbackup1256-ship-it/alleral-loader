@@ -101,7 +101,7 @@ local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 28
+local ALLERAL_SYDE_PATCH = 29
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -225,6 +225,23 @@ local function sydeFindChild(parent, ...)
 	return nil
 end
 
+local function sydeFindDescendant(parent, ...)
+	local direct = sydeFindChild(parent, ...)
+	if direct then
+		return direct
+	end
+	if not parent then
+		return nil
+	end
+	for i = 1, select("#", ...) do
+		local child = parent:FindFirstChild(select(i, ...), true)
+		if child then
+			return child
+		end
+	end
+	return nil
+end
+
 local function sydeButtonLabel(button)
 	if not button then
 		return nil
@@ -248,6 +265,30 @@ end
 
 local function sydeTitleLabel(instance)
 	return sydeOptionLabel(instance)
+end
+
+local function sydeParagraphParts(paragraph)
+	local frame = sydeFindChild(paragraph, "Frame", "frame")
+	local title = sydeTitleLabel(paragraph) or (frame and sydeTitleLabel(frame))
+	local content = sydeFindDescendant(paragraph, "Content", "content", "Description", "description", "desc")
+	local function isTextObject(instance)
+		return instance and (instance:IsA("TextLabel") or instance:IsA("TextBox") or instance:IsA("TextButton"))
+	end
+	if not isTextObject(title) or not isTextObject(content) then
+		for _, descendant in ipairs(paragraph:GetDescendants()) do
+			if isTextObject(descendant) then
+				local name = string.lower(descendant.Name)
+				if not isTextObject(title) and (name == "title" or name == "textlabel") then
+					title = descendant
+				elseif not isTextObject(content) and (name == "content" or name == "description" or name == "desc") then
+					content = descendant
+				end
+			end
+		end
+	end
+	if not isTextObject(title) then title = nil end
+	if not isTextObject(content) then content = nil end
+	return title, content
 end
 
 local function sydeOptionText(option)
@@ -288,7 +329,7 @@ local function sydeBindUi(root)
 			if key == "main" or key == "Main" then
 				return main
 			end
-			return root[key]
+			return sydeFindChild(root, tostring(key))
 		end,
 	})
 end
@@ -3097,47 +3138,48 @@ function syde:Init(library)
 	end
 
 
-	local Minihome = ui.minihome
+	local Minihome = sydeFindChild(ui._root, "minihome", "Minihome")
 
 	local MinihomeData = {
 		QuickActions = library.QuickActions or false;
 	}
 
-	-- FPS tracking
+	local miniInfo = sydeFindDescendant(Minihome, "info", "Info")
+	local miniFps = miniInfo and sydeFindDescendant(miniInfo, "fps", "FPS")
+	local miniTime = miniInfo and sydeFindDescendant(miniInfo, "time", "Time")
 	local lastTime = tick()
 	local frames = 0
 
-	if mh then
-		rs = RunService.RenderStepped:Connect(function()
-			-- FPS
+	if mh and (miniFps or miniTime) then
+		rs = syde:AddConnection(RunService.RenderStepped, function()
 			frames += 1
 			local now = tick()
-
-			if now - lastTime >= 1 then
+			if miniFps and now - lastTime >= 1 then
 				local fps = math.floor(frames / (now - lastTime))
 				lastTime = now
 				frames = 0
-
-				Minihome.info.fps.Text = fps .. " FPS"
+				miniFps.Text = fps .. " FPS"
 			end
-
-			-- Time → 8:45
-			local hour = tonumber(os.date("%I"))
-			Minihome.info.time.Text = hour .. os.date(":%M")
+			if miniTime then
+				local hour = tonumber(os.date("%I")) or 0
+				miniTime.Text = hour .. os.date(":%M")
+			end
 		end)
-
-
-		if MinihomeData.QuickActions == false then
-			ui.minihome.quick.Visible = false
-			ui.minihome:TweenSize(UDim2.new(0, 150, 0, 40), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.8, true)
-		end
 	end
 
+	if Minihome then
+		local miniQuick = sydeFindDescendant(Minihome, "quick", "Quick")
+		if MinihomeData.QuickActions == false then
+			if miniQuick then miniQuick.Visible = false end
+			Minihome:TweenSize(UDim2.new(0, 150, 0, 40), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.8, true)
+		end
 
-	if not uiclosed then
-		ui.minihome.open.quickfunc.interact.MouseButton1Click:Connect(function()
-			ToggleUI()
-		end)
+		local miniOpen = sydeFindDescendant(Minihome, "open", "Open")
+		local quickFunc = sydeFindDescendant(miniOpen, "quickfunc", "QuickFunc")
+		local interact = sydeFindDescendant(quickFunc, "interact", "Interact")
+		if not uiclosed and interact and interact:IsA("GuiButton") then
+			syde:AddConnection(interact.MouseButton1Click, ToggleUI)
+		end
 	end
 
 	--ui elements
@@ -6266,24 +6308,29 @@ function syde:Init(library)
 				if not Para then return nil end
 				Para.Visible = true
 				Para.Parent = Page
-				Para.Frame.title.Text = ParaData.Title
-				Para.Content.Text = ParaData.Content
+				local paraTitle, paraContent = sydeParagraphParts(Para)
+				if paraTitle then paraTitle.Text = tostring(ParaData.Title or "") end
+				if not paraContent then
+					Para:Destroy()
+					return nil
+				end
+				paraContent.Text = tostring(ParaData.Content or "")
 
-				Para.Content.Size = UDim2.new(1, -20, 0, Para.Content.TextBounds.Y)
-				--	Para.Size = UDim2.new(1, -35, 0, Para.Content.Size.Y.Offset + 200)
+				paraContent.Size = UDim2.new(1, -20, 0, paraContent.TextBounds.Y)
+				--	Para.Size = UDim2.new(1, -35, 0, paraContent.Size.Y.Offset + 200)
 
 				local function updateSize()
 					local textSize = textservice:GetTextSize(
-						Para.Content.Text,
-						Para.Content.TextSize,
-						Para.Content.Font,
-						Vector2.new(Para.Content.AbsoluteSize.X, math.huge) -- Allows vertical expansion
+						paraContent.Text,
+						paraContent.TextSize,
+						paraContent.Font,
+						Vector2.new(paraContent.AbsoluteSize.X, math.huge) -- Allows vertical expansion
 					)
 
 					local newDescSize = UDim2.new(1, -20, 0, textSize.Y)
 					local newButtonSize = UDim2.new(Para.Size.X.Scale, Para.Size.X.Offset, 0, textSize.Y + 120) -- Adding extra padding
 
-					local descTween = tweenservice:Create(Para.Content, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newDescSize })
+					local descTween = tweenservice:Create(paraContent, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newDescSize })
 					descTween:Play()
 
 					local buttonTween = tweenservice:Create(Para, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newButtonSize })
@@ -6292,13 +6339,13 @@ function syde:Init(library)
 
 				updateSize()
 
-				Para.Content:GetPropertyChangedSignal("TextBounds"):Connect(updateSize)
+				paraContent:GetPropertyChangedSignal("TextBounds"):Connect(updateSize)
 
 				local ParagraphSettings = {}
 
 				function ParagraphSettings:Set(text, title)
-					Para.Frame.title.Text = title
-					Para.Content.Text = text
+					if paraTitle and title ~= nil then paraTitle.Text = tostring(title) end
+					paraContent.Text = tostring(text or "")
 				end
 
 				ParagraphSettings.Instance = Para
@@ -9002,25 +9049,30 @@ function syde:Init(library)
 			if not Para then return nil end
 			Para.Visible = true
 			Para.Parent = Page
-			Para.Frame.title.Text = ParaData.Title
-			Para.Content.Text = ParaData.Content
+			local paraTitle, paraContent = sydeParagraphParts(Para)
+			if paraTitle then paraTitle.Text = tostring(ParaData.Title or "") end
+			if not paraContent then
+				Para:Destroy()
+				return nil
+			end
+			paraContent.Text = tostring(ParaData.Content or "")
 			Para:SetAttribute("Searchable", true)
 
-			Para.Content.Size = UDim2.new(1, -20, 0, Para.Content.TextBounds.Y)
-			--	Para.Size = UDim2.new(1, -35, 0, Para.Content.Size.Y.Offset + 200)
+			paraContent.Size = UDim2.new(1, -20, 0, paraContent.TextBounds.Y)
+			--	Para.Size = UDim2.new(1, -35, 0, paraContent.Size.Y.Offset + 200)
 
 			local function updateSize()
 				local textSize = textservice:GetTextSize(
-					Para.Content.Text,
-					Para.Content.TextSize,
-					Para.Content.Font,
-					Vector2.new(Para.Content.AbsoluteSize.X, math.huge) -- Allows vertical expansion
+					paraContent.Text,
+					paraContent.TextSize,
+					paraContent.Font,
+					Vector2.new(paraContent.AbsoluteSize.X, math.huge) -- Allows vertical expansion
 				)
 
 				local newDescSize = UDim2.new(1, -20, 0, textSize.Y)
 				local newButtonSize = UDim2.new(Para.Size.X.Scale, Para.Size.X.Offset, 0, textSize.Y + 120) -- Adding extra padding
 
-				local descTween = tweenservice:Create(Para.Content, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newDescSize })
+				local descTween = tweenservice:Create(paraContent, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newDescSize })
 				descTween:Play()
 
 				local buttonTween = tweenservice:Create(Para, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newButtonSize })
@@ -9029,7 +9081,7 @@ function syde:Init(library)
 
 			updateSize()
 
-			Para.Content:GetPropertyChangedSignal("TextBounds"):Connect(updateSize)
+			paraContent:GetPropertyChangedSignal("TextBounds"):Connect(updateSize)
 		end
 
 		function initelement:Label(Text, Alignment)

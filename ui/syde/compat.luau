@@ -1,7 +1,7 @@
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 28
+local ALLERAL_SYDE_PATCH = 29
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -125,6 +125,23 @@ local function sydeFindChild(parent, ...)
 	return nil
 end
 
+local function sydeFindDescendant(parent, ...)
+	local direct = sydeFindChild(parent, ...)
+	if direct then
+		return direct
+	end
+	if not parent then
+		return nil
+	end
+	for i = 1, select("#", ...) do
+		local child = parent:FindFirstChild(select(i, ...), true)
+		if child then
+			return child
+		end
+	end
+	return nil
+end
+
 local function sydeButtonLabel(button)
 	if not button then
 		return nil
@@ -148,6 +165,30 @@ end
 
 local function sydeTitleLabel(instance)
 	return sydeOptionLabel(instance)
+end
+
+local function sydeParagraphParts(paragraph)
+	local frame = sydeFindChild(paragraph, "Frame", "frame")
+	local title = sydeTitleLabel(paragraph) or (frame and sydeTitleLabel(frame))
+	local content = sydeFindDescendant(paragraph, "Content", "content", "Description", "description", "desc")
+	local function isTextObject(instance)
+		return instance and (instance:IsA("TextLabel") or instance:IsA("TextBox") or instance:IsA("TextButton"))
+	end
+	if not isTextObject(title) or not isTextObject(content) then
+		for _, descendant in ipairs(paragraph:GetDescendants()) do
+			if isTextObject(descendant) then
+				local name = string.lower(descendant.Name)
+				if not isTextObject(title) and (name == "title" or name == "textlabel") then
+					title = descendant
+				elseif not isTextObject(content) and (name == "content" or name == "description" or name == "desc") then
+					content = descendant
+				end
+			end
+		end
+	end
+	if not isTextObject(title) then title = nil end
+	if not isTextObject(content) then content = nil end
+	return title, content
 end
 
 local function sydeOptionText(option)
@@ -188,7 +229,7 @@ local function sydeBindUi(root)
 			if key == "main" or key == "Main" then
 				return main
 			end
-			return root[key]
+			return sydeFindChild(root, tostring(key))
 		end,
 	})
 end
