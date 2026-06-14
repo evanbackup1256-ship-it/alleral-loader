@@ -66,7 +66,7 @@ local function installAutoexecRedirect()
 		log("Autoexec install failed at " .. targetDir .. "/alleral.luau: " .. tostring(writeErr), true)
 	end
 	return okWrite, writeErr
-end
+	end
 
 local function markSupportedPlaces()
 	local places = {}
@@ -84,6 +84,9 @@ local function relaunchViaBootstrap(reason)
 		stopAutoUpdater()
 	end
 	if type(ENV.Alleral_Bootstrap) == "function" then
+	if ENV._Alleral_BootstrapRunning then
+		return false, "bootstrap already running"
+	end
 		local ok, result = ENV.Alleral_Bootstrap(reason)
 		return ok == true, result
 	end
