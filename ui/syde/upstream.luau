@@ -1088,6 +1088,86 @@ function syde:updateLayout(container, spacing)
 	container.CanvasSize = UDim2.new(0, 0, 0, yOffset)
 end
 
+-- Real-time auto-scaler to prevent overlapping elements
+local autoScaleEnabled = true
+local autoScaleConnections = {}
+
+function syde:enableAutoScale(container)
+	if not container or not container:IsA("GuiObject") then
+		return
+	end
+	
+	local function checkOverlaps()
+		if not autoScaleEnabled then return end
+		
+		local children = {}
+		for _, child in ipairs(container:GetChildren()) do
+			if (child:IsA("Frame") or child:IsA("ImageLabel") or child:IsA("TextLabel") or child:IsA("TextButton")) and child.Visible then
+				table.insert(children, child)
+			end
+		end
+		
+		for i, child1 in ipairs(children) do
+			for j, child2 in ipairs(children) do
+				if i >= j then continue end
+				
+				local pos1 = child1.AbsolutePosition
+				local size1 = child1.AbsoluteSize
+				local pos2 = child2.AbsolutePosition
+				local size2 = child2.AbsoluteSize
+				
+				-- Check for overlap
+				if pos1.X < pos2.X + size2.X and pos1.X + size1.X > pos2.X and
+				   pos1.Y < pos2.Y + size2.Y and pos1.Y + size1.Y > pos2.Y then
+					
+					-- Calculate overlap amount
+					local overlapX = math.min(pos1.X + size1.X, pos2.X + size2.X) - math.max(pos1.X, pos2.X)
+					local overlapY = math.min(pos1.Y + size1.Y, pos2.Y + size2.Y) - math.max(pos1.Y, pos2.Y)
+					
+					-- Adjust spacing to fix overlap
+					if overlapY > 0 then
+						local currentSpacing = child2.Position.Y.Offset - (child1.Position.Y.Offset + child1.Size.Y.Offset)
+						local newSpacing = currentSpacing + overlapY + 5
+						tweenservice:Create(child2, TweenInfo.new(0.2, Enum.EasingStyle.Quart), {
+							Position = UDim2.new(child2.Position.X.Scale, child2.Position.X.Offset, 0, child1.Position.Y.Offset + child1.Size.Y.Offset + newSpacing)
+						}):Play()
+					end
+				end
+			end
+		end
+	end
+	
+	-- Connect to property changes for real-time updates
+	local conn1 = container:GetPropertyChangedSignal("AbsoluteSize"):Connect(checkOverlaps)
+	local conn2 = container.ChildAdded:Connect(function(child)
+		if child:IsA("GuiObject") then
+			child:GetPropertyChangedSignal("AbsoluteSize"):Connect(checkOverlaps)
+			child:GetPropertyChangedSignal("Position"):Connect(checkOverlaps)
+			task.wait(0.1)
+			checkOverlaps()
+		end
+	end)
+	local conn3 = container.ChildRemoved:Connect(checkOverlaps)
+	
+	-- Initial check
+	task.wait(0.2)
+	checkOverlaps()
+	
+	table.insert(autoScaleConnections, conn1)
+	table.insert(autoScaleConnections, conn2)
+	table.insert(autoScaleConnections, conn3)
+end
+
+function syde:disableAutoScale()
+	autoScaleEnabled = false
+	for _, conn in ipairs(autoScaleConnections) do
+		if conn.Connected then
+			conn:Disconnect()
+		end
+	end
+	autoScaleConnections = {}
+end
+
 local dragSpeed = 0.6
 local LockToScreen = false
 
@@ -6398,6 +6478,9 @@ function syde:Init(library)
 		end)
 
 		syde:updateLayout(Page, 7)
+		
+		-- Enable real-time auto-scaler to prevent overlapping elements
+		syde:enableAutoScale(Page)
 
 
 
