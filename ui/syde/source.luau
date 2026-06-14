@@ -101,7 +101,7 @@ local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 31
+local ALLERAL_SYDE_PATCH = 32
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -329,7 +329,17 @@ local function sydeBindUi(root)
 			if key == "main" or key == "Main" then
 				return main
 			end
+			if key == "Enabled" or key == "DisplayOrder" or key == "IgnoreGuiInset" or key == "ResetOnSpawn" then
+				return root[key]
+			end
 			return sydeFindChild(root, tostring(key))
+		end,
+		__newindex = function(_, key, value)
+			if key == "Enabled" or key == "DisplayOrder" or key == "IgnoreGuiInset" or key == "ResetOnSpawn" then
+				root[key] = value
+			else
+				rawset(bound, key, value)
+			end
 		end,
 	})
 end
@@ -10477,14 +10487,14 @@ function syde:Init(library)
 	end
 
 	function tbdata:GetState()
-		return ui.Enabled ~= false and window.Visible == true
+		return ui._root.Enabled ~= false and window.Visible == true
 	end
 
 	function tbdata:SetState(state)
 		local want = state == true
 		if want then
 			local needsOpen = window.Visible ~= true or uiclosed
-			ui.Enabled = true
+			ui._root.Enabled = true
 			window.Visible = true
 			if needsOpen then
 				openui()

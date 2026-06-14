@@ -1009,14 +1009,14 @@ def main() -> None:
 \tend
 
 \tfunction tbdata:GetState()
-\t\treturn ui.Enabled ~= false and window.Visible == true
+\t\treturn ui._root.Enabled ~= false and window.Visible == true
 \tend
 
 \tfunction tbdata:SetState(state)
 \t\tlocal want = state == true
 \t\tif want then
 \t\t\tlocal needsOpen = window.Visible ~= true or uiclosed
-\t\t\tui.Enabled = true
+\t\t\tui._root.Enabled = true
 \t\t\twindow.Visible = true
 \t\t\tif needsOpen then
 \t\t\t\topenui()
