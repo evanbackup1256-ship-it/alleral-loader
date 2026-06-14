@@ -77,6 +77,12 @@ if ($alleralUi -match 'function Core\.buildUiWindow') {
     Fail "alleral_ui missing buildUiWindow override"
 }
 
+if ($alleralUi -match 'pcall\(rawWindow\.SetState, rawWindow, true\)' -and $alleralUi -notmatch '(?m)^\s*window:Toggle\(\)\s*$') {
+    Pass "Syde windows open explicitly without blind toggle"
+} else {
+    Fail "Syde window creation can toggle an initially-open window closed"
+}
+
 if ($alleralUi -match 'function Core\.createWindUiGroupbox') {
     Pass "alleral_ui exposes createWindUiGroupbox adapter"
 } else {

@@ -944,7 +944,11 @@ return function(Core)
 			end
 		end
 
-		window:Toggle()
+		if type(rawWindow.SetState) == "function" then
+			pcall(rawWindow.SetState, rawWindow, true)
+		elseif type(rawWindow.GetState) == "function" and rawWindow:GetState() == false and type(rawWindow.Toggle) == "function" then
+			pcall(rawWindow.Toggle, rawWindow)
+		end
 		return window
 	end
 
@@ -991,6 +995,12 @@ return function(Core)
 			window._initialized = true
 			task.defer(function()
 				pcall(function()
+					local rawWindow = window._rawWindow
+					if rawWindow and type(rawWindow.SetState) == "function" then
+						rawWindow:SetState(true)
+					elseif rawWindow and type(rawWindow.GetState) == "function" and rawWindow:GetState() == false and type(rawWindow.Toggle) == "function" then
+						rawWindow:Toggle()
+					end
 					local defaultTab = window._defaultTab
 					if defaultTab and type(defaultTab.Select) == "function" then
 						defaultTab:Select()
