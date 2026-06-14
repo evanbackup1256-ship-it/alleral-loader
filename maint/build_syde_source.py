@@ -836,6 +836,8 @@ def validate_output(body: str) -> None:
         "TweenInfo.new(1.34, Enum.EasingStyle.Exponential)": 4,
         "TweenInfo.new(2, Enum.EasingStyle.Exponential)": 7,
         "TweenInfo.new(0.73, Enum.EasingStyle.Exponential)": 3,
+        "task.wait(0.45)\n\t\t\tModalInstance:Destroy()": 1,
+        "task.wait(0.7)\n\t\t\t\tdimOverlay.Visible = false": 2,
     }
     for fragment, expected in required_counts.items():
         actual = body.count(fragment)
@@ -853,6 +855,20 @@ def validate_output(body: str) -> None:
     for fragment in forbidden:
         if fragment in body:
             raise RuntimeError(f"Generated Syde still contains unsafe fragment: {fragment!r}")
+
+
+def validate_visual_fidelity(upstream: str, body: str) -> None:
+    visual_patterns = {
+        "asset IDs": r"rbxassetid://\d+",
+        "colors": r"Color3\.from(?:RGB|HSV|Hex)\([^\r\n]*?\)",
+        "animations": r"TweenInfo\.new\([^\r\n]*?\)",
+    }
+    for label, pattern in visual_patterns.items():
+        expected = set(re.findall(pattern, upstream))
+        actual = set(re.findall(pattern, body))
+        missing = sorted(expected - actual)
+        if missing:
+            raise RuntimeError(f"Generated Syde changed upstream {label}: missing {missing[:5]}")
 
 
 def main() -> None:
@@ -1044,6 +1060,7 @@ return syde
     body = patch_paragraph_contracts(body)
     body = "\n".join(line.rstrip() for line in body.splitlines()) + "\n"
     validate_output(body)
+    validate_visual_fidelity(upstream, body)
 
     if "--check" in sys.argv:
         current = OUT.read_text(encoding="utf-8") if OUT.exists() else ""

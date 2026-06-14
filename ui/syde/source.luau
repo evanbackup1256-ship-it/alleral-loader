@@ -101,7 +101,7 @@ local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 30
+local ALLERAL_SYDE_PATCH = 31
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -2657,7 +2657,7 @@ function syde:Modal(Modal)
 			if modalParts.CancelStroke then
 				tweenservice:Create(modalParts.CancelStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
 			end
-			task.wait(0.6)
+			task.wait(0.45)
 			ModalInstance:Destroy()
 		end
 
@@ -2681,7 +2681,7 @@ function syde:Modal(Modal)
 				tweenservice:Create(dimOverlay, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
 					BackgroundTransparency = 1
 				}):Play()
-				task.wait(0.6)
+				task.wait(0.7)
 				dimOverlay.Visible = false
 			end
 		end)
@@ -2695,7 +2695,7 @@ function syde:Modal(Modal)
 				tweenservice:Create(dimOverlay, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
 					BackgroundTransparency = 1
 				}):Play()
-				task.wait(0.6)
+				task.wait(0.7)
 				dimOverlay.Visible = false
 			end
 		end)

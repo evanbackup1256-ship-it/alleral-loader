@@ -1508,7 +1508,7 @@ end)
 local window = Core.buildUiWindow(ui, Core.uiWindowSettings({
 	Subtitle = "Slime RNG · v" .. VERSION,
 	Icon = "droplet",
-	Theme = "Private",
+	Theme = "Default",
 }))
 if not window or not window._rawWindow then
 	getgenv().Alleral_StartupFailed = "UI window failed"

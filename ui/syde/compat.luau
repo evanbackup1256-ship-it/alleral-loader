@@ -1,7 +1,7 @@
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 30
+local ALLERAL_SYDE_PATCH = 31
 
 local function sydeLog(...) end
 local function sydeWarn(...) end

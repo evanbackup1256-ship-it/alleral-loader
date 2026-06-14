@@ -116,7 +116,7 @@ function syde:Modal(Modal)
 			if modalParts.CancelStroke then
 				tweenservice:Create(modalParts.CancelStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
 			end
-			task.wait(0.6)
+			task.wait(0.45)
 			ModalInstance:Destroy()
 		end
 
@@ -140,7 +140,7 @@ function syde:Modal(Modal)
 				tweenservice:Create(dimOverlay, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
 					BackgroundTransparency = 1
 				}):Play()
-				task.wait(0.6)
+				task.wait(0.7)
 				dimOverlay.Visible = false
 			end
 		end)
@@ -154,7 +154,7 @@ function syde:Modal(Modal)
 				tweenservice:Create(dimOverlay, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
 					BackgroundTransparency = 1
 				}):Play()
-				task.wait(0.6)
+				task.wait(0.7)
 				dimOverlay.Visible = false
 			end
 		end)

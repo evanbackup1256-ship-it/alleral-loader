@@ -3130,7 +3130,7 @@ end
 local uiWindow = Core.buildUiWindow(ui, Core.uiWindowSettings({
 	Subtitle = "Kick a Lucky Block · v" .. VERSION,
 	Icon = "zap",
-	Theme = "Private",
+	Theme = "Default",
 	Size = UDim2.fromOffset(960, 660),
 }))
 if not uiWindow or not uiWindow._rawWindow then

@@ -1833,7 +1833,7 @@ end)
 local window = Core.buildUiWindow(ui, Core.uiWindowSettings({
 	Subtitle = "Build A Ring Farm · v" .. VERSION,
 	Icon = "leaf",
-	Theme = "Private",
+	Theme = "Default",
 }))
 if not window or not window._rawWindow then
 	getgenv().Alleral_StartupFailed = "UI window failed"

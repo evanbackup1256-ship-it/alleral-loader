@@ -37,7 +37,7 @@ if (Test-Path $sydeSource) {
 }
 
 $sydeContracts = @(
-    @{ Pattern = 'ALLERAL_SYDE_PATCH = 30'; Message = 'Syde patch version is 30' },
+    @{ Pattern = 'ALLERAL_SYDE_PATCH = 31'; Message = 'Syde patch version is 31' },
     @{ Pattern = 'local Minihome = sydeFindChild\(ui\._root'; Message = 'Minihome lookup tolerates missing executor assets' },
     @{ Pattern = 'local paraTitle, paraContent = sydeParagraphParts\(Para\)'; Message = 'paragraph templates use compatible child lookup' },
     @{ Pattern = 'return ui\.Enabled ~= false and window\.Visible == true'; Message = 'window state reflects actual GUI visibility' },
@@ -80,6 +80,35 @@ if ($alleralUi -match 'function Core\.buildUiWindow') {
     Pass "alleral_ui overrides buildUiWindow"
 } else {
     Fail "alleral_ui missing buildUiWindow override"
+}
+
+$upstreamSyde = Get-Content (Join-Path $root "ui/syde/upstream.luau") -Raw
+if ($upstreamSyde -match "\['Accent'\]\s*=\s*Color3\.fromRGB\(255, 151, 227\)" -and
+    $upstreamSyde -match "\['HitBox'\]\s*=\s*Color3\.fromRGB\(255, 151, 227\)") {
+    Pass "vendored Syde retains the original accent colors"
+} else {
+    Fail "vendored Syde default colors differ from upstream"
+}
+
+$gameUiSources = @(
+    "games/kick_a_lucky_block.luau",
+    "games/build_a_ring_farm.luau",
+    "games/slime_rng.luau"
+)
+foreach ($relativePath in $gameUiSources) {
+    $gameUiSource = Get-Content (Join-Path $root $relativePath) -Raw
+    if ($gameUiSource -match 'Theme\s*=\s*"Default"' -and $gameUiSource -notmatch 'Theme\s*=\s*"Private"') {
+        Pass "$relativePath starts with the original Syde theme"
+    } else {
+        Fail "$relativePath overrides the original Syde theme"
+    }
+}
+
+if ($syde -match 'task\.wait\(0\.45\)\s+ModalInstance:Destroy\(\)' -and
+    ([regex]::Matches($syde, 'task\.wait\(0\.7\)\s+dimOverlay\.Visible = false')).Count -eq 2) {
+    Pass "modal close and dim timings match upstream Syde"
+} else {
+    Fail "modal animation timings differ from upstream Syde"
 }
 
 if ($alleralUi -match 'pcall\(rawWindow\.SetState, rawWindow, true\)' -and $alleralUi -notmatch '(?m)^\s*window:Toggle\(\)\s*$') {
