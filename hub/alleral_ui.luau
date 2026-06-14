@@ -12,7 +12,7 @@ return function(Core)
 		"kick/ui/syde/source.luau",
 	}
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-	local SYDE_PATCH_VERSION = 29
+	local SYDE_PATCH_VERSION = 30
 	local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
 	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
@@ -378,7 +378,9 @@ return function(Core)
 
 		function Library:RepairWindow(window)
 			window = window or activeWindow or Library.Window
-			if window and type(window.Toggle) == "function" then
+			if window and type(window.SetState) == "function" then
+				pcall(window.SetState, window, true)
+			elseif window and type(window.Toggle) == "function" then
 				pcall(window.Toggle, window)
 			end
 			return true

@@ -101,7 +101,7 @@ local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 29
+local ALLERAL_SYDE_PATCH = 30
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -10473,21 +10473,32 @@ function syde:Init(library)
 	end
 
 	function tbdata:Toggle()
-		ToggleUI()
+		self:SetState(not self:GetState())
 	end
 
 	function tbdata:GetState()
-		return not uiclosed
+		return ui.Enabled ~= false and window.Visible == true
 	end
 
 	function tbdata:SetState(state)
 		local want = state == true
-		if want and uiclosed then
-			ToggleUI()
-		elseif not want and not uiclosed then
-			ToggleUI()
+		if want then
+			local needsOpen = window.Visible ~= true or uiclosed
+			ui.Enabled = true
+			window.Visible = true
+			if needsOpen then
+				openui()
+			else
+				uiclosed = false
+			end
+		elseif window.Visible == true or not uiclosed then
+			closeui()
 		end
+		return self:GetState()
 	end
+
+	tbdata.Root = ui._root
+	tbdata.Main = window
 
 	return tbdata
 

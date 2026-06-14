@@ -989,21 +989,32 @@ def main() -> None:
 \tend
 
 \tfunction tbdata:Toggle()
-\t\tToggleUI()
+\t\tself:SetState(not self:GetState())
 \tend
 
 \tfunction tbdata:GetState()
-\t\treturn not uiclosed
+\t\treturn ui.Enabled ~= false and window.Visible == true
 \tend
 
 \tfunction tbdata:SetState(state)
 \t\tlocal want = state == true
-\t\tif want and uiclosed then
-\t\t\tToggleUI()
-\t\telseif not want and not uiclosed then
-\t\t\tToggleUI()
+\t\tif want then
+\t\t\tlocal needsOpen = window.Visible ~= true or uiclosed
+\t\t\tui.Enabled = true
+\t\t\twindow.Visible = true
+\t\t\tif needsOpen then
+\t\t\t\topenui()
+\t\t\telse
+\t\t\t\tuiclosed = false
+\t\t\tend
+\t\telseif window.Visible == true or not uiclosed then
+\t\t\tcloseui()
 \t\tend
+\t\treturn self:GetState()
 \tend
+
+\ttbdata.Root = ui._root
+\ttbdata.Main = window
 
 \treturn tbdata
 
