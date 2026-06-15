@@ -1,8 +1,10 @@
--- Alleral entry v1.0.11 — fetches hub/bootstrap via request (avoids HttpGet freeze on Xeno)
-local ENTRY_VERSION = "1.0.11"
+-- Alleral entry v1.0.12 — fetches hub/bootstrap via request (avoids HttpGet freeze on Xeno)
+local ENTRY_VERSION = "1.0.12"
 local REPO = "evanbackup1256-ship-it/kick"
-local HUB_BOOT =
-	"https://cdn.jsdelivr.net/gh/" .. REPO .. "@main/hub/bootstrap.luau?v=" .. ENTRY_VERSION
+local HUB_BOOT_URLS = {
+	"https://raw.githubusercontent.com/" .. REPO .. "/main/hub/bootstrap.luau?v=" .. ENTRY_VERSION,
+	"https://cdn.jsdelivr.net/gh/" .. REPO .. "@main/hub/bootstrap.luau?v=" .. ENTRY_VERSION,
+}
 
 local function genv()
 	local ok, env = pcall(function()
@@ -37,25 +39,27 @@ local function pickRequest()
 end
 
 local function fetchBootstrapSource()
-	local url = HUB_BOOT .. "&t=" .. tostring(tick()) .. "&r=" .. tostring(math.random(1, 2147483646))
 	local requestFn = pickRequest()
-	if requestFn then
-		local ok, res = pcall(requestFn, {
-			Url = url,
-			Method = "GET",
-			Headers = {
-				["Cache-Control"] = "no-cache, no-store",
-				["User-Agent"] = "Alleral-Entry/" .. ENTRY_VERSION,
-			},
-		})
-		if ok and type(res) == "table" and type(res.Body) == "string" and #res.Body > 2000 then
-			return res.Body
+	for _, baseUrl in ipairs(HUB_BOOT_URLS) do
+		local url = baseUrl .. "&t=" .. tostring(tick()) .. "&r=" .. tostring(math.random(1, 2147483646))
+		if requestFn then
+			local ok, res = pcall(requestFn, {
+				Url = url,
+				Method = "GET",
+				Headers = {
+					["Cache-Control"] = "no-cache, no-store",
+					["User-Agent"] = "Alleral-Entry/" .. ENTRY_VERSION,
+				},
+			})
+			if ok and type(res) == "table" and type(res.Body) == "string" and #res.Body > 2000 then
+				return res.Body
+			end
 		end
-	end
-	if typeof(game) == "Instance" and type(game.HttpGet) == "function" then
-		local ok, body = pcall(game.HttpGet, game, url, true)
-		if ok and type(body) == "string" and #body > 2000 then
-			return body
+		if typeof(game) == "Instance" and type(game.HttpGet) == "function" then
+			local ok, body = pcall(game.HttpGet, game, url, true)
+			if ok and type(body) == "string" and #body > 2000 then
+				return body
+			end
 		end
 	end
 	return nil

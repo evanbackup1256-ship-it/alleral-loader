@@ -1,8 +1,8 @@
--- Alleral Bootstrap v1.0.11
+-- Alleral Bootstrap v1.0.12
 -- Save this loadstring once in your executor — it always fetches the latest loader from GitHub.
--- One-liner: loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?t=" .. tick(), true))()
+-- One-liner: loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?v=1.0.12&t=" .. tick(), true))()
 
-local BOOTSTRAP_VERSION = "1.0.11"
+local BOOTSTRAP_VERSION = "1.0.12"
 print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Starting…")
 local HTTP_GET_TIMEOUT = 12
 local LOADER_FETCH_TIMEOUT = 28
@@ -254,6 +254,26 @@ local function loaderMaclibVersionFromSource(src)
 	return tonumber(src:match("local MACLIB_VERSION = (%d+)"))
 end
 
+local function loaderVersionParts(ver)
+	local parts = {}
+	for n in tostring(ver or ""):gmatch("%d+") do
+		table.insert(parts, tonumber(n) or 0)
+	end
+	return parts
+end
+
+local function loaderVersionCompatible(remoteVer, expectedVer)
+	if remoteVer == expectedVer then
+		return true
+	end
+	local remote = loaderVersionParts(remoteVer)
+	local expected = loaderVersionParts(expectedVer)
+	if remote[1] ~= expected[1] or remote[2] ~= expected[2] then
+		return false
+	end
+	return (remote[3] or 0) >= (expected[3] or 0)
+end
+
 local function loaderMatchesRelease(src, meta)
 	if type(src) ~= "string" or type(meta) ~= "table" then
 		return false, "invalid loader body"
@@ -266,7 +286,7 @@ local function loaderMatchesRelease(src, meta)
 	end
 	local remoteVer = loaderVersionFromSource(src)
 	if type(meta.loader) == "string" and meta.loader ~= "" then
-		if remoteVer ~= meta.loader then
+		if not loaderVersionCompatible(remoteVer, meta.loader) then
 			return false, "loader v" .. tostring(remoteVer or "?") .. " != release v" .. meta.loader
 		end
 	end
@@ -311,10 +331,10 @@ end
 local function buildLoaderUrls(meta)
 	local commit = (meta and meta.commit) or BRANCH
 	local bust = "?t=" .. tostring(tick())
-	-- Live main first — CDN release.json commit pins are often stale and block bootstrap on Xeno.
+	-- GitHub raw first — jsDelivr often lags main by hours.
 	return {
-		{ url = JSDELIVR .. "@main/loader.luau" .. bust, label = "jsdelivr@main/loader.luau" },
 		{ url = GITHUB_RAW .. "/loader.luau" .. bust, label = "github@main/loader.luau" },
+		{ url = JSDELIVR .. "@main/loader.luau" .. bust, label = "jsdelivr@main/loader.luau" },
 		{ url = JSDELIVR .. "@" .. commit .. "/loader.luau" .. bust, label = "jsdelivr@" .. commit .. "/loader.luau" },
 		{
 			url = "https://raw.githubusercontent.com/" .. REPO .. "/" .. commit .. "/loader.luau" .. bust,
