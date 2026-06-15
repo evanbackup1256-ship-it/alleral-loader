@@ -414,6 +414,21 @@ function Core.releaseUiWindow()
 	if type(lib) == "table" and type(lib.Unload) == "function" then
 		pcall(lib.Unload, lib)
 	end
+	local syde = ENV._AlleralSyde
+	if type(syde) == "table" then
+		if type(syde.DisconnectAll) == "function" then
+			pcall(syde.DisconnectAll, syde)
+		end
+		local root = syde._root
+		if root and root.Destroy then
+			pcall(function()
+				root:Destroy()
+			end)
+		end
+	end
+	ENV._AlleralSyde = nil
+	ENV._AlleralSydeSourceKey = nil
+	ENV._AlleralUiLibrary = nil
 	ENV.Alleral_UiWindow = nil
 	getgenv().Alleral_UiWindow = nil
 end
@@ -434,7 +449,15 @@ function Core.toggleUiVisibility()
 	end
 	if type(raw.SetOpen) == "function" then
 		pcall(function()
-			raw:SetOpen(not raw.IsOpen)
+			local open = false
+			if type(raw.GetState) == "function" then
+				open = raw:GetState() == true
+			elseif type(raw.IsOpen) == "function" then
+				open = raw:IsOpen() == true
+			else
+				open = raw.IsOpen == true
+			end
+			raw:SetOpen(not open)
 		end)
 		return true
 	end
@@ -1569,28 +1592,30 @@ end
 
 function Core.buildExecutorIntelGroup(tab, column)
 	local group = Core.buildUiGroup(tab, "Executor intel", column or 1, nil, nil, "ExecutorIntel")
-	local execName = Core.getExecutorDisplayName()
+	local profile = type(Core.executorProfile) == "function" and Core.executorProfile() or {}
+	local execName = profile.displayName or Core.getExecutorDisplayName()
 	group:CreateLabel("Executor · " .. execName)
+	if profile.tier then
+		group:CreateLabel("Tier · " .. tostring(profile.tier))
+	end
+	if profile.layoutMode then
+		group:CreateLabel("UI layout · " .. tostring(profile.layoutMode))
+	end
 	group:CreateLabel("PlaceId · " .. tostring(game.PlaceId))
 	group:CreateLabel("JobId · " .. tostring(game.JobId):sub(1, 20) .. "...")
 	group:CreateLabel("UserId · " .. tostring(game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.UserId or "?"))
 	local caps = {}
-	for _, cap in ipairs({ "clipboard", "filesystem", "http", "hookmetamethod", "decompile", "getconnections" }) do
-		local ok = false
-		if cap == "clipboard" then
-			ok = type(Core.execFunction("setclipboard")) == "function" or type(setclipboard) == "function"
-		elseif cap == "filesystem" then
-			ok = type(writefile) == "function"
-		elseif cap == "http" then
-			ok = type(request) == "function" or type(http_request) == "function"
-		else
-			ok = type(_G[cap]) == "function" or type(getfenv()[cap]) == "function"
-			pcall(function()
-				ok = ok or type(loadstring("return " .. cap)()) == "function"
-			end)
-		end
-		if ok then
-			table.insert(caps, cap)
+	for key, label in pairs({
+		hasClipboard = "clipboard",
+		hasFilesystem = "filesystem",
+		hasHttp = "http",
+		hasHook = "hook",
+		hasDrawing = "drawing",
+		hasGetConn = "signals",
+		hasFireTouch = "touch",
+	}) do
+		if profile[key] then
+			table.insert(caps, label)
 		end
 	end
 	group:CreateLabel("Caps · " .. (#caps > 0 and table.concat(caps, ", ") or "sandboxed"))

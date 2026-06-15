@@ -918,6 +918,17 @@ Core.EXECUTOR_COMPAT = {
 
 function Core.executorProfile()
 	local detected = Core.detectExecutor()
+	local runtime = ENV.Alleral_ExecutorRuntime
+	if type(runtime) == "table" and type(runtime.enrichProfile) == "function" then
+		return runtime.enrichProfile({
+			slug = detected.slug,
+			rawName = detected.rawName,
+			displayName = detected.name,
+			isKnown = detected.isKnown,
+			envSlugs = detected.envSlugs,
+			weao = Core.formatWeaoEntry(Core.matchWeaoExploit(detected, ENV.Alleral_WeaoCache and ENV.Alleral_WeaoCache.data)),
+		})
+	end
 	local slug = detected.slug
 	local fsOk = not Core.EXECUTOR_FS_BROKEN[slug]
 	local sharedEnv = ENV.shared or (typeof(shared) == "table" and shared) or nil
@@ -1003,6 +1014,10 @@ function Core.refreshLoaderCapabilities()
 		hasClipboard = profile.hasClipboard,
 		hasFireTouch = profile.hasFireTouch,
 		hasGetConn = profile.hasGetConn,
+		hasHook = profile.hasHook,
+		hasDrawing = profile.hasDrawing,
+		tier = profile.tier,
+		layoutMode = profile.layoutMode,
 	}
 	ENV.Alleral_LoaderCapabilities = caps
 	pcall(function()
@@ -1045,9 +1060,9 @@ function Core.notifyExecutorCompat(profile)
 			msg = msg .. ". Update your executor for best results."
 		end
 	elseif not profile.isKnown then
-		msg = msg .. " — universal mode (any executor with loadstring)."
+		msg = msg .. " — universal mode (adaptive UI enabled)."
 	else
-		msg = msg .. " — ready."
+		msg = msg .. " — " .. tostring(profile.tier or "ready") .. " tier, rail layout."
 	end
 	Core.say("Executor: " .. msg)
 end

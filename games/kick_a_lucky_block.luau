@@ -1988,7 +1988,7 @@ local function approachWavePad(root, humanoid, kickReady)
 	safeCall("KickWaveApproach", function()
 		humanoid.PlatformStand = true
 		humanoid.MaxSlopeAngle = 89
-		while state.HubRunning and state.AFarm do
+		while state.HubRunning and (state.AFarm or state.AAutoBattle) do
 			local waves = Workspace:FindFirstChild("Waves")
 			if not waves or #waves:GetChildren() == 0 then
 				break
@@ -2080,7 +2080,7 @@ local intervalKeys = {
 	AutoPlaceBest = "AutoPlaceInterval",
 	Mastery = "MasteryInterval",
 	RefreshData = "PlotRefreshInterval",
-	AutoFavorite = "FavoriteScanInterval",
+	AutoFavoriteScan = "FavoriteScanInterval",
 }
 
 local minimumLoopIntervals = {
@@ -4571,6 +4571,7 @@ webhookGroup:CreateButton(
 	end
 
 	return {
+		window = uiWindow,
 		predictionStatus = predictionStatus,
 		sessionStatus = sessionStatus,
 		protectedDropdown = protectedDropdown,
@@ -4580,7 +4581,10 @@ webhookGroup:CreateButton(
 	}
 end
 
-local ui = buildInterface()
+local uiHandles = buildInterface()
+if not uiHandles or not uiHandles.window then
+	return
+end
 
 local function startRuntime()
 syncTrackerConfig()
@@ -4867,8 +4871,8 @@ makeSupervisor("AutoKick", 0.3, function()
 	if not humanoid:GetAttribute("DefaultHipHeight") then
 		humanoid:SetAttribute("DefaultHipHeight", defaultHip)
 	end
-	if camera and humanoid and camera.CameraSubject ~= humanoid and not battleActive then
-		return
+	if camera and humanoid and camera.CameraSubject ~= humanoid then
+		restoreCamera(humanoid)
 	end
 	if state.AAutoBattle then
 		if not battleActive then
@@ -5185,8 +5189,15 @@ makeSupervisor("AutoFavorite", 0.55, function()
 		if remotes.toggleFavorite then
 			remotes.toggleFavorite:FireServer(guid)
 		else
-			local network = require(ReplicatedStorage.Shared.Packages.Network)
-			network.FireServer("ToggleFav", guid)
+			local shared = ReplicatedStorage:FindFirstChild("Shared")
+			local packages = shared and shared:FindFirstChild("Packages")
+			local networkModule = packages and packages:FindFirstChild("Network")
+			if networkModule then
+				local ok, network = pcall(require, networkModule)
+				if ok and network and type(network.FireServer) == "function" then
+					network.FireServer("ToggleFav", guid)
+				end
+			end
 		end
 	end)
 end)
@@ -5566,7 +5577,7 @@ if state.AAutoFav then
 	scanTools()
 end
 
-Core.finalizeGameUi(uiWindow, ui, {
+Core.finalizeGameUi(uiHandles.window, ui, {
 	Subtitle = "Kick a Lucky Block · v" .. VERSION,
 })
 end

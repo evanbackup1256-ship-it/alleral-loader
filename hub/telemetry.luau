@@ -439,6 +439,10 @@ function Telemetry:Configure(extra)
 	return self._config
 end
 
+function Telemetry:GetConfig()
+	return self._config
+end
+
 function Telemetry:UsesRelay()
 	local cfg = self._config or {}
 	return trim(cfg.relayUrl) ~= ""

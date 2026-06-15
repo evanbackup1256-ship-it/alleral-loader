@@ -6,8 +6,7 @@
   "windui": "4.0.1-syde",
   "alleral": "4.0.1-syde",
   "commit": "19403c6",
-  "updatedAt": "2026-06-14T22:18:03Z",
-  "updatePollSeconds": 120,
+  "updatedAt": "2026-06-15T17:54:00Z",  "updatePollSeconds": 120,
   "autoUpdate": true,
   "minLoader": "8.2.0",
   "minCore": "2.7.0",
@@ -16,5 +15,5 @@
   "helpers": "1.0",
   "security": "1.3",
   "access": "1.1",
-  "sydePatch": 34
+  "sydePatch": 35
 }

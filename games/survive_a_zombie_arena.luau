@@ -253,6 +253,11 @@ local function hitboxTick()
 		end
 		return
 	end
+	for model in pairs(runtime.hitboxTouched) do
+		if not model or not model.Parent then
+			runtime.hitboxTouched[model] = nil
+		end
+	end
 	local scale = tonumber(state.HitboxScale) or 3
 	for _, entry in ipairs(livingZombies()) do
 		if entry.model then
@@ -466,20 +471,31 @@ local function teleportSafe(root, force)
 		return
 	end
 	local spot = SAFE_SPOTS[state.SafeSpot] or SAFE_SPOTS.Classic
+	if not force then
+		local distance = (root.Position - spot.Position).Magnitude
+		if distance < 10 then
+			return
+		end
+	end
 	root.CFrame = spot
 end
 
 local function removeGates()
-	if runtime.gatesRemoved or (not state.ARemoveGates and not state.AAutoFarm) then
+	if not state.ARemoveGates and not state.AAutoFarm then
 		return
 	end
 	local gates = Workspace:FindFirstChild("Gates")
-	if gates then
-		pcall(function()
-			gates:Destroy()
-		end)
-		runtime.gatesRemoved = true
+	if not gates then
+		runtime.gatesRemoved = false
+		return
 	end
+	if runtime.gatesRemoved then
+		return
+	end
+	pcall(function()
+		gates:Destroy()
+	end)
+	runtime.gatesRemoved = true
 end
 
 local function godModeTick()
@@ -593,6 +609,19 @@ local function applyAutoFarmPreset(enabled)
 		state.ARemoveGates = true
 		notify("Alleral", "Auto farm preset enabled.", 3)
 	else
+		state.AKillAura = false
+		state.AInstantKill = false
+		state.AAutoSkip = false
+		state.AAutoShoot = false
+		state.AGodMode = false
+		state.ASafeZone = false
+		state.ATeleportSafe = false
+		state.ACollectShards = false
+		state.AAutoEquip = false
+		state.AAutoUpgrade = false
+		state.AAutoBuy = false
+		state.ARemoveGates = false
+		state.AAutoFarm = false
 		notify("Alleral", "Auto farm preset disabled.", 3)
 	end
 	saveSettings()

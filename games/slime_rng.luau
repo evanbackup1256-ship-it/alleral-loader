@@ -586,20 +586,24 @@ end
 
 local function setMusicMuted(enabled)
 	if enabled then
-		runtime.musicBackup = {}
-		for _, sound in ipairs(game:GetDescendants()) do
-			if sound:IsA("Sound") then
-				runtime.musicBackup[sound] = sound.Volume
-				sound.Volume = 0
+		if not runtime.musicMuted then
+			runtime.musicBackup = {}
+			for _, sound in ipairs(game:GetDescendants()) do
+				if sound:IsA("Sound") then
+					runtime.musicBackup[sound] = sound.Volume
+					sound.Volume = 0
+				end
 			end
+			runtime.musicMuted = true
 		end
 	else
-		for sound, volume in pairs(runtime.musicBackup) do
+		for sound, volume in pairs(runtime.musicBackup or {}) do
 			if sound and sound.Parent then
 				sound.Volume = volume
 			end
 		end
 		runtime.musicBackup = {}
+		runtime.musicMuted = false
 	end
 end
 
@@ -1064,7 +1068,7 @@ local function useFruitIfAvailable()
 	end
 end
 
-LocalPlayer.CharacterAdded:Connect(function()
+connections.characterAdded = LocalPlayer.CharacterAdded:Connect(function()
 	state.LastTeleportedZone = nil
 	state.PreviousKnownMaxZone = nil
 end)
@@ -1100,7 +1104,7 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoFarmZone", 2, function()
 			end
 		end
 	else
-		for _, zoneName in ipairs(state.TargetZone) do
+		for _, zoneName in ipairs(normalizeMultiSelection(state.TargetZone)) do
 			local zoneId = zoneIdFromName(zoneName)
 			if zoneId and state.LastTeleportedZone ~= zoneId then
 				local ok = pcall(function()
@@ -1155,7 +1159,7 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoClaimIndex", 3, function
 			task.wait(0.5)
 		end
 	else
-		for _, category in ipairs(state.TargetIndexCategory) do
+		for _, category in ipairs(normalizeMultiSelection(state.TargetIndexCategory)) do
 			pcall(function()
 				indexRemote:InvokeServer("requestClaimReward", category)
 			end)
@@ -1181,12 +1185,12 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoRoll", 0.5, function()
 		return
 	end
 	local ok = pcall(function()
-		rollRemote:InvokeServer("requestRoll")
+		return rollRemote:InvokeServer("requestRoll")
 	end)
 	if ok then
 		runtime.rollFailCount = 0
 	else
-		runtime.rollFailCount = runtime.rollFailCount + 1
+		runtime.rollFailCount = (runtime.rollFailCount or 0) + 1
 		if runtime.rollFailCount >= 5 then
 			task.wait(2)
 			runtime.rollFailCount = 0
@@ -1297,7 +1301,7 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoCollectLoot", 0.5, funct
 				local ok, result = pcall(function()
 					return lootRemote:InvokeServer("requestCollect", loot.Name)
 				end)
-				if ok or result == "Loot not found" or result == "Loot expired" then
+				if ok and result ~= false then
 					pcall(function()
 						loot:Destroy()
 					end)
@@ -1391,10 +1395,10 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoCraft", 3, function()
 							table.insert(ingredients, itemId)
 						end
 					end
-					local ok = pcall(function()
+					local ok, result = pcall(function()
 						return craftingRemote:InvokeServer("requestCraftRecipe", recipe.id, ingredients, 1)
 					end)
-					if ok then
+					if ok and result ~= false then
 						for itemId, count in pairs(plan) do
 							if type(inventory[itemId]) == "number" then
 								inventory[itemId] = math.max(0, inventory[itemId] - count)
@@ -1435,7 +1439,7 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoFeedPet", 1, function()
 			end
 		end
 	else
-		for _, foodName in ipairs(state.FeedFood) do
+		for _, foodName in ipairs(normalizeMultiSelection(state.FeedFood)) do
 			local candidate = foodNameToId[foodName]
 			if candidate and items[candidate] and items[candidate] > 0 then
 				foodId = candidate
@@ -1578,7 +1582,7 @@ local function addMultiDropdown(group, name, label, values, default, callback)
 		Multi = true,
 		Searchable = true,
 		Callback = function(selection)
-			callback(selection)
+			callback(normalizeMultiSelection(selection))
 			saveSettings()
 		end,
 	})
@@ -1602,6 +1606,15 @@ local function applyAutoFarmPreset(enabled)
 		state.AutoUnlockMachine = true
 		Core.notify("Alleral", "Auto farm preset enabled.", 3)
 	else
+		state.AutoBestArea = false
+		state.AutoRoll = false
+		state.AutoEquip = false
+		state.AutoRebirth = false
+		state.AutoCollectLoot = false
+		state.AutoGun = false
+		state.AutoUpgradeTree = false
+		state.AutoUnlockMachine = false
+		state.AutoFarmPreset = false
 		Core.notify("Alleral", "Auto farm preset disabled.", 3)
 	end
 	saveSettings()
@@ -1758,6 +1771,10 @@ Core.buildStandardSettingsExtras(settingsTab, Core.settingsExtrasOptions(window,
 Core.finalizeGameUi(window, ui, {
 	Subtitle = "Slime RNG · v" .. VERSION,
 })
+
+if state.AntiAFK ~= false then
+	Core.setupAntiAfk(LocalPlayer)
+end
 
 state.Alleral_Unload = function()
 	Core.stopAutomation(state, connections, loopControllers, loops, function()

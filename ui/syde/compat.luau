@@ -1,7 +1,7 @@
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 34
+local ALLERAL_SYDE_PATCH = 35
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -13,6 +13,14 @@ local function sydeGetCurrentCamera()
 		current = workspace.CurrentCamera
 	end
 	return current
+end
+
+local function sydeGetViewportSize()
+	local camera = sydeGetCurrentCamera()
+	if camera then
+		return camera.ViewportSize
+	end
+	return Vector2.new(1280, 720)
 end
 
 local function sydeSetClipboard(value)

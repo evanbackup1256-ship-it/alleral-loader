@@ -44,9 +44,15 @@ function Access.getConfig()
 	end
 	cfg.mode = cfg.mode or "public"
 	cfg.publicKey = cfg.publicKey or "PUBLIC"
-	cfg.blockUnknownExecutor = cfg.blockUnknownExecutor ~= false
-	cfg.requireLoadstring = cfg.requireLoadstring ~= false
-	cfg.requireHttp = cfg.requireHttp ~= false
+	if cfg.blockUnknownExecutor == nil then
+		cfg.blockUnknownExecutor = false
+	end
+	if cfg.requireLoadstring == nil then
+		cfg.requireLoadstring = true
+	end
+	if cfg.requireHttp == nil then
+		cfg.requireHttp = false
+	end
 	cfg.blockWeaoDetected = cfg.blockWeaoDetected == true
 	return cfg
 end
@@ -86,7 +92,12 @@ function Access.checkExecutor(options)
 	end
 
 	if type(cfg.allowedExecutors) == "table" and #cfg.allowedExecutors > 0 and not listHasSlug(cfg.allowedExecutors, slug) then
-		return false, "Executor not supported: " .. slug
+		local runtime = ENV.Alleral_ExecutorRuntime
+		if type(runtime) == "table" and type(runtime.REGISTRY) == "table" and runtime.REGISTRY[slug] then
+			-- Known executor from runtime registry — allow even if remote allowlist is stale.
+		elseif cfg.blockUnknownExecutor then
+			return false, "Executor not supported: " .. slug
+		end
 	end
 
 	if cfg.requireLoadstring and profile.hasLoadstring == false then

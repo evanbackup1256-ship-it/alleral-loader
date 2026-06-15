@@ -362,6 +362,10 @@ local function normalizePlantName(name)
 	return (name:gsub("%s+[Ss]eed$", ""))
 end
 
+local function normalizedList(list)
+	return Core.normalizeMultiSelection(list)
+end
+
 local function matchesSeedFilter(plantName, nameList, rarityList)
 	if not nameList or not rarityList then
 		return false
@@ -369,7 +373,7 @@ local function matchesSeedFilter(plantName, nameList, rarityList)
 	local normalized = normalizePlantName(plantName)
 	local nameOk = listContains(nameList, "Any")
 	if not nameOk and plantName then
-		for _, target in ipairs(nameList) do
+		for _, target in ipairs(normalizedList(nameList)) do
 			if target ~= "Any" then
 				local targetNorm = normalizePlantName(target)
 				if normalized:lower() == targetNorm:lower() then
@@ -729,7 +733,6 @@ local function pickPriorityTarget(candidates, rootPosition)
 	if #candidates == 0 then
 		return nil
 	end
-	local closestMode = listContains(state.TargetEnemyPriority, "Closest")
 	local best
 	local bestScore = math.huge
 	for _, entry in ipairs(candidates) do
@@ -748,7 +751,7 @@ local function pickPriorityTarget(candidates, rootPosition)
 			elseif listContains(state.TargetEnemyPriority, "Boss") and entry.Type == "Boss" then
 				score = score - 2000
 			end
-			if closestMode and score < bestScore then
+			if score < bestScore then
 				bestScore = score
 				best = entry
 			end
@@ -886,8 +889,10 @@ local function triggerAfkSpin()
 					callRemote(startRemote)
 				end
 			elseif stopRemote then
-				callRemote(saveRemote, { AutoBuy = false, PauseOnRarity = true })
-				task.wait(0.15)
+				if saveRemote then
+					callRemote(saveRemote, { AutoBuy = false, PauseOnRarity = true })
+					task.wait(0.15)
+				end
 				callRemote(stopRemote)
 			end
 		end)
@@ -907,7 +912,7 @@ local function floorAllowed(floorName)
 		or listContains(state.TargetUpgradeFloor, "any") then
 		return true
 	end
-	for _, target in ipairs(state.TargetUpgradeFloor) do
+	for _, target in ipairs(normalizedList(state.TargetUpgradeFloor)) do
 		if tostring(target) == tostring(floorName) or tostring(target) == "Floor " .. tostring(floorName) then
 			return true
 		end
@@ -1455,7 +1460,7 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoBuyEventShop", 1, functi
 		return
 	end
 	pcall(function()
-		for _, itemId in ipairs(state.TargetEventItem) do
+		for _, itemId in ipairs(normalizedList(state.TargetEventItem)) do
 			if itemId ~= "Any" then
 				PlantRushBuyRemote:InvokeServer(itemId, 1)
 				task.wait(0.2)
@@ -1473,7 +1478,7 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoComposter", 2, function(
 		if listContains(state.TargetComposterFloor, "Any") then
 			floors = { 2, 3, 4 }
 		else
-			for _, floorLabel in ipairs(state.TargetComposterFloor) do
+			for _, floorLabel in ipairs(normalizedList(state.TargetComposterFloor)) do
 				local num = tonumber(tostring(floorLabel):match("(%d+)"))
 				if num and num >= 2 and num <= 4 then
 					table.insert(floors, num)
@@ -1509,13 +1514,14 @@ Core.makeSupervisor(state, loops, loopControllers, "EventTargeting", 0.15, funct
 	if not root then
 		return
 	end
-	runtime.eventTarget = nil
+	runtime.eventCombatTarget = nil
+	runtime.eventDropTarget = nil
 	runtime.honeyTarget = nil
 	if state.AutoShootEvent then
 		local enemies = findEventEnemies()
 		local picked = pickPriorityTarget(enemies, root.Position)
 		if picked then
-			runtime.eventTarget = picked.Instance
+			runtime.eventCombatTarget = picked.Instance
 		end
 	end
 	if state.AutoCollectRushDrops then
@@ -1531,31 +1537,31 @@ Core.makeSupervisor(state, loops, loopControllers, "EventTargeting", 0.15, funct
 			end
 		end
 		if bestDrop then
-			runtime.eventTarget = bestDrop:IsA("BasePart") and bestDrop or bestDrop:FindFirstChildWhichIsA("BasePart", true)
+			runtime.eventDropTarget = bestDrop:IsA("BasePart") and bestDrop or bestDrop:FindFirstChildWhichIsA("BasePart", true)
 		end
 	end
 end)
 
 Core.makeSupervisor(state, loops, loopControllers, "EventCombat", 0.2, function()
-	if state.AutoShootEvent and runtime.eventTarget then
+	if state.AutoShootEvent and runtime.eventCombatTarget then
 		if not runtime.combatActive then
 			runtime.combatActive = true
 			boostShooter()
 		end
 		local character = LocalPlayer.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart")
-		if root and runtime.eventTarget.Parent then
-			root.CFrame = CFrame.new(root.Position, runtime.eventTarget.Position)
-			local prompt = runtime.eventTarget:FindFirstChildWhichIsA("ProximityPrompt", true)
+		if root and runtime.eventCombatTarget.Parent then
+			root.CFrame = CFrame.new(root.Position, runtime.eventCombatTarget.Position)
+			local prompt = runtime.eventCombatTarget:FindFirstChildWhichIsA("ProximityPrompt", true)
 			if prompt then
 				firePrompt(prompt)
 			end
 		end
-	elseif state.AutoCollectRushDrops and runtime.eventTarget then
+	elseif state.AutoCollectRushDrops and runtime.eventDropTarget then
 		local character = LocalPlayer.Character
 		local root = character and character:FindFirstChild("HumanoidRootPart")
 		if root then
-			root.CFrame = CFrame.new(runtime.eventTarget.Position + Vector3.new(0, 3, 0))
+			root.CFrame = CFrame.new(runtime.eventDropTarget.Position + Vector3.new(0, 3, 0))
 		end
 	else
 		if runtime.combatActive then
@@ -1650,10 +1656,10 @@ Core.makeSupervisor(state, loops, loopControllers, "AutoContract", 0.25, functio
 						local plantName = normalizePlantName(tool:GetAttribute("Plant") or tool.Name)
 						if not listContains(state.IgnoreContractSeeds, plantName) then
 							humanoid:EquipTool(tool)
-							local ok = pcall(function()
-								ContractSubmitRemote:InvokeServer(slot)
+							local ok, result = pcall(function()
+								return ContractSubmitRemote:InvokeServer(slot)
 							end)
-							if ok then
+							if ok and result ~= false then
 								submitted = true
 								break
 							end
@@ -1789,6 +1795,7 @@ end)
 
 Core.makeSupervisor(state, loops, loopControllers, "AutoBuySeed", state.RollDelay or 1, function()
 	if not state.AutoBuySeed then
+		runtime.afkSpinStarted = false
 		return
 	end
 	if not runtime.afkSpinStarted then

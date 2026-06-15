@@ -16,7 +16,7 @@ local UI = "ui"
 local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-local SYDE_PATCH_VERSION = 34 -- Restores grouped two-column layout with native Syde controls
+local SYDE_PATCH_VERSION = 35 -- Fluid spring motion + viewport-safe open UI
 local MAX_RELAUNCHES = 3
 local RELAUNCH_COOLDOWN = 15
 local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
@@ -47,8 +47,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "19403c6",
-	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
+	commit = "19403c6",	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
 	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -604,7 +603,56 @@ local function syncWeaoConfig(quiet)
 	return changed == true
 end
 
+local function bootExecutorRuntime()
+	if type(ENV.Alleral_ExecutorRuntime) == "table" then
+		return true
+	end
+	if not loadStringFn then
+		return false
+	end
+	local paths = {
+		HUB .. "/executor_runtime.luau",
+		"kick/" .. HUB .. "/executor_runtime.luau",
+		".alleral/cache/" .. HUB .. "/executor_runtime.luau",
+	}
+	for _, path in ipairs(paths) do
+		if isFile and readFile then
+			local okExists, exists = pcall(isFile, path)
+			if okExists and exists then
+				local okRead, src = pcall(readFile, path)
+				if okRead and type(src) == "string" and #src > 400 then
+					local fn = loadStringFn(src, "Alleral/executor_runtime")
+					if fn then
+						local okRun = pcall(fn)
+						return okRun and type(ENV.Alleral_ExecutorRuntime) == "table"
+					end
+				end
+			end
+		end
+	end
+	local url = GITHUB_RAW .. "/" .. HUB .. "/executor_runtime.luau?t=" .. tostring(tick())
+	local body = select(1, tryGameHttpGet(url))
+	if type(body) == "string" and #body > 400 then
+		local fn = loadStringFn(body, "Alleral/executor_runtime@remote")
+		if fn then
+			local okRun = pcall(fn)
+			return okRun and type(ENV.Alleral_ExecutorRuntime) == "table"
+		end
+	end
+	return false
+end
+
+bootExecutorRuntime()
+
 local EXECUTOR = resolveExecutorProfile()
+if type(ENV.Alleral_ExecutorRuntime) == "table" and type(ENV.Alleral_ExecutorRuntime.enrichProfile) == "function" then
+	local enriched = ENV.Alleral_ExecutorRuntime.enrichProfile(EXECUTOR)
+	if type(enriched) == "table" then
+		EXECUTOR = enriched
+		EXECUTOR.slug = enriched.slug or EXECUTOR.slug
+		EXECUTOR.name = enriched.displayName or enriched.name or EXECUTOR.name
+	end
+end
 log("Executor: " .. EXECUTOR.name .. " (" .. EXECUTOR.slug .. ")")
 
 -- Per-executor HTTP transport order (first = preferred for that injector)
@@ -3858,6 +3906,13 @@ local function main()
 			local last = tonumber(ENV._Alleral_LastRelaunch) or 0
 			if count >= MAX_RELAUNCHES or os.time() - last < RELAUNCH_COOLDOWN then
 				warn("[Alleral v" .. LOADER_VERSION .. "] Skipping syde-patch relaunch (count=" .. count .. ")")
+				pcall(function()
+					game:GetService("StarterGui"):SetCore("SendNotification", {
+						Title = "Alleral",
+						Text = "Syde patch mismatch — reload the script to update UI.",
+						Duration = 8,
+					})
+				end)
 				return
 			end
 			ENV._Alleral_RelaunchCount = count + 1
@@ -4005,6 +4060,7 @@ local function main()
 
 	grantPublicAccess()
 	task.spawn(function()
+		pcall(loadModule, { HUB .. "/executor_runtime.luau" }, HUB .. "/executor_runtime.luau", "Alleral_ExecutorRuntime", "Alleral/executor_runtime")
 		pcall(loadModule, { HUB .. "/analytics.luau" }, HUB .. "/analytics.luau", "Alleral_Analytics", "Alleral/analytics")
 		pcall(loadModule, { HUB .. "/helpers.luau", "core/game_helpers.luau" }, HUB .. "/helpers.luau", "GameHelpers", "Alleral/helpers")
 	end)

@@ -12,7 +12,7 @@ return function(Core)
 		"kick/ui/syde/source.luau",
 	}
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-	local SYDE_PATCH_VERSION = 34
+	local SYDE_PATCH_VERSION = 35
 	local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
 	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
@@ -293,6 +293,262 @@ return function(Core)
 		return accent
 	end
 
+	Core._UiTabRegistry = Core._UiTabRegistry or {}
+	local COLUMN_GAP = 12
+	local GROUP_GAP = 8
+
+	local AlleralLayout = {}
+	AlleralLayout._resizeToken = 0
+	AlleralLayout._activeTweens = {}
+
+	local tweenService = game:GetService("TweenService")
+	local MOTION_PANEL = TweenInfo.new(0.48, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	local MOTION_LAYOUT = TweenInfo.new(0.38, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+	local function tweenGui(instance, info, props)
+		if not instance or not instance:IsA("GuiObject") then
+			return
+		end
+		local prev = AlleralLayout._activeTweens[instance]
+		if prev then
+			pcall(function()
+				prev:Cancel()
+			end)
+		end
+		local tw = tweenService:Create(instance, info, props)
+		AlleralLayout._activeTweens[instance] = tw
+		tw:Play()
+		pcall(function()
+			tw.Completed:Once(function()
+				if AlleralLayout._activeTweens[instance] == tw then
+					AlleralLayout._activeTweens[instance] = nil
+				end
+			end)
+		end)
+	end
+
+	function AlleralLayout.getProfile()
+		if type(Core.executorProfile) == "function" then
+			return Core.executorProfile()
+		end
+		return {
+			ui = { min = Vector2.new(440, 330), max = Vector2.new(860, 640), rail = 60, scale = 0.92, mobile = false },
+		}
+	end
+
+	function AlleralLayout.viewport()
+		local camera = workspace.CurrentCamera
+		if camera then
+			return camera.ViewportSize
+		end
+		return Vector2.new(1280, 720)
+	end
+
+	function AlleralLayout.computeSize(profile, tabCount, override)
+		if override and typeof(override) == "UDim2" then
+			return override
+		end
+		profile = profile or AlleralLayout.getProfile()
+		local ui = profile.ui or {}
+		local vp = AlleralLayout.viewport()
+		local scale = tonumber(ui.scale) or 1
+		local mobile = ui.mobile == true or profile.tier == "mobile"
+		local minSize = ui.min or Vector2.new(440, 330)
+		local maxSize = ui.max or Vector2.new(860, 640)
+		local vpX = mobile and 0.88 or 0.92
+		local vpY = mobile and 0.84 or 0.88
+		local maxW = math.min(maxSize.X, vp.X * vpX)
+		local maxH = math.min(maxSize.Y, vp.Y * vpY)
+		tabCount = math.max(1, tonumber(tabCount) or 4)
+		local heightBoost = math.min(140, tabCount * 10)
+		local width = math.clamp(math.floor(720 * scale), minSize.X, maxW)
+		local height = math.clamp(math.floor(560 * scale) + heightBoost, minSize.Y, maxH)
+		return UDim2.fromOffset(width, height)
+	end
+
+	function AlleralLayout.findNodes(rawWindow)
+		if type(rawWindow) ~= "table" then
+			return nil
+		end
+		local main = rawWindow.Main
+		if not main or not main:IsA("GuiObject") then
+			return nil
+		end
+		return {
+			main = main,
+			tabs = main:FindFirstChild("tabs"),
+			pages = main:FindFirstChild("pages"),
+			top = main:FindFirstChild("top"),
+			user = main:FindFirstChild("user"),
+		}
+	end
+
+	function AlleralLayout.applyRailLayout(rawWindow, profile, animated)
+		local nodes = AlleralLayout.findNodes(rawWindow)
+		if not nodes or not nodes.tabs or not nodes.pages then
+			return false
+		end
+		profile = profile or AlleralLayout.getProfile()
+		local ui = profile.ui or {}
+		local rail = math.clamp(tonumber(ui.rail) or 64, 48, 88)
+		local topHeight = 52
+		if nodes.top and nodes.top:IsA("GuiObject") then
+			topHeight = math.max(44, nodes.top.AbsoluteSize.Y)
+		end
+
+		nodes.tabs.AnchorPoint = Vector2.new(0, 0)
+		local tabsPos = UDim2.new(0, 6, 0, topHeight + 4)
+		local tabsSize = UDim2.new(0, rail, 1, -(topHeight + 10))
+		if animated then
+			tweenGui(nodes.tabs, MOTION_LAYOUT, { Position = tabsPos, Size = tabsSize })
+		else
+			nodes.tabs.Position = tabsPos
+			nodes.tabs.Size = tabsSize
+		end
+		if nodes.tabs:IsA("ScrollingFrame") then
+			nodes.tabs.ScrollBarThickness = 2
+			nodes.tabs.AutomaticCanvasSize = Enum.AutomaticSize.Y
+			nodes.tabs.ScrollingDirection = Enum.ScrollingDirection.Y
+			nodes.tabs.CanvasSize = UDim2.new(0, 0, 0, 0)
+		end
+		local tabList = nodes.tabs:FindFirstChildOfClass("UIListLayout")
+		if tabList then
+			tabList.FillDirection = Enum.FillDirection.Vertical
+			tabList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			tabList.Padding = UDim.new(0, 5)
+		end
+
+		nodes.pages.AnchorPoint = Vector2.new(0, 0)
+		local pagesPos = UDim2.new(0, rail + 12, 0, topHeight + 2)
+		local pagesSize = UDim2.new(1, -(rail + 18), 1, -(topHeight + 8))
+		if animated then
+			tweenGui(nodes.pages, MOTION_LAYOUT, { Position = pagesPos, Size = pagesSize })
+		else
+			nodes.pages.Position = pagesPos
+			nodes.pages.Size = pagesSize
+		end
+
+		if nodes.user and nodes.user:IsA("GuiObject") then
+			nodes.user.AnchorPoint = Vector2.new(1, 0)
+			local userPos = UDim2.new(1, -6, 0, 6)
+			if animated then
+				tweenGui(nodes.user, MOTION_LAYOUT, { Position = userPos })
+			else
+				nodes.user.Position = userPos
+			end
+		end
+
+		if nodes.top and nodes.top:IsA("GuiObject") then
+			local topSize = UDim2.new(1, -12, 0, topHeight)
+			local topPos = UDim2.new(0, 6, 0, 4)
+			if animated then
+				tweenGui(nodes.top, MOTION_LAYOUT, { Size = topSize, Position = topPos })
+			else
+				nodes.top.Size = topSize
+				nodes.top.Position = topPos
+			end
+		end
+
+		rawWindow._alleralRailLayout = true
+		return true
+	end
+
+	function AlleralLayout.relayoutColumns(animated)
+		for _, tab in ipairs(Core._UiTabRegistry or {}) do
+			local layout = tab._layout
+			if layout and layout.row and layout.left and layout.right then
+				local width = layout.row.AbsoluteSize.X
+				if width > 0 and width < 440 then
+					layout.right.Visible = false
+					if animated then
+						tweenGui(layout.left, MOTION_LAYOUT, { Size = UDim2.new(1, 0, 0, 0) })
+					else
+						layout.left.Size = UDim2.new(1, 0, 0, 0)
+					end
+				elseif width >= 440 then
+					layout.right.Visible = true
+					local half = math.max(120, math.floor((width - COLUMN_GAP) / 2))
+					local leftSize = UDim2.new(0, half, 0, 0)
+					local rightSize = UDim2.new(0, half, 0, 0)
+					if animated then
+						tweenGui(layout.left, MOTION_LAYOUT, { Size = leftSize })
+						tweenGui(layout.right, MOTION_LAYOUT, { Size = rightSize })
+					else
+						layout.left.Size = leftSize
+						layout.right.Size = rightSize
+					end
+				end
+			end
+		end
+	end
+
+	function AlleralLayout.smartResize(window, rawWindow, settings, instant)
+		if type(rawWindow) ~= "table" or not rawWindow.Main then
+			return
+		end
+		local profile = AlleralLayout.getProfile()
+		local tabCount = #(Core._UiTabRegistry or {})
+		local target = AlleralLayout.computeSize(profile, tabCount, settings and settings.Size)
+		local main = rawWindow.Main
+		local animated = not instant
+		if main and main:IsA("GuiObject") then
+			if instant then
+				main.Size = target
+			else
+				tweenGui(main, MOTION_PANEL, { Size = target })
+			end
+		end
+		AlleralLayout.applyRailLayout(rawWindow, profile, animated)
+		AlleralLayout.relayoutColumns(animated)
+		if type(window) == "table" then
+			window._alleralLastSize = target
+		end
+	end
+
+	function AlleralLayout.install(window, rawWindow, settings)
+		if type(rawWindow) ~= "table" then
+			return
+		end
+		settings = type(settings) == "table" and settings or {}
+		AlleralLayout.smartResize(window, rawWindow, settings, true)
+		if rawWindow._alleralResizeHooked then
+			return
+		end
+		rawWindow._alleralResizeHooked = true
+		AlleralLayout._resizeToken += 1
+		local token = AlleralLayout._resizeToken
+		local function schedule()
+			if token ~= AlleralLayout._resizeToken then
+				return
+			end
+			task.defer(function()
+				if token ~= AlleralLayout._resizeToken then
+					return
+				end
+				AlleralLayout.smartResize(window, rawWindow, settings)
+			end)
+		end
+		local camera = workspace.CurrentCamera
+		if camera then
+			pcall(function()
+				camera:GetPropertyChangedSignal("ViewportSize"):Connect(schedule)
+			end)
+		end
+		local nodes = AlleralLayout.findNodes(rawWindow)
+		if nodes and nodes.main then
+			pcall(function()
+				nodes.main:GetPropertyChangedSignal("AbsoluteSize"):Connect(schedule)
+			end)
+		end
+		if nodes and nodes.pages then
+			pcall(function()
+				nodes.pages:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+					AlleralLayout.relayoutColumns()
+				end)
+			end)
+		end
+	end
+
 	local function wrapLibrary(Syde)
 		local themes = { "Default", "Maclib", "Private", "Dark", "Light", "Linoria", "Obsidian" }
 		local activeTheme = "Default"
@@ -382,6 +638,10 @@ return function(Core)
 				pcall(window.SetState, window, true)
 			elseif window and type(window.Toggle) == "function" then
 				pcall(window.Toggle, window)
+			end
+			if window then
+				AlleralLayout.applyRailLayout(window, AlleralLayout.getProfile())
+				AlleralLayout.relayoutColumns()
 			end
 			return true
 		end
@@ -523,6 +783,9 @@ return function(Core)
 			activeWindow = sydeWindow
 			Library.Window = sydeWindow
 			flushPendingNotifies()
+			task.defer(function()
+				AlleralLayout.install(nil, sydeWindow, settings)
+			end)
 			return sydeWindow
 		end
 
@@ -857,10 +1120,6 @@ return function(Core)
 		return groupbox
 	end
 
-	Core._UiTabRegistry = Core._UiTabRegistry or {}
-	local COLUMN_GAP = 12
-	local GROUP_GAP = 8
-
 	local function ensureSydeColumns(tab)
 		if tab._layout then
 			return tab._layout
@@ -958,7 +1217,6 @@ return function(Core)
 			groupLayout.Padding = UDim.new(0, GROUP_GAP)
 			groupLayout.Parent = group
 
-			pcall(rawTab.SetParent, rawTab, group)
 			pcall(function()
 				rawTab:Section(name, optionalIconImage(settings.Icon))
 			end)
@@ -1006,6 +1264,10 @@ return function(Core)
 		if not lib or type(lib.CreateWindow) ~= "function" then
 			return nil
 		end
+		local profile = AlleralLayout.getProfile()
+		if not settings.Size then
+			settings.Size = AlleralLayout.computeSize(profile, 4, nil)
+		end
 		local rawWindow = lib:CreateWindow(settings)
 		if not rawWindow then
 			Core.logWarn("Syde window create failed")
@@ -1018,6 +1280,7 @@ return function(Core)
 			_library = lib,
 			_initialized = false,
 			_tabGroup = rawWindow._sydeTabGroup or rawWindow._macTabGroup,
+			_alleralSettings = settings,
 		}
 		Core.registerUiWindow(window)
 		Core.flushPendingNotifications()
@@ -1043,6 +1306,7 @@ return function(Core)
 		elseif type(rawWindow.GetState) == "function" and rawWindow:GetState() == false and type(rawWindow.Toggle) == "function" then
 			pcall(rawWindow.Toggle, rawWindow)
 		end
+		AlleralLayout.install(window, rawWindow, settings)
 		return window
 	end
 
@@ -1099,6 +1363,7 @@ return function(Core)
 					if defaultTab and type(defaultTab.Select) == "function" then
 						defaultTab:Select()
 					end
+					AlleralLayout.smartResize(window, rawWindow, options)
 				end)
 			end)
 		end
@@ -1121,11 +1386,27 @@ return function(Core)
 		return window
 	end
 
-	function Core.repairUiWindow(_window)
+	function Core.repairUiWindow(window)
+		window = window or ENV.Alleral_UiWindow
+		if type(window) ~= "table" or not window._rawWindow then
+			return false
+		end
+		local rawWindow = window._rawWindow
+		if type(rawWindow.SetState) == "function" then
+			pcall(rawWindow.SetState, rawWindow, true)
+		end
+		AlleralLayout.applyRailLayout(rawWindow, AlleralLayout.getProfile())
+		AlleralLayout.relayoutColumns()
+		AlleralLayout.smartResize(window, rawWindow, window._alleralSettings)
 		return true
 	end
 
 	function Core.refreshAllTabColumns()
+		AlleralLayout.relayoutColumns()
+		local window = ENV.Alleral_UiWindow
+		if type(window) == "table" and window._rawWindow then
+			AlleralLayout.applyRailLayout(window._rawWindow, AlleralLayout.getProfile())
+		end
 		return true
 	end
 

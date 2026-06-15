@@ -1,8 +1,26 @@
 return function(Core)
 	local HttpService = game:GetService("HttpService")
 	local StarterGui = game:GetService("StarterGui")
-	local ALLERAL_ACCENT = Color3.fromHex("#53fc18")
-	local ALLERAL_ACCENT_ALT = Color3.fromHex("#30ff6a")
+	local function safeHex(hex, fallback)
+		fallback = fallback or Color3.fromRGB(83, 252, 24)
+		if Color3.fromHex then
+			local ok, color = pcall(Color3.fromHex, hex)
+			if ok and typeof(color) == "Color3" then
+				return color
+			end
+		end
+		local raw = tostring(hex or ""):gsub("#", "")
+		if #raw >= 6 then
+			return Color3.fromRGB(
+				tonumber(raw:sub(1, 2), 16) or 255,
+				tonumber(raw:sub(3, 4), 16) or 255,
+				tonumber(raw:sub(5, 6), 16) or 255
+			)
+		end
+		return fallback
+	end
+	local ALLERAL_ACCENT = safeHex("#53fc18")
+	local ALLERAL_ACCENT_ALT = safeHex("#30ff6a")
 	local function genv()
 		local ok, env = pcall(function()
 			return getgenv and getgenv() or getfenv()
@@ -242,11 +260,18 @@ end
 
 function Core.resolveRelayBase()
 	local telemetry = ENV.Alleral_Telemetry
-	if type(telemetry) == "table" and type(telemetry.GetConfig) == "function" then
-		local ok, cfg = pcall(function()
-			return telemetry:GetConfig()
-		end)
-		if ok and type(cfg) == "table" and cfg.relayUrl and cfg.relayUrl ~= "" then
+	if type(telemetry) == "table" then
+		local cfg
+		if type(telemetry.GetConfig) == "function" then
+			local ok, resolved = pcall(function()
+				return telemetry:GetConfig()
+			end)
+			if ok then
+				cfg = resolved
+			end
+		end
+		cfg = cfg or telemetry._config
+		if type(cfg) == "table" and cfg.relayUrl and cfg.relayUrl ~= "" then
 			local base = tostring(cfg.relayUrl):gsub("/+$", ""):gsub("/ingest$", "")
 			return base
 		end
@@ -299,6 +324,20 @@ local function windUiVisibilityTarget(label)
 		return label.Instance
 	end
 	return nil
+end
+
+local function fixWrappedLabels(root)
+	if not root then
+		return
+	end
+	for _, descendant in ipairs(root:GetDescendants()) do
+		if descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
+			if descendant.TextWrapped then
+				descendant.AutomaticSize = Enum.AutomaticSize.Y
+				descendant.TextYAlignment = Enum.TextYAlignment.Top
+			end
+		end
+	end
 end
 
 function Core.createWindUiGroupbox(rawGroup, uiBundle)
@@ -1155,7 +1194,9 @@ function Core.ensureCore()
 	end
 	for _, path in ipairs({ "hub/core_base.luau", "hub/core.luau", "core/alleral_core.luau", "src/alleral_core.luau", "alleral_core.luau" }) do
 		if isFile(path) then
-			local ok = pcall(loadStringFn(readFile(path), "Alleral/core")())
+			local ok = pcall(function()
+				loadStringFn(readFile(path), "Alleral/core")()
+			end)
 			if ok and ENV.Alleral_Core then
 				return ENV.Alleral_Core
 			end
@@ -2137,7 +2178,21 @@ function Core.makeSupervisor(state, loops, controllers, name, interval, callback
 	end)
 end
 
+function Core.clearAntiAfk()
+	if ENV._AlleralAntiAfkIdledConn and ENV._AlleralAntiAfkIdledConn.Disconnect then
+		pcall(function()
+			ENV._AlleralAntiAfkIdledConn:Disconnect()
+		end)
+	end
+	ENV._AlleralAntiAfkIdledConn = nil
+	ENV._AlleralAntiAfkLoopToken = (ENV._AlleralAntiAfkLoopToken or 0) + 1
+end
+
 function Core.setupAntiAfk(player)
+	if not player then
+		return
+	end
+	Core.clearAntiAfk()
 	local getConnections = ENV.getconnections or ENV.get_signal_cons
 	if getConnections then
 		for _, connection in ipairs(getConnections(player.Idled)) do
@@ -2149,16 +2204,18 @@ function Core.setupAntiAfk(player)
 		end
 	else
 		local VirtualUser = game:GetService("VirtualUser")
-		player.Idled:Connect(function()
+		ENV._AlleralAntiAfkIdledConn = player.Idled:Connect(function()
 			pcall(function()
 				VirtualUser:CaptureController()
 				VirtualUser:ClickButton2(Vector2.new(0, 0))
 			end)
 		end)
 	end
+	ENV._AlleralAntiAfkLoopToken = (ENV._AlleralAntiAfkLoopToken or 0) + 1
+	local loopToken = ENV._AlleralAntiAfkLoopToken
 	task.spawn(function()
 		local VirtualUser = game:GetService("VirtualUser")
-		while player.Parent do
+		while player.Parent and ENV._AlleralAntiAfkLoopToken == loopToken do
 			task.wait(120)
 			pcall(function()
 				local camera = workspace.CurrentCamera

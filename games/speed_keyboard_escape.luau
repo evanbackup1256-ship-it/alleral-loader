@@ -267,7 +267,23 @@ local function refreshWorldRoutes()
 end
 refreshWorldRoutes()
 
+local function safeRequire(moduleScript)
+	if not moduleScript then
+		return nil
+	end
+	local ok, result = pcall(require, moduleScript)
+	if ok then
+		return result
+	end
+	return nil
+end
+
 local Remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
+if not Remotes then
+	Core.logWarn("Remotes folder missing")
+	getgenv().Alleral_StartupFailed = "Remotes missing"
+	return
+end
 local UpdateSpeedRemote = Remotes:WaitForChild("UpdateSpeed", 10)
 local TreadmillSignalRemote = Remotes:WaitForChild("TreadmillSignal", 10)
 local ItemsShopRemote = Remotes:WaitForChild("ItemsShopAction", 10)
@@ -275,14 +291,27 @@ local ItemActionRemote = Remotes:FindFirstChild("ItemAction")
 local RebirthRemote = Remotes:WaitForChild("Rebirth", 5)
 local BuyAuraRemote = Remotes:FindFirstChild("BuyAura")
 local EquipAuraRemote = Remotes:FindFirstChild("EquipAura")
+if not UpdateSpeedRemote or not TreadmillSignalRemote then
+	Core.logWarn("Required treadmill remotes missing")
+	getgenv().Alleral_StartupFailed = "Required remotes missing"
+	return
+end
 
-local ClientState = require(ReplicatedStorage:WaitForChild("ClientState", 10))
-local NotificationSystem = require(ReplicatedStorage:WaitForChild("NotificationSystem", 10))
-local EventsConfig = require(ReplicatedStorage:WaitForChild("EventsConfig", 10))
+local ClientState = safeRequire(ReplicatedStorage:WaitForChild("ClientState", 10))
+local NotificationSystem = safeRequire(ReplicatedStorage:WaitForChild("NotificationSystem", 10))
+local EventsConfig = safeRequire(ReplicatedStorage:WaitForChild("EventsConfig", 10))
 local ConfigFolder = ReplicatedStorage:WaitForChild("Config", 10)
-local GeneralConfig = ConfigFolder:IsA("Folder")
-		and require(ConfigFolder:WaitForChild("GeneralConfig", 10))
-	or require(ConfigFolder)
+local GeneralConfig
+if ConfigFolder and ConfigFolder:IsA("Folder") then
+	GeneralConfig = safeRequire(ConfigFolder:WaitForChild("GeneralConfig", 10))
+elseif ConfigFolder then
+	GeneralConfig = safeRequire(ConfigFolder)
+end
+if not ClientState or not NotificationSystem or not GeneralConfig or not EventsConfig then
+	Core.logWarn("Required game modules missing")
+	getgenv().Alleral_StartupFailed = "Required modules missing"
+	return
+end
 
 local sensors = {
 	wallLeft = nil,
@@ -307,15 +336,37 @@ function state.BypassFunction()
 		if type(data) ~= "table" then
 			return
 		end
-		data.GoldTreadmillActive = true
-		data.DiamondTreadmillActive = true
-		data.CandyTreadmillActive = true
-		data.AdminTreadmillActive = true
-		data.AdminAbuseTreadmillActive = true
-		data.ManualGoldAccess = true
-		data.ManualDiamondAccess = true
-		data.ManualCandyAccess = true
-		data.ManualAdminAccess = true
+		local treadmillFlags = {
+			Gold = { GoldTreadmillActive = true, ManualGoldAccess = true },
+			Diamond = { DiamondTreadmillActive = true, ManualDiamondAccess = true },
+			Candy = { CandyTreadmillActive = true, ManualCandyAccess = true },
+			Admin = {
+				AdminTreadmillActive = true,
+				AdminAbuseTreadmillActive = true,
+				ManualAdminAccess = true,
+			},
+		}
+		local resetKeys = {
+			"GoldTreadmillActive",
+			"DiamondTreadmillActive",
+			"CandyTreadmillActive",
+			"AdminTreadmillActive",
+			"AdminAbuseTreadmillActive",
+			"ManualGoldAccess",
+			"ManualDiamondAccess",
+			"ManualCandyAccess",
+			"ManualAdminAccess",
+		}
+		for _, key in ipairs(resetKeys) do
+			data[key] = false
+		end
+		local target = tostring(state.TargetTreadmill or "Diamond")
+		local flags = treadmillFlags[target]
+		if flags then
+			for key, value in pairs(flags) do
+				data[key] = value
+			end
+		end
 	end)
 end
 
@@ -480,6 +531,7 @@ local function tweenTo(targetPosition)
 	while tween.PlaybackState == Enum.PlaybackState.Playing do
 		if not humanoid or humanoid.Health <= 0 then
 			tween:Cancel()
+			_G.TempTweenSpeed = nil
 			return false
 		end
 		task.wait()
@@ -683,6 +735,9 @@ end)
 Core.makeSupervisor(state, loops, loopControllers, "world2WallSensor", 0.05, function()
 	refreshWorldRoutes()
 	if not state.isWorld2 then
+		sensors.world2WallMin = math.huge
+		sensors.world2WallMax = -math.huge
+		sensors.world2WallCalibratingSince = nil
 		return
 	end
 	local wallA, wallB = refreshWorld2WallSensors()
@@ -695,9 +750,16 @@ Core.makeSupervisor(state, loops, loopControllers, "world2WallSensor", 0.05, fun
 	sensors.world2WallMax = math.max(sensors.world2WallMax, distance)
 	local span = sensors.world2WallMax - sensors.world2WallMin
 	if span > 1 then
+		sensors.world2WallCalibratingSince = nil
 		local openRatio = ((distance - sensors.world2WallMin) / span) * 100
 		state.World2WallState = openRatio > 70 and "Open" or "Closed"
 	else
+		sensors.world2WallCalibratingSince = sensors.world2WallCalibratingSince or tick()
+		if tick() - sensors.world2WallCalibratingSince > 8 then
+			sensors.world2WallMin = distance
+			sensors.world2WallMax = distance
+			sensors.world2WallCalibratingSince = tick()
+		end
 		state.World2WallState = "Calibrating"
 	end
 end)
@@ -946,6 +1008,10 @@ Core.buildStandardSettingsExtras(settingsTab, Core.settingsExtrasOptions(window,
 Core.finalizeGameUi(window, ui, {
 	Subtitle = "Speed Keyboard Escape · v" .. VERSION,
 })
+
+if state.AntiAFK ~= false then
+	Core.setupAntiAfk(LocalPlayer)
+end
 
 saveSettings()
 

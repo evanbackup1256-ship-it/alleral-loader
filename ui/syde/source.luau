@@ -101,7 +101,7 @@ local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 34
+local ALLERAL_SYDE_PATCH = 35
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -113,6 +113,14 @@ local function sydeGetCurrentCamera()
 		current = workspace.CurrentCamera
 	end
 	return current
+end
+
+local function sydeGetViewportSize()
+	local camera = sydeGetCurrentCamera()
+	if camera then
+		return camera.ViewportSize
+	end
+	return Vector2.new(1280, 720)
 end
 
 local function sydeSetClipboard(value)
@@ -1689,10 +1697,13 @@ end
 
 -- Spring physics animation system (inspired by React Framer Motion)
 local springPhysics = {
-	snappy = {stiffness = 400, damping = 25},
-	soft = {stiffness = 200, damping = 20},
-	panel = {stiffness = 300, damping = 25},
-	layout = {stiffness = 350, damping = 30},
+	snappy = {stiffness = 520, damping = 38, mass = 0.36},
+	soft = {stiffness = 420, damping = 32, mass = 0.475},
+	panel = {stiffness = 480, damping = 36, mass = 0.44},
+	layout = {stiffness = 500, damping = 38, mass = 0.45},
+	magnetic = {stiffness = 320, damping = 28, mass = 0.275},
+	tooltip = {stiffness = 560, damping = 42, mass = 0.325},
+	status = {stiffness = 500, damping = 36, mass = 0.35},
 }
 
 local activeSpringTweens = {}
@@ -1701,6 +1712,7 @@ local function springTween(object, properties, config)
 	config = config or springPhysics.panel
 	local stiffness = config.stiffness
 	local damping = config.damping
+	local mass = config.mass or 1
 	local dt = 1 / 60
 
 	-- Replacing any spring already animating this object stops the old loop.
@@ -1757,11 +1769,11 @@ local function springTween(object, properties, config)
 				local trackSettled = true
 				for i = 1, #track.value do
 					local displacement = track.value[i] - track.goal[i]
-					-- Spring acceleration: a = -stiffness * displacement - damping * velocity
-					local acceleration = -stiffness * displacement - damping * track.vel[i]
+					-- Spring acceleration: a = (-stiffness * displacement - damping * velocity) / mass
+					local acceleration = (-stiffness * displacement - damping * track.vel[i]) / mass
 					track.vel[i] = track.vel[i] + acceleration * dt
 					track.value[i] = track.value[i] + track.vel[i] * dt
-					if math.abs(track.vel[i]) > 0.05 or math.abs(displacement) > 0.05 then
+					if math.abs(track.vel[i]) > 0.02 or math.abs(displacement) > 0.02 then
 						trackSettled = false
 					end
 				end
@@ -3065,7 +3077,7 @@ function openui()
 		springTween(window, {BackgroundTransparency = 0}, springPhysics.panel)
 	end
 	
-	local viewport = game:GetService("GuiService"):GetViewportSize()
+	local viewport = sydeGetViewportSize()
 	local uiWidth = math.min(700, viewport.X * 0.9)
 	local uiHeight = math.min(560, viewport.Y * 0.85)
 	springTween(window, {Size = UDim2.new(0, uiWidth, 0, uiHeight)}, springPhysics.panel)
@@ -3100,7 +3112,7 @@ function openui()
 					springTween(v.rainbow, {ImageTransparency = 1}, springPhysics.panel)
 				end
 			end)
-			staggerDelay = staggerDelay + 0.02
+			staggerDelay = staggerDelay + 0.0175
 		end
 	end
 
