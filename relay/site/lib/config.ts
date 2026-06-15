@@ -1,6 +1,5 @@
-export const API_BASE =
-  process.env.NEXT_PUBLIC_ALLERAL_API?.replace(/\/$/, "") ||
-  "https://alleral-telemetry-production.up.railway.app";
+/** Same-origin in production; override with NEXT_PUBLIC_ALLERAL_API for split-host deploys. */
+export const API_BASE = (process.env.NEXT_PUBLIC_ALLERAL_API || "").replace(/\/$/, "");
 
 export const PUBLIC_URL =
   process.env.NEXT_PUBLIC_PUBLIC_URL || "https://alleral-telemetry-production.up.railway.app/";

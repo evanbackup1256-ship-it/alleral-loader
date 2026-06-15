@@ -57,8 +57,10 @@ export const Select = memo(function Select({
         <button
           type="button"
           className={clsx(
-            "custom-select-trigger flex w-full items-center justify-between gap-2 text-left",
-            open && "border-accent/50 shadow-[0_0_0_3px_rgba(52,211,153,0.15)]",
+            "flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-bg-1 px-3.5 py-2.5 text-left text-sm outline-none transition",
+            "hover:border-border-strong hover:bg-bg-2",
+            "focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(83,252,18,0.15)]",
+            open && "border-accent/50 shadow-[0_0_0_3px_rgba(83,252,18,0.15)]",
             disabled && "cursor-not-allowed opacity-50",
             className
           )}
@@ -67,7 +69,7 @@ export const Select = memo(function Select({
           aria-controls={listId}
         >
           <span className={clsx("truncate", !selected && "text-muted")}>{label}</span>
-          <ChevronDown className={clsx("h-4 w-4 shrink-0 text-muted transition-transform", open && "rotate-180")} />
+          <ChevronDown className={clsx("h-4 w-4 shrink-0 text-muted transition-transform duration-200", open && "rotate-180")} />
         </button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -78,7 +80,7 @@ export const Select = memo(function Select({
           align="start"
           collisionPadding={12}
           onOpenAutoFocus={(e) => e.preventDefault()}
-          className="custom-select-menu z-[600] max-h-60 w-[var(--radix-popover-trigger-width)] overflow-y-auto overscroll-contain p-1 view-enter"
+          className="z-[600] view-enter flex max-h-60 w-[var(--radix-popover-trigger-width)] flex-col gap-0.5 overflow-y-auto overscroll-contain rounded-xl border border-border-strong bg-bg-3 p-1.5 shadow-[0_24px_60px_rgba(0,0,0,0.55)]"
         >
           {items.map((opt) => {
             const active = opt.value === current;
@@ -88,11 +90,16 @@ export const Select = memo(function Select({
                 type="button"
                 role="option"
                 aria-selected={active}
-                className={clsx("custom-select-option", active && "selected")}
+                className={clsx(
+                  "flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition",
+                  active
+                    ? "bg-accent/15 text-text"
+                    : "text-muted hover:bg-white/[0.06] hover:text-text"
+                )}
                 onClick={() => pick(opt.value)}
               >
                 <span className="truncate">{opt.label}</span>
-                {active ? <Check className="h-3.5 w-3.5 shrink-0 opacity-80" /> : null}
+                {active ? <Check className="h-3.5 w-3.5 shrink-0 text-accent-bright" /> : null}
               </button>
             );
           })}
@@ -107,7 +114,7 @@ export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInp
     <input
       className={clsx(
         "w-full rounded-xl border border-border bg-bg-1 px-3.5 py-2.5 text-sm outline-none transition",
-        "focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.15)]",
+        "hover:border-border-strong focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(83,252,18,0.15)]",
         className
       )}
       {...props}
@@ -120,7 +127,7 @@ export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<H
     <textarea
       className={clsx(
         "min-h-[100px] w-full rounded-xl border border-border bg-bg-1 px-3.5 py-2.5 text-sm outline-none transition",
-        "focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.15)]",
+        "hover:border-border-strong focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(83,252,18,0.15)]",
         className
       )}
       {...props}

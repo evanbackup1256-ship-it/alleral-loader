@@ -21,7 +21,7 @@ export function Panel({
   return (
     <div
       style={style}
-      className={clsx("panel", hover && "panel-hover", glow && "shadow-[0_0_32px_rgba(52,211,153,0.12)]", pad, className)}
+      className={clsx("panel view-enter motion-pop", hover && "panel-hover", glow && "shadow-[0_0_32px_rgba(52,211,153,0.12)]", pad, className)}
     >
       {children}
     </div>

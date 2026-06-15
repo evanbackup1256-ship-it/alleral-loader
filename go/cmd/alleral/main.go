@@ -49,8 +49,24 @@ func main() {
 		r.Handle("/api/bug-report", proxy)
 		r.Handle("/api/feature-request", proxy)
 		r.Handle("/api/faq-feedback", proxy)
+		r.Handle("/api/gate/*", proxy)
+		r.Handle("/api/weao/*", proxy)
+		r.Handle("/api/admin/*", proxy)
+		r.Handle("/api/bootstrap", proxy)
+		r.Handle("/api/games/*", proxy)
+		r.Handle("/api/credits/*", proxy)
+		r.Handle("/api/manage/*", proxy)
+		r.Handle("/api/dev/*", proxy)
+		r.Handle("/api/v1/*", proxy)
+		r.Handle("/api/ban/check", proxy)
+		r.Handle("/api/ban/status", proxy)
+		r.Handle("/api/ban/roblox/*", proxy)
 		r.Handle("/api/ban/*", proxy)
 		r.Handle("/gate/*", proxy)
+		r.Handle("/scripts", proxy)
+		r.Handle("/scripts/*", proxy)
+		r.Handle("/admin/bans", proxy)
+		r.Handle("/admin/bans/*", proxy)
 	}
 
 	fileServer := spaFileServer(cfg.SiteDir)
@@ -66,15 +82,37 @@ func spaFileServer(root string) http.Handler {
 	root = filepath.Clean(root)
 	fs := http.FileServer(http.Dir(root))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := filepath.Clean(strings.TrimPrefix(r.URL.Path, "/"))
-		if path == "." || path == "" {
-			path = "index.html"
+		raw := strings.TrimPrefix(r.URL.Path, "/")
+		raw = strings.TrimSuffix(raw, "/")
+		if raw == "" {
+			r.URL.Path = "/index.html"
+			fs.ServeHTTP(w, r)
+			return
 		}
-		full := filepath.Join(root, path)
+
+		// Legacy static HTML pages (admin.html, dev.html, manage.html)
+		if !strings.Contains(raw, ".") {
+			htmlPath := filepath.Join(root, raw+".html")
+			if info, err := os.Stat(htmlPath); err == nil && !info.IsDir() {
+				r.URL.Path = "/" + raw + ".html"
+				fs.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		full := filepath.Join(root, filepath.FromSlash(raw))
 		if info, err := os.Stat(full); err == nil && !info.IsDir() {
 			fs.ServeHTTP(w, r)
 			return
 		}
+
+		indexNested := filepath.Join(root, raw, "index.html")
+		if info, err := os.Stat(indexNested); err == nil && !info.IsDir() {
+			r.URL.Path = "/" + raw + "/index.html"
+			fs.ServeHTTP(w, r)
+			return
+		}
+
 		r.URL.Path = "/index.html"
 		fs.ServeHTTP(w, r)
 	})

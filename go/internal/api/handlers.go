@@ -118,10 +118,21 @@ func (s *Server) HubVisit(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
+func normalizeProxyPath(path string) string {
+	if path == "" {
+		return "/"
+	}
+	if len(path) > 1 && strings.HasSuffix(path, "/") {
+		return strings.TrimSuffix(path, "/")
+	}
+	return path
+}
+
 func (s *Server) ProxyPython(upstream string) http.Handler {
 	target := strings.TrimRight(upstream, "/")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		url := target + r.URL.Path
+		path := normalizeProxyPath(r.URL.Path)
+		url := target + path
 		if r.URL.RawQuery != "" {
 			url += "?" + r.URL.RawQuery
 		}

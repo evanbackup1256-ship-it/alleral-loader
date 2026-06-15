@@ -2015,7 +2015,7 @@ def client_bootstrap():
     })
 
 
-@app.get("/api/gate/config")
+@app.get("/api/gate/config", strict_slashes=False)
 def gate_config():
     client_ip = resolve_client_ip(request)
     if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
@@ -2031,7 +2031,7 @@ def gate_config():
     })
 
 
-@app.post("/api/gate/verify")
+@app.post("/api/gate/verify", strict_slashes=False)
 def gate_verify():
     client_ip = resolve_client_ip(request)
     if not public_allow_ip(client_ip, GATE_IP_HITS, PUBLIC_RATE_PER_MIN):
@@ -2322,7 +2322,7 @@ def _weao_exploits_body(
     return body
 
 
-@app.get("/api/weao/exploits")
+@app.get("/api/weao/exploits", strict_slashes=False)
 def weao_exploits():
     """Live executor statuses from WEAO (WhatExpsAre.Online)."""
     client_ip = resolve_client_ip(request)

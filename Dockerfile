@@ -13,6 +13,7 @@ COPY cfg/site.json ./cfg/site.json
 COPY relay/site ./
 ENV SKIP_BACKEND_SYNC=1
 ENV ALLERAL_SITE_CONFIG=/site/cfg/site.json
+ENV NEXT_PUBLIC_ALLERAL_API=
 RUN npm run build
 
 FROM python:3.12-slim

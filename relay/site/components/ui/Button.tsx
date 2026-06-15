@@ -44,7 +44,7 @@ export function Button({
       disabled={disabled}
       onClick={onClick}
       className={clsx(
-        "inline-flex items-center justify-center gap-2 font-medium transition-[transform,filter,background] duration-150 active:scale-[0.98] disabled:opacity-50",
+        "motion-pop inline-flex items-center justify-center gap-2 font-medium transition-[transform,filter,background] duration-150 disabled:opacity-50",
         variants[variant],
         sizes[size],
         className
