@@ -101,7 +101,7 @@ local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 36
+local ALLERAL_SYDE_PATCH = 38
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -231,6 +231,13 @@ local function sydeFindChild(parent, ...)
 		end
 	end
 	return nil
+end
+
+local function sydeTopFunctions(topFrame)
+	if not topFrame then
+		return nil
+	end
+	return sydeFindChild(topFrame, "functions", "Functions")
 end
 
 local function sydeFindDescendant(parent, ...)
@@ -403,6 +410,37 @@ local function sydeConnectClick(button, callback)
 	local interact = sydeFindChild(button, "interact", "Interact")
 	if interact and interact:IsA("GuiButton") then
 		interact.MouseButton1Click:Connect(callback)
+	end
+end
+
+local function sydeConnectDropdownToggle(drop, callback)
+	if not drop or type(callback) ~= "function" then
+		return
+	end
+	local wired = {}
+	local function bind(target)
+		if not target or wired[target] then
+			return
+		end
+		wired[target] = true
+		sydeConnectClick(target, callback)
+	end
+	bind(drop.down)
+	bind(drop.selectContainer)
+	if drop.selected and drop.selected:IsA("GuiObject") then
+		bind(drop.selected)
+	end
+	local frame = type(drop) == "table" and drop._drop or drop
+	if frame and frame:IsA("GuiObject") then
+		bind(frame)
+		if not frame:IsA("GuiButton") and not sydeFindChild(frame, "interact", "Interact") then
+			frame.Active = true
+			frame.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+					callback()
+				end
+			end)
+		end
 	end
 end
 
@@ -5893,264 +5931,393 @@ function syde:Init(library)
 
 
 			function telement:Dropdown(Dropdown)
-				local data = {
-					Title = Dropdown.Title or "Temp Dropdown";
-					Options = Dropdown.Options or {};
-					StarterOption = Dropdown.StarterOption;
-					PlaceHolder = Dropdown.PlaceHolder or "Select Option...";
-					Multi = Dropdown.Multi or false;
-					CallBack = Dropdown.CallBack;
-				}
+    local data = {
+        Title = Dropdown.Title or "Temp Dropdown";
+        Options = Dropdown.Options or {};
+        StarterOption = Dropdown.StarterOption;
+        PlaceHolder = Dropdown.PlaceHolder or "Select Option...";
+        Multi = Dropdown.Multi or false;
+        CallBack = Dropdown.CallBack;
+    }
 
-				local dropdown = sydeClonePageTemplate(window.settings.pages.page, "Dropdown")
-				if not dropdown then return nil end
-				dropdown.Visible = true
-				dropdown.Parent = Page
-				dropdown.title.Text = data.Title
-				dropdown.Name = data.Title
-			local drop = sydePrepareDropdownDrop(dropdown)
-			if not drop or not drop.Container then
-				sydeWarn("[Syde] Skipping dropdown: " .. tostring(data.Title))
-				return telement
-			end
-				drop.Container.Option.Visible = false
-				drop.Container.Visible = false
-				tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
-				sydeSetDropSelectedText(drop, data.PlaceHolder)
+    local dropdown = sydeClonePageTemplate(window.settings.pages.page, "Dropdown")
+    sydeSanitizeUiClone(dropdown)
+    dropdown.Visible = true
+    dropdown.Parent = Page
+    dropdown.title.Text = data.Title
+    dropdown.Name = data.Title
 
-				local DropOpen = false
-				local DeBounce = false
-				local OptionButton = drop.Container.Option
-					sydeSanitizeUiClone(OptionButton)
-				local SelectedOptions = {}
-				local SelectedOrder = {}
+    local drop = sydePrepareDropdownDrop(dropdown)
+    if not drop or not drop.Container then
+        warn("[Syde] Skipping dropdown (no valid drop frame): " .. tostring(data.Title))
+        return telement
+    end
 
-				local function UpdateCustomLayout()
-					local yOffset = 0
-					for _, option in ipairs(drop.Container:GetChildren()) do
-						if option:IsA("Frame") and option.Visible then
-							tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
-							yOffset = yOffset + option.Size.Y.Offset + 7
-						end
-					end
-				end
+    drop.Container.Option.Visible = false
+    drop.Container.Visible = false
 
-				local function OpenDrop()
-					DropOpen = true
-					drop.Container.Visible = true
-					drop.search.Visible = true
+    tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { 
+        Size = UDim2.new(0.33, -20, 0.576, -75) 
+    }):Play()
 
-					tweenservice:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
-					tweenservice:Create(drop.UICorner, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(0, 20) }):Play()
-					tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-					tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-					tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
+    sydeSetDropSelectedText(drop, data.PlaceHolder)
 
-					tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-					tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-					tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-					tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-					tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+    local DropOpen = false
+    local DeBounce = false
+    local OptionButton = drop.Container.Option
+    local SelectedOptions = {}
+    local SelectedOrder = {}
 
-				end
+    local function UpdateCustomLayout()
+        local yOffset = 0
+        for _, option in ipairs(drop.Container:GetChildren()) do
+            if option:IsA("Frame") and option.Visible then
+                tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {
+                    Position = UDim2.new(0, 0, 0, yOffset)
+                }):Play()
+                yOffset = yOffset + option.Size.Y.Offset + 7
+            end
+        end
+    end
 
-				local function CloseDrop()
-					DropOpen = false
-					tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-					tweenservice:Create(drop.UICorner, TweenInfo.new(1, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(1,0) }):Play()
-					tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-					tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
+    local function OpenDrop()
+        DropOpen = true
+        drop.Container.Visible = true
+        if drop.search then drop.search.Visible = true end
 
-					tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-					tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-					tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-					tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+        tweenservice:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { 
+            Size = UDim2.new(1, -35, 0, 300) 
+        }):Play()
 
-					task.wait(0.6)
-					drop.Container.Visible = false
-					drop.search.Visible = false
+        if drop.UICorner then
+            tweenservice:Create(drop.UICorner, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { 
+                CornerRadius = UDim.new(0, 20) 
+            }):Play()
+        end
 
-				end
+        tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { 
+            Size = UDim2.new(1, -20, 1, -75) 
+        }):Play()
 
-				drop.down.MouseButton1Click:Connect(function()
-					if DeBounce then return end
-					DeBounce = true
+        if drop.v0 then
+            tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { 
+                BackgroundTransparency = 0 
+            }):Play()
+        end
+        if drop.down then
+            tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { 
+                Rotation = 180 
+            }):Play()
+        end
 
-					if DropOpen then
-						CloseDrop()
-					else
-						OpenDrop()
-					end
+        if drop.search then
+            tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                BackgroundTransparency = 0.65 
+            }):Play()
+            if drop.search.UIStroke then
+                tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    Transparency = 0.4 
+                }):Play()
+            end
+            if drop.search.TextBox then
+                tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    TextTransparency = 0 
+                }):Play()
+            end
+            if drop.search.ImageLabel then
+                tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    ImageTransparency = 0.9 
+                }):Play()
+            end
+            if drop.search.icon then
+                tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    ImageTransparency = 0.85 
+                }):Play()
+            end
+        end
+    end
 
-					task.delay(1.2, function()
-						DeBounce = false
-					end)
-				end)
+    local function CloseDrop()
+        DropOpen = false
+        tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { 
+            Size = UDim2.new(1, -35, 0, 95) 
+        }):Play()
 
-				local function AddToSelected(option)
-					if not SelectedOptions[option] then
-						SelectedOptions[option] = true
+        if drop.UICorner then
+            tweenservice:Create(drop.UICorner, TweenInfo.new(1, Enum.EasingStyle.Quint), { 
+                CornerRadius = UDim.new(1, 0) 
+            }):Play()
+        end
 
-						local originalIndex
-						for i, opt in ipairs(data.Options) do
-							if opt == option then
-								originalIndex = i
-								break
-							end
-						end
+        tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { 
+            Size = UDim2.new(0.33, -20, 0.576, -75) 
+        }):Play()
 
-						local insertIndex = 1
-						for i, selected in ipairs(SelectedOrder) do
-							local selectedIndex = table.find(data.Options, selected)
-							if selectedIndex and selectedIndex < originalIndex then
-								insertIndex = i + 1
-							else
-								break
-							end
-						end
-						table.insert(SelectedOrder, insertIndex, option)
-					end
-				end
+        if drop.v0 then
+            tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { 
+                BackgroundTransparency = 1 
+            }):Play()
+        end
+        if drop.down then
+            tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { 
+                Rotation = 0 
+            }):Play()
+        end
 
-				local function RemoveFromSelected(option)
-					if SelectedOptions[option] then
-						SelectedOptions[option] = nil
-						for i = #SelectedOrder, 1, -1 do
-							if SelectedOrder[i] == option then
-								table.remove(SelectedOrder, i)
-								break
-							end
-						end
-					end
+        if drop.search then
+            tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                BackgroundTransparency = 1 
+            }):Play()
+            if drop.search.UIStroke then
+                tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    Transparency = 1 
+                }):Play()
+            end
+            if drop.search.TextBox then
+                tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    TextTransparency = 1 
+                }):Play()
+            end
+            if drop.search.ImageLabel then
+                tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    ImageTransparency = 1 
+                }):Play()
+            end
+            if drop.search.icon then
+                tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    ImageTransparency = 1 
+                }):Play()
+            end
+        end
 
-					local selectedContainer = drop.selectContainer.ScrollingFrame
-					for _, child in ipairs(selectedContainer:GetChildren()) do
-						if child:IsA("Frame") and child.Name == option then
-							child:Destroy()
-							break
-						end
-					end
-				end
+        task.wait(0.6)
+        drop.Container.Visible = false
+        if drop.search then drop.search.Visible = false end
+    end
 
-				local function UpdateSelectedText()
-					local selectedContainer = drop.selectContainer.ScrollingFrame
-					local placeholderText = drop.selected
-					selectedContainer.Visible = data.Multi
-					drop.selected.Visible = false
+    sydeConnectDropdownToggle(drop, function()
+        if DeBounce then return end
+        DeBounce = true
 
+        if DropOpen then
+            CloseDrop()
+        else
+            OpenDrop()
+        end
 
-					if data.Multi then
+        task.delay(0.35, function()
+            DeBounce = false
+        end)
+    end)
 
-						if #SelectedOrder == 0 then
-							placeholderText.Visible = true
-							selectedContainer.Visible = false
-							return
-						end
+    local function AddToSelected(option)
+        if not SelectedOptions[option] then
+            SelectedOptions[option] = true
 
+            local originalIndex
+            for i, opt in ipairs(data.Options) do
+                if opt == option then
+                    originalIndex = i
+                    break
+                end
+            end
 
-						-- Create chips for each selected option
-						for _, option in ipairs(SelectedOrder) do
-							-- Prevent duplicate pills
-							if not selectedContainer:FindFirstChild(option) then
-								local optionGroup = selectedContainer.result:Clone()
-								optionGroup.Visible = true
-								optionGroup.Name = option
-								optionGroup.TextLabel.Text = option
+            local insertIndex = 1
+            for i, selected in ipairs(SelectedOrder) do
+                local selectedIndex = table.find(data.Options, selected)
+                if selectedIndex and selectedIndex < originalIndex then
+                    insertIndex = i + 1
+                else
+                    break
+                end
+            end
 
-								-- Set up remove button
-								optionGroup.X.MouseButton1Click:Connect(function()
-									RemoveFromSelected(option)
-									UpdateSelectedText()
+            table.insert(SelectedOrder, insertIndex, option)
+        end
+    end
 
-									-- Visually update the dropdown list
-									for _, opt in ipairs(drop.Container:GetChildren()) do
-										if opt:IsA("Frame") and opt.Name == option then
-											tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-											tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-											do local _optionLabel = sydeOptionLabel(opt); if _optionLabel then tweenservice:Create(_optionLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end end
-											tweenservice:Create(opt.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-											tweenservice:Create(opt.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
-										end
-									end
+    local function RemoveFromSelected(option)
+        if SelectedOptions[option] then
+            SelectedOptions[option] = nil
+            for i = #SelectedOrder, 1, -1 do
+                if SelectedOrder[i] == option then
+                    table.remove(SelectedOrder, i)
+                    break
+                end
+            end
+        end
 
-									if data.CallBack then
-										data.CallBack(SelectedOrder)
-									end
-								end)
+        local selectedContainer = drop.selectContainer and drop.selectContainer.ScrollingFrame
+        if selectedContainer then
+            for _, child in ipairs(selectedContainer:GetChildren()) do
+                if child:IsA("Frame") and child.Name == option then
+                    child:Destroy()
+                    break
+                end
+            end
+        end
+    end
 
-								optionGroup.Parent = selectedContainer
+    local function UpdateSelectedText()
+        local selectedContainer = drop.selectContainer and drop.selectContainer.ScrollingFrame
+        local hasSelectedContainer = selectedContainer ~= nil
 
-								-- Optional: auto-size width
-								task.defer(function()
-									local padding = 40
-									local textWidth = optionGroup.TextLabel.TextBounds.X
-									local totalWidth = textWidth + padding
+        if hasSelectedContainer then
+            selectedContainer.Visible = data.Multi
+        end
 
-									optionGroup.TextLabel.Size = UDim2.new(0, textWidth, 1, 0)
+        if data.Multi then
+            if drop.selected then drop.selected.Visible = false end
 
-									tweenservice:Create(optionGroup, TweenInfo.new(0.67, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, totalWidth, 0, 20)}):Play()
-								end)
-							end
-						end
+            if #SelectedOrder == 0 then
+                if drop.selected then
+                    drop.selected.Visible = true
+                    drop.selected.Text = data.PlaceHolder
+                end
+                if hasSelectedContainer then selectedContainer.Visible = false end
+                return
+            end
 
-					else
-						-- Single option text fallback
-						drop.selected.Visible = true
-						if #SelectedOrder > 0 then
-							drop.selected.Text = SelectedOrder[1]
-						else
-							sydeSetDropSelectedText(drop, data.PlaceHolder)
-						end
-					end
-				end
+            -- Create chips
+            for _, optionText in ipairs(SelectedOrder) do
+                if hasSelectedContainer and not selectedContainer:FindFirstChild(optionText) then
+                    local template = selectedContainer:FindFirstChild("result")
+                    if template then
+                        local optionGroup = template:Clone()
+                        optionGroup.Visible = true
+                        optionGroup.Name = optionText
+                        if optionGroup:FindFirstChild("TextLabel") then
+                            optionGroup.TextLabel.Text = optionText
+                        end
 
-				--[SEARCH]
-				drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
-					local searchText = drop.search.TextBox.Text:lower()
+                        -- Remove button
+                        local removeBtn = optionGroup:FindFirstChild("X")
+                        if removeBtn then
+                            removeBtn.MouseButton1Click:Connect(function()
+                                RemoveFromSelected(optionText)
+                                UpdateSelectedText()
 
-					for _, option in ipairs(drop.Container:GetChildren()) do
-						local optionLabel = sydeOptionLabel(option)
+                                for _, opt in ipairs(drop.Container:GetChildren()) do
+                                    if opt:IsA("Frame") and opt.Name == optionText then
+                                        tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                                            BackgroundTransparency = 0 
+                                        }):Play()
+                                        tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                                            BackgroundColor3 = Color3.fromRGB(33, 33, 33) 
+                                        }):Play()
 
-						if option:IsA("Frame") and optionLabel then
-							local optionText = optionLabel.Text:lower()
-							local isTemplate = option.Name == "Option"
-							local shouldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[optionLabel.Text])
+                                        local lbl = sydeOptionLabel(opt) or sydeTitleLabel(opt)
+                                        if lbl then
+                                            tweenservice:Create(lbl, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                                                TextTransparency = 0 
+                                            }):Play()
+                                        end
 
-							if shouldShow then
-								option.Visible = true
-								if SelectedOptions[optionLabel.Text] then
-									tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-									tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-									if optionLabel then tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end
-									tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-									tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
-								else
-									tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-									tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-									if optionLabel then tweenservice:Create(optionLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end
-									tweenservice:Create(option.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-									tweenservice:Create(option.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
-								end
-							else
-								-- Hide with animation, but wait before setting Visible = false
-								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-								if optionLabel then tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play() end
-								tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
-								option.Visible = false
-							end
-						end
-					end
+                                        if opt:FindFirstChild("UIStroke") then
+                                            tweenservice:Create(opt.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                                                Transparency = 0.5 
+                                            }):Play()
+                                        end
+                                        if opt:FindFirstChild("ImageLabel") then
+                                            tweenservice:Create(opt.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                                                ImageTransparency = 0.9 
+                                            }):Play()
+                                        end
+                                    end
+                                end
 
-					UpdateCustomLayout()
-				end)
+                                if data.CallBack then data.CallBack(SelectedOrder) end
+                            end)
+                        end
 
+                        optionGroup.Parent = selectedContainer
 
+                        task.defer(function()
+                            if optionGroup:FindFirstChild("TextLabel") then
+                                local textWidth = optionGroup.TextLabel.TextBounds.X
+                                optionGroup.TextLabel.Size = UDim2.new(0, textWidth, 1, 0)
+                                tweenservice:Create(optionGroup, TweenInfo.new(0.67, Enum.EasingStyle.Exponential), { 
+                                    Size = UDim2.new(0, textWidth + 40, 0, 20) 
+                                }):Play()
+                            end
+                        end)
+                    end
+                end
+            end
+        else
+            -- Single select mode
+            if drop.selected then
+                drop.selected.Visible = true
+                if #SelectedOrder > 0 then
+                    drop.selected.Text = SelectedOrder[1]
+                else
+                    drop.selected.Text = data.PlaceHolder
+                end
+            end
+            if hasSelectedContainer then
+                selectedContainer.Visible = false
+            end
+        end
+    end
 
-				local function SetDropdownOptions()
+    -- SEARCH
+    if drop.search and drop.search.TextBox then
+        drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
+            local searchText = drop.search.TextBox.Text:lower()
+
+            for _, option in ipairs(drop.Container:GetChildren()) do
+                if option:IsA("Frame") then
+                    local optionLabel = sydeTitleLabel(option) or sydeOptionLabel(option)
+                    if optionLabel then
+                        local optionText = optionLabel.Text:lower()
+                        local isTemplate = option.Name == "Option"
+                        local shouldShow = not isTemplate and 
+                            (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[optionLabel.Text])
+
+                        if shouldShow then
+                            option.Visible = true
+                            if SelectedOptions[optionLabel.Text] then
+                                tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+                                tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { BackgroundColor3 = Color3.fromRGB(39, 39, 39) }):Play()
+                                tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+                                if option:FindFirstChild("UIStroke") then
+                                    tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+                                end
+                                if option:FindFirstChild("ImageLabel") then
+                                    tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+                                end
+                            else
+                                tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+                                tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundColor3 = Color3.fromRGB(33, 33, 33) }):Play()
+                                tweenservice:Create(optionLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+                                if option:FindFirstChild("UIStroke") then
+                                    tweenservice:Create(option.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.5 }):Play()
+                                end
+                                if option:FindFirstChild("ImageLabel") then
+                                    tweenservice:Create(option.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
+                                end
+                            end
+                        else
+                            tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+                            tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { BackgroundColor3 = Color3.fromRGB(33, 33, 33) }):Play()
+                            tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+                            if option:FindFirstChild("UIStroke") then
+                                tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+                            end
+                            if option:FindFirstChild("ImageLabel") then
+                                tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+                            end
+                            option.Visible = false
+                        end
+                    end
+                end
+            end
+
+            UpdateCustomLayout()
+        end)
+    end
+
+    local function SetDropdownOptions()
 				for _, child in ipairs(drop.Container:GetChildren()) do
 					if child:IsA("Frame") and child ~= OptionButton then child:Destroy() end
 				end
@@ -6168,98 +6335,104 @@ function syde:Init(library)
 				elseif data.StarterOption ~= nil then
 					starterValues[tostring(data.StarterOption)] = true
 				end
-					local starterSet = false
-					for _, OptionText in ipairs(data.Options) do
-						local option = OptionButton:Clone()
-						sydeSanitizeUiClone(option)
-						local optionLabel = sydeOptionLabel(option)
-						if optionLabel then
-							optionLabel.Text = OptionText
-						end
-						option.Parent = drop.Container
-						option.Visible = true
-						option.Name = OptionText
+        local starterSet = false
 
-						if starterValues[tostring(OptionText)] and (data.Multi or not starterSet) then
-							starterSet = true
-							sydeSetDropSelectedText(drop, OptionText)
-							AddToSelected(OptionText)
+        for _, OptionText in ipairs(data.Options) do
+            local option = OptionButton:Clone()
+            sydeSanitizeUiClone(option)
 
-							tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-							tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
-						end
+            local optionLabel = sydeTitleLabel(option) or sydeOptionLabel(option)
+            if optionLabel then
+                optionLabel.Text = OptionText
+            end
 
-						sydeConnectClick(option, function()
-							if data.Multi then
-								if SelectedOptions[OptionText] then
-									RemoveFromSelected(OptionText)
-									tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-									tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
-								else
-									AddToSelected(OptionText)
-									tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-									tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
-								end
+            option.Parent = drop.Container
+            option.Visible = true
+            option.Name = OptionText
 
-								if data.CallBack then
-									data.CallBack(SelectedOrder)
-								end
-							else
-								drop.selected.Text = OptionText
+            if starterValues[tostring(OptionText)] and (data.Multi or not starterSet) then
+                starterSet = true
+                if drop.selected then drop.selected.Text = OptionText end
+                SelectedOptions = { [OptionText] = true }
+                SelectedOrder = { OptionText }
 
-								AddToSelected(OptionText)
+                tweenservice:Create(option, TweenInfo.new(0.3), { BackgroundColor3 = Color3.fromRGB(39, 39, 39) }):Play()
+                if option:FindFirstChild("ImageLabel") then
+                    tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), { ImageTransparency = 0 }):Play()
+                end
+            end
 
-								for _, opt in ipairs(drop.Container:GetChildren()) do
-									if opt:IsA("Frame") then
-										tweenservice:Create(opt, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-										tweenservice:Create(opt.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
-									end
-								end
+            sydeConnectClick(option, function()
+                if data.Multi then
+                    if SelectedOptions[OptionText] then
+                        RemoveFromSelected(OptionText)
+                        tweenservice:Create(option, TweenInfo.new(0.3), { BackgroundColor3 = Color3.fromRGB(33, 33, 33) }):Play()
+                        if option:FindFirstChild("ImageLabel") then
+                            tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), { ImageTransparency = 0.9 }):Play()
+                        end
+                    else
+                        AddToSelected(OptionText)
+                        tweenservice:Create(option, TweenInfo.new(0.3), { BackgroundColor3 = Color3.fromRGB(39, 39, 39) }):Play()
+                        if option:FindFirstChild("ImageLabel") then
+                            tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), { ImageTransparency = 0 }):Play()
+                        end
+                    end
 
-								tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+                    if data.CallBack then data.CallBack(SelectedOrder) end
+                else
+                    if drop.selected then drop.selected.Text = OptionText end
+                    SelectedOptions = { [OptionText] = true }
+                    SelectedOrder = { OptionText }
 
+                    for _, opt in ipairs(drop.Container:GetChildren()) do
+                        if opt:IsA("Frame") then
+                            tweenservice:Create(opt, TweenInfo.new(0.3), { BackgroundColor3 = Color3.fromRGB(33, 33, 33) }):Play()
+                            if opt:FindFirstChild("ImageLabel") then
+                                tweenservice:Create(opt.ImageLabel, TweenInfo.new(0.3), { ImageTransparency = 0.9 }):Play()
+                            end
+                        end
+                    end
 
-								if data.CallBack then
-									data.CallBack(OptionText)
-								end
+                    tweenservice:Create(option, TweenInfo.new(0.3), { BackgroundColor3 = Color3.fromRGB(39, 39, 39) }):Play()
+                    if option:FindFirstChild("ImageLabel") then
+                        tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), { ImageTransparency = 0 }):Play()
+                    end
 
+                    if data.CallBack then data.CallBack(OptionText) end
+                    CloseDrop()
+                end
 
-								CloseDrop()
-							end
+                UpdateSelectedText()
+            end)
+        end
 
-							UpdateSelectedText()
+        if not starterSet and drop.selected then
+            drop.selected.Text = data.PlaceHolder
+        end
 
-						end)
-					end
+        UpdateCustomLayout()
+    end
 
-					if not starterSet then
-						sydeSetDropSelectedText(drop, data.PlaceHolder)
-					end
-
-					UpdateCustomLayout()
-				end
-
+    SetDropdownOptions()
+    UpdateSelectedText()
+			function data:Set(value, skipCallback)
+				data.StarterOption = value
 				SetDropdownOptions()
-				function data:Set(value, skipCallback)
-					data.StarterOption = value
-					SetDropdownOptions()
-					UpdateSelectedText()
-					if not skipCallback then
-						sydeCall(data.CallBack, "Dropdown " .. tostring(data.Title), data.Multi and table.clone(SelectedOrder) or SelectedOrder[1])
-					end
+				UpdateSelectedText()
+				if not skipCallback then
+					sydeCall(data.CallBack, "Dropdown " .. tostring(data.Title), data.Multi and table.clone(SelectedOrder) or SelectedOrder[1])
 				end
-				function data:Refresh(options, value)
-					data.Options = type(options) == "table" and options or {}
-					if value ~= nil then data.StarterOption = value end
-					SetDropdownOptions()
-					UpdateSelectedText()
-				end
-				data.Instance = dropdown
-				return data
-
 			end
+			function data:Refresh(options, value)
+				data.Options = type(options) == "table" and options or {}
+				if value ~= nil then data.StarterOption = value end
+				SetDropdownOptions()
+				UpdateSelectedText()
+			end
+			data.Instance = dropdown
+			return data
 
+end
 			function telement:Slider(Slider)
 				local data = {
 					Title = Slider.Title;
@@ -9462,263 +9635,394 @@ function syde:Init(library)
 
 		--@@Dropdown
 		function initelement:Dropdown(Dropdown)
-			local data = {
-				Title = Dropdown.Title or "Temp Dropdown";
-				Options = Dropdown.Options or {};
-				StarterOption = Dropdown.StarterOption;
-				PlaceHolder = Dropdown.PlaceHolder or "Select Option...";
-				Multi = Dropdown.Multi or false;
-				CallBack = Dropdown.CallBack;
-			}
+    local data = {
+        Title = Dropdown.Title or "Temp Dropdown";
+        Options = Dropdown.Options or {};
+        StarterOption = Dropdown.StarterOption;
+        PlaceHolder = Dropdown.PlaceHolder or "Select Option...";
+        Multi = Dropdown.Multi or false;
+        CallBack = Dropdown.CallBack;
+    }
 
-			local dropdown = sydeClonePageTemplate(pages.page, "Dropdown")
-			if not dropdown then return nil end
-			dropdown.Visible = true
-			dropdown.Parent = defaultParent
-			dropdown.title.Text = data.Title
-			dropdown.Name = data.Title
-			local drop = sydePrepareDropdownDrop(dropdown)
-			if not drop or not drop.Container then
-				sydeWarn("[Syde] Skipping dropdown: " .. tostring(data.Title))
-				return initelement
-			end
-			drop.Container.Option.Visible = false
-			drop.Container.Visible = false
-			tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
-			sydeSetDropSelectedText(drop, data.PlaceHolder)
-			dropdown:SetAttribute("Searchable", true)
+    local dropdown = sydeClonePageTemplate(pages.page, "Dropdown")
+    sydeSanitizeUiClone(dropdown)
+    dropdown.Visible = true
+    dropdown.Parent = defaultParent
+    dropdown.title.Text = data.Title
+    dropdown.Name = data.Title
 
-			local DropOpen = false
-			local DeBounce = false
-			local OptionButton = drop.Container.Option
-					sydeSanitizeUiClone(OptionButton)
-			local SelectedOptions = {}
-			local SelectedOrder = {}
+    local drop = sydePrepareDropdownDrop(dropdown)
+    if not drop or not drop.Container then
+        warn("[Syde] Skipping dropdown (no valid drop frame): " .. tostring(data.Title))
+        return initelement
+    end
 
-			local function UpdateCustomLayout()
-				local yOffset = 0
-				for _, option in ipairs(drop.Container:GetChildren()) do
-					if option:IsA("Frame") and option.Visible then
-						tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
-						yOffset = yOffset + option.Size.Y.Offset + 7
-					end
-				end
-			end
+    drop.Container.Option.Visible = false
+    drop.Container.Visible = false
 
-			local function OpenDrop()
-				DropOpen = true
-				drop.Container.Visible = true
-				drop.search.Visible = true
+    tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { 
+        Size = UDim2.new(0.33, -20, 0.576, -75) 
+    }):Play()
 
-				tweenservice:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
-				tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-				tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-				tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
+    sydeSetDropSelectedText(drop, data.PlaceHolder)
+				dropdown:SetAttribute("Searchable", true)
 
-				tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-				tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-				tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-				tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-				tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+    local DropOpen = false
+    local DeBounce = false
+    local OptionButton = drop.Container.Option
+    local SelectedOptions = {}
+    local SelectedOrder = {}
 
-			end
+    local function UpdateCustomLayout()
+        local yOffset = 0
+        for _, option in ipairs(drop.Container:GetChildren()) do
+            if option:IsA("Frame") and option.Visible then
+                tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {
+                    Position = UDim2.new(0, 0, 0, yOffset)
+                }):Play()
+                yOffset = yOffset + option.Size.Y.Offset + 7
+            end
+        end
+    end
 
-			local function CloseDrop()
-				DropOpen = false
-				tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-				tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-				tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
+    local function OpenDrop()
+        DropOpen = true
+        drop.Container.Visible = true
+        if drop.search then drop.search.Visible = true end
 
-				tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-				tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-				tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-				tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-				tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+        tweenservice:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { 
+            Size = UDim2.new(1, -35, 0, 300) 
+        }):Play()
 
-				task.wait(0.6)
-				drop.Container.Visible = false
-				drop.search.Visible = false
+        if drop.UICorner then
+            tweenservice:Create(drop.UICorner, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { 
+                CornerRadius = UDim.new(0, 20) 
+            }):Play()
+        end
 
-			end
+        tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { 
+            Size = UDim2.new(1, -20, 1, -75) 
+        }):Play()
 
-			drop.down.MouseButton1Click:Connect(function()
-				if DeBounce then return end
-				DeBounce = true
+        if drop.v0 then
+            tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { 
+                BackgroundTransparency = 0 
+            }):Play()
+        end
+        if drop.down then
+            tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { 
+                Rotation = 180 
+            }):Play()
+        end
 
-				if DropOpen then
-					CloseDrop()
-				else
-					OpenDrop()
-				end
+        if drop.search then
+            tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                BackgroundTransparency = 0.65 
+            }):Play()
+            if drop.search.UIStroke then
+                tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    Transparency = 0.4 
+                }):Play()
+            end
+            if drop.search.TextBox then
+                tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    TextTransparency = 0 
+                }):Play()
+            end
+            if drop.search.ImageLabel then
+                tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    ImageTransparency = 0.9 
+                }):Play()
+            end
+            if drop.search.icon then
+                tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    ImageTransparency = 0.85 
+                }):Play()
+            end
+        end
+    end
 
-				task.delay(1.2, function()
-					DeBounce = false
-				end)
-			end)
+    local function CloseDrop()
+        DropOpen = false
+        tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { 
+            Size = UDim2.new(1, -35, 0, 95) 
+        }):Play()
 
-			local function AddToSelected(option)
-				if not SelectedOptions[option] then
-					SelectedOptions[option] = true
+        if drop.UICorner then
+            tweenservice:Create(drop.UICorner, TweenInfo.new(1, Enum.EasingStyle.Quint), { 
+                CornerRadius = UDim.new(1, 0) 
+            }):Play()
+        end
 
-					local originalIndex
-					for i, opt in ipairs(data.Options) do
-						if opt == option then
-							originalIndex = i
-							break
-						end
-					end
+        tweenservice:Create(drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { 
+            Size = UDim2.new(0.33, -20, 0.576, -75) 
+        }):Play()
 
-					local insertIndex = 1
-					for i, selected in ipairs(SelectedOrder) do
-						local selectedIndex = table.find(data.Options, selected)
-						if selectedIndex and selectedIndex < originalIndex then
-							insertIndex = i + 1
-						else
-							break
-						end
-					end
-					table.insert(SelectedOrder, insertIndex, option)
-				end
-			end
+        if drop.v0 then
+            tweenservice:Create(drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { 
+                BackgroundTransparency = 1 
+            }):Play()
+        end
+        if drop.down then
+            tweenservice:Create(drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { 
+                Rotation = 0 
+            }):Play()
+        end
 
-			local function RemoveFromSelected(option)
-				if SelectedOptions[option] then
-					SelectedOptions[option] = nil
-					for i = #SelectedOrder, 1, -1 do
-						if SelectedOrder[i] == option then
-							table.remove(SelectedOrder, i)
-							break
-						end
-					end
-				end
+        if drop.search then
+            tweenservice:Create(drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                BackgroundTransparency = 1 
+            }):Play()
+            if drop.search.UIStroke then
+                tweenservice:Create(drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    Transparency = 1 
+                }):Play()
+            end
+            if drop.search.TextBox then
+                tweenservice:Create(drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    TextTransparency = 1 
+                }):Play()
+            end
+            if drop.search.ImageLabel then
+                tweenservice:Create(drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    ImageTransparency = 1 
+                }):Play()
+            end
+            if drop.search.icon then
+                tweenservice:Create(drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                    ImageTransparency = 1 
+                }):Play()
+            end
+        end
 
-				local selectedContainer = drop.selectContainer.ScrollingFrame
-				for _, child in ipairs(selectedContainer:GetChildren()) do
-					if child:IsA("Frame") and child.Name == option then
-						child:Destroy()
-						break
-					end
-				end
-			end
+        task.wait(0.6)
+        drop.Container.Visible = false
+        if drop.search then drop.search.Visible = false end
+    end
 
-			local function UpdateSelectedText()
-				local selectedContainer = drop.selectContainer.ScrollingFrame
-				local placeholderText = drop.selected
-				selectedContainer.Visible = data.Multi
-				drop.selected.Visible = false
+    sydeConnectDropdownToggle(drop, function()
+        if DeBounce then return end
+        DeBounce = true
 
+        if DropOpen then
+            CloseDrop()
+        else
+            OpenDrop()
+        end
 
-				if data.Multi then
+        task.delay(0.35, function()
+            DeBounce = false
+        end)
+    end)
 
-					if #SelectedOrder == 0 then
-						placeholderText.Visible = true
-						selectedContainer.Visible = false
-						return
-					end
+    local function AddToSelected(option)
+        if not SelectedOptions[option] then
+            SelectedOptions[option] = true
 
+            local originalIndex
+            for i, opt in ipairs(data.Options) do
+                if opt == option then
+                    originalIndex = i
+                    break
+                end
+            end
 
-					-- Create chips for each selected option
-					for _, option in ipairs(SelectedOrder) do
-						-- Prevent duplicate pills
-						if not selectedContainer:FindFirstChild(option) then
-							local optionGroup = selectedContainer.result:Clone()
-							optionGroup.Visible = true
-							optionGroup.Name = option
-							optionGroup.TextLabel.Text = option
+            local insertIndex = 1
+            for i, selected in ipairs(SelectedOrder) do
+                local selectedIndex = table.find(data.Options, selected)
+                if selectedIndex and selectedIndex < originalIndex then
+                    insertIndex = i + 1
+                else
+                    break
+                end
+            end
 
-							-- Set up remove button
-							optionGroup.X.MouseButton1Click:Connect(function()
-								RemoveFromSelected(option)
-								UpdateSelectedText()
+            table.insert(SelectedOrder, insertIndex, option)
+        end
+    end
 
-								-- Visually update the dropdown list
-								for _, opt in ipairs(drop.Container:GetChildren()) do
-									if opt:IsA("Frame") and opt.Name == option then
-										tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-										tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-										do local _optionLabel = sydeOptionLabel(opt); if _optionLabel then tweenservice:Create(_optionLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end end
-										tweenservice:Create(opt.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-										tweenservice:Create(opt.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
-									end
-								end
+    local function RemoveFromSelected(option)
+        if SelectedOptions[option] then
+            SelectedOptions[option] = nil
+            for i = #SelectedOrder, 1, -1 do
+                if SelectedOrder[i] == option then
+                    table.remove(SelectedOrder, i)
+                    break
+                end
+            end
+        end
 
-								if data.CallBack then
-									data.CallBack(SelectedOrder)
-								end
-							end)
+        local selectedContainer = drop.selectContainer and drop.selectContainer.ScrollingFrame
+        if selectedContainer then
+            for _, child in ipairs(selectedContainer:GetChildren()) do
+                if child:IsA("Frame") and child.Name == option then
+                    child:Destroy()
+                    break
+                end
+            end
+        end
+    end
 
-							optionGroup.Parent = selectedContainer
+    local function UpdateSelectedText()
+        local selectedContainer = drop.selectContainer and drop.selectContainer.ScrollingFrame
+        local hasSelectedContainer = selectedContainer ~= nil
 
-							-- Optional: auto-size width
-							task.defer(function()
-								local padding = 40
-								local textWidth = optionGroup.TextLabel.TextBounds.X
-								local totalWidth = textWidth + padding
+        if hasSelectedContainer then
+            selectedContainer.Visible = data.Multi
+        end
 
-								optionGroup.TextLabel.Size = UDim2.new(0, textWidth, 1, 0)
+        if data.Multi then
+            if drop.selected then drop.selected.Visible = false end
 
-								tweenservice:Create(optionGroup, TweenInfo.new(0.67, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, totalWidth, 0, 20)}):Play()
-							end)
-						end
-					end
+            if #SelectedOrder == 0 then
+                if drop.selected then
+                    drop.selected.Visible = true
+                    drop.selected.Text = data.PlaceHolder
+                end
+                if hasSelectedContainer then selectedContainer.Visible = false end
+                return
+            end
 
-				else
-					-- Single option text fallback
-					drop.selected.Visible = true
-					if #SelectedOrder > 0 then
-						drop.selected.Text = SelectedOrder[1]
-					else
-						sydeSetDropSelectedText(drop, data.PlaceHolder)
-					end
-				end
-			end
+            -- Create chips
+            for _, optionText in ipairs(SelectedOrder) do
+                if hasSelectedContainer and not selectedContainer:FindFirstChild(optionText) then
+                    local template = selectedContainer:FindFirstChild("result")
+                    if template then
+                        local optionGroup = template:Clone()
+                        optionGroup.Visible = true
+                        optionGroup.Name = optionText
+                        if optionGroup:FindFirstChild("TextLabel") then
+                            optionGroup.TextLabel.Text = optionText
+                        end
 
-			--[SEARCH]
-			drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
-				local searchText = drop.search.TextBox.Text:lower()
+                        -- Remove button
+                        local removeBtn = optionGroup:FindFirstChild("X")
+                        if removeBtn then
+                            removeBtn.MouseButton1Click:Connect(function()
+                                RemoveFromSelected(optionText)
+                                UpdateSelectedText()
 
-				for _, option in ipairs(drop.Container:GetChildren()) do
-					local optionLabel = sydeOptionLabel(option)
+                                for _, opt in ipairs(drop.Container:GetChildren()) do
+                                    if opt:IsA("Frame") and opt.Name == optionText then
+                                        tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                                            BackgroundTransparency = 0 
+                                        }):Play()
+                                        tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                                            BackgroundColor3 = Color3.fromRGB(33, 33, 33) 
+                                        }):Play()
 
-					if option:IsA("Frame") and optionLabel then
-						local optionText = optionLabel.Text:lower()
-						local isTemplate = option.Name == "Option"
-						local shouldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[optionLabel.Text])
+                                        local lbl = sydeOptionLabel(opt) or sydeTitleLabel(opt)
+                                        if lbl then
+                                            tweenservice:Create(lbl, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                                                TextTransparency = 0 
+                                            }):Play()
+                                        end
 
-						if shouldShow then
-							option.Visible = true
-							if SelectedOptions[optionLabel.Text] then
-								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-								if optionLabel then tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end
-								tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
-							else
-								tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-								tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-								if optionLabel then tweenservice:Create(optionLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play() end
-								tweenservice:Create(option.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-								tweenservice:Create(option.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
-							end
-						else
-							-- Hide with animation, but wait before setting Visible = false
-							tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-							tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-							if optionLabel then tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play() end
-							tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-							tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
-							option.Visible = false
-						end
-					end
-				end
+                                        if opt:FindFirstChild("UIStroke") then
+                                            tweenservice:Create(opt.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                                                Transparency = 0.5 
+                                            }):Play()
+                                        end
+                                        if opt:FindFirstChild("ImageLabel") then
+                                            tweenservice:Create(opt.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { 
+                                                ImageTransparency = 0.9 
+                                            }):Play()
+                                        end
+                                    end
+                                end
 
-				UpdateCustomLayout()
-			end)
+                                if data.CallBack then data.CallBack(SelectedOrder) end
+                            end)
+                        end
 
+                        optionGroup.Parent = selectedContainer
 
+                        task.defer(function()
+                            if optionGroup:FindFirstChild("TextLabel") then
+                                local textWidth = optionGroup.TextLabel.TextBounds.X
+                                optionGroup.TextLabel.Size = UDim2.new(0, textWidth, 1, 0)
+                                tweenservice:Create(optionGroup, TweenInfo.new(0.67, Enum.EasingStyle.Exponential), { 
+                                    Size = UDim2.new(0, textWidth + 40, 0, 20) 
+                                }):Play()
+                            end
+                        end)
+                    end
+                end
+            end
+        else
+            -- Single select mode
+            if drop.selected then
+                drop.selected.Visible = true
+                if #SelectedOrder > 0 then
+                    drop.selected.Text = SelectedOrder[1]
+                else
+                    drop.selected.Text = data.PlaceHolder
+                end
+            end
+            if hasSelectedContainer then
+                selectedContainer.Visible = false
+            end
+        end
+    end
 
-			local function SetDropdownOptions()
+    -- SEARCH
+    if drop.search and drop.search.TextBox then
+        drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
+            local searchText = drop.search.TextBox.Text:lower()
+
+            for _, option in ipairs(drop.Container:GetChildren()) do
+                if option:IsA("Frame") then
+                    local optionLabel = sydeTitleLabel(option) or sydeOptionLabel(option)
+                    if optionLabel then
+                        local optionText = optionLabel.Text:lower()
+                        local isTemplate = option.Name == "Option"
+                        local shouldShow = not isTemplate and 
+                            (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[optionLabel.Text])
+
+                        if shouldShow then
+                            option.Visible = true
+                            if SelectedOptions[optionLabel.Text] then
+                                tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+                                tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { BackgroundColor3 = Color3.fromRGB(39, 39, 39) }):Play()
+                                tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+                                if option:FindFirstChild("UIStroke") then
+                                    tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+                                end
+                                if option:FindFirstChild("ImageLabel") then
+                                    tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+                                end
+                            else
+                                tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+                                tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundColor3 = Color3.fromRGB(33, 33, 33) }):Play()
+                                tweenservice:Create(optionLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+                                if option:FindFirstChild("UIStroke") then
+                                    tweenservice:Create(option.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.5 }):Play()
+                                end
+                                if option:FindFirstChild("ImageLabel") then
+                                    tweenservice:Create(option.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
+                                end
+                            end
+                        else
+                            tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+                            tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { BackgroundColor3 = Color3.fromRGB(33, 33, 33) }):Play()
+                            tweenservice:Create(optionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+                            if option:FindFirstChild("UIStroke") then
+                                tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+                            end
+                            if option:FindFirstChild("ImageLabel") then
+                                tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+                            end
+                            option.Visible = false
+                        end
+                    end
+                end
+            end
+
+            UpdateCustomLayout()
+        end)
+    end
+
+    local function SetDropdownOptions()
 				for _, child in ipairs(drop.Container:GetChildren()) do
 					if child:IsA("Frame") and child ~= OptionButton then child:Destroy() end
 				end
@@ -9736,99 +10040,104 @@ function syde:Init(library)
 				elseif data.StarterOption ~= nil then
 					starterValues[tostring(data.StarterOption)] = true
 				end
-				local starterSet = false
-				for _, OptionText in ipairs(data.Options) do
-					local option = OptionButton:Clone()
-					sydeSanitizeUiClone(option)
-					local optionLabel = sydeOptionLabel(option)
-					if optionLabel then
-						optionLabel.Text = OptionText
-					end
-					option.Parent = drop.Container
-					option.Visible = true
-					option.Name = OptionText
+        local starterSet = false
 
-					if starterValues[tostring(OptionText)] and (data.Multi or not starterSet) then
-						starterSet = true
-						sydeSetDropSelectedText(drop, OptionText)
-						AddToSelected(OptionText)
+        for _, OptionText in ipairs(data.Options) do
+            local option = OptionButton:Clone()
+            sydeSanitizeUiClone(option)
 
-						tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-						tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
-					end
+            local optionLabel = sydeTitleLabel(option) or sydeOptionLabel(option)
+            if optionLabel then
+                optionLabel.Text = OptionText
+            end
 
-					sydeConnectClick(option, function()
-						if data.Multi then
-							if SelectedOptions[OptionText] then
-								RemoveFromSelected(OptionText)
-								tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
-							else
-								AddToSelected(OptionText)
-								tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
-							end
+            option.Parent = drop.Container
+            option.Visible = true
+            option.Name = OptionText
 
-							if data.CallBack then
-								data.CallBack(SelectedOrder)
-							end
-						else
-							drop.selected.Text = OptionText
+            if starterValues[tostring(OptionText)] and (data.Multi or not starterSet) then
+                starterSet = true
+                if drop.selected then drop.selected.Text = OptionText end
+                SelectedOptions = { [OptionText] = true }
+                SelectedOrder = { OptionText }
 
-							AddToSelected(OptionText)
+                tweenservice:Create(option, TweenInfo.new(0.3), { BackgroundColor3 = Color3.fromRGB(39, 39, 39) }):Play()
+                if option:FindFirstChild("ImageLabel") then
+                    tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), { ImageTransparency = 0 }):Play()
+                end
+            end
 
-							for _, opt in ipairs(drop.Container:GetChildren()) do
-								if opt:IsA("Frame") then
-									tweenservice:Create(opt, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-									tweenservice:Create(opt.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
-								end
-							end
+            sydeConnectClick(option, function()
+                if data.Multi then
+                    if SelectedOptions[OptionText] then
+                        RemoveFromSelected(OptionText)
+                        tweenservice:Create(option, TweenInfo.new(0.3), { BackgroundColor3 = Color3.fromRGB(33, 33, 33) }):Play()
+                        if option:FindFirstChild("ImageLabel") then
+                            tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), { ImageTransparency = 0.9 }):Play()
+                        end
+                    else
+                        AddToSelected(OptionText)
+                        tweenservice:Create(option, TweenInfo.new(0.3), { BackgroundColor3 = Color3.fromRGB(39, 39, 39) }):Play()
+                        if option:FindFirstChild("ImageLabel") then
+                            tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), { ImageTransparency = 0 }):Play()
+                        end
+                    end
 
-							tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-							tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+                    if data.CallBack then data.CallBack(SelectedOrder) end
+                else
+                    if drop.selected then drop.selected.Text = OptionText end
+                    SelectedOptions = { [OptionText] = true }
+                    SelectedOrder = { OptionText }
 
+                    for _, opt in ipairs(drop.Container:GetChildren()) do
+                        if opt:IsA("Frame") then
+                            tweenservice:Create(opt, TweenInfo.new(0.3), { BackgroundColor3 = Color3.fromRGB(33, 33, 33) }):Play()
+                            if opt:FindFirstChild("ImageLabel") then
+                                tweenservice:Create(opt.ImageLabel, TweenInfo.new(0.3), { ImageTransparency = 0.9 }):Play()
+                            end
+                        end
+                    end
 
-							if data.CallBack then
-								data.CallBack(OptionText)
-							end
+                    tweenservice:Create(option, TweenInfo.new(0.3), { BackgroundColor3 = Color3.fromRGB(39, 39, 39) }):Play()
+                    if option:FindFirstChild("ImageLabel") then
+                        tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), { ImageTransparency = 0 }):Play()
+                    end
 
+                    if data.CallBack then data.CallBack(OptionText) end
+                    CloseDrop()
+                end
 
-							CloseDrop()
-						end
+                UpdateSelectedText()
+            end)
+        end
 
-						UpdateSelectedText()
+        if not starterSet and drop.selected then
+            drop.selected.Text = data.PlaceHolder
+        end
 
-					end)
+        UpdateCustomLayout()
+    end
+
+    SetDropdownOptions()
+    UpdateSelectedText()
+			function data:Set(value, skipCallback)
+				data.StarterOption = value
+				SetDropdownOptions()
+				UpdateSelectedText()
+				if not skipCallback then
+					sydeCall(data.CallBack, "Dropdown " .. tostring(data.Title), data.Multi and table.clone(SelectedOrder) or SelectedOrder[1])
 				end
-
-				if not starterSet then
-					sydeSetDropSelectedText(drop, data.PlaceHolder)
-				end
-
-				UpdateCustomLayout()
 			end
+			function data:Refresh(options, value)
+				data.Options = type(options) == "table" and options or {}
+				if value ~= nil then data.StarterOption = value end
+				SetDropdownOptions()
+				UpdateSelectedText()
+			end
+			data.Instance = dropdown
+			return data
 
-			SetDropdownOptions()
-			UpdateSelectedText()
-				function data:Set(value, skipCallback)
-					data.StarterOption = value
-					SetDropdownOptions()
-					UpdateSelectedText()
-					if not skipCallback then
-						sydeCall(data.CallBack, "Dropdown " .. tostring(data.Title), data.Multi and table.clone(SelectedOrder) or SelectedOrder[1])
-					end
-				end
-				function data:Refresh(options, value)
-					data.Options = type(options) == "table" and options or {}
-					if value ~= nil then data.StarterOption = value end
-					SetDropdownOptions()
-					UpdateSelectedText()
-				end
-				data.Instance = dropdown
-				return data
-
-		end
-
+end
 		--@@Colorpicker
 		function initelement:ColorPicker(ColorPicker)
 			local data = {

@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowRight, Check, Copy, ExternalLink, Gamepad2, Radio, Sparkles, Zap } from "lucide-react";
+import { ArrowRight, Check, Copy, ExternalLink, Gamepad2, Radio, Sparkles, Terminal, Zap } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { MetricCard } from "@/components/observability/MetricCard";
 import { StatusPill } from "@/components/observability/StatusPill";
 import { FreshnessChip } from "@/components/observability/FreshnessChip";
+import { InViewReveal } from "@/components/motion/InViewReveal";
 import { useLiveSyncMeta } from "@/lib/queries/hooks";
 import { resolveRelayStatus, resolveSyncStatus } from "@/lib/status/resolve";
 import { resolveResourceUrl } from "@/lib/sanitize";
@@ -30,81 +31,81 @@ export function OverviewView({
   const syncKind = resolveSyncStatus(live?.sync);
 
   return (
-    <div className="space-y-6">
-      {/* Hero */}
-      <section className="panel relative overflow-hidden p-6 md:p-10">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-accent/10 blur-3xl" />
+    <div className="bento-grid">
+      <InViewReveal className="bento-hero panel relative overflow-hidden p-6 md:p-10">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(83,252,18,0.12),transparent_45%)]" />
         <div className="relative z-[1] max-w-3xl">
-          <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="mb-5 flex flex-wrap items-center gap-2">
             <StatusPill kind={relayKind} />
             <StatusPill kind={syncKind} size="sm" />
             <FreshnessChip dataUpdatedAt={dataUpdatedAt} live />
           </div>
-          <p className="obs-kicker">Alleral Hub</p>
-          <h2 className="obs-title mt-2 hero-gradient-text">{site.brand || "Alleral"}</h2>
-          <p className="mt-4 text-base leading-relaxed text-muted md:text-lg">{site.tagline}</p>
+          <p className="obs-kicker">Alleral · v{site.loaderVersion || live?.versions?.loader || "—"}</p>
+          <h2 className="obs-title mt-3 hero-gradient-text hero-shimmer">{site.brand || "Alleral"}</h2>
+          <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted md:text-lg">{site.tagline}</p>
           {site.announcement ? (
-            <div className="mt-5 rounded-xl border border-accent/25 bg-accent/8 px-4 py-3 text-sm text-accent-bright">
+            <div className="mt-6 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent-bright">
               {site.announcement}
             </div>
           ) : null}
-          <div className="mt-8 flex flex-wrap gap-2">
-            <Button variant="primary" onClick={onCopy}>
+          <div className="mt-9 flex flex-wrap gap-3">
+            <Button variant="primary" onClick={onCopy} className="btn-glow">
               <Copy className="h-4 w-4" /> Copy loader
             </Button>
             <Button onClick={() => setView("games")}>
-              <Gamepad2 className="h-4 w-4" /> Browse games
+              <Gamepad2 className="h-4 w-4" /> Games
             </Button>
             <Button variant="ghost" onClick={() => setView("status")}>
-              <Radio className="h-4 w-4" /> Live status
+              <Radio className="h-4 w-4" /> Live ops
             </Button>
           </div>
         </div>
-      </section>
+      </InViewReveal>
 
-      {/* Stats */}
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard label="Scripts online" numeric={working} suffix={` / ${total}`} accent="green" trend="Live fleet health" />
-        <MetricCard label="Loader" value={`v${live?.versions?.loader || site.loaderVersion || "—"}`} accent="cyan" />
+      <InViewReveal className="bento-stat" delay={0.05}>
+        <MetricCard label="Fleet online" numeric={working} suffix={` / ${total}`} accent="green" trend="Live game health" />
+      </InViewReveal>
+      <InViewReveal className="bento-stat" delay={0.1}>
+        <MetricCard label="Loader" value={`v${live?.versions?.loader || site.loaderVersion || "—"}`} accent="cyan" trend="Auto-update bootstrap" />
+      </InViewReveal>
+      <InViewReveal className="bento-stat" delay={0.15}>
         <MetricCard label="Core" value={`v${live?.versions?.core || site.coreVersion || "—"}`} accent="violet" trend={`Syde patch ${site.sydePatch ?? "—"}`} />
-        <MetricCard label="UI" value={site.uiLibrary || "Syde"} accent="yellow" trend={site.uiVersion} />
-      </section>
+      </InViewReveal>
+      <InViewReveal className="bento-stat" delay={0.2}>
+        <MetricCard label="UI stack" value={site.uiLibrary || "Syde"} accent="yellow" trend={site.uiVersion} />
+      </InViewReveal>
 
-      {/* Features + loader */}
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="panel p-5 md:p-6">
-          <div className="mb-4 flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-accent" />
-            <h3 className="obs-title-sm">Why Alleral</h3>
-          </div>
-          <ul className="space-y-2">
-            {(site.features || []).slice(0, 6).map((f) => (
-              <li key={f} className="flex items-start gap-2 text-sm text-muted">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
-                <span>{f}</span>
-              </li>
-            ))}
-          </ul>
+      <InViewReveal className="bento-wide panel p-5 md:p-6" delay={0.08}>
+        <div className="mb-4 flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-accent" />
+          <h3 className="obs-title-sm">Built for executors that move fast</h3>
         </div>
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {(site.features || []).slice(0, 8).map((f) => (
+            <li key={f} className="flex items-start gap-2 rounded-xl border border-border/80 bg-bg-1/50 px-3 py-2.5 text-sm text-muted">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+              <span>{f}</span>
+            </li>
+          ))}
+        </ul>
+      </InViewReveal>
 
-        <div className="panel p-5 md:p-6">
-          <div className="obs-panel-head">
-            <div>
-              <p className="obs-kicker">Bootstrap</p>
-              <h3 className="obs-title-sm">Save once — auto-updates forever</h3>
-            </div>
-            <Button size="sm" variant="ghost" onClick={onCopy}>
-              Copy
-            </Button>
+      <InViewReveal className="bento-wide panel p-5 md:p-6" delay={0.12}>
+        <div className="obs-panel-head">
+          <div>
+            <p className="obs-kicker flex items-center gap-1.5">
+              <Terminal className="h-3.5 w-3.5" /> Bootstrap
+            </p>
+            <h3 className="obs-title-sm mt-1">Save once — ships updates automatically</h3>
           </div>
-          <pre className="mt-4 max-h-40 overflow-auto rounded-xl border border-border bg-bg-1 p-4 font-mono text-[11px] leading-relaxed text-muted obs-scroll">
-            {site.loadstring}
-          </pre>
+          <Button size="sm" variant="ghost" onClick={onCopy}>
+            Copy
+          </Button>
         </div>
-      </section>
+        <pre className="loader-block mt-4 max-h-44 overflow-auto p-4 text-muted obs-scroll">{site.loadstring}</pre>
+      </InViewReveal>
 
-      {/* Game preview */}
-      <section>
+      <InViewReveal className="bento-full" delay={0.14}>
         <div className="mb-3 flex items-center justify-between gap-2">
           <h3 className="obs-title-sm">Supported games</h3>
           <Button variant="ghost" size="sm" onClick={() => setView("games")}>
@@ -127,26 +128,24 @@ export function OverviewView({
             </button>
           ))}
         </div>
-      </section>
+      </InViewReveal>
 
-      {/* FAQ */}
       {(site.faq?.length ?? 0) > 0 ? (
-        <section className="panel p-5 md:p-6">
+        <InViewReveal className="bento-full panel p-5 md:p-6" delay={0.16}>
           <h3 className="obs-title-sm mb-4">FAQ</h3>
-          <div className="space-y-2">
+          <div className="grid gap-2 md:grid-cols-2">
             {site.faq!.map((item) => (
-              <details key={item.q} className="faq-item rounded-xl border border-border bg-bg-1 px-4 py-3">
-                <summary className="font-medium text-sm">{item.q}</summary>
+              <details key={item.q} className="faq-item rounded-xl border border-border bg-bg-1/60 px-4 py-3">
+                <summary className="text-sm font-medium">{item.q}</summary>
                 <p className="mt-2 text-sm leading-relaxed text-muted">{item.a}</p>
               </details>
             ))}
           </div>
-        </section>
+        </InViewReveal>
       ) : null}
 
-      {/* Resources */}
       {(site.resources?.length ?? 0) > 0 ? (
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <InViewReveal className="bento-full grid gap-3 sm:grid-cols-2 lg:grid-cols-3" delay={0.18}>
           {site.resources!.map((r) => {
             const href = resolveResourceUrl(site, r);
             if (!href) return null;
@@ -160,13 +159,13 @@ export function OverviewView({
               >
                 <ExternalLink className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
                 <div>
-                  <p className="font-medium text-sm">{r.title}</p>
+                  <p className="text-sm font-medium">{r.title}</p>
                   <p className="mt-1 text-xs text-muted">{r.desc}</p>
                 </div>
               </a>
             );
           })}
-        </section>
+        </InViewReveal>
       ) : null}
     </div>
   );

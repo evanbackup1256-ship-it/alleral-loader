@@ -1,37 +1,37 @@
 import type { Metadata, Viewport } from "next";
-import { Outfit, IBM_Plex_Mono } from "next/font/google";
+import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 
-const outfit = Outfit({
+const space = Space_Grotesk({
   subsets: ["latin"],
-  variable: "--font-outfit",
+  variable: "--font-space",
   display: "swap",
   preload: true,
 });
 
-const plexMono = IBM_Plex_Mono({
+const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "500", "600"],
   variable: "--font-mono",
   display: "swap",
   preload: false,
 });
 
 export const metadata: Metadata = {
-  title: "Alleral Hub",
-  description: "Roblox scripts that stay updated — live game status, loader, and executor compatibility.",
+  title: "Alleral — Script Hub",
+  description: "Roblox scripts that stay updated. Live fleet status, one-click loader, executor compatibility.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#030508",
+  themeColor: "#010102",
   width: "device-width",
   initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${outfit.variable} ${plexMono.variable}`}>
+    <html lang="en" className={`${space.variable} ${jetbrains.variable}`}>
       <body className="site-body hub-shell">
         {children}
         <Toaster
@@ -42,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           toastOptions={{
             unstyled: true,
             classNames: {
-              toast: "panel-raised px-4 py-3 text-sm",
+              toast: "panel-raised px-4 py-3 text-sm border-accent/20",
             },
           }}
         />

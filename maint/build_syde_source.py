@@ -13,7 +13,7 @@ UPSTREAM = ROOT / "ui" / "syde" / "upstream.luau"
 COMPAT = ROOT / "ui" / "syde" / "compat.luau"
 PATCHES = ROOT / "ui" / "syde" / "patches"
 OUT = ROOT / "ui" / "syde" / "source.luau"
-UPSTREAM_SHA256 = "109eb48ed795597161a57a0cb0cf4808532c1d0b2bd2fa420e758e9792f5cedf"
+UPSTREAM_SHA256 = "93824ec19a44c8c2114a794407ba489db1dfb9e38d91364c2710678bd8ef9b97"
 
 
 def read(path: Path) -> str:
@@ -65,6 +65,50 @@ def convert_dropdown_block(block: str, page_expr: str, return_name: str) -> str:
     return block
 
 
+def strip_upstream_compat(text: str) -> str:
+    marker = "-- Alleral compatibility layer for upstream Syde"
+    start = text.find(marker)
+    if start == -1:
+        return text
+    func_anchor = "local function sydeClonePageTemplate(pageContainer, templateName)"
+    func_start = text.find(func_anchor, start)
+    if func_start == -1:
+        raise RuntimeError("Could not locate embedded compat block in upstream Syde")
+    end_anchor = "\n\nlocal resizing"
+    end_idx = text.find(end_anchor, func_start)
+    if end_idx == -1:
+        raise RuntimeError("Could not locate compat block end in upstream Syde")
+    return text[:start] + text[end_idx + 2:]
+
+
+def adapt_dropdown_patch(
+    patch_text: str,
+    *,
+    page_expr: str,
+    return_name: str,
+    parent_expr: str,
+    searchable: bool = False,
+) -> str:
+    block = patch_text.replace("function telement:Dropdown", f"function {return_name}:Dropdown")
+    block = block.replace("window.settings.pages.page", page_expr)
+    block = block.replace("dropdown.Parent = Page", f"dropdown.Parent = {parent_expr}")
+    block = block.replace("return telement", f"return {return_name}")
+    if searchable:
+        block = block.replace(
+            "sydeSetDropSelectedText(drop, data.PlaceHolder)\n",
+            'sydeSetDropSelectedText(drop, data.PlaceHolder)\n\t\t\t\tdropdown:SetAttribute("Searchable", true)\n',
+            1,
+        )
+    return block
+
+
+def patch_dropdown_toggle(text: str) -> str:
+    return text.replace(
+        "drop.down.MouseButton1Click:Connect(function()",
+        "sydeConnectDropdownToggle(drop, function()",
+    )
+
+
 def adapt_modal(block: str) -> str:
     return block
 
@@ -87,6 +131,8 @@ local tabsContainer = window and sydeFindChild(window, "tabs", "Tabs")
 local tabs = tabsContainer and sydeFindChild(tabsContainer, "tab", "Tab", "tb", "Tb")
 local pages = window and sydeFindChild(window, "pages", "Pages")"""
     if old not in text:
+        if "local ui = sydeBindUi(Library)" in text:
+            return text
         raise RuntimeError("Syde UI setup anchor missing")
     return text.replace(old, new, 1)
 
@@ -832,35 +878,68 @@ def add_dropdown_handle(block: str) -> str:
         block,
     )
     block = block.replace("\n\t\t\tSetDropdownOptions()\n", "\n\t\t\tSetDropdownOptions()\n\t\t\tUpdateSelectedText()\n", 1)
-    final = block.rfind("\n\t\tend")
-    if final == -1:
-        final = block.rfind("\n\t\t\tend")
-    if final == -1:
-        raise RuntimeError("Dropdown function footer missing")
-    indent = "\t\t" if block.startswith("\t\tfunction") else "\t\t\t"
-    addition = f'''\n{indent}\tfunction data:Set(value, skipCallback)
-{indent}\t\tdata.StarterOption = value
-{indent}\t\tSetDropdownOptions()
-{indent}\t\tUpdateSelectedText()
-{indent}\t\tif not skipCallback then
-{indent}\t\t\tsydeCall(data.CallBack, "Dropdown " .. tostring(data.Title), data.Multi and table.clone(SelectedOrder) or SelectedOrder[1])
-{indent}\t\tend
+    block = block.replace("\n    SetDropdownOptions()\n", "\n    SetDropdownOptions()\n    UpdateSelectedText()\n", 1)
+    return_markers = (
+        "\n    return telement",
+        "\n    return initelement",
+        "\n\t\treturn telement",
+        "\n\t\treturn initelement",
+        "\n\t\t\treturn telement",
+        "\n\t\t\treturn initelement",
+    )
+    insert_at = -1
+    for marker in return_markers:
+        idx = block.rfind(marker)
+        if idx != -1:
+            insert_at = idx
+            break
+    if insert_at == -1:
+        final = block.rfind("\n\t\tend")
+        if final == -1:
+            final = block.rfind("\n\t\t\tend")
+        if final == -1:
+            final = block.rfind("\nend")
+        if final == -1:
+            raise RuntimeError("Dropdown function footer missing")
+    else:
+        final = insert_at
+    if block.startswith("    function") or block.startswith("\tfunction telement"):
+        indent = "    "
+    elif block.startswith("\t\tfunction"):
+        indent = "\t\t"
+    else:
+        indent = "\t\t\t"
+    addition = f'''
+{indent}function data:Set(value, skipCallback)
+{indent}\tdata.StarterOption = value
+{indent}\tSetDropdownOptions()
+{indent}\tUpdateSelectedText()
+{indent}\tif not skipCallback then
+{indent}\t\tsydeCall(data.CallBack, "Dropdown " .. tostring(data.Title), data.Multi and table.clone(SelectedOrder) or SelectedOrder[1])
 {indent}\tend
-{indent}\tfunction data:Refresh(options, value)
-{indent}\t\tdata.Options = type(options) == "table" and options or {{}}
-{indent}\t\tif value ~= nil then data.StarterOption = value end
-{indent}\t\tSetDropdownOptions()
-{indent}\t\tUpdateSelectedText()
-{indent}\tend
-{indent}\tdata.Instance = dropdown
-{indent}\treturn data
+{indent}end
+{indent}function data:Refresh(options, value)
+{indent}\tdata.Options = type(options) == "table" and options or {{}}
+{indent}\tif value ~= nil then data.StarterOption = value end
+{indent}\tSetDropdownOptions()
+{indent}\tUpdateSelectedText()
+{indent}end
+{indent}data.Instance = dropdown
+{indent}return data
 '''
+    if insert_at != -1:
+        rest = block[insert_at:]
+        end_idx = rest.find("\nend")
+        tail = rest[end_idx:] if end_idx != -1 else ""
+        return block[:insert_at] + addition + tail
     return block[:final] + addition + block[final:]
 
 
 def validate_output(body: str) -> None:
     required_counts = {
         "function syde:DisconnectAll()": 1,
+        "local function sydeConnectDropdownToggle": 1,
+        "sydeConnectDropdownToggle(drop": 2,
         "function data:Refresh(options, value)": 2,
         "local sliderHandles = {}": 2,
         "data.Instance = textinput": 2,
@@ -907,7 +986,7 @@ def validate_visual_fidelity(upstream: str, body: str) -> None:
 
 
 def main() -> None:
-    upstream = read(UPSTREAM)
+    upstream = strip_upstream_compat(read(UPSTREAM))
     upstream_hash = hashlib.sha256(upstream.encode("utf-8")).hexdigest()
     if upstream_hash != UPSTREAM_SHA256:
         raise RuntimeError(
@@ -960,10 +1039,11 @@ def main() -> None:
 
     body = replace_between(body, "function syde:Modal(Modal)", "--@@Toast", modal_block)
 
-    settings_dropdown = convert_dropdown_block(
-        extract_block(upstream, "function telement:Dropdown(Dropdown)", "\n\t\t\tfunction telement:Slider"),
-        "window.settings.pages.page",
-        "telement",
+    settings_dropdown = adapt_dropdown_patch(
+        read(PATCHES / "settings_dropdown.luau"),
+        page_expr="window.settings.pages.page",
+        return_name="telement",
+        parent_expr="Page",
     )
     settings_dropdown = add_dropdown_handle(settings_dropdown)
     body = replace_between(
@@ -973,10 +1053,12 @@ def main() -> None:
         settings_dropdown,
     )
 
-    page_dropdown = convert_dropdown_block(
-        extract_block(upstream, "function initelement:Dropdown(Dropdown)", "\n\t\t--@@Colorpicker"),
-        "pages.page",
-        "initelement",
+    page_dropdown = adapt_dropdown_patch(
+        read(PATCHES / "settings_dropdown.luau"),
+        page_expr="pages.page",
+        return_name="initelement",
+        parent_expr="defaultParent",
+        searchable=True,
     )
     page_dropdown = add_dropdown_handle(page_dropdown)
     body = replace_between(
@@ -1082,9 +1164,10 @@ syde.__AlleralPatch = ALLERAL_SYDE_PATCH
 
 return syde
 """
-    if footer_start not in body:
+    if footer_start in body:
+        body = replace_from(body, footer_start, end_patch)
+    elif "\tfunction tbdata:SetState(state)" not in body or "syde.__AlleralPatch = ALLERAL_SYDE_PATCH" not in body:
         raise RuntimeError("Syde Init footer anchor missing — upstream layout changed")
-    body = replace_from(body, footer_start, end_patch)
 
     body = silence_syde_logging(body)
     body = patch_ui_setup(body)
@@ -1094,6 +1177,7 @@ return syde
     body = patch_option_clicks(body)
     body = patch_normalized_labels(body)
     body = patch_dropdown_template(body)
+    body = patch_dropdown_toggle(body)
     body = patch_ui_main_access(body)
     body = patch_runtime_safety(body)
     body = patch_minihome_contracts(body)

@@ -163,22 +163,20 @@ function telement:Dropdown(Dropdown)
         if drop.search then drop.search.Visible = false end
     end
 
-    if drop.down then
-        drop.down.MouseButton1Click:Connect(function()
-            if DeBounce then return end
-            DeBounce = true
+    sydeConnectDropdownToggle(drop, function()
+        if DeBounce then return end
+        DeBounce = true
 
-            if DropOpen then
-                CloseDrop()
-            else
-                OpenDrop()
-            end
+        if DropOpen then
+            CloseDrop()
+        else
+            OpenDrop()
+        end
 
-            task.delay(1.2, function()
-                DeBounce = false
-            end)
+        task.delay(0.35, function()
+            DeBounce = false
         end)
-    end
+    end)
 
     local function AddToSelected(option)
         if not SelectedOptions[option] then

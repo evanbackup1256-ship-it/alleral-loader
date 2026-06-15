@@ -36,13 +36,13 @@ function SidebarNav({ online, collapsed }: { online?: boolean; collapsed: boolea
   return (
     <>
       <div className="flex items-center gap-3 border-b border-border px-4 py-4">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-accent/30 bg-accent/10">
-          <Zap className="h-4 w-4 text-accent-bright" strokeWidth={2} />
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-accent/40 bg-accent/12 shadow-[0_0_20px_rgba(83,252,18,0.15)]">
+          <Zap className="h-4 w-4 text-accent-bright" strokeWidth={2.25} />
         </div>
         {!collapsed ? (
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold tracking-tight">Alleral</p>
-            <p className="truncate text-[11px] text-muted">Script Hub</p>
+            <p className="truncate text-sm font-bold tracking-tight">Alleral</p>
+            <p className="truncate text-[11px] text-muted">Neon script hub</p>
           </div>
         ) : null}
       </div>

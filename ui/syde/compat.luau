@@ -1,7 +1,7 @@
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 37
+local ALLERAL_SYDE_PATCH = 38
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -310,6 +310,37 @@ local function sydeConnectClick(button, callback)
 	local interact = sydeFindChild(button, "interact", "Interact")
 	if interact and interact:IsA("GuiButton") then
 		interact.MouseButton1Click:Connect(callback)
+	end
+end
+
+local function sydeConnectDropdownToggle(drop, callback)
+	if not drop or type(callback) ~= "function" then
+		return
+	end
+	local wired = {}
+	local function bind(target)
+		if not target or wired[target] then
+			return
+		end
+		wired[target] = true
+		sydeConnectClick(target, callback)
+	end
+	bind(drop.down)
+	bind(drop.selectContainer)
+	if drop.selected and drop.selected:IsA("GuiObject") then
+		bind(drop.selected)
+	end
+	local frame = type(drop) == "table" and drop._drop or drop
+	if frame and frame:IsA("GuiObject") then
+		bind(frame)
+		if not frame:IsA("GuiButton") and not sydeFindChild(frame, "interact", "Interact") then
+			frame.Active = true
+			frame.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+					callback()
+				end
+			end)
+		end
 	end
 end
 

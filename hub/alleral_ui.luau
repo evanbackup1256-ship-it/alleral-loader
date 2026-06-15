@@ -12,7 +12,7 @@ return function(Core)
 		"kick/ui/syde/source.luau",
 	}
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-	local SYDE_PATCH_VERSION = 36
+	local SYDE_PATCH_VERSION = 38
 	local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
 	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
@@ -95,7 +95,11 @@ return function(Core)
 		if type(src) ~= "string" then
 			return nil
 		end
-		return tonumber(src:match("ALLERAL_SYDE_PATCH%s*=%s*(%d+)"))
+		local last
+		for patch in src:gmatch("ALLERAL_SYDE_PATCH%s*=%s*(%d+)") do
+			last = tonumber(patch)
+		end
+		return last
 	end
 
 	local function sydeSourceValid(src)

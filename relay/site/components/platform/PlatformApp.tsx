@@ -14,6 +14,7 @@ import { QueryProvider } from "@/components/providers/QueryProvider";
 import { MainScroll, ScrollContent } from "@/components/providers/MainScroll";
 import { PageTransition } from "@/components/motion/Reveal";
 import { ScrollProgress } from "@/components/ui/ScrollProgress";
+import { AmbientBackground } from "@/components/ui/AmbientBackground";
 import { SITE_SNAPSHOT } from "@/lib/site-snapshot";
 
 const CommandPalette = dynamic(
@@ -94,6 +95,7 @@ function PlatformShell({ site, online }: { site: SitePayload; online?: boolean }
 
   return (
     <>
+      <AmbientBackground />
       <LiveAlerts online={online !== false} errorMessage={error?.message} data={data} />
       <ScrollProgress />
       <div className="relative z-10 flex h-[100dvh] min-h-0">

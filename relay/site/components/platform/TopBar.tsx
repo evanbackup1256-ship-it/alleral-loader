@@ -32,7 +32,7 @@ export function TopBar({
   const meta = VIEW_META[activeView];
 
   return (
-    <header className="panel z-20 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-3 md:h-[3.75rem] md:px-5">
+    <header className="panel z-20 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/80 bg-surface-raised/80 px-3 backdrop-blur-xl md:h-[3.75rem] md:px-5">
       <div className="flex min-w-0 items-center gap-2">
         <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation">
           <Menu className="h-4 w-4" />

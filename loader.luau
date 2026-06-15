@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.2.25"
+local LOADER_VERSION = "8.2.26"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -16,7 +16,7 @@ local UI = "ui"
 local SYDE_SOURCE_PATH = UI .. "/syde/source.luau"
 local SYDE_SOURCE_MIN_BYTES = 5000
 local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
-local SYDE_PATCH_VERSION = 37 -- Fix bootstrap relaunch loop + Syde top.functions casing
+local SYDE_PATCH_VERSION = 38 -- Dropdown toggle clicks + patch version sync
 local MAX_RELAUNCHES = 3
 local RELAUNCH_COOLDOWN = 15
 local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
@@ -36,7 +36,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.2.25",
+	loader = "8.2.26",
 	core = "2.9.5",
 	ui = "Syde",
 	windui = "4.0.1-syde",
@@ -47,7 +47,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "95950b7",
+	commit = "524b4b9",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -935,7 +935,11 @@ local function sydePatchFromSource(src)
 	if type(src) ~= "string" then
 		return nil
 	end
-	return tonumber(src:match("ALLERAL_SYDE_PATCH%s*=%s*(%d+)"))
+	local last
+	for patch in src:gmatch("ALLERAL_SYDE_PATCH%s*=%s*(%d+)") do
+		last = tonumber(patch)
+	end
+	return last
 end
 
 local function sydeSourceValid(src)
@@ -1034,8 +1038,37 @@ local function clearStaleSydeRuntime()
 	end
 end
 
+local function purgeInvalidSydeSources()
+	local need = requiredSydePatch()
+	local paths = {
+		SYDE_SOURCE_PATH,
+		"kick/" .. SYDE_SOURCE_PATH,
+		".alleral/cache/" .. SYDE_SOURCE_PATH,
+	}
+	for _, path in ipairs(paths) do
+		local src = readLocal({ path }, 100)
+		if src then
+			local patch = sydePatchFromSource(src)
+			if type(patch) ~= "number" or patch ~= need then
+				deleteWorkspaceFile(path, { silent = true, label = "stale Syde" })
+				log(
+					"Purged stale Syde source "
+						.. path
+						.. " (v"
+						.. tostring(patch or "?")
+						.. " != v"
+						.. tostring(need)
+						.. ")",
+					true
+				)
+			end
+		end
+	end
+end
+
 local function ensureSydeSource()
 	clearStaleSydeRuntime()
+	purgeInvalidSydeSources()
 
 	-- 1. Check for user-provided patched override (highest priority for local fixes)
 	for _, overridePath in ipairs(SYDE_PATCHED_OVERRIDE_PATHS) do
@@ -1088,25 +1121,21 @@ local function ensureSydeSource()
 	local localPatch = sydePatchFromSource(localSrc)
 
 	if remoteOk then
-		local bestSrc, bestLabel = remoteSrc, "remote:" .. tostring(remoteVia or "github")
-		local bestPatch = remotePatch or 0
-		if localOk and (localPatch or 0) > bestPatch then
-			bestSrc, bestLabel, bestPatch = localSrc, "local:" .. tostring(localPath), localPatch or 0
-		elseif cacheOk and (cachePatch or 0) > bestPatch then
-			bestSrc, bestLabel = cacheSrc, "cache:" .. tostring(cachePath)
-		end
-		if localOk and localPath and (localPatch or 0) < (remotePatch or 0) then
+		if localOk and localPath and (localPatch or 0) ~= (remotePatch or 0) then
 			log(
 				"Replacing stale Syde source (local v"
 					.. tostring(localPatch or "?")
-					.. " < remote v"
+					.. " != remote v"
 					.. tostring(remotePatch or "?")
 					.. ")",
 				true
 			)
 			deleteWorkspaceFile(localPath)
 		end
-		return adoptSyde(bestSrc, bestLabel)
+		if cacheOk and cachePath and (cachePatch or 0) ~= (remotePatch or 0) then
+			deleteWorkspaceFile(cachePath, { silent = true, label = "stale Syde cache" })
+		end
+		return adoptSyde(remoteSrc, "remote:" .. tostring(remoteVia or "github"))
 	end
 
 	if localOk then
@@ -3240,7 +3269,7 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.2.25"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.2.26"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
