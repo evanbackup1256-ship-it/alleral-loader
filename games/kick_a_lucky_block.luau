@@ -34,7 +34,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "7.2.1"
+local VERSION = "7.2.2"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -371,6 +371,24 @@ if not Core or not ui then
 end
 
 local G = Core.Game or getgenv().Alleral_GameHelpers or {}
+
+local function gameRequireModule(moduleScript)
+	if G.gameRequire then
+		return G.gameRequire(moduleScript)
+	end
+	return require(moduleScript)
+end
+
+local function isPrivateServer()
+	if RunService:IsClient() then
+		return false
+	end
+	local private = false
+	pcall(function()
+		private = game.PrivateServerId ~= "" or game.PrivateServerOwnerId ~= 0
+	end)
+	return private
+end
 
 local function trim(value)
 	return tostring(value or ""):gsub("^%s*(.-)%s*$", "%1")
@@ -1164,16 +1182,18 @@ local function loadModule(key, label, resolver, optional)
 		return nil
 	end
 
-	local ok, result = safeCall("LoadModule:" .. label, function()
-		if G.gameRequire then
-			return G.gameRequire(target)
-		end
-		return require(target)
-	end)
+	local ok, result
+	if entry.optional then
+		ok, result = pcall(function()
+			return gameRequireModule(target)
+		end)
+	else
+		ok, result = safeCall("LoadModule:" .. label, function()
+			return gameRequireModule(target)
+		end)
+	end
 	if ok and result then
 		modules[key] = result
-		entry.giveUp = true
-	elseif entry.optional then
 		entry.giveUp = true
 	end
 	return modules[key]
@@ -1262,6 +1282,19 @@ end, true)
 loadModule("serverLuckClient", "ServerLuckClient", function()
 	return rsChild("Modules", "ServicesLoader", "ServerLuckClient")
 end, true)
+
+task.spawn(function()
+	local player = LocalPlayer or Players.LocalPlayer
+	if not player then
+		return
+	end
+	player:WaitForChild("PlayerScripts", 45)
+	task.wait(1.5)
+	if G.invalidateGameRequire then
+		G.invalidateGameRequire()
+	end
+	retryMissingModules()
+end)
 
 local function refreshBrainrotCpsCache()
 	runtime.brainrotCpsCache = {}
@@ -1367,7 +1400,7 @@ local function findPlot()
 	end
 	runtime.nextPlotLookup = tick() + 2
 	local ok, plotService = safeCall("FindPlotService", function()
-		return require(ReplicatedStorage.Modules.ServicesLoader.ClientPlotService)
+		return gameRequireModule(ReplicatedStorage.Modules.ServicesLoader.ClientPlotService)
 	end)
 	if ok and plotService and plotService.Model then
 		runtime.cachedPlot = plotService.Model
@@ -1598,7 +1631,7 @@ local function rememberWeatherReport(key)
 end
 
 local function reportWeatherEvent(weatherName, expiresAt)
-	if game.PrivateServerId ~= "" or game.PrivateServerOwnerId ~= 0 then
+	if isPrivateServer() then
 		return
 	end
 	weatherName = tostring(weatherName or "")
@@ -1782,7 +1815,7 @@ end
 
 local function getNetworkModule()
 	local ok, network = safeCall("RequireNetwork", function()
-		return require(ReplicatedStorage.Shared.Packages.Network)
+		return gameRequireModule(ReplicatedStorage.Shared.Packages.Network)
 	end)
 	if ok then
 		return network
@@ -1937,7 +1970,7 @@ local function currentBattleStatus()
 	end
 	local status = nil
 	safeCall("BattleStatus", function()
-		local m = require(ReplicatedStorage.Modules.UILoader.KickBattlesUI)
+		local m = gameRequireModule(ReplicatedStorage.Modules.UILoader.KickBattlesUI)
 		if m and m.CurrentStatus ~= nil then
 			status = tostring(m.CurrentStatus)
 		end

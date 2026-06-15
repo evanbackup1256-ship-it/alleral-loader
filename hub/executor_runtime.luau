@@ -132,7 +132,7 @@ ExecutorRuntime.REGISTRY = {
 		aliases = { "xeno" },
 		envKeys = { "Xeno" },
 		tier = "mobile",
-		ui = { min = Vector2.new(420, 320), max = Vector2.new(800, 600), rail = 56, scale = 0.9, mobile = true },
+		ui = { min = Vector2.new(520, 360), max = Vector2.new(960, 680), rail = 108, scale = 0.96, mobile = false },
 	},
 	volt = {
 		display = "Volt",

@@ -21,6 +21,7 @@ local EVENT_META = {
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Stats = game:GetService("Stats")
 local UserInputService = game:GetService("UserInputService")
@@ -301,9 +302,11 @@ local function serverInfo()
 		universeId = game.GameId
 	end)
 	local privateServer = false
-	pcall(function()
-		privateServer = game.PrivateServerId ~= nil and game.PrivateServerId ~= ""
-	end)
+	if not RunService:IsClient() then
+		pcall(function()
+			privateServer = game.PrivateServerId ~= nil and game.PrivateServerId ~= ""
+		end)
+	end
 	return {
 		placeId = game.PlaceId,
 		universeId = universeId,

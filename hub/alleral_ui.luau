@@ -305,6 +305,67 @@ return function(Core)
 	AlleralLayout._resizeToken = 0
 	AlleralLayout._activeTweens = {}
 
+	local function findChildLoose(parent, ...)
+		if not parent then
+			return nil
+		end
+		local names = { ... }
+		for _, child in ipairs(parent:GetChildren()) do
+			local lower = child.Name:lower()
+			for _, name in ipairs(names) do
+				if lower == string.lower(tostring(name)) then
+					return child
+				end
+			end
+		end
+		for _, name in ipairs(names) do
+			local direct = parent:FindFirstChild(name)
+			if direct then
+				return direct
+			end
+		end
+		return nil
+	end
+
+	local function fitSydeRailTabs(tabsFrame, railWidth)
+		if not tabsFrame or not tabsFrame:IsA("GuiObject") then
+			return
+		end
+		for _, tabButton in ipairs(tabsFrame:GetChildren()) do
+			if tabButton:IsA("GuiObject") and tabButton:FindFirstChild("title") then
+				local title = tabButton.title
+				tabButton.Size = UDim2.new(1, -6, 0, 36)
+				if title:IsA("TextLabel") then
+					title.Size = UDim2.new(1, -10, 1, 0)
+					title.Position = UDim2.new(0, 5, 0, 0)
+					title.TextXAlignment = Enum.TextXAlignment.Left
+					title.TextTruncate = Enum.TextTruncate.AtEnd
+					title.TextWrapped = false
+				end
+			end
+		end
+	end
+
+	local function stretchSydePages(pagesFrame)
+		if not pagesFrame or not pagesFrame:IsA("GuiObject") then
+			return
+		end
+		pagesFrame.ClipsDescendants = true
+		local clip = findChildLoose(pagesFrame, "clipframe", "ClipFrame", "clip")
+		if clip and clip:IsA("GuiObject") then
+			clip.AnchorPoint = Vector2.new(0, 0)
+			clip.Position = UDim2.new(0, 0, 0, 0)
+			clip.Size = UDim2.new(1, 0, 1, 0)
+		end
+		for _, page in ipairs(pagesFrame:GetChildren()) do
+			if page:IsA("ScrollingFrame") then
+				page.Size = UDim2.new(1, 0, 1, 0)
+				page.Position = UDim2.new(0, 0, 0, 0)
+				page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+			end
+		end
+	end
+
 	local tweenService = game:GetService("TweenService")
 	local MOTION_PANEL = TweenInfo.new(0.48, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	local MOTION_LAYOUT = TweenInfo.new(0.38, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -380,10 +441,10 @@ return function(Core)
 		end
 		return {
 			main = main,
-			tabs = main:FindFirstChild("tabs"),
-			pages = main:FindFirstChild("pages"),
-			top = main:FindFirstChild("top"),
-			user = main:FindFirstChild("user"),
+			tabs = findChildLoose(main, "tabs", "Tabs"),
+			pages = findChildLoose(main, "pages", "Pages"),
+			top = findChildLoose(main, "top", "Top"),
+			user = findChildLoose(main, "user", "User"),
 		}
 	end
 
@@ -394,7 +455,7 @@ return function(Core)
 		end
 		profile = profile or AlleralLayout.getProfile()
 		local ui = profile.ui or {}
-		local rail = math.clamp(tonumber(ui.rail) or 64, 48, 88)
+		local rail = math.clamp(tonumber(ui.rail) or 64, 72, 128)
 		local topHeight = 52
 		if nodes.top and nodes.top:IsA("GuiObject") then
 			topHeight = math.max(44, nodes.top.AbsoluteSize.Y)
@@ -415,6 +476,7 @@ return function(Core)
 			nodes.tabs.ScrollingDirection = Enum.ScrollingDirection.Y
 			nodes.tabs.CanvasSize = UDim2.new(0, 0, 0, 0)
 		end
+		fitSydeRailTabs(nodes.tabs, rail)
 		local tabList = nodes.tabs:FindFirstChildOfClass("UIListLayout")
 		if tabList then
 			tabList.FillDirection = Enum.FillDirection.Vertical
@@ -431,6 +493,7 @@ return function(Core)
 			nodes.pages.Position = pagesPos
 			nodes.pages.Size = pagesSize
 		end
+		stretchSydePages(nodes.pages)
 
 		if nodes.user and nodes.user:IsA("GuiObject") then
 			nodes.user.AnchorPoint = Vector2.new(1, 0)
@@ -466,7 +529,11 @@ return function(Core)
 				layout.row.Size = UDim2.new(1, 0, 0, 0)
 				layout.row.AutomaticSize = Enum.AutomaticSize.Y
 				local width = layout.row.AbsoluteSize.X
-				if width > 0 and width < 440 then
+				if width <= 0 then
+					task.defer(function()
+						AlleralLayout.relayoutColumns(false)
+					end)
+				elseif width > 0 and width < 440 then
 					layout.right.Visible = false
 					layout.left.Size = UDim2.new(1, 0, 0, 0)
 					layout.left.AutomaticSize = Enum.AutomaticSize.Y
@@ -478,8 +545,9 @@ return function(Core)
 					layout.right.AutomaticSize = Enum.AutomaticSize.Y
 				end
 				pcall(function()
-					if tab._rawTab and tab._rawTab.Page then
-						local page = tab._rawTab.Page
+					local rawTab = tab._rawTab or tab._sydeTab
+					if rawTab and rawTab.Page then
+						local page = rawTab.Page
 						local columns = page:FindFirstChild("AlleralColumns", true)
 						if columns then
 							local y = columns.AbsoluteSize.Y + 16
@@ -1192,6 +1260,7 @@ return function(Core)
 
 	function Core.wrapUiTab(rawTab, uiBundle, window)
 		local tab = {
+			_rawTab = rawTab,
 			_sydeTab = rawTab,
 			_macTab = rawTab,
 			_ui = uiBundle,

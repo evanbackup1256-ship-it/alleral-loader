@@ -5,8 +5,8 @@
     "kick_a_lucky_block": {
       "name": "Kick a Lucky Block",
       "status": "working",
-      "version": "7.2.1",
-      "message": "Fix Syde UI crash on Xeno and improve game module loading under executor sandboxes.",
+      "version": "7.2.2",
+      "message": "Fix Xeno module loading, PrivateServerId spam, and Syde UI clipping on Kick.",
       "updatedAt": "2026-06-15T21:00:00+00:00",
       "updatedBy": "system"
     },

@@ -1,5 +1,5 @@
 local Helpers = {}
-Helpers.VERSION = "1.2"
+Helpers.VERSION = "1.3"
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -141,42 +141,198 @@ function Helpers.findRemote(cache, names)
 	return nil
 end
 
-function Helpers.gameRequire(moduleScript)
-	if not moduleScript or not moduleScript:IsA("ModuleScript") then
+local MODULE_CACHE = {}
+local GAME_REQUIRE_FN = nil
+
+local function isSandboxRequireError(err)
+	err = tostring(err or "")
+	return err:find("RobloxScript", 1, true) ~= nil
+		or err:find("non%-RobloxScript", 1, true) ~= nil
+end
+
+local function gameEnvTable(env)
+	if type(env) ~= "table" then
+		return false
+	end
+	local ok, sameGame = pcall(function()
+		return env.game == game
+	end)
+	return ok and sameGame
+end
+
+local function registryModule(moduleScript)
+	local reg
+	if debug and type(debug.getregistry) == "function" then
+		local ok, value = pcall(debug.getregistry)
+		reg = ok and value or nil
+	end
+	if type(reg) ~= "table" and type(getreg) == "function" then
+		local ok, value = pcall(getreg)
+		reg = ok and value or nil
+	end
+	if type(reg) ~= "table" then
 		return nil
 	end
+	for _, value in pairs(reg) do
+		if type(value) == "table" and rawget(value, moduleScript) ~= nil then
+			return rawget(value, moduleScript)
+		end
+	end
+	return nil
+end
 
-	local function tryRequire(reqFn)
-		if type(reqFn) ~= "function" then
-			return nil
-		end
-		local ok, result = pcall(reqFn, moduleScript)
-		if ok then
-			return result
-		end
-		return nil
+local function addRequireCandidate(list, seen, reqFn, priority)
+	if type(reqFn) ~= "function" or seen[reqFn] then
+		return
+	end
+	seen[reqFn] = true
+	table.insert(list, { fn = reqFn, priority = priority or 50 })
+end
+
+local function collectRequireCandidates()
+	local list = {}
+	local seen = {}
+	addRequireCandidate(list, seen, require, 90)
+
+	if typeof(shared) == "table" then
+		addRequireCandidate(list, seen, shared.require, 12)
 	end
 
-	local direct = tryRequire(require)
-	if direct ~= nil then
-		return direct
+	if type(getrenv) == "function" then
+		local ok, renv = pcall(getrenv)
+		if ok and gameEnvTable(renv) then
+			addRequireCandidate(list, seen, renv.require, 10)
+		end
 	end
 
-	if type(getthreadidentity) == "function" and type(setthreadidentity) == "function" then
-		for _, identity in ipairs({ 8, 7, 2 }) do
-			local ok, result = pcall(function()
-				local old = getthreadidentity()
-				setthreadidentity(identity)
-				local value = require(moduleScript)
-				setthreadidentity(old)
-				return value
-			end)
-			if ok and result ~= nil then
-				return result
+	for _, key in ipairs({ "Xeno", "Volt", "Wave", "Electron", "Solara", "Krnl", "Fluxus", "Delta" }) do
+		local bucket = ENV[key]
+		if type(bucket) == "table" then
+			addRequireCandidate(list, seen, bucket.require, 14)
+		end
+	end
+
+	local scriptSet = {}
+	local function consider(script)
+		if not script or not script:IsDescendantOf(game) then
+			return
+		end
+		if script:IsDescendantOf(game:GetService("CoreGui")) then
+			return
+		end
+		scriptSet[script] = true
+	end
+
+	if type(getscripts) == "function" then
+		pcall(function()
+			for _, script in ipairs(getscripts()) do
+				consider(script)
+			end
+		end)
+	end
+
+	local player = Players.LocalPlayer
+	local playerScripts = player and player:FindFirstChild("PlayerScripts")
+	if playerScripts then
+		for _, inst in ipairs(playerScripts:GetDescendants()) do
+			if inst:IsA("LocalScript") or inst:IsA("ModuleScript") then
+				consider(inst)
 			end
 		end
 	end
 
+	local starterPlayer = game:GetService("StarterPlayer")
+	local starterScripts = starterPlayer:FindFirstChild("StarterPlayerScripts")
+	if starterScripts then
+		for _, inst in ipairs(starterScripts:GetDescendants()) do
+			if inst:IsA("LocalScript") or inst:IsA("ModuleScript") then
+				consider(inst)
+			end
+		end
+	end
+
+	local ordered = {}
+	for script in pairs(scriptSet) do
+		table.insert(ordered, script)
+	end
+	table.sort(ordered, function(a, b)
+		local aName = a:GetFullName():lower()
+		local bName = b:GetFullName():lower()
+		local function score(name)
+			if name:find("servicesloader", 1, true) then
+				return 0
+			end
+			if name:find("client", 1, true) and name:find("loader", 1, true) then
+				return 1
+			end
+			if name:find("playerscripts", 1, true) then
+				return 2
+			end
+			return 3
+		end
+		return score(aName) < score(bName)
+	end)
+
+	if type(getsenv) == "function" then
+		for index, script in ipairs(ordered) do
+			local ok, env = pcall(getsenv, script)
+			if ok and gameEnvTable(env) then
+				addRequireCandidate(list, seen, env.require, 5 + math.min(index, 20))
+			end
+		end
+	end
+
+	table.sort(list, function(a, b)
+		return a.priority < b.priority
+	end)
+	return list
+end
+
+local function resolveGameRequire(testModule)
+	if GAME_REQUIRE_FN then
+		return GAME_REQUIRE_FN
+	end
+	local probe = testModule
+	if not probe or not probe:IsA("ModuleScript") then
+		local replicated = game:GetService("ReplicatedStorage")
+		for _, inst in ipairs(replicated:GetDescendants()) do
+			if inst:IsA("ModuleScript") then
+				probe = inst
+				break
+			end
+		end
+	end
+	for _, candidate in ipairs(collectRequireCandidates()) do
+		if probe then
+			local ok, result = pcall(candidate.fn, probe)
+			if ok then
+				GAME_REQUIRE_FN = candidate.fn
+				return GAME_REQUIRE_FN
+			end
+			if not isSandboxRequireError(result) then
+				GAME_REQUIRE_FN = candidate.fn
+				return GAME_REQUIRE_FN
+			end
+		else
+			GAME_REQUIRE_FN = candidate.fn
+			return GAME_REQUIRE_FN
+		end
+	end
+	return nil
+end
+
+local function compileModule(moduleScript, reqFn)
+	if type(loadstring) ~= "function" then
+		return nil
+	end
+	local source = moduleScript.Source
+	if type(source) ~= "string" or source == "" then
+		return nil
+	end
+	local fn = loadstring(source, "@" .. moduleScript:GetFullName())
+	if not fn then
+		return nil
+	end
 	local renv = ENV
 	if type(getrenv) == "function" then
 		local ok, env = pcall(getrenv)
@@ -184,44 +340,85 @@ function Helpers.gameRequire(moduleScript)
 			renv = env
 		end
 	end
-
-	local fromRenv = tryRequire(renv and renv.require)
-	if fromRenv ~= nil then
-		return fromRenv
+	local env = setmetatable({
+		script = moduleScript,
+		require = function(target)
+			return Helpers.gameRequire(target)
+		end,
+	}, { __index = renv })
+	if setfenv then
+		setfenv(fn, env)
 	end
-
-	if type(getsenv) == "function" then
-		local player = Players.LocalPlayer
-		local playerScripts = player and player:FindFirstChild("PlayerScripts")
-		if playerScripts then
-			for _, inst in ipairs(playerScripts:GetDescendants()) do
-				if inst:IsA("LocalScript") then
-					local ok, env = pcall(getsenv, inst)
-					if ok and type(env) == "table" and type(env.require) == "function" then
-						local value = tryRequire(env.require)
-						if value ~= nil then
-							return value
-						end
-					end
-				end
+	local ok, result = pcall(fn)
+	if ok then
+		return result
+	end
+	if reqFn and reqFn ~= require then
+		env.require = function(target)
+			if target == moduleScript then
+				error("recursive require")
 			end
+			local okInner, value = pcall(reqFn, target)
+			if okInner then
+				return value
+			end
+			return Helpers.gameRequire(target)
 		end
-	end
-
-	if type(loadstring) == "function" and type(moduleScript.Source) == "string" and moduleScript.Source ~= "" then
-		local ok, result = pcall(function()
-			local fn = loadstring(moduleScript.Source, moduleScript:GetFullName())
-			if not fn then
-				return nil
-			end
-			if setfenv and renv then
-				setfenv(fn, renv)
-			end
-			return fn()
-		end)
-		if ok and result ~= nil then
+		ok, result = pcall(fn)
+		if ok then
 			return result
 		end
+	end
+	return nil
+end
+
+function Helpers.invalidateGameRequire()
+	GAME_REQUIRE_FN = nil
+end
+
+function Helpers.gameRequire(moduleScript)
+	if not moduleScript or not moduleScript:IsA("ModuleScript") then
+		return nil
+	end
+	if MODULE_CACHE[moduleScript] ~= nil then
+		return MODULE_CACHE[moduleScript]
+	end
+
+	local cached = registryModule(moduleScript)
+	if cached ~= nil then
+		MODULE_CACHE[moduleScript] = cached
+		return cached
+	end
+
+	if type(getthreadidentity) == "function" and type(setthreadidentity) == "function" then
+		for _, identity in ipairs({ 8, 7, 4, 2, 0 }) do
+			local ok, result = pcall(function()
+				local old = getthreadidentity()
+				setthreadidentity(identity)
+				local value = require(moduleScript)
+				setthreadidentity(old)
+				return value
+			end)
+			if ok then
+				MODULE_CACHE[moduleScript] = result
+				return result
+			end
+		end
+	end
+
+	local reqFn = resolveGameRequire(moduleScript)
+	if reqFn then
+		local ok, result = pcall(reqFn, moduleScript)
+		if ok then
+			MODULE_CACHE[moduleScript] = result
+			return result
+		end
+	end
+
+	local compiled = compileModule(moduleScript, reqFn)
+	if compiled ~= nil then
+		MODULE_CACHE[moduleScript] = compiled
+		return compiled
 	end
 
 	return nil

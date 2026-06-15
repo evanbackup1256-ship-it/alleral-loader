@@ -43,7 +43,7 @@ local RELEASE_FALLBACK = {
 	alleral = "4.0.1-syde",
 	analytics = "1.2",
 	telemetry = "3.4",
-	helpers = "1.2",
+	helpers = "1.3",
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
@@ -2722,7 +2722,7 @@ local GAMES = {
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
-		version = "7.2.1",
+		version = "7.2.2",
 		placeIds = { 89469502395769 },
 		universeIds = { 10004244222 },
 		scriptFiles = { "games/kick_a_lucky_block.luau", "kick_a_lucky_block.luau" },
