@@ -14,6 +14,7 @@ return function(Core)
 	local SYDE_PATCH_MARKER = "ALLERAL_SYDE_PATCH"
 	local SYDE_PATCH_VERSION = 40
 	local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
+	local SYDE_SEARCH_GUARD_FN = "sydeWindowSearch"
 	local SYDE_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
 	local SYDE_RAW_URLS = {
 			"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/syde/source.luau",
@@ -109,7 +110,8 @@ return function(Core)
 			or not src:find("sydeFindChild", 1, true)
 			or not src:find(SYDE_PATCH_MARKER, 1, true)
 			or not src:find("sydePrepareDropdownDrop", 1, true)
-			or not src:find(SYDE_PATCH_REQUIRED_FN, 1, true) then
+			or not src:find(SYDE_PATCH_REQUIRED_FN, 1, true)
+			or not src:find(SYDE_SEARCH_GUARD_FN, 1, true) then
 			return false
 		end
 		local patch = sydePatchFromSource(src)

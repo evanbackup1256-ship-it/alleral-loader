@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.3.1"
+local LOADER_VERSION = "8.3.2"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -20,6 +20,7 @@ local SYDE_PATCH_VERSION = 40 -- Guard optional window search UI on stripped Syd
 local MAX_RELAUNCHES = 3
 local RELAUNCH_COOLDOWN = 15
 local SYDE_PATCH_REQUIRED_FN = "sydePrepareDropdownDrop"
+local SYDE_SEARCH_GUARD_FN = "sydeWindowSearch"
 local SYDE_PATCHED_OVERRIDE_PATHS = {
 	"syde_patched.luau",
 	"patched_syde.luau",
@@ -36,7 +37,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.3.1",
+	loader = "8.3.2",
 	core = "2.9.5",
 	ui = "Syde",
 	windui = "4.1.0-studio",
@@ -949,6 +950,7 @@ local function sydeSourceValid(src)
 		or not src:find(SYDE_PATCH_MARKER, 1, true)
 		or not src:find("sydePrepareDropdownDrop", 1, true)
 		or not src:find(SYDE_PATCH_REQUIRED_FN, 1, true)
+		or not src:find(SYDE_SEARCH_GUARD_FN, 1, true)
 		or not looksLikeLua(src) then
 		return false
 	end
@@ -978,6 +980,9 @@ local function sydeSourceRejectReason(src)
 	end
 	if not src:find(SYDE_PATCH_REQUIRED_FN, 1, true) then
 		return "missing " .. SYDE_PATCH_REQUIRED_FN
+	end
+	if not src:find(SYDE_SEARCH_GUARD_FN, 1, true) then
+		return "missing " .. SYDE_SEARCH_GUARD_FN
 	end
 	local patch = sydePatchFromSource(src)
 	local need = requiredSydePatch()
@@ -3316,7 +3321,7 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.3.1"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.3.2"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
