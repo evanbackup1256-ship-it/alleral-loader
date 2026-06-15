@@ -80,16 +80,14 @@ end
 
 local function relaunchViaBootstrap(reason)
 	reason = reason or "relaunch"
-	if type(stopAutoUpdater) == "function" then
-		stopAutoUpdater()
-	end
-	if type(ENV.Alleral_Bootstrap) == "function" then
 	if ENV._Alleral_BootstrapRunning then
 		return false, "bootstrap already running"
 	end
-		local ok, result = ENV.Alleral_Bootstrap(reason)
-		return ok == true, result
+	if type(stopAutoUpdater) == "function" then
+		stopAutoUpdater()
 	end
+	-- Never call ENV.Alleral_Bootstrap here — loader publishes a wrapper that calls this
+	-- function back, which caused infinite recursion / stack overflow.
 	local src, via = httpGet(GITHUB_RAW .. "/" .. BOOTSTRAP_REMOTE_PATH .. "?t=" .. tostring(tick()), 200)
 	if type(src) ~= "string" or #src < 200 then
 		return false, "bootstrap fetch failed (" .. tostring(via) .. ")"

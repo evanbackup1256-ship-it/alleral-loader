@@ -66,7 +66,7 @@ export function OverviewView({
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard label="Scripts online" numeric={working} suffix={` / ${total}`} accent="green" trend="Live fleet health" />
         <MetricCard label="Loader" value={`v${live?.versions?.loader || site.loaderVersion || "—"}`} accent="cyan" />
-        <MetricCard label="Core" value={`v${live?.versions?.core || site.coreVersion || "—"}`} accent="violet" trend={`Syde patch ${site.sydePatch ?? live?.versions?.sydePatch ?? "—"}`} />
+        <MetricCard label="Core" value={`v${live?.versions?.core || site.coreVersion || "—"}`} accent="violet" trend={`Syde patch ${site.sydePatch ?? "—"}`} />
         <MetricCard label="UI" value={site.uiLibrary || "Syde"} accent="yellow" trend={site.uiVersion} />
       </section>
 

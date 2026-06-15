@@ -2560,6 +2560,10 @@ if not window then
 	sydeWarn("[Syde] Library missing main frame")
 end
 local top = window and sydeFindChild(window, "top", "Top")
+local topFunctions = top and sydeTopFunctions(top)
+local settingsFrame = window and sydeFindChild(window, "settings", "Settings")
+local settingsTop = settingsFrame and sydeFindChild(settingsFrame, "top", "Top")
+local settingsTopFunctions = settingsTop and sydeTopFunctions(settingsTop)
 local tabsContainer = window and sydeFindChild(window, "tabs", "Tabs")
 local tabs = tabsContainer and sydeFindChild(tabsContainer, "tab", "Tab", "tb", "Tb")
 local pages = window and sydeFindChild(window, "pages", "Pages")
@@ -3115,14 +3119,17 @@ function openui()
 		end
 	end
 
-	springTween(window.top.functions, {BackgroundTransparency = 0}, springPhysics.panel)
+	if topFunctions then
+		springTween(topFunctions, {BackgroundTransparency = 0}, springPhysics.panel)
+	end
 
 	if window.wallpaper.ison.Value  then
 		springTween(window.wallpaper, {ImageTransparency = 0.84}, springPhysics.panel)
 	end
 
 	local staggerDelay = 0
-	for i,v in pairs(window.top.functions:GetChildren()) do
+	if topFunctions then
+		for i,v in pairs(topFunctions:GetChildren()) do
 		if v:IsA("Frame") then
 			task.delay(staggerDelay, function()
 				springTween(v, {BackgroundTransparency = 0.8}, springPhysics.panel)
@@ -3139,6 +3146,7 @@ function openui()
 			end)
 			staggerDelay = staggerDelay + 0.0175
 		end
+	end
 	end
 
 	springTween(window.shadow.ImageLabel, {ImageTransparency = 0.5}, springPhysics.panel)
@@ -3183,22 +3191,23 @@ function closeui()
 
 	syde:UnbindFrame(window)
 
-
-	springTween(window.top.functions, {BackgroundTransparency = 1}, springPhysics.snappy)
-	local staggerDelay = 0
-	for i,v in pairs(window.top.functions:GetChildren()) do
-		if v:IsA("Frame") then
-			task.delay(staggerDelay, function()
-				springTween(v, {BackgroundTransparency = 1}, springPhysics.snappy)
-				v.Visible = false
-				for i,v2 in pairs(v:GetChildren()) do
-					if v2:IsA("ImageLabel") then
-						springTween(v2, {ImageTransparency = 1}, springPhysics.snappy)
-						v2.Visible = false
+	if topFunctions then
+		springTween(topFunctions, {BackgroundTransparency = 1}, springPhysics.snappy)
+		local staggerDelay = 0
+		for i,v in pairs(topFunctions:GetChildren()) do
+			if v:IsA("Frame") then
+				task.delay(staggerDelay, function()
+					springTween(v, {BackgroundTransparency = 1}, springPhysics.snappy)
+					v.Visible = false
+					for i,v2 in pairs(v:GetChildren()) do
+						if v2:IsA("ImageLabel") then
+							springTween(v2, {ImageTransparency = 1}, springPhysics.snappy)
+							v2.Visible = false
+						end
 					end
-				end
-			end)
-			staggerDelay = staggerDelay + 0.015
+				end)
+				staggerDelay = staggerDelay + 0.015
+			end
 		end
 	end
 
@@ -3265,21 +3274,27 @@ function ToggleUI()
 	end)
 end
 
-window.top.functions.close.interact.MouseButton1Click:Connect(function()
-	syde:Modal({
-		Title = 'Please Confirm Below.',
-		Content = 'Are You Sure You Want To Close This UI?',
-		ConfimCallBack = function()
-			mh = false
-			rs:Disconnect()
-			ss:Disconnect()
-			--	if not ui.Parent then return end
-			syde:DisconnectAll()
-			task.wait(1)
-			Library:Destroy()
-		end,
-	})
-end)
+if topFunctions then
+	local closeFrame = sydeFindChild(topFunctions, "close", "Close")
+	local closeInteract = closeFrame and sydeFindDescendant(closeFrame, "interact", "Interact")
+	if closeInteract and closeInteract:IsA("GuiButton") then
+		closeInteract.MouseButton1Click:Connect(function()
+			syde:Modal({
+				Title = 'Please Confirm Below.',
+				Content = 'Are You Sure You Want To Close This UI?',
+				ConfimCallBack = function()
+					mh = false
+					rs:Disconnect()
+					ss:Disconnect()
+					--	if not ui.Parent then return end
+					syde:DisconnectAll()
+					task.wait(1)
+					Library:Destroy()
+				end,
+			})
+		end)
+	end
+end
 
 
 syde:HidePH(tabs, 'btn')
@@ -3455,7 +3470,8 @@ function syde:Init(library)
 	local RainbowStates = {}
 
 
-	for _, v in ipairs(top.functions:GetChildren()) do
+	if topFunctions then
+		for _, v in ipairs(topFunctions:GetChildren()) do
 		if not v:IsA("Frame") then continue end
 		if not v:FindFirstChild("ImageLabel") then continue end
 
@@ -3531,6 +3547,7 @@ function syde:Init(library)
 			end
 		end)
 	end
+	end
 
 
 	--[[if not searchopen then
@@ -3545,20 +3562,26 @@ function syde:Init(library)
 	local debounce = false
 	local DEBOUNCE_TIME = 0.1
 
-	top.functions.search.interact.MouseButton1Click:Connect(function()
-		if debounce then return end
-		debounce = true
+	if topFunctions then
+		local searchFrame = sydeFindChild(topFunctions, "search", "Search")
+		local searchInteract = searchFrame and sydeFindDescendant(searchFrame, "interact", "Interact")
+		if searchInteract and searchInteract:IsA("GuiButton") then
+			searchInteract.MouseButton1Click:Connect(function()
+				if debounce then return end
+				debounce = true
 
-		if not searchopen then
-			opensearch()
-		else
-			closesearch()
+				if not searchopen then
+					opensearch()
+				else
+					closesearch()
+				end
+
+				task.delay(DEBOUNCE_TIME, function()
+					debounce = false
+				end)
+			end)
 		end
-
-		task.delay(DEBOUNCE_TIME, function()
-			debounce = false
-		end)
-	end)
+	end
 
 
 
@@ -4184,8 +4207,15 @@ function syde:Init(library)
 			tweenservice:Create(window.settings.top.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0}):Play()
 		end
 		tweenservice:Create(window.settings.top.separator, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0}):Play()
-		tweenservice:Create(window.settings.top.functions.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0}):Play()
-		tweenservice:Create(window.settings.top.functions.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0}):Play()
+		if settingsTopFunctions then
+			local settingsClose = sydeFindChild(settingsTopFunctions, "close", "Close")
+			if settingsClose then
+				tweenservice:Create(settingsClose, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0}):Play()
+				if settingsClose:FindFirstChild("ImageLabel") then
+					tweenservice:Create(settingsClose.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0}):Play()
+				end
+			end
+		end
 	end
 
 	function closesettings()
@@ -4201,8 +4231,15 @@ function syde:Init(library)
 			tweenservice:Create(window.settings.top.title, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { TextTransparency = 1}):Play()
 		end
 		tweenservice:Create(window.settings.top.separator, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-		tweenservice:Create(window.settings.top.functions.close, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-		tweenservice:Create(window.settings.top.functions.close.ImageLabel, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { ImageTransparency = 1}):Play()
+		if settingsTopFunctions then
+			local settingsClose = sydeFindChild(settingsTopFunctions, "close", "Close")
+			if settingsClose then
+				tweenservice:Create(settingsClose, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
+				if settingsClose:FindFirstChild("ImageLabel") then
+					tweenservice:Create(settingsClose.ImageLabel, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { ImageTransparency = 1}):Play()
+				end
+			end
+		end
 		task.wait(0.6)
 		window.settings.Visible = false
 		window.dim.Visible = false
@@ -4212,25 +4249,43 @@ function syde:Init(library)
 		closesettings()
 	end
 
-	window.top.functions.settings.interact.MouseButton1Click:Connect(function()
-		if not settingsOpen then
-			settingsOpen = true
-			opensettings()
+	if topFunctions then
+		local settingsBtn = sydeFindChild(topFunctions, "settings", "Settings")
+		local settingsInteract = settingsBtn and sydeFindDescendant(settingsBtn, "interact", "Interact")
+		if settingsInteract and settingsInteract:IsA("GuiButton") then
+			settingsInteract.MouseButton1Click:Connect(function()
+				if not settingsOpen then
+					settingsOpen = true
+					opensettings()
+				end
+			end)
 		end
-	end)
+	end
 
-	window.settings.top.functions.close.interact.MouseButton1Click:Connect(function()
-		if settingsOpen then
-			settingsOpen = false
-			closesettings()
+	if settingsTopFunctions then
+		local settingsClose = sydeFindChild(settingsTopFunctions, "close", "Close")
+		local settingsCloseInteract = settingsClose and sydeFindDescendant(settingsClose, "interact", "Interact")
+		if settingsCloseInteract and settingsCloseInteract:IsA("GuiButton") then
+			settingsCloseInteract.MouseButton1Click:Connect(function()
+				if settingsOpen then
+					settingsOpen = false
+					closesettings()
+				end
+			end)
 		end
-	end)
+	end
 
-	window.top.functions.mini.interact.MouseButton1Click:Connect(function()
-		if not uiclosed then
-			ToggleUI()
+	if topFunctions then
+		local miniBtn = sydeFindChild(topFunctions, "mini", "Mini")
+		local miniInteract = miniBtn and sydeFindDescendant(miniBtn, "interact", "Interact")
+		if miniInteract and miniInteract:IsA("GuiButton") then
+			miniInteract.MouseButton1Click:Connect(function()
+				if not uiclosed then
+					ToggleUI()
+				end
+			end)
 		end
-	end)
+	end
 
 	--[[
 
