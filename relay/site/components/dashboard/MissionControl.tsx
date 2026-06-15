@@ -6,7 +6,6 @@ import { Activity, Gamepad2, Layers, Radio } from "lucide-react";
 import { useLiveSyncMeta } from "@/lib/queries/hooks";
 import { useMetricHistory, historyToSeries } from "@/lib/hooks/useMetricHistory";
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
-import { useScrollResize } from "@/lib/scroll/lenis-context";
 import { resolveRelayStatus } from "@/lib/status/resolve";
 import type { SitePayload } from "@/lib/types";
 import { MetricCard } from "@/components/observability/MetricCard";
@@ -15,7 +14,7 @@ import { HealthRing } from "@/components/observability/HealthRing";
 import { FreshnessChip } from "@/components/observability/FreshnessChip";
 import { StatusPill } from "@/components/observability/StatusPill";
 import { TelemetryAlertBanner, TelemetryMetaStrip } from "@/components/observability/TelemetryPanels";
-import { TelemetryLineChart } from "@/components/charts/TelemetryLineChart";
+import { TelemetryLineChart } from "@/components/charts/LiteLineChart";
 import { StatusHeatmap } from "@/components/charts/StatusHeatmap";
 import { EventTimeline, GameStatusStream } from "@/components/charts/EventTimeline";
 import { ServiceGraph } from "@/components/charts/ServiceGraph";
@@ -99,7 +98,7 @@ function ThroughputPanel({
 
 function MissionControlInner({ site }: { site: SitePayload }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
-  const { data, error, dataUpdatedAt, loading } = useLiveSyncMeta();
+  const { data, error, dataUpdatedAt, loading } = useLiveSyncMeta("status");
   const online = !error && data?.ok !== false;
   const relayKind = resolveRelayStatus(online, error ? error.message : null);
   const relayError = error ? error.message : null;
@@ -178,8 +177,6 @@ function MissionControlInner({ site }: { site: SitePayload }) {
 
     return items;
   }, [data, games, site.announcement]);
-
-  useScrollResize([isMobile, hasLiveData, games.length, timeline.length]);
 
   return (
     <div className="mission-control">

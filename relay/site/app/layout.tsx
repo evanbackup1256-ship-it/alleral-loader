@@ -7,6 +7,7 @@ const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-outfit",
   display: "swap",
+  preload: true,
 });
 
 const plexMono = IBM_Plex_Mono({
@@ -14,32 +15,34 @@ const plexMono = IBM_Plex_Mono({
   weight: ["400", "500"],
   variable: "--font-mono",
   display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
-  title: "Alleral Observability",
-  description: "Premium observability platform — live script health, sync monitoring, and fleet analytics.",
+  title: "Alleral Hub",
+  description: "Roblox scripts that stay updated — live game status, loader, and executor compatibility.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#020204",
+  themeColor: "#030508",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${outfit.variable} ${plexMono.variable}`}>
-      <body className="site-body">
+      <body className="site-body hub-shell">
         {children}
         <Toaster
           theme="dark"
           position="bottom-right"
-          expand
-          visibleToasts={4}
-          gap={10}
+          visibleToasts={3}
+          gap={8}
           toastOptions={{
             unstyled: true,
             classNames: {
-              toast: "glass-float border border-border rounded-2xl px-4 py-3 text-sm shadow-2xl",
+              toast: "panel-raised px-4 py-3 text-sm",
             },
           }}
         />

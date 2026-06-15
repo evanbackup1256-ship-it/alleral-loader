@@ -1,58 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useLenis } from "@/lib/scroll/lenis-context";
-
-function findScrollRoot(): HTMLElement | null {
-  return document.querySelector("[data-scroll-root]") as HTMLElement | null;
-}
 
 export function ScrollProgress() {
-  const lenis = useLenis();
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    let detach: (() => void) | undefined;
-    let pollId = 0;
+    const root = document.querySelector("[data-scroll-root]") as HTMLElement | null;
+    if (!root) return;
 
-    const attachNative = (el: HTMLElement) => {
-      const onScroll = () => {
-        const max = el.scrollHeight - el.clientHeight;
-        setProgress(max > 0 ? el.scrollTop / max : 0);
-      };
-      onScroll();
-      el.addEventListener("scroll", onScroll, { passive: true });
-      return () => el.removeEventListener("scroll", onScroll);
+    const onScroll = () => {
+      const max = root.scrollHeight - root.clientHeight;
+      setProgress(max > 0 ? root.scrollTop / max : 0);
     };
 
-    if (lenis) {
-      const onScroll = ({ scroll, limit }: { scroll: number; limit: number }) => {
-        setProgress(limit > 0 ? scroll / limit : 0);
-      };
-      const unsubscribe = lenis.on("scroll", onScroll);
-      onScroll({ scroll: lenis.scroll, limit: lenis.limit });
-      return unsubscribe;
-    }
-
-    const root = findScrollRoot();
-    if (root) {
-      detach = attachNative(root);
-      return () => detach?.();
-    }
-
-    pollId = window.setInterval(() => {
-      const found = findScrollRoot();
-      if (found) {
-        window.clearInterval(pollId);
-        detach = attachNative(found);
-      }
-    }, 120);
-
-    return () => {
-      window.clearInterval(pollId);
-      detach?.();
-    };
-  }, [lenis]);
+    onScroll();
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => root.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
     <div

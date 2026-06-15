@@ -3,11 +3,9 @@
 import clsx from "clsx";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
 import { StatusPill } from "./StatusPill";
 import { FreshnessChip } from "./FreshnessChip";
 import { formatDisplayValue, resolveSyncStatus } from "@/lib/status/resolve";
-import { spring } from "@/lib/motion/config";
 
 export function SyncMonitor({
   sync,
@@ -65,10 +63,7 @@ export function SyncMonitor({
 
       <div className="mt-4 space-y-2">
         {rows.map((row) => (
-          <div
-            key={row.label}
-            className="rounded-xl border border-border/80 bg-black/25 px-3 py-2.5 transition-colors duration-300 hover:border-white/10"
-          >
+          <div key={row.label} className="rounded-xl border border-border bg-bg-1 px-3 py-2.5">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs text-muted">{row.label}</span>
               <div className="flex items-center gap-2">
@@ -81,31 +76,23 @@ export function SyncMonitor({
         ))}
       </div>
 
-      <AnimatePresence initial={false}>
-        {sync?.lastError ? (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={spring.soft}
-            className="overflow-hidden"
+      {sync?.lastError ? (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="flex w-full items-center justify-between rounded-xl border border-red-400/25 bg-red-400/8 px-3 py-2 text-left text-xs text-red-200 hover:bg-red-400/12"
           >
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="mt-3 flex w-full items-center justify-between rounded-xl border border-red-400/25 bg-red-400/8 px-3 py-2 text-left text-xs text-red-200 transition-colors duration-300 hover:bg-red-400/12"
-            >
-              <span>Full error payload</span>
-              <ChevronDown className={clsx("h-4 w-4 transition-transform duration-300", expanded && "rotate-180")} />
-            </button>
-            {expanded ? (
-              <pre className="error-reveal mt-2 max-h-40 overflow-auto rounded-xl border border-red-400/20 bg-black/40 p-3 font-mono text-[11px] leading-relaxed text-red-100/90 whitespace-pre-wrap">
-                {sync.lastError}
-              </pre>
-            ) : null}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+            <span>Full error payload</span>
+            <ChevronDown className={clsx("h-4 w-4 transition-transform", expanded && "rotate-180")} />
+          </button>
+          {expanded ? (
+            <pre className="error-reveal mt-2 max-h-40 overflow-auto rounded-xl border border-red-400/20 bg-bg-1 p-3 font-mono text-[11px] leading-relaxed text-red-100/90 whitespace-pre-wrap">
+              {sync.lastError}
+            </pre>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

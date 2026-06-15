@@ -1,10 +1,8 @@
 "use client";
 
-import { motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { API_BASE } from "@/lib/config";
 import type { SitePayload } from "@/lib/types";
-import { spring } from "@/lib/motion/config";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Form";
 import { Panel } from "@/components/ui/Panel";
@@ -76,7 +74,7 @@ export function SupportView({ site }: { site: SitePayload }) {
       </div>
 
       <Panel padding="lg" className="overflow-visible">
-        <motion.form key={tab} onSubmit={submit} className="grid gap-4" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={spring.soft}>
+        <form key={tab} onSubmit={submit} className="view-enter grid gap-4">
           {tab === "bug" ? (
             <>
               <Field label="Category"><Select name="category" options={site.bugCategories || ["UI", "Script", "Loader", "Other"]} required /></Field>
@@ -112,10 +110,10 @@ export function SupportView({ site }: { site: SitePayload }) {
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
           {ok ? <p className="text-sm text-green-400">Sent — thanks!</p> : null}
           {captchaRequired ? <FormTurnstile formId={tab} onToken={setTurnstileToken} /> : null}
-          <Button type="submit" variant="primary" magnetic>
+          <Button type="submit" variant="primary">
             Submit
           </Button>
-        </motion.form>
+        </form>
       </Panel>
     </div>
   );

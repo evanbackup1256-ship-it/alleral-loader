@@ -1,8 +1,6 @@
 "use client";
 
 import clsx from "clsx";
-import { motion } from "motion/react";
-import { spring } from "@/lib/motion/config";
 
 export function Panel({
   children,
@@ -21,16 +19,12 @@ export function Panel({
 }) {
   const pad = { none: "", sm: "p-4", md: "p-5", lg: "p-6" }[padding];
   return (
-    <motion.div
+    <div
       style={style}
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={spring.soft}
-      whileHover={hover ? { y: -2 } : undefined}
-      className={clsx("glass-panel rounded-2xl transition-shadow duration-500", glow && "accent-glow", pad, className)}
+      className={clsx("panel", hover && "panel-hover", glow && "shadow-[0_0_32px_rgba(52,211,153,0.12)]", pad, className)}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }
 

@@ -1,9 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { motion } from "motion/react";
 import { status, type StatusKind } from "@/lib/design/tokens";
-import { spring } from "@/lib/motion/config";
 
 export function HealthRing({
   kind,
@@ -30,7 +28,7 @@ export function HealthRing({
     <div className={clsx("relative inline-grid place-items-center", className)} style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke} />
-        <motion.circle
+        <circle
           cx={size / 2}
           cy={size / 2}
           r={r}
@@ -39,10 +37,8 @@ export function HealthRing({
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={c}
-          initial={{ strokeDashoffset: c }}
-          animate={{ strokeDashoffset: offset }}
-          transition={spring.soft}
-          style={{ filter: `drop-shadow(0 0 6px ${meta.glow})` }}
+          strokeDashoffset={offset}
+          style={{ filter: `drop-shadow(0 0 6px ${meta.glow})`, transition: "stroke-dashoffset 0.6s ease-out" }}
         />
       </svg>
       <div className="absolute text-center">

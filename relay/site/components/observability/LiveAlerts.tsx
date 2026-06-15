@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { motion } from "motion/react";
 import { toast } from "sonner";
 import type { HubStatusPayload } from "@/lib/types";
-import { spring } from "@/lib/motion/config";
 
 function AlertToast({
   title,
@@ -22,17 +20,10 @@ function AlertToast({
   };
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 12, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 8, scale: 0.98 }}
-      transition={spring.soft}
-      className={`glass-float w-[min(420px,calc(100vw-2rem))] rounded-2xl border px-4 py-3 shadow-2xl ${colors[tone]}`}
-    >
+    <div className={`panel w-[min(420px,calc(100vw-2rem))] px-4 py-3 ${colors[tone]}`}>
       <p className="text-sm font-semibold text-text">{title}</p>
       {detail ? <p className="mt-1 font-mono text-[11px] leading-relaxed opacity-90 whitespace-pre-wrap">{detail}</p> : null}
-    </motion.div>
+    </div>
   );
 }
 
@@ -50,9 +41,7 @@ export function LiveAlerts({
   useEffect(() => {
     const syncError = data?.sync?.lastError?.trim() || "";
     const broken =
-      data?.games?.items
-        ?.filter((g) => (g.status || "working") !== "working")
-        .map((g) => g.id) || [];
+      data?.games?.items?.filter((g) => (g.status || "working") !== "working").map((g) => g.id) || [];
 
     const p = prev.current;
 

@@ -2,10 +2,8 @@
 
 import clsx from "clsx";
 import * as Popover from "@radix-ui/react-popover";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Check, ChevronDown } from "lucide-react";
 import { memo, useEffect, useId, useMemo, useState } from "react";
-import { spring, stagger } from "@/lib/motion/config";
 
 export type SelectOption = { value: string; label: string };
 
@@ -34,7 +32,6 @@ export const Select = memo(function Select({
   className?: string;
   disabled?: boolean;
 }) {
-  const reduce = useReducedMotion();
   const items = useMemo(() => normalizeOptions(options), [options]);
   const listId = useId();
   const [open, setOpen] = useState(false);
@@ -61,7 +58,7 @@ export const Select = memo(function Select({
           type="button"
           className={clsx(
             "custom-select-trigger flex w-full items-center justify-between gap-2 text-left",
-            open && "border-accent/50 shadow-[0_0_0_3px_rgba(99,102,241,0.15)]",
+            open && "border-accent/50 shadow-[0_0_0_3px_rgba(52,211,153,0.15)]",
             disabled && "cursor-not-allowed opacity-50",
             className
           )}
@@ -70,71 +67,47 @@ export const Select = memo(function Select({
           aria-controls={listId}
         >
           <span className={clsx("truncate", !selected && "text-muted")}>{label}</span>
-          <motion.span animate={{ rotate: open ? 180 : 0 }} transition={spring.tooltip}>
-            <ChevronDown className="h-4 w-4 shrink-0 text-muted" />
-          </motion.span>
+          <ChevronDown className={clsx("h-4 w-4 shrink-0 text-muted transition-transform", open && "rotate-180")} />
         </button>
       </Popover.Trigger>
-      <AnimatePresence>
-        {open ? (
-          <Popover.Portal forceMount>
-            <Popover.Content
-              id={listId}
-              role="listbox"
-              sideOffset={8}
-              align="start"
-              collisionPadding={12}
-              asChild
-              onOpenAutoFocus={(e) => e.preventDefault()}
-            >
-              <motion.div
-                initial={reduce ? false : { opacity: 0, y: -8, scale: 0.96, filter: "blur(4px)" }}
-                animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-                exit={reduce ? undefined : { opacity: 0, y: -6, scale: 0.98, filter: "blur(2px)" }}
-                transition={spring.panel}
-                style={{ transformOrigin: "var(--radix-popover-content-transform-origin)" }}
-                className="custom-select-menu z-[600] max-h-60 w-[var(--radix-popover-trigger-width)] overflow-y-auto overscroll-contain p-1"
+      <Popover.Portal>
+        <Popover.Content
+          id={listId}
+          role="listbox"
+          sideOffset={8}
+          align="start"
+          collisionPadding={12}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          className="custom-select-menu z-[600] max-h-60 w-[var(--radix-popover-trigger-width)] overflow-y-auto overscroll-contain p-1 view-enter"
+        >
+          {items.map((opt) => {
+            const active = opt.value === current;
+            return (
+              <button
+                key={`${opt.value}-${opt.label}`}
+                type="button"
+                role="option"
+                aria-selected={active}
+                className={clsx("custom-select-option", active && "selected")}
+                onClick={() => pick(opt.value)}
               >
-                {items.map((opt, index) => {
-                  const active = opt.value === current;
-                  return (
-                    <motion.button
-                      key={`${opt.value}-${opt.label}`}
-                      type="button"
-                      role="option"
-                      aria-selected={active}
-                      initial={reduce ? false : { opacity: 0, x: -8, scale: 0.98 }}
-                      animate={{ opacity: 1, x: 0, scale: 1 }}
-                      exit={reduce ? undefined : { opacity: 0, x: -4 }}
-                      whileHover={reduce ? undefined : { x: 2, backgroundColor: "rgba(255,255,255,0.05)" }}
-                      whileTap={reduce ? undefined : { scale: 0.98 }}
-                      transition={{ ...spring.tooltip, delay: reduce ? 0 : index * stagger.fast }}
-                      className={clsx("custom-select-option", active && "selected")}
-                      onClick={() => pick(opt.value)}
-                    >
-                      <span className="truncate">{opt.label}</span>
-                      {active ? <Check className="h-3.5 w-3.5 shrink-0 opacity-80" /> : null}
-                    </motion.button>
-                  );
-                })}
-              </motion.div>
-            </Popover.Content>
-          </Popover.Portal>
-        ) : null}
-      </AnimatePresence>
+                <span className="truncate">{opt.label}</span>
+                {active ? <Check className="h-3.5 w-3.5 shrink-0 opacity-80" /> : null}
+              </button>
+            );
+          })}
+        </Popover.Content>
+      </Popover.Portal>
     </Popover.Root>
   );
 });
 
-export function Input({
-  className,
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       className={clsx(
-        "w-full rounded-xl border border-border bg-black/30 px-3.5 py-2.5 text-sm outline-none transition",
-        "focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)]",
+        "w-full rounded-xl border border-border bg-bg-1 px-3.5 py-2.5 text-sm outline-none transition",
+        "focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.15)]",
         className
       )}
       {...props}
@@ -142,15 +115,12 @@ export function Input({
   );
 }
 
-export function Textarea({
-  className,
-  ...props
-}: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
       className={clsx(
-        "min-h-[100px] w-full rounded-xl border border-border bg-black/30 px-3.5 py-2.5 text-sm outline-none transition",
-        "focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)]",
+        "min-h-[100px] w-full rounded-xl border border-border bg-bg-1 px-3.5 py-2.5 text-sm outline-none transition",
+        "focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.15)]",
         className
       )}
       {...props}

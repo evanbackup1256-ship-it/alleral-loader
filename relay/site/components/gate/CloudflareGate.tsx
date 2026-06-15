@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { mountTurnstileWidget, resolveTurnstileSiteKey, verifyGateToken } from "@/lib/turnstile";
-import { spring } from "@/lib/motion/config";
 
 const STORAGE_KEY = "alleral_gate_ok";
 const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
@@ -32,7 +30,6 @@ export function CloudflareGate({ children }: { children: React.ReactNode }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<{ remove: () => void; reset: () => void } | null>(null);
   const verifiedRef = useRef(false);
-  const reduce = useReducedMotion();
 
   useEffect(() => {
     setPassed(readSessionPassed());
@@ -99,7 +96,7 @@ export function CloudflareGate({ children }: { children: React.ReactNode }) {
             if (cancelled) return;
             if (!ok) {
               verifiedRef.current = false;
-              setError("Verification failed. Try the challenge again.");
+              setError("Verification failed. Try again.");
               widgetRef.current?.reset();
               return;
             }
@@ -113,12 +110,12 @@ export function CloudflareGate({ children }: { children: React.ReactNode }) {
           },
           onExpire: () => {
             verifiedRef.current = false;
-            if (!cancelled) setError("Challenge expired. Complete it again.");
+            if (!cancelled) setError("Challenge expired.");
           },
           onTimeout: () => {
             if (!cancelled) {
               setLoading(false);
-              setError("Challenge timed out. Click Try Again.");
+              setError("Challenge timed out.");
             }
           },
         });
@@ -133,7 +130,7 @@ export function CloudflareGate({ children }: { children: React.ReactNode }) {
       } catch {
         if (!cancelled) {
           setLoading(false);
-          setError("Could not load Cloudflare Turnstile. Check your connection.");
+          setError("Could not load Turnstile.");
         }
       }
     };
@@ -147,52 +144,39 @@ export function CloudflareGate({ children }: { children: React.ReactNode }) {
     };
   }, [passed, retry, finish]);
 
-  if (passed === null) return null;
-
-  if (passed === false) {
-    return (
-      <AnimatePresence>
-        <motion.div
-          key="cf-gate"
-          className="cf-gate-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Security check"
-          initial={reduce ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <motion.div
-            className="cf-gate-card glass"
-            initial={reduce ? false : { opacity: 0, y: 24, scale: 0.96, filter: "blur(8px)" }}
-            animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-            transition={spring.panel}
-          >
-          <p className="text-sm text-muted mb-2">Alleral Hub</p>
-          <h2 className="text-xl font-semibold mb-2">Verify you&apos;re human</h2>
-          <p className="text-sm text-muted mb-4">Quick check before loading the hub.</p>
-          {loading ? <p className="mb-3 text-xs text-muted-2">Loading security widget…</p> : null}
-          <div ref={mountRef} id="cfTurnstileHost" className="flex justify-center min-h-[65px]" />
-          {error ? (
-            <div className="mt-3 grid gap-2">
-              <p className="text-sm text-red-400">{error}</p>
-              <button
-                type="button"
-                className="mx-auto rounded-full border border-border px-4 py-2 text-sm text-muted hover:text-text"
-                onClick={() => {
-                  verifiedRef.current = false;
-                  setRetry((n) => n + 1);
-                }}
-              >
-                Try Again
-              </button>
-            </div>
-          ) : null}
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
-    );
+  if (passed === null) {
+    return <>{children}</>;
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {passed === false ? (
+        <div className="cf-gate-backdrop" role="dialog" aria-modal="true" aria-label="Security check">
+          <div className="cf-gate-card">
+            <p className="text-sm text-muted mb-2">Alleral Hub</p>
+            <h2 className="text-xl font-semibold mb-2">Quick verification</h2>
+            <p className="text-sm text-muted mb-4">One-time check — the hub loads behind this overlay.</p>
+            {loading ? <p className="mb-3 text-xs text-muted-2">Loading…</p> : null}
+            <div ref={mountRef} id="cfTurnstileHost" className="flex justify-center min-h-[65px]" />
+            {error ? (
+              <div className="mt-3 grid gap-2">
+                <p className="text-sm text-red-400">{error}</p>
+                <button
+                  type="button"
+                  className="mx-auto rounded-full border border-border px-4 py-2 text-sm text-muted hover:text-text"
+                  onClick={() => {
+                    verifiedRef.current = false;
+                    setRetry((n) => n + 1);
+                  }}
+                >
+                  Try Again
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
 }

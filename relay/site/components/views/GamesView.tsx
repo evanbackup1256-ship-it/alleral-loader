@@ -1,11 +1,9 @@
 "use client";
 
 import clsx from "clsx";
-import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { fetchThumbnails } from "@/lib/api";
 import { useLiveSyncMeta } from "@/lib/queries/hooks";
-import { spring } from "@/lib/motion/config";
 import type { GameEntry, SitePayload } from "@/lib/types";
 import { FreshnessChip } from "@/components/observability/FreshnessChip";
 import { StatusPill } from "@/components/observability/StatusPill";
@@ -20,7 +18,7 @@ export function GamesView({ site }: { site: SitePayload }) {
   const [query, setQuery] = useState("");
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [modal, setModal] = useState<{ id: string; game: GameEntry } | null>(null);
-  const { data: live, dataUpdatedAt } = useLiveSyncMeta();
+  const { data: live, dataUpdatedAt } = useLiveSyncMeta("games");
 
   const liveStatus = useMemo(() => {
     const map: Record<string, string> = {};
@@ -57,9 +55,9 @@ export function GamesView({ site }: { site: SitePayload }) {
 
   return (
     <div className="space-y-4">
-      <div className="obs-panel flex flex-wrap items-center justify-between gap-3 !py-3">
+      <div className="panel flex flex-wrap items-center justify-between gap-3 !py-3">
         <FreshnessChip dataUpdatedAt={dataUpdatedAt} live />
-        <p className="text-xs text-muted">Live script endpoints · observability stream</p>
+        <p className="text-xs text-muted">{filtered.length} games · live status</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {STATUSES.map((s) => (
@@ -71,58 +69,54 @@ export function GamesView({ site }: { site: SitePayload }) {
       <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search games…" />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((game, i) => {
+        {filtered.map((game) => {
           const status = game.liveStatus;
           const placeId = game.placeIds?.[0] ? String(game.placeIds[0]) : null;
           const thumb = placeId ? thumbs[placeId] : null;
           return (
-            <motion.div key={game.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring.soft, delay: Math.min(i * 0.04, 0.3) }}>
-              <div className="obs-panel group overflow-hidden p-0 transition hover:border-cyan-400/20 hover:shadow-[0_0_32px_rgba(34,211,238,0.08)]">
-                <button type="button" className="block w-full text-left" onClick={() => setModal({ id: game.id, game })}>
-                  <div className="relative h-36 overflow-hidden">
-                    {thumb ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={thumb} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-700 hover:scale-105" />
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-bg-2" />
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-bg-2 to-transparent" />
+            <div key={game.id} className="panel panel-hover overflow-hidden p-0">
+              <button type="button" className="block w-full text-left" onClick={() => setModal({ id: game.id, game })}>
+                <div className="relative h-36 overflow-hidden bg-bg-2">
+                  {thumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={thumb} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-accent/15 to-bg-2" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-bg-2 to-transparent" />
+                </div>
+                <div className="p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <h3 className="font-semibold">{game.name || game.id}</h3>
+                    <StatusBadge status={status} />
                   </div>
-                  <div className="p-4">
-                    <div className="mb-2 flex items-center gap-2">
-                      <h3 className="font-semibold">{game.name || game.id}</h3>
-                      <StatusBadge status={status} />
-                    </div>
-                    <p className="line-clamp-2 text-sm text-muted">{game.description || game.message || "No description."}</p>
-                  </div>
-                </button>
-              </div>
-            </motion.div>
+                  <p className="line-clamp-2 text-sm text-muted">{game.description || game.message || "No description."}</p>
+                </div>
+              </button>
+            </div>
           );
         })}
       </div>
 
-      <AnimatePresence>
-        {modal ? (
-          <motion.div className="fixed inset-0 z-[120] grid place-items-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <button type="button" aria-label="Close" className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setModal(null)} />
-            <motion.div initial={{ scale: 0.96, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.96, y: 12 }} transition={spring.snappy} className="glass-raised relative max-h-[90vh] w-full max-w-md overflow-auto rounded-2xl">
-              <button type="button" onClick={() => setModal(null)} className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full bg-black/50">
-                ×
-              </button>
-              <div className="p-6">
-                <h3 className="text-xl font-semibold">{modal.game.name || modal.id}</h3>
-                <p className="mt-3 text-sm text-muted">{modal.game.description || modal.game.message}</p>
-                {modal.game.robloxUrl ? (
-                  <a href={modal.game.robloxUrl} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex">
-                    <Button variant="primary">Open on Roblox</Button>
-                  </a>
-                ) : null}
-              </div>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      {modal ? (
+        <div className="fixed inset-0 z-[120] grid place-items-center p-4">
+          <button type="button" aria-label="Close" className="absolute inset-0 bg-black/70" onClick={() => setModal(null)} />
+          <div className="panel-raised view-enter relative max-h-[90vh] w-full max-w-md overflow-auto">
+            <button type="button" onClick={() => setModal(null)} className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full bg-bg-1">
+              ×
+            </button>
+            <div className="p-6">
+              <h3 className="text-xl font-semibold">{modal.game.name || modal.id}</h3>
+              <p className="mt-3 text-sm text-muted">{modal.game.description || modal.game.message}</p>
+              {modal.game.robloxUrl ? (
+                <a href={modal.game.robloxUrl} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex">
+                  <Button variant="primary">Open on Roblox</Button>
+                </a>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,39 +1,21 @@
 "use client";
 
-import clsx from "clsx";
-import { useEffect, useMemo, useState } from "react";
-import { motion } from "motion/react";
-import { fetchWeao } from "@/lib/api";
+import { useMemo, useState } from "react";
 import { resolveResourceUrl } from "@/lib/sanitize";
+import { useWeaoQuery } from "@/lib/queries/hooks";
 import type { SitePayload, WeaoExploit } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Form";
 import { Input } from "@/components/ui/Form";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { MetricTile, Panel } from "@/components/ui/Panel";
-import { Stagger, StaggerItem } from "@/components/motion/Reveal";
-import { spring } from "@/lib/motion/config";
 
 const FILTERS = ["all", "working", "not_working", "recommended", "detected", "outdated", "free"] as const;
 
 export function ToolsView({ site }: { site: SitePayload }) {
-  const [data, setData] = useState<Awaited<ReturnType<typeof fetchWeao>> | null>(null);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [query, setQuery] = useState("");
-
-  const load = async () => {
-    try {
-      setData(await fetchWeao());
-    } catch {
-      setData(null);
-    }
-  };
-
-  useEffect(() => {
-    void load();
-    const t = setInterval(load, (data?.pollIntervalSec || 35) * 1000);
-    return () => clearInterval(t);
-  }, [data?.pollIntervalSec]);
+  const { data, refetch, isFetching } = useWeaoQuery(true);
 
   const list = useMemo(() => {
     const exploits = data?.exploits || [];
@@ -51,13 +33,13 @@ export function ToolsView({ site }: { site: SitePayload }) {
 
   return (
     <div className="space-y-4">
-      <Stagger className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <StaggerItem><MetricTile label="Tracked" value={<AnimatedNumber value={summary.total || 0} />} /></StaggerItem>
-        <StaggerItem><MetricTile label="Working" value={<AnimatedNumber value={summary.working || 0} />} accent="green" /></StaggerItem>
-        <StaggerItem><MetricTile label="Not working" value={<AnimatedNumber value={summary.notWorking || 0} />} accent="red" /></StaggerItem>
-        <StaggerItem><MetricTile label="Detected" value={<AnimatedNumber value={summary.detected || 0} />} accent="yellow" /></StaggerItem>
-        <StaggerItem><MetricTile label="Recommended" value={<AnimatedNumber value={summary.recommended || 0} />} accent="violet" /></StaggerItem>
-      </Stagger>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <MetricTile label="Tracked" value={<AnimatedNumber value={summary.total || 0} />} />
+        <MetricTile label="Working" value={<AnimatedNumber value={summary.working || 0} />} accent="green" />
+        <MetricTile label="Not working" value={<AnimatedNumber value={summary.notWorking || 0} />} accent="red" />
+        <MetricTile label="Detected" value={<AnimatedNumber value={summary.detected || 0} />} accent="yellow" />
+        <MetricTile label="Recommended" value={<AnimatedNumber value={summary.recommended || 0} />} accent="violet" />
+      </div>
 
       <Panel padding="md">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -65,29 +47,25 @@ export function ToolsView({ site }: { site: SitePayload }) {
             <h3 className="text-lg font-semibold">WEAO executor intel</h3>
             <p className="text-sm text-muted">Live status from WEAO API</p>
           </div>
-          <Button size="sm" onClick={() => void load()}>
-            Refresh
+          <Button size="sm" onClick={() => void refetch()} disabled={isFetching}>
+            {isFetching ? "Refreshing…" : "Refresh"}
           </Button>
         </div>
         <div className="mb-3 flex flex-wrap gap-2">
           {FILTERS.map((f) => (
-            <motion.div key={f} whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={spring.snappy}>
-              <Button size="sm" variant={filter === f ? "primary" : "ghost"} onClick={() => setFilter(f)} className="capitalize">
-                {f.replace("_", " ")}
-              </Button>
-            </motion.div>
+            <Button key={f} size="sm" variant={filter === f ? "primary" : "ghost"} onClick={() => setFilter(f)} className="capitalize">
+              {f.replace("_", " ")}
+            </Button>
           ))}
         </div>
         <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search executors…" className="mb-4 max-w-sm" />
-        <Stagger className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {list.length ? list.map((ex) => (
-            <StaggerItem key={ex.slug || ex.title}>
-              <ExecutorCard ex={ex} />
-            </StaggerItem>
-          )) : (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {list.length ? (
+            list.map((ex) => <ExecutorCard key={ex.slug || ex.title} ex={ex} />)
+          ) : (
             <p className="text-sm text-muted">{data ? "No matches." : "Loading WEAO…"}</p>
           )}
-        </Stagger>
+        </div>
       </Panel>
 
       <Panel padding="md">
@@ -102,7 +80,7 @@ export function ToolsView({ site }: { site: SitePayload }) {
                 key={item.title}
                 href={url}
                 {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                className="rounded-xl border border-border bg-white/[0.02] px-4 py-3 transition hover:-translate-y-0.5 hover:border-accent/30 hover:bg-accent/5"
+                className="panel panel-hover px-4 py-3"
               >
                 <strong className="text-sm">{item.title}</strong>
                 <p className="mt-1 text-xs text-muted">{item.desc}</p>
@@ -119,15 +97,11 @@ function ExecutorCard({ ex }: { ex: WeaoExploit }) {
   const live = ex.live || "working";
   const tone = live === "working" ? "green" : live === "not_working" ? "red" : live === "detected" ? "yellow" : "neutral";
   return (
-    <motion.article
-      whileHover={{ y: -3, scale: 1.01 }}
-      transition={spring.soft}
-      className="rounded-xl border border-border bg-white/[0.02] p-4 transition hover:border-accent/20"
-    >
+    <article className="panel panel-hover p-4">
       <div className="mb-2 flex items-center gap-3">
         {ex.logo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={ex.logo} alt="" width={40} height={40} className="rounded-lg" />
+          <img src={ex.logo} alt="" width={40} height={40} className="rounded-lg" loading="lazy" />
         ) : (
           <span className="grid h-10 w-10 place-items-center rounded-lg bg-white/5 text-sm font-bold">{(ex.title || "?")[0]}</span>
         )}
@@ -139,6 +113,6 @@ function ExecutorCard({ ex }: { ex: WeaoExploit }) {
         </div>
       </div>
       {ex.liveDetail ? <p className="text-xs text-muted">{ex.liveDetail}</p> : null}
-    </motion.article>
+    </article>
   );
 }

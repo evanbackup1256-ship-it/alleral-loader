@@ -1,8 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
 import type { SitePayload } from "@/lib/types";
-import { spring } from "@/lib/motion/config";
 import { Panel } from "@/components/ui/Panel";
 
 export function CreditsView({ site }: { site: SitePayload }) {
@@ -19,14 +17,18 @@ export function CreditsView({ site }: { site: SitePayload }) {
         <div key={team.id || team.title}>
           <h3 className="mb-4 text-lg font-semibold">{team.title}</h3>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {(team.members || []).map((member, i) => (
-              <motion.div key={member.id || member.displayName} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring.soft, delay: i * 0.05 }}>
-                <Panel padding="md" hover glow={!!member.accent} style={member.accent ? { boxShadow: `0 0 0 1px ${member.accent}33 inset` } : undefined}>
-                  <strong className="block text-lg">{member.displayName}</strong>
-                  <span className="text-sm text-accent">{member.role}</span>
-                  {member.bio ? <p className="mt-3 text-sm text-muted">{member.bio}</p> : null}
-                </Panel>
-              </motion.div>
+            {(team.members || []).map((member) => (
+              <Panel
+                key={member.id || member.displayName}
+                padding="md"
+                hover
+                glow={!!member.accent}
+                style={member.accent ? { boxShadow: `0 0 0 1px ${member.accent}33 inset` } : undefined}
+              >
+                <strong className="block text-lg">{member.displayName}</strong>
+                <span className="text-sm text-accent">{member.role}</span>
+                {member.bio ? <p className="mt-3 text-sm text-muted">{member.bio}</p> : null}
+              </Panel>
             ))}
           </div>
         </div>
