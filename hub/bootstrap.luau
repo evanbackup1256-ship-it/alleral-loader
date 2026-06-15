@@ -1,9 +1,11 @@
--- Alleral Bootstrap v1.0.8
+-- Alleral Bootstrap v1.0.10
 -- Save this loadstring once in your executor — it always fetches the latest loader from GitHub.
 -- One-liner: loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?t=" .. tick(), true))()
 
-local BOOTSTRAP_VERSION = "1.0.9"
+local BOOTSTRAP_VERSION = "1.0.10"
 local HTTP_GET_TIMEOUT = 12
+local LOADER_FETCH_TIMEOUT = 28
+local LOADER_MIN_BYTES = 50000
 local FALLBACK_RELEASE = {
 	loader = "8.6.0",
 	rayfieldVersion = 2,
@@ -65,7 +67,7 @@ end
 
 local function httpGetOnce(url, minBytes)
 	minBytes = minBytes or 0
-	local requestFn = pick({ "request", "http_request", "httprequest" })
+	local requestFn = pick({ "request", "http_request", "httprequest", "syn_request", "http_request_async" })
 	if requestFn then
 		local ok, body = pcall(function()
 			local res = requestFn({
@@ -126,16 +128,30 @@ local function httpGet(url, minBytes)
 	return nil, "all transports failed"
 end
 
-local function httpGetWithTimeout(url, minBytes, timeoutSec)
+local function httpGetWithTimeout(url, minBytes, timeoutSec, label)
 	timeoutSec = timeoutSec or HTTP_GET_TIMEOUT
 	minBytes = minBytes or 0
+	label = label or url:gsub("%?.*$", "")
 	local body, via, finished = nil, nil, false
 	local worker = task.spawn(function()
 		body, via = httpGet(url, minBytes)
 		finished = true
 	end)
 	local deadline = tick() + timeoutSec
+	local lastPulse = tick()
 	while not finished and tick() < deadline do
+		if tick() - lastPulse >= 2.5 then
+			print(
+				"[Alleral Bootstrap v"
+					.. BOOTSTRAP_VERSION
+					.. "] Still fetching "
+					.. label
+					.. " ("
+					.. tostring(math.floor(deadline - tick()))
+					.. "s left)…"
+			)
+			lastPulse = tick()
+		end
 		task.wait(0.05)
 	end
 	if finished then
@@ -144,6 +160,7 @@ local function httpGetWithTimeout(url, minBytes, timeoutSec)
 	pcall(function()
 		task.cancel(worker)
 	end)
+	warn("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Timed out fetching " .. label)
 	return nil, "timeout after " .. tostring(timeoutSec) .. "s"
 end
 
@@ -179,26 +196,20 @@ local function loaderRayfieldVersionFromSource(src)
 	return tonumber(src:match("local RAYFIELD_VERSION = (%d+)"))
 end
 
-local function loaderMatchesRelease(src, meta, strictCommit)
+local function loaderMatchesRelease(src, meta)
 	if type(src) ~= "string" or type(meta) ~= "table" then
 		return false, "invalid loader body"
+	end
+	if not src:find("LOADER_VERSION", 1, true) or not src:find("Alleral", 1, true) then
+		return false, "not an Alleral loader"
+	end
+	if #src < LOADER_MIN_BYTES then
+		return false, "too small (" .. tostring(#src) .. "b, need " .. tostring(LOADER_MIN_BYTES) .. "+)"
 	end
 	local remoteVer = loaderVersionFromSource(src)
 	if type(meta.loader) == "string" and meta.loader ~= "" then
 		if remoteVer ~= meta.loader then
 			return false, "loader v" .. tostring(remoteVer or "?") .. " != release v" .. meta.loader
-		end
-	end
-	if strictCommit and type(meta.commit) == "string" and meta.commit ~= "" then
-		local embedded = loaderCommitFromSource(src)
-		if embedded ~= meta.commit then
-			return false, "embedded commit " .. tostring(embedded or "?") .. " != release " .. meta.commit
-		end
-	end
-	if strictCommit and type(meta.rayfieldVersion) == "number" then
-		local version = loaderRayfieldVersionFromSource(src)
-		if version ~= meta.rayfieldVersion then
-			return false, "rayfield v" .. tostring(version or "?") .. " != release v" .. tostring(meta.rayfieldVersion)
 		end
 	end
 	return true, remoteVer
@@ -207,8 +218,8 @@ end
 local function releaseMetaUrls()
 	local bust = "?t=" .. tostring(tick())
 	return {
-		JSDELIVR .. "@" .. BRANCH .. "/cfg/release.json" .. bust,
 		GITHUB_RAW .. "/cfg/release.json" .. bust,
+		JSDELIVR .. "@" .. BRANCH .. "/cfg/release.json" .. bust,
 		"https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. BRANCH .. "/cfg/release.json" .. bust,
 	}
 end
@@ -242,10 +253,15 @@ end
 local function buildLoaderUrls(meta)
 	local commit = (meta and meta.commit) or BRANCH
 	local bust = "?t=" .. tostring(tick())
+	-- Live main first — CDN release.json commit pins are often stale and block bootstrap on Xeno.
 	return {
-		{ url = JSDELIVR .. "@" .. commit .. "/loader.luau" .. bust, strictCommit = commit ~= BRANCH },
-		{ url = "https://raw.githubusercontent.com/" .. REPO .. "/" .. commit .. "/loader.luau" .. bust, strictCommit = commit ~= BRANCH },
-		{ url = GITHUB_RAW .. "/loader.luau" .. bust, strictCommit = false },
+		{ url = JSDELIVR .. "@main/loader.luau" .. bust, label = "jsdelivr@main/loader.luau" },
+		{ url = GITHUB_RAW .. "/loader.luau" .. bust, label = "github@main/loader.luau" },
+		{ url = JSDELIVR .. "@" .. commit .. "/loader.luau" .. bust, label = "jsdelivr@" .. commit .. "/loader.luau" },
+		{
+			url = "https://raw.githubusercontent.com/" .. REPO .. "/" .. commit .. "/loader.luau" .. bust,
+			label = "github@" .. commit .. "/loader.luau",
+		},
 	}
 end
 
@@ -637,19 +653,32 @@ local function Alleral_Bootstrap(reason)
 		if i > 1 and typeof(task) == "table" and type(task.wait) == "function" then
 			pcall(task.wait, 0.05)
 		end
-		print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Loader fetch: " .. entry.url:gsub("%?.*$", ""))
-		local body, transport = httpGetWithTimeout(entry.url, 500, HTTP_GET_TIMEOUT)
-		if type(body) == "string" and #body >= 500 then
-			local ok, detail = loaderMatchesRelease(body, meta, entry.strictCommit == true)
+		local label = entry.label or entry.url:gsub("%?.*$", "")
+		print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Loader fetch: " .. label)
+		local body, transport = httpGetWithTimeout(entry.url, LOADER_MIN_BYTES, LOADER_FETCH_TIMEOUT, label)
+		if type(body) == "string" and #body >= LOADER_MIN_BYTES then
+			local ok, detail = loaderMatchesRelease(body, meta)
 			if ok then
 				src, via = body, transport
 				break
 			end
 			lastReject = tostring(detail) .. " (" .. tostring(#body) .. "b via " .. tostring(transport) .. ")"
+			warn("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Loader rejected: " .. lastReject)
+		else
+			lastReject = tostring(transport or "empty response")
+			warn("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Loader fetch failed: " .. label .. " — " .. lastReject)
 		end
 	end
-	if type(src) ~= "string" or #src < 500 then
+	if type(src) ~= "string" or #src < LOADER_MIN_BYTES then
 		ENV._Alleral_BootstrapRunning = false
+		warn(
+			"[Alleral Bootstrap v"
+				.. BOOTSTRAP_VERSION
+				.. "] Could not load remote loader (expected v"
+				.. tostring(expectedLoader or FALLBACK_RELEASE.loader)
+				.. "). Last error: "
+				.. lastReject
+		)
 		return false, "remote loader failed (" .. tostring(via) .. "; " .. lastReject .. ")"
 	end
 
