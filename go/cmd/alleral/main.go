@@ -33,35 +33,27 @@ func main() {
 	}))
 
 	r.Get("/health", srv.Health)
-	r.Get("/api/health", srv.Health)
-	r.Get("/api/site", srv.Site)
-	r.Get("/api/live/status", srv.LiveStatus)
-	r.Get("/api/sync/status", srv.SyncStatus)
-	r.Post("/api/hub/visit", srv.HubVisit)
+
+	r.Route("/api", func(r chi.Router) {
+		r.Get("/health", srv.Health)
+		r.Get("/site", srv.Site)
+		r.Get("/live/status", srv.LiveStatus)
+		r.Get("/sync/status", srv.SyncStatus)
+		r.Post("/hub/visit", srv.HubVisit)
+
+		if cfg.PythonUpstream != "" {
+			proxy := srv.ProxyPython(cfg.PythonUpstream)
+			r.Handle("/", proxy)
+			r.Handle("/*", proxy)
+		} else {
+			r.NotFound(srv.ApiNotFound)
+		}
+	})
 
 	if cfg.PythonUpstream != "" {
 		proxy := srv.ProxyPython(cfg.PythonUpstream)
 		r.Handle("/ingest", proxy)
 		r.Handle("/ingest/*", proxy)
-		r.Handle("/api/telemetry", proxy)
-		r.Handle("/api/telemetry/*", proxy)
-		r.Handle("/api/support", proxy)
-		r.Handle("/api/bug-report", proxy)
-		r.Handle("/api/feature-request", proxy)
-		r.Handle("/api/faq-feedback", proxy)
-		r.Handle("/api/gate/*", proxy)
-		r.Handle("/api/weao/*", proxy)
-		r.Handle("/api/admin/*", proxy)
-		r.Handle("/api/bootstrap", proxy)
-		r.Handle("/api/games/*", proxy)
-		r.Handle("/api/credits/*", proxy)
-		r.Handle("/api/manage/*", proxy)
-		r.Handle("/api/dev/*", proxy)
-		r.Handle("/api/v1/*", proxy)
-		r.Handle("/api/ban/check", proxy)
-		r.Handle("/api/ban/status", proxy)
-		r.Handle("/api/ban/roblox/*", proxy)
-		r.Handle("/api/ban/*", proxy)
 		r.Handle("/gate/*", proxy)
 		r.Handle("/scripts", proxy)
 		r.Handle("/scripts/*", proxy)
@@ -72,7 +64,7 @@ func main() {
 	fileServer := spaFileServer(cfg.SiteDir)
 	r.Handle("/*", fileServer)
 
-	log.Printf("Alleral Go relay listening on %s (site=%s)", cfg.Addr, cfg.SiteDir)
+	log.Printf("Alleral Go relay listening on %s (site=%s python=%q)", cfg.Addr, cfg.SiteDir, cfg.PythonUpstream)
 	if err := http.ListenAndServe(cfg.Addr, r); err != nil {
 		log.Fatal(err)
 	}
@@ -82,6 +74,13 @@ func spaFileServer(root string) http.Handler {
 	root = filepath.Clean(root)
 	fs := http.FileServer(http.Dir(root))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/api" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"ok":false,"error":"api_not_found"}`))
+			return
+		}
+
 		raw := strings.TrimPrefix(r.URL.Path, "/")
 		raw = strings.TrimSuffix(raw, "/")
 		if raw == "" {

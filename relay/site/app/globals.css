@@ -403,4 +403,66 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.72; }
   }
+
+  .game-card-3d {
+    perspective: 1100px;
+  }
+
+  .game-card-3d-inner {
+    transform-style: preserve-3d;
+    transition: transform 0.45s var(--ease-out), box-shadow 0.45s var(--ease-out);
+    will-change: transform;
+  }
+
+  .game-card-3d:hover .game-card-3d-inner {
+    box-shadow:
+      0 28px 56px rgba(0, 0, 0, 0.55),
+      0 0 0 1px rgba(83, 252, 18, 0.12) inset,
+      0 12px 40px rgba(83, 252, 18, 0.08);
+  }
+
+  .game-card-3d-scene {
+    transform-style: preserve-3d;
+    transform: translateZ(0);
+  }
+
+  .game-card-3d-thumb {
+    transform-style: preserve-3d;
+    transition: transform 0.35s var(--ease-out);
+    will-change: transform;
+  }
+
+  .game-card-3d-shine {
+    background: linear-gradient(
+      120deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.16) 48%,
+      transparent 62%
+    );
+    transform: translateZ(24px);
+    opacity: 0;
+    transition: opacity 0.35s var(--ease-out);
+    mix-blend-mode: soft-light;
+  }
+
+  .game-card-3d:hover .game-card-3d-shine {
+    opacity: 1;
+  }
+
+  .game-card-3d-reflection {
+    transform: rotateX(78deg) translateZ(-18px) scale(0.94);
+    transform-origin: top center;
+    opacity: 0.28;
+    filter: blur(1px);
+    mask-image: linear-gradient(to bottom, black, transparent 72%);
+  }
+
+  @keyframes game-thumb-float {
+    0%, 100% { transform: translateY(0) translateZ(12px); }
+    50% { transform: translateY(-4px) translateZ(18px); }
+  }
+
+  .game-card-3d-thumb-float {
+    animation: game-thumb-float 5s ease-in-out infinite;
+  }
 }

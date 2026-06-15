@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -128,34 +129,146 @@ func normalizeProxyPath(path string) string {
 	return path
 }
 
+func pathsEqualIgnoringSlash(a, b string) bool {
+	return normalizeProxyPath(a) == normalizeProxyPath(b)
+}
+
+func redirectStatus(code int) bool {
+	return code == http.StatusMovedPermanently ||
+		code == http.StatusFound ||
+		code == http.StatusSeeOther ||
+		code == http.StatusTemporaryRedirect ||
+		code == http.StatusPermanentRedirect
+}
+
+func locationPath(location string, req *http.Request) string {
+	if location == "" {
+		return ""
+	}
+	if strings.HasPrefix(location, "/") {
+		return location
+	}
+	parsed, err := url.Parse(location)
+	if err != nil {
+		return ""
+	}
+	if parsed.Host != "" && !strings.EqualFold(parsed.Host, req.Host) {
+		return ""
+	}
+	return parsed.Path
+}
+
+func alternateSlashPath(path string) string {
+	if path == "" || path == "/" {
+		return path
+	}
+	if strings.HasSuffix(path, "/") {
+		return strings.TrimSuffix(path, "/")
+	}
+	return path + "/"
+}
+
+var hopByHopHeaders = map[string]struct{}{
+	"connection":          {},
+	"keep-alive":          {},
+	"proxy-authenticate":  {},
+	"proxy-authorization": {},
+	"te":                  {},
+	"trailers":            {},
+	"transfer-encoding":   {},
+	"upgrade":             {},
+}
+
+func (s *Server) ApiNotFound(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotFound, map[string]any{
+		"ok":    false,
+		"error": "api_not_found",
+		"path":  r.URL.Path,
+	})
+}
+
 func (s *Server) ProxyPython(upstream string) http.Handler {
 	target := strings.TrimRight(upstream, "/")
+	targetURL, err := url.Parse(target)
+	if err != nil || targetURL.Host == "" {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "bad_upstream"})
+		})
+	}
+
+	client := &http.Client{
+		Timeout: 120 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := normalizeProxyPath(r.URL.Path)
-		url := target + path
-		if r.URL.RawQuery != "" {
-			url += "?" + r.URL.RawQuery
-		}
-		req, err := http.NewRequestWithContext(r.Context(), r.Method, url, r.Body)
-		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "proxy_error"})
+		if strings.EqualFold(targetURL.Host, r.Host) {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "upstream_loop"})
 			return
 		}
-		for k, vals := range r.Header {
-			for _, v := range vals {
-				req.Header.Add(k, v)
+
+		path := normalizeProxyPath(r.URL.Path)
+
+		doProxy := func(proxyPath string) (*http.Response, error) {
+			proxyPath = normalizeProxyPath(proxyPath)
+			reqURL := target + proxyPath
+			if r.URL.RawQuery != "" {
+				reqURL += "?" + r.URL.RawQuery
 			}
+			req, err := http.NewRequestWithContext(r.Context(), r.Method, reqURL, r.Body)
+			if err != nil {
+				return nil, err
+			}
+			for k, vals := range r.Header {
+				if strings.EqualFold(k, "Host") {
+					continue
+				}
+				for _, v := range vals {
+					req.Header.Add(k, v)
+				}
+			}
+			req.Host = targetURL.Host
+			return client.Do(req)
 		}
-		res, err := http.DefaultClient.Do(req)
+
+		res, err := doProxy(path)
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "upstream_unavailable"})
 			return
 		}
+
+		for attempt := 0; attempt < 2 && redirectStatus(res.StatusCode); attempt++ {
+			locPath := locationPath(res.Header.Get("Location"), r)
+			if locPath == "" || !pathsEqualIgnoringSlash(locPath, path) {
+				break
+			}
+			res.Body.Close()
+			nextPath := normalizeProxyPath(alternateSlashPath(locPath))
+			res, err = doProxy(nextPath)
+			if err != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "upstream_unavailable"})
+				return
+			}
+		}
+
 		defer res.Body.Close()
+
 		for k, vals := range res.Header {
+			if _, skip := hopByHopHeaders[strings.ToLower(k)]; skip {
+				continue
+			}
+			if redirectStatus(res.StatusCode) && strings.EqualFold(k, "Location") {
+				continue
+			}
 			for _, v := range vals {
 				w.Header().Add(k, v)
 			}
+		}
+		if redirectStatus(res.StatusCode) {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "upstream_redirect"})
+			return
 		}
 		w.WriteHeader(res.StatusCode)
 		io.Copy(w, res.Body)

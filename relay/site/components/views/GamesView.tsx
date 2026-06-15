@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchThumbnails } from "@/lib/api";
 import { useLiveSyncMeta } from "@/lib/queries/hooks";
 import type { GameEntry, SitePayload } from "@/lib/types";
@@ -74,26 +74,13 @@ export function GamesView({ site }: { site: SitePayload }) {
           const placeId = game.placeIds?.[0] ? String(game.placeIds[0]) : null;
           const thumb = placeId ? thumbs[placeId] : null;
           return (
-            <div key={game.id} className="panel panel-hover overflow-hidden p-0">
-              <button type="button" className="block w-full text-left" onClick={() => setModal({ id: game.id, game })}>
-                <div className="relative h-36 overflow-hidden bg-bg-2">
-                  {thumb ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={thumb} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
-                  ) : (
-                    <div className="absolute inset-0 bg-gradient-to-br from-accent/15 to-bg-2" />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-bg-2 to-transparent" />
-                </div>
-                <div className="p-4">
-                  <div className="mb-2 flex items-center gap-2">
-                    <h3 className="font-semibold">{game.name || game.id}</h3>
-                    <StatusBadge status={status} />
-                  </div>
-                  <p className="line-clamp-2 text-sm text-muted">{game.description || game.message || "No description."}</p>
-                </div>
-              </button>
-            </div>
+            <GameCard
+              key={game.id}
+              game={game}
+              status={status}
+              thumb={thumb}
+              onOpen={() => setModal({ id: game.id, game })}
+            />
           );
         })}
       </div>
@@ -117,6 +104,81 @@ export function GamesView({ site }: { site: SitePayload }) {
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function GameCard({
+  game,
+  status,
+  thumb,
+  onOpen,
+}: {
+  game: GameEntry & { id: string; liveStatus: string };
+  status: string;
+  thumb: string | null;
+  onOpen: () => void;
+}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const thumbRef = useRef<HTMLDivElement>(null);
+
+  const resetTilt = useCallback(() => {
+    const card = cardRef.current;
+    const layer = thumbRef.current;
+    if (card) card.style.transform = "";
+    if (layer) layer.style.transform = "";
+  }, []);
+
+  const onMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const card = cardRef.current;
+    const layer = thumbRef.current;
+    if (!card || !layer) return;
+    const rect = card.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    card.style.transform = `rotateY(${x * 10}deg) rotateX(${-y * 8}deg)`;
+    layer.style.transform = `translateZ(28px) scale(1.04) rotateY(${x * -4}deg) rotateX(${y * 3}deg)`;
+  }, []);
+
+  return (
+    <div className="game-card-3d">
+      <div
+        ref={cardRef}
+        className="game-card-3d-inner panel panel-hover overflow-hidden p-0"
+        onMouseMove={onMove}
+        onMouseLeave={resetTilt}
+      >
+        <button type="button" className="block w-full text-left" onClick={onOpen}>
+          <div className="game-card-3d-scene relative h-40 overflow-hidden bg-bg-2">
+            <div ref={thumbRef} className={clsx("game-card-3d-thumb absolute inset-0", thumb && "game-card-3d-thumb-float")}>
+              {thumb ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={thumb} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-accent/20 via-bg-2 to-bg-1" />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-bg-2 via-bg-2/20 to-transparent" />
+              <div className="game-card-3d-shine absolute inset-0" />
+            </div>
+            {thumb ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={thumb}
+                alt=""
+                aria-hidden
+                className="game-card-3d-reflection pointer-events-none absolute inset-x-3 bottom-[-34px] h-24 w-[calc(100%-1.5rem)] object-cover"
+              />
+            ) : null}
+          </div>
+          <div className="relative z-[1] p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <h3 className="font-semibold">{game.name || game.id}</h3>
+              <StatusBadge status={status} />
+            </div>
+            <p className="line-clamp-2 text-sm text-muted">{game.description || game.message || "No description."}</p>
+          </div>
+        </button>
+      </div>
     </div>
   );
 }

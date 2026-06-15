@@ -2015,6 +2015,12 @@ def client_bootstrap():
     })
 
 
+@app.get("/api/gate", strict_slashes=False)
+@app.get("/api/gate/", strict_slashes=False)
+def gate_index():
+    return jsonify({"ok": True, "config": "/api/gate/config", "verify": "/api/gate/verify"})
+
+
 @app.get("/api/gate/config", strict_slashes=False)
 def gate_config():
     client_ip = resolve_client_ip(request)
@@ -2320,6 +2326,12 @@ def _weao_exploits_body(
     if not ok:
         body["error"] = str(meta.get("warning") or "weao_unavailable")
     return body
+
+
+@app.get("/api/weao", strict_slashes=False)
+@app.get("/api/weao/", strict_slashes=False)
+def weao_index():
+    return jsonify({"ok": True, "exploits": "/api/weao/exploits"})
 
 
 @app.get("/api/weao/exploits", strict_slashes=False)
