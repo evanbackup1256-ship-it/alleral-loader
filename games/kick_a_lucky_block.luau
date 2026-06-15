@@ -34,7 +34,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "7.2.5"
+local VERSION = "7.2.6"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -372,29 +372,11 @@ end
 
 local G = Core.Game or getgenv().Alleral_GameHelpers or {}
 
-local function gameRequireModule(moduleScript)
-	if G.gameRequire then
-		return G.gameRequire(moduleScript)
+local function registryGameModule(moduleScript, timeoutSec)
+	if G.registryGameModule then
+		return G.registryGameModule(moduleScript, timeoutSec)
 	end
-	return require(moduleScript)
-end
-
-local function gameRequireModuleWithTimeout(moduleScript, timeoutSec)
-	local result, finished = nil, false
-	task.spawn(function()
-		local ok, value = pcall(function()
-			return gameRequireModule(moduleScript)
-		end)
-		if ok then
-			result = value
-		end
-		finished = true
-	end)
-	local started = tick()
-	while not finished and tick() - started < (timeoutSec or 8) do
-		task.wait(0.05)
-	end
-	return finished and result or nil
+	return nil
 end
 
 local function isPrivateServer()
@@ -1215,30 +1197,13 @@ local function loadModule(key, label, resolver, optional)
 		return nil
 	end
 
-	local ok, result
-	local requireFn = entry.optional and gameRequireModuleWithTimeout or gameRequireModule
-	local requireTimeout = entry.optional and 18 or nil
-	if entry.optional then
-		ok, result = pcall(function()
-			return requireFn(target, requireTimeout)
-		end)
-	else
-		if (entry.failures or 0) > 0 then
-			ok, result = pcall(function()
-				return gameRequireModule(target)
-			end)
-		else
-			ok, result = safeCall("LoadModule:" .. label, function()
-				return gameRequireModule(target)
-			end)
-		end
-	end
-	if ok and result then
+	local result = registryGameModule(target, entry.optional and 18 or 12)
+	if result then
 		modules[key] = result
 		entry.giveUp = true
 	else
 		entry.failures = (entry.failures or 0) + 1
-		if entry.optional and entry.failures >= 2 then
+		if entry.optional and entry.failures >= 3 then
 			entry.giveUp = true
 		elseif not entry.optional and entry.failures >= 8 then
 			entry.giveUp = true
@@ -1457,10 +1422,8 @@ local function findPlot()
 		return nil
 	end
 	runtime.nextPlotLookup = tick() + 2
-	local ok, plotService = safeCall("FindPlotService", function()
-		return gameRequireModule(ReplicatedStorage.Modules.ServicesLoader.ClientPlotService)
-	end)
-	if ok and plotService and plotService.Model then
+	local plotService = registryGameModule(ReplicatedStorage.Modules.ServicesLoader.ClientPlotService, 0)
+	if plotService and plotService.Model then
 		runtime.cachedPlot = plotService.Model
 		runtime.cachedPlotAt = tick()
 		runtime.nextPlotLookup = 0
@@ -1873,13 +1836,7 @@ local function syncMasteryKickPercent()
 end
 
 local function getNetworkModule()
-	local ok, network = safeCall("RequireNetwork", function()
-		return gameRequireModule(ReplicatedStorage.Shared.Packages.Network)
-	end)
-	if ok then
-		return network
-	end
-	return nil
+	return registryGameModule(ReplicatedStorage.Shared.Packages.Network, 0)
 end
 
 local function fireNetworkEvent(eventName, ...)
@@ -2033,12 +1990,10 @@ local function currentBattleStatus()
 		status = tostring(attr)
 	end
 	if not status then
-		safeCall("BattleStatus", function()
-			local m = gameRequireModule(ReplicatedStorage.Modules.UILoader.KickBattlesUI)
-			if m and m.CurrentStatus ~= nil then
-				status = tostring(m.CurrentStatus)
-			end
-		end)
+		local battlesUi = registryGameModule(ReplicatedStorage.Modules.UILoader.KickBattlesUI, 0)
+		if battlesUi and battlesUi.CurrentStatus ~= nil then
+			status = tostring(battlesUi.CurrentStatus)
+		end
 	end
 	if status == "None" or status == "" then
 		status = nil
@@ -5588,8 +5543,8 @@ makeSupervisor("AutoFavorite", 0.55, function()
 			local packages = shared and shared:FindFirstChild("Packages")
 			local networkModule = packages and packages:FindFirstChild("Network")
 			if networkModule then
-				local ok, network = pcall(gameRequireModule, networkModule)
-				if ok and network and type(network.FireServer) == "function" then
+				local network = registryGameModule(networkModule, 0)
+				if network and type(network.FireServer) == "function" then
 					network.FireServer("ToggleFav", guid)
 				end
 			end

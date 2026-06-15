@@ -1,5 +1,5 @@
 local Helpers = {}
-Helpers.VERSION = "1.6"
+Helpers.VERSION = "1.7"
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -430,7 +430,11 @@ function Helpers.invalidateGameRequire()
 end
 
 local function waitRegistryModule(moduleScript, timeoutSec)
-	local deadline = tick() + (timeoutSec or 15)
+	timeoutSec = timeoutSec or 15
+	if timeoutSec <= 0 then
+		return registryModule(moduleScript)
+	end
+	local deadline = tick() + timeoutSec
 	while tick() < deadline do
 		local cached = registryModule(moduleScript)
 		if cached ~= nil then
@@ -441,56 +445,33 @@ local function waitRegistryModule(moduleScript, timeoutSec)
 	return nil
 end
 
-local function requireWithGameIdentity(moduleScript)
-	if type(getthreadidentity) ~= "function" or type(setthreadidentity) ~= "function" then
-		return nil
-	end
-	local ok, result = pcall(function()
-		local old = getthreadidentity()
-		setthreadidentity(2)
-		local reqFn = nil
-		if type(getrenv) == "function" then
-			local renvOk, renv = pcall(getrenv)
-			if renvOk and type(renv) == "table" and type(renv.require) == "function" then
-				reqFn = renv.require
-			end
-		end
-		if not reqFn and typeof(shared) == "table" and type(shared.require) == "function" then
-			reqFn = shared.require
-		end
-		if not reqFn then
-			error("no game require")
-		end
-		local value = reqFn(moduleScript)
-		setthreadidentity(old)
-		return value
-	end)
-	if ok then
-		return result
-	end
-	return nil
-end
-
-local function requireProtectedGameModule(moduleScript)
+local function requireProtectedGameModule(moduleScript, timeoutSec)
 	local cached = registryModule(moduleScript)
 	if cached ~= nil then
 		MODULE_CACHE[moduleScript] = cached
 		return cached
 	end
 
-	cached = waitRegistryModule(moduleScript, 15)
+	cached = waitRegistryModule(moduleScript, timeoutSec or 15)
 	if cached ~= nil then
 		MODULE_CACHE[moduleScript] = cached
 		return cached
 	end
 
-	local result = requireWithGameIdentity(moduleScript)
-	if result ~= nil then
-		MODULE_CACHE[moduleScript] = result
-		return result
-	end
-
 	return nil
+end
+
+function Helpers.registryGameModule(moduleScript, timeoutSec)
+	if not moduleScript or not moduleScript:IsA("ModuleScript") then
+		return nil
+	end
+	if MODULE_CACHE[moduleScript] ~= nil then
+		return MODULE_CACHE[moduleScript]
+	end
+	if not isProtectedGameModule(moduleScript) then
+		return Helpers.gameRequire(moduleScript)
+	end
+	return requireProtectedGameModule(moduleScript, timeoutSec)
 end
 
 function Helpers.gameRequire(moduleScript)
@@ -502,7 +483,7 @@ function Helpers.gameRequire(moduleScript)
 	end
 
 	if isProtectedGameModule(moduleScript) then
-		return requireProtectedGameModule(moduleScript)
+		return requireProtectedGameModule(moduleScript, 15)
 	end
 
 	local cached = registryModule(moduleScript)
