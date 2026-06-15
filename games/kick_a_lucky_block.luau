@@ -34,7 +34,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "7.2.2"
+local VERSION = "7.2.3"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -1162,6 +1162,7 @@ local modules = {
 }
 
 local moduleResolvers = {}
+local gameModulesDeferred = true
 
 local function loadModule(key, label, resolver, optional)
 	local entry = moduleResolvers[key] or { label = label, resolver = resolver, optional = optional ~= false }
@@ -1169,6 +1170,10 @@ local function loadModule(key, label, resolver, optional)
 	entry.resolver = resolver
 	entry.optional = optional ~= false
 	moduleResolvers[key] = entry
+
+	if gameModulesDeferred then
+		return modules[key]
+	end
 
 	if entry.giveUp then
 		return modules[key]
@@ -1284,8 +1289,6 @@ loadModule("rebirthService", "RebirthServiceClient", function()
 	return rsChild("Modules", "ServicesLoader", "RebirthServiceClient")
 end, true)
 
-syncKickServicePercent()
-bindProgressionModules()
 loadModule("balanceService", "ClientBalanceService", function()
 	return rsChild("Modules", "ServicesLoader", "ClientBalanceService")
 end, true)
@@ -1295,6 +1298,13 @@ end, true)
 loadModule("serverLuckClient", "ServerLuckClient", function()
 	return rsChild("Modules", "ServicesLoader", "ServerLuckClient")
 end, true)
+
+local function bootstrapGameModules()
+	gameModulesDeferred = false
+	retryMissingModules()
+	syncKickServicePercent()
+	bindProgressionModules()
+end
 
 task.spawn(function()
 	local player = LocalPlayer or Players.LocalPlayer
@@ -1306,12 +1316,12 @@ task.spawn(function()
 	if G.invalidateGameRequire then
 		G.invalidateGameRequire()
 	end
-	retryMissingModules()
+	bootstrapGameModules()
 	task.wait(5)
 	if G.invalidateGameRequire then
 		G.invalidateGameRequire()
 	end
-	retryMissingModules()
+	bootstrapGameModules()
 end)
 
 local function refreshBrainrotCpsCache()
@@ -5547,7 +5557,7 @@ makeSupervisor("AutoFavorite", 0.55, function()
 			local packages = shared and shared:FindFirstChild("Packages")
 			local networkModule = packages and packages:FindFirstChild("Network")
 			if networkModule then
-				local ok, network = pcall(require, networkModule)
+				local ok, network = pcall(gameRequireModule, networkModule)
 				if ok and network and type(network.FireServer) == "function" then
 					network.FireServer("ToggleFav", guid)
 				end

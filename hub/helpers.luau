@@ -150,6 +150,17 @@ local function isSandboxRequireError(err)
 		or err:find("non%-RobloxScript", 1, true) ~= nil
 end
 
+local function isProtectedGameModule(moduleScript)
+	if typeof(moduleScript) ~= "Instance" or not moduleScript:IsA("ModuleScript") then
+		return false
+	end
+	if not moduleScript:IsDescendantOf(game) then
+		return false
+	end
+	local coreGui = game:GetService("CoreGui")
+	return not (coreGui and moduleScript:IsDescendantOf(coreGui))
+end
+
 local function gameEnvTable(env)
 	if type(env) ~= "table" then
 		return false
@@ -201,7 +212,6 @@ end
 local function collectRequireCandidates()
 	local list = {}
 	local seen = {}
-	addRequireCandidate(list, seen, require, 90)
 
 	if typeof(shared) == "table" then
 		addRequireCandidate(list, seen, shared.require, 12)
@@ -439,6 +449,9 @@ function Helpers.gameRequire(moduleScript)
 				GAME_REQUIRE_FN = candidate.fn
 				return result
 			end
+			if isSandboxRequireError(result) and GAME_REQUIRE_FN == candidate.fn then
+				GAME_REQUIRE_FN = nil
+			end
 		end
 	end
 
@@ -459,30 +472,18 @@ function Helpers.gameRequire(moduleScript)
 		end
 	end
 
-	local compiled = compileModule(moduleScript, reqFn)
-	if compiled ~= nil then
-		MODULE_CACHE[moduleScript] = compiled
-		return compiled
+	if not isProtectedGameModule(moduleScript) then
+		local compiled = compileModule(moduleScript, reqFn)
+		if compiled ~= nil then
+			MODULE_CACHE[moduleScript] = compiled
+			return compiled
+		end
 	end
 
 	cached = registryModule(moduleScript)
 	if cached ~= nil then
 		MODULE_CACHE[moduleScript] = cached
 		return cached
-	end
-
-	if type(getthreadidentity) == "function" and type(setthreadidentity) == "function" then
-		local ok, result = pcall(function()
-			local old = getthreadidentity()
-			setthreadidentity(2)
-			local value = require(moduleScript)
-			setthreadidentity(old)
-			return value
-		end)
-		if ok then
-			MODULE_CACHE[moduleScript] = result
-			return result
-		end
 	end
 
 	return nil
