@@ -1,8 +1,13 @@
--- Alleral Bootstrap v1.0.5
+-- Alleral Bootstrap v1.0.6
 -- Save this loadstring once in your executor — it always fetches the latest loader from GitHub.
 -- One-liner: loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?t=" .. tick(), true))()
 
-local BOOTSTRAP_VERSION = "1.0.5"
+local BOOTSTRAP_VERSION = "1.0.6"
+local HTTP_GET_TIMEOUT = 12
+local FALLBACK_RELEASE = {
+	loader = "8.3.3",
+	sydePatch = 41,
+}
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
 local GITHUB_RAW = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH
@@ -58,55 +63,88 @@ if not loadStringFn then
 	error("[Alleral Bootstrap] loadstring is not available in this executor.")
 end
 
+local function httpGetOnce(url, minBytes)
+	minBytes = minBytes or 0
+	local requestFn = pick({ "request", "http_request", "httprequest" })
+	if requestFn then
+		local ok, body = pcall(function()
+			local res = requestFn({
+				Url = url,
+				Method = "GET",
+				Headers = {
+					["User-Agent"] = "Alleral-Bootstrap/" .. BOOTSTRAP_VERSION,
+					["Cache-Control"] = "no-cache",
+				},
+			})
+			if type(res) == "table" and type(res.Body) == "string" and #res.Body >= minBytes then
+				return res.Body
+			end
+			return nil
+		end)
+		if ok and type(body) == "string" then
+			return body, "request"
+		end
+	end
+	if type(game.HttpGet) == "function" then
+		local ok, body = pcall(game.HttpGet, game, url, true)
+		if ok and type(body) == "string" and #body >= minBytes then
+			return body, "httpget"
+		end
+		ok, body = pcall(game.HttpGet, game, url)
+		if ok and type(body) == "string" and #body >= minBytes then
+			return body, "httpget"
+		end
+	end
+	local ok, body = pcall(function()
+		return game:HttpGet(url, true)
+	end)
+	if ok and type(body) == "string" and #body >= minBytes then
+		return body, "httpget"
+	end
+	ok, body = pcall(function()
+		return game:HttpGet(url)
+	end)
+	if ok and type(body) == "string" and #body >= minBytes then
+		return body, "httpget"
+	end
+	return nil, "transport failed"
+end
+
 local function httpGet(url, minBytes)
 	minBytes = minBytes or 0
 	local plain = url:gsub("%?.*$", "")
 	local candidates = { plain .. "?t=" .. tostring(tick()), plain, url }
 	for i, candidate in ipairs(candidates) do
 		if i > 1 and typeof(task) == "table" and type(task.wait) == "function" then
-			pcall(task.wait)
+			pcall(task.wait, 0.05)
 		end
-		if type(game.HttpGet) == "function" then
-			local ok, body = pcall(game.HttpGet, game, candidate, true)
-			if ok and type(body) == "string" and #body >= minBytes then
-				return body, "httpget"
-			end
-			ok, body = pcall(game.HttpGet, game, candidate)
-			if ok and type(body) == "string" and #body >= minBytes then
-				return body, "httpget"
-			end
-		end
-		local ok, body = pcall(function()
-			return game:HttpGet(candidate, true)
-		end)
-		if ok and type(body) == "string" and #body >= minBytes then
-			return body, "httpget"
-		end
-		ok, body = pcall(function()
-			return game:HttpGet(candidate)
-		end)
-		if ok and type(body) == "string" and #body >= minBytes then
-			return body, "httpget"
-		end
-		local requestFn = pick({ "request", "http_request", "httprequest" })
-		if requestFn then
-			ok, body = pcall(function()
-				local res = requestFn({
-					Url = candidate,
-					Method = "GET",
-					Headers = { ["User-Agent"] = "Alleral-Bootstrap/" .. BOOTSTRAP_VERSION },
-				})
-				if type(res) == "table" and res.Body and #res.Body >= minBytes then
-					return res.Body
-				end
-				return nil
-			end)
-			if ok and type(body) == "string" then
-				return body, "request"
-			end
+		local body, via = httpGetOnce(candidate, minBytes)
+		if type(body) == "string" then
+			return body, via
 		end
 	end
 	return nil, "all transports failed"
+end
+
+local function httpGetWithTimeout(url, minBytes, timeoutSec)
+	timeoutSec = timeoutSec or HTTP_GET_TIMEOUT
+	minBytes = minBytes or 0
+	local body, via, finished = nil, nil, false
+	local worker = task.spawn(function()
+		body, via = httpGet(url, minBytes)
+		finished = true
+	end)
+	local deadline = tick() + timeoutSec
+	while not finished and tick() < deadline do
+		task.wait(0.05)
+	end
+	if finished then
+		return body, via
+	end
+	pcall(function()
+		task.cancel(worker)
+	end)
+	return nil, "timeout after " .. tostring(timeoutSec) .. "s"
 end
 
 local function loaderVersionFromSource(src)
@@ -166,21 +204,47 @@ local function loaderMatchesRelease(src, meta, strictCommit)
 	return true, remoteVer
 end
 
+local function releaseMetaUrls()
+	local bust = "?t=" .. tostring(tick())
+	return {
+		JSDELIVR .. "@" .. BRANCH .. "/cfg/release.json" .. bust,
+		GITHUB_RAW .. "/cfg/release.json" .. bust,
+		"https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. BRANCH .. "/cfg/release.json" .. bust,
+	}
+end
+
 local function fetchReleaseMeta()
-	local src, via = httpGet(RELEASE_URL, 40)
-	local meta = parseReleaseJson(src)
-	if meta and meta.loader and meta.commit then
-		return meta, via
+	for _, url in ipairs(releaseMetaUrls()) do
+		print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Release metadata: " .. url:gsub("%?.*$", ""))
+		local src, via = httpGetWithTimeout(url, 40, HTTP_GET_TIMEOUT)
+		local meta = parseReleaseJson(src)
+		if meta and meta.loader and meta.commit then
+			return meta, via or "release"
+		end
+		if via then
+			warn("[Alleral Bootstrap] Release fetch failed (" .. tostring(via) .. ")")
+		end
 	end
-	return { loader = nil, commit = BRANCH }, via or "release-unavailable"
+	warn(
+		"[Alleral Bootstrap] Release metadata unavailable — loading loader from "
+			.. BRANCH
+			.. " (expected v"
+			.. tostring(FALLBACK_RELEASE.loader)
+			.. ")"
+	)
+	return {
+		loader = FALLBACK_RELEASE.loader,
+		commit = BRANCH,
+		sydePatch = FALLBACK_RELEASE.sydePatch,
+	}, "fallback"
 end
 
 local function buildLoaderUrls(meta)
 	local commit = (meta and meta.commit) or BRANCH
 	local bust = "?t=" .. tostring(tick())
 	return {
-		{ url = "https://raw.githubusercontent.com/" .. REPO .. "/" .. commit .. "/loader.luau" .. bust, strictCommit = true },
-		{ url = JSDELIVR .. "@" .. commit .. "/loader.luau" .. bust, strictCommit = true },
+		{ url = JSDELIVR .. "@" .. commit .. "/loader.luau" .. bust, strictCommit = commit ~= BRANCH },
+		{ url = "https://raw.githubusercontent.com/" .. REPO .. "/" .. commit .. "/loader.luau" .. bust, strictCommit = commit ~= BRANCH },
 		{ url = GITHUB_RAW .. "/loader.luau" .. bust, strictCommit = false },
 	}
 end
@@ -570,9 +634,10 @@ local function Alleral_Bootstrap(reason)
 	local lastReject = "no matching loader"
 	for i, entry in ipairs(urls) do
 		if i > 1 and typeof(task) == "table" and type(task.wait) == "function" then
-			pcall(task.wait)
+			pcall(task.wait, 0.05)
 		end
-		local body, transport = httpGet(entry.url, 500)
+		print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Loader fetch: " .. entry.url:gsub("%?.*$", ""))
+		local body, transport = httpGetWithTimeout(entry.url, 500, HTTP_GET_TIMEOUT)
 		if type(body) == "string" and #body >= 500 then
 			local ok, detail = loaderMatchesRelease(body, meta, entry.strictCommit == true)
 			if ok then
