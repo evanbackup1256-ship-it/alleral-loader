@@ -101,7 +101,7 @@ local Loader =          game:GetObjects("rbxassetid://110221114597158")[1]
 -- Alleral compatibility layer for upstream Syde (essencejs/syde).
 -- Applied before the original library body; keeps upstream logic intact.
 
-local ALLERAL_SYDE_PATCH = 40
+local ALLERAL_SYDE_PATCH = 41
 
 local function sydeLog(...) end
 local function sydeWarn(...) end
@@ -219,10 +219,6 @@ local SYDE_CANONICAL_NAMES = {
 	Option = "Option",
 }
 
-local function sydeWindowSearch(windowFrame)
-	return sydeFindChild(windowFrame, "search", "Search")
-end
-
 local function sydeFindChild(parent, ...)
 	if not parent then
 		return nil
@@ -235,6 +231,10 @@ local function sydeFindChild(parent, ...)
 		end
 	end
 	return nil
+end
+
+local function sydeWindowSearch(windowFrame)
+	return sydeFindChild(windowFrame, "search", "Search")
 end
 
 local function sydeTopFunctions(topFrame)
