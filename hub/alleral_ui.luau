@@ -1,7 +1,7 @@
 return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "4.0.1-syde"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "4.1.0-studio"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
 	Core.UI_LIBRARY = "Syde"
 
@@ -298,8 +298,27 @@ return function(Core)
 	end
 
 	Core._UiTabRegistry = Core._UiTabRegistry or {}
-	local COLUMN_GAP = 12
-	local GROUP_GAP = 8
+	local COLUMN_GAP = 16
+	local GROUP_GAP = 10
+	local STUDIO = {
+		topBar = 50,
+		segmentBar = 46,
+		pad = 16,
+		corner = 20,
+		segmentGap = 8,
+		pillHeight = 34,
+		colors = {
+			shell = Color3.fromRGB(22, 22, 24),
+			shellStroke = Color3.fromRGB(72, 72, 78),
+			segmentBg = Color3.fromRGB(36, 36, 40),
+			pill = Color3.fromRGB(48, 48, 52),
+			pillActive = Color3.fromRGB(72, 72, 78),
+			pillText = Color3.fromRGB(174, 174, 178),
+			pillTextActive = Color3.fromRGB(255, 255, 255),
+			title = Color3.fromRGB(245, 245, 247),
+			subtitle = Color3.fromRGB(142, 142, 147),
+		},
+	}
 
 	local AlleralLayout = {}
 	AlleralLayout._resizeToken = 0
@@ -343,19 +362,189 @@ return function(Core)
 		return nil
 	end
 
-	local function fitSydeRailTabs(tabsFrame)
-		if not tabsFrame or not tabsFrame:IsA("GuiObject") then
+	local function getTabStrip(tabsContainer)
+		if not tabsContainer then
+			return nil
+		end
+		return findChildLoose(tabsContainer, "tab", "Tab", "tb", "Tb") or tabsContainer
+	end
+
+	local function ensureCorner(instance, radius)
+		if not instance or not instance:IsA("GuiObject") then
 			return
 		end
-		for _, tabButton in ipairs(tabsFrame:GetChildren()) do
-			if tabButton:IsA("GuiObject") and tabButton:FindFirstChild("title") and not tabButton:GetAttribute("AlleralRailFit") then
-				local title = tabButton.title
-				if title:IsA("TextLabel") then
-					title.TextXAlignment = Enum.TextXAlignment.Left
-					title.TextTruncate = Enum.TextTruncate.AtEnd
-					title.TextWrapped = false
+		local corner = instance:FindFirstChild("AlleralCorner")
+		if not corner then
+			corner = Instance.new("UICorner")
+			corner.Name = "AlleralCorner"
+			corner.Parent = instance
+		end
+		corner.CornerRadius = UDim.new(0, radius)
+	end
+
+	local function styleStudioTabPill(tabButton, selected)
+		if not tabButton or not tabButton:IsA("GuiObject") then
+			return
+		end
+		local title = tabButton:FindFirstChild("title")
+		local indicator = tabButton:FindFirstChild("indicator")
+		if indicator and indicator:IsA("GuiObject") then
+			indicator.Visible = false
+		end
+		tabButton.AutomaticSize = Enum.AutomaticSize.X
+		tabButton.Size = UDim2.new(0, 0, 0, STUDIO.pillHeight)
+		tabButton.BackgroundTransparency = selected and 0.08 or 0.42
+		tabButton.BackgroundColor3 = selected and STUDIO.colors.pillActive or STUDIO.colors.pill
+		ensureCorner(tabButton, 12)
+		local pad = tabButton:FindFirstChild("AlleralPad")
+		if not pad then
+			pad = Instance.new("UIPadding")
+			pad.Name = "AlleralPad"
+			pad.PaddingLeft = UDim.new(0, 14)
+			pad.PaddingRight = UDim.new(0, 14)
+			pad.Parent = tabButton
+		end
+		if title and title:IsA("TextLabel") then
+			if tabButton.Name and tabButton.Name ~= "" then
+				title.Text = tabButton.Name
+			end
+			title.TextSize = 13
+			title.Font = selected and Enum.Font.GothamMedium or Enum.Font.Gotham
+			title.TextColor3 = selected and STUDIO.colors.pillTextActive or STUDIO.colors.pillText
+			title.TextXAlignment = Enum.TextXAlignment.Center
+			title.TextTruncate = Enum.TextTruncate.None
+			title.TextWrapped = false
+			title.BackgroundTransparency = 1
+			title.Size = UDim2.new(1, 0, 1, 0)
+			title.Position = UDim2.new(0, 0, 0, 0)
+		end
+	end
+
+	local function refreshStudioTabSelection(tabStrip, activeName)
+		if not tabStrip then
+			return
+		end
+		activeName = activeName or tabStrip:GetAttribute("AlleralActiveTab")
+		for _, child in ipairs(tabStrip:GetChildren()) do
+			if child:IsA("GuiObject") and child:FindFirstChild("title") then
+				styleStudioTabPill(child, child.Name == activeName)
+			end
+		end
+	end
+
+	local function styleStudioTabStrip(tabStrip)
+		if not tabStrip or not tabStrip:IsA("GuiObject") then
+			return
+		end
+		if not tabStrip:GetAttribute("AlleralStripHooked") then
+			tabStrip:SetAttribute("AlleralStripHooked", true)
+			tabStrip.ChildAdded:Connect(function(child)
+				task.defer(function()
+					if child:IsA("GuiObject") and child:FindFirstChild("interact") then
+						local interact = child.interact
+						if interact:IsA("GuiButton") then
+							interact.MouseButton1Click:Connect(function()
+								tabStrip:SetAttribute("AlleralActiveTab", child.Name)
+								task.defer(function()
+									refreshStudioTabSelection(tabStrip, child.Name)
+								end)
+							end)
+						end
+					end
+					refreshStudioTabSelection(tabStrip)
+				end)
+			end)
+		end
+		local layout = tabStrip:FindFirstChildOfClass("UIListLayout")
+		if not layout then
+			layout = Instance.new("UIListLayout")
+			layout.Parent = tabStrip
+		end
+		layout.FillDirection = Enum.FillDirection.Horizontal
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+		layout.VerticalAlignment = Enum.VerticalAlignment.Center
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Padding = UDim.new(0, STUDIO.segmentGap)
+		for _, child in ipairs(tabStrip:GetChildren()) do
+			if child:IsA("GuiObject") and child:FindFirstChild("title") then
+				if child:FindFirstChild("interact") and child.interact:IsA("GuiButton") and not child:GetAttribute("AlleralPillHooked") then
+					child:SetAttribute("AlleralPillHooked", true)
+					child.interact.MouseButton1Click:Connect(function()
+						tabStrip:SetAttribute("AlleralActiveTab", child.Name)
+						task.defer(function()
+							refreshStudioTabSelection(tabStrip, child.Name)
+						end)
+					end)
 				end
-				tabButton:SetAttribute("AlleralRailFit", true)
+			end
+		end
+		local active = tabStrip:GetAttribute("AlleralActiveTab")
+		if not active then
+			for _, child in ipairs(tabStrip:GetChildren()) do
+				if child:IsA("GuiObject") and child:FindFirstChild("title") and child.Visible then
+					active = child.Name
+					break
+				end
+			end
+			if active then
+				tabStrip:SetAttribute("AlleralActiveTab", active)
+			end
+		end
+		refreshStudioTabSelection(tabStrip, active)
+	end
+
+	local function applyAppleChrome(main, nodes)
+		if not main or not main:IsA("GuiObject") then
+			return
+		end
+		main.BackgroundColor3 = STUDIO.colors.shell
+		main.BackgroundTransparency = 0.06
+		ensureCorner(main, STUDIO.corner)
+		local stroke = main:FindFirstChild("AlleralStroke")
+		if not stroke then
+			stroke = Instance.new("UIStroke")
+			stroke.Name = "AlleralStroke"
+			stroke.Parent = main
+		end
+		stroke.Color = STUDIO.colors.shellStroke
+		stroke.Transparency = 0.35
+		stroke.Thickness = 1
+		if nodes and nodes.top then
+			local title = findChildLoose(nodes.top, "title", "Title")
+			if title and title:IsA("TextLabel") then
+				title.TextColor3 = STUDIO.colors.title
+				title.Font = Enum.Font.GothamMedium
+				title.TextSize = 15
+				local sub = title:FindFirstChild("sub") or title:FindFirstChild("Sub")
+				if sub and sub:IsA("TextLabel") then
+					sub.TextColor3 = STUDIO.colors.subtitle
+					sub.Font = Enum.Font.Gotham
+					sub.TextSize = 12
+				end
+			end
+			local separator = findChildLoose(nodes.top, "separator", "Separator")
+			if separator and separator:IsA("GuiObject") then
+				separator.BackgroundTransparency = 0.55
+				separator.BackgroundColor3 = STUDIO.colors.shellStroke
+			end
+		end
+	end
+
+	local function hidePageChrome(pagesFrame)
+		if not pagesFrame then
+			return
+		end
+		local clip = findChildLoose(pagesFrame, "clipframe", "ClipFrame", "clip")
+		if clip then
+			local clipTitle = findChildLoose(clip, "title", "Title")
+			if clipTitle and clipTitle:IsA("GuiObject") then
+				clipTitle.Visible = false
+			end
+			for _, deco in ipairs({ "v0", "v1" }) do
+				local node = clip:FindFirstChild(deco)
+				if node and node:IsA("GuiObject") then
+					node.Visible = false
+				end
 			end
 		end
 	end
@@ -436,9 +625,9 @@ return function(Core)
 		local maxW = math.min(maxSize.X, vp.X * vpX)
 		local maxH = math.min(maxSize.Y, vp.Y * vpY)
 		tabCount = math.max(1, tonumber(tabCount) or 4)
-		local heightBoost = math.min(140, tabCount * 10)
-		local width = math.clamp(math.floor(720 * scale), minSize.X, maxW)
-		local height = math.clamp(math.floor(560 * scale) + heightBoost, minSize.Y, maxH)
+		local heightBoost = math.min(120, tabCount * 8)
+		local width = math.clamp(math.floor(820 * scale), minSize.X, maxW)
+		local height = math.clamp(math.floor(620 * scale) + heightBoost, minSize.Y, maxH)
 		return UDim2.fromOffset(width, height)
 	end
 
@@ -465,60 +654,18 @@ return function(Core)
 			return false
 		end
 		profile = profile or AlleralLayout.getProfile()
-		local ui = profile.ui or {}
-		local rail = math.clamp(tonumber(ui.rail) or 64, 72, 128)
-		local topHeight = 52
+		local pad = STUDIO.pad
+		local topHeight = STUDIO.topBar
+		local segmentHeight = STUDIO.segmentBar
 		if nodes.top and nodes.top:IsA("GuiObject") then
-			topHeight = math.max(44, nodes.top.AbsoluteSize.Y)
+			topHeight = math.max(STUDIO.topBar, math.min(56, nodes.top.AbsoluteSize.Y))
 		end
 
-		nodes.tabs.AnchorPoint = Vector2.new(0, 0)
-		local tabsPos = UDim2.new(0, 6, 0, topHeight + 4)
-		local tabsSize = UDim2.new(0, rail, 1, -(topHeight + 10))
-		if animated then
-			tweenGui(nodes.tabs, MOTION_LAYOUT, { Position = tabsPos, Size = tabsSize })
-		else
-			nodes.tabs.Position = tabsPos
-			nodes.tabs.Size = tabsSize
-		end
-		if nodes.tabs:IsA("ScrollingFrame") then
-			nodes.tabs.ScrollBarThickness = 2
-			nodes.tabs.AutomaticCanvasSize = Enum.AutomaticSize.Y
-			nodes.tabs.ScrollingDirection = Enum.ScrollingDirection.Y
-			nodes.tabs.CanvasSize = UDim2.new(0, 0, 0, 0)
-		end
-		fitSydeRailTabs(nodes.tabs)
-		local tabList = nodes.tabs:FindFirstChildOfClass("UIListLayout")
-		if tabList then
-			tabList.FillDirection = Enum.FillDirection.Vertical
-			tabList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-			tabList.Padding = UDim.new(0, 5)
-		end
-
-		nodes.pages.AnchorPoint = Vector2.new(0, 0)
-		local pagesPos = UDim2.new(0, rail + 12, 0, topHeight + 2)
-		local pagesSize = UDim2.new(1, -(rail + 18), 1, -(topHeight + 8))
-		if animated then
-			tweenGui(nodes.pages, MOTION_LAYOUT, { Position = pagesPos, Size = pagesSize })
-		else
-			nodes.pages.Position = pagesPos
-			nodes.pages.Size = pagesSize
-		end
-		stretchSydePages(nodes.pages)
-
-		if nodes.user and nodes.user:IsA("GuiObject") then
-			nodes.user.AnchorPoint = Vector2.new(1, 0)
-			local userPos = UDim2.new(1, -6, 0, 6)
-			if animated then
-				tweenGui(nodes.user, MOTION_LAYOUT, { Position = userPos })
-			else
-				nodes.user.Position = userPos
-			end
-		end
+		applyAppleChrome(nodes.main, nodes)
 
 		if nodes.top and nodes.top:IsA("GuiObject") then
-			local topSize = UDim2.new(1, -12, 0, topHeight)
-			local topPos = UDim2.new(0, 6, 0, 4)
+			local topSize = UDim2.new(1, -(pad * 2), 0, topHeight)
+			local topPos = UDim2.new(0, pad, 0, 8)
 			if animated then
 				tweenGui(nodes.top, MOTION_LAYOUT, { Size = topSize, Position = topPos })
 			else
@@ -527,7 +674,62 @@ return function(Core)
 			end
 		end
 
+		if nodes.user and nodes.user:IsA("GuiObject") then
+			nodes.user.AnchorPoint = Vector2.new(1, 0)
+			local userPos = UDim2.new(1, -pad, 0, 10)
+			if animated then
+				tweenGui(nodes.user, MOTION_LAYOUT, { Position = userPos })
+			else
+				nodes.user.Position = userPos
+			end
+			ensureCorner(nodes.user, 14)
+		end
+
+		local segmentY = topHeight + 6
+		nodes.tabs.AnchorPoint = Vector2.new(0, 0)
+		local tabsPos = UDim2.new(0, pad, 0, segmentY)
+		local tabsSize = UDim2.new(1, -(pad * 2), 0, segmentHeight)
+		if animated then
+			tweenGui(nodes.tabs, MOTION_LAYOUT, { Position = tabsPos, Size = tabsSize })
+		else
+			nodes.tabs.Position = tabsPos
+			nodes.tabs.Size = tabsSize
+		end
+		nodes.tabs.BackgroundTransparency = 0.35
+		nodes.tabs.BackgroundColor3 = STUDIO.colors.segmentBg
+		ensureCorner(nodes.tabs, 14)
+		if nodes.tabs:IsA("ScrollingFrame") then
+			nodes.tabs.ScrollBarThickness = 0
+			nodes.tabs.AutomaticCanvasSize = Enum.AutomaticSize.X
+			nodes.tabs.ScrollingDirection = Enum.ScrollingDirection.X
+			nodes.tabs.CanvasSize = UDim2.new(0, 0, 0, 0)
+			local scrollPad = nodes.tabs:FindFirstChild("AlleralScrollPad")
+			if not scrollPad then
+				scrollPad = Instance.new("UIPadding")
+				scrollPad.Name = "AlleralScrollPad"
+				scrollPad.PaddingLeft = UDim.new(0, 8)
+				scrollPad.PaddingRight = UDim.new(0, 8)
+				scrollPad.Parent = nodes.tabs
+			end
+		end
+		local tabStrip = getTabStrip(nodes.tabs)
+		styleStudioTabStrip(tabStrip)
+
+		local contentTop = segmentY + segmentHeight + 10
+		nodes.pages.AnchorPoint = Vector2.new(0, 0)
+		local pagesPos = UDim2.new(0, pad, 0, contentTop)
+		local pagesSize = UDim2.new(1, -(pad * 2), 1, -(contentTop + 10))
+		if animated then
+			tweenGui(nodes.pages, MOTION_LAYOUT, { Position = pagesPos, Size = pagesSize })
+		else
+			nodes.pages.Position = pagesPos
+			nodes.pages.Size = pagesSize
+		end
+		stretchSydePages(nodes.pages)
+		hidePageChrome(nodes.pages)
+
 		rawWindow._alleralRailLayout = true
+		rawWindow._alleralLayoutMode = "studio"
 		return true
 	end
 
@@ -544,7 +746,7 @@ return function(Core)
 					task.defer(function()
 						AlleralLayout.relayoutColumns(false)
 					end)
-				elseif width > 0 and width < 440 then
+				elseif width > 0 and width < 560 then
 					layout.right.Visible = false
 					layout.left.Size = UDim2.new(1, 0, 0, 0)
 					layout.left.AutomaticSize = Enum.AutomaticSize.Y
@@ -1090,7 +1292,7 @@ return function(Core)
 				Description = settings.Description or settings.Tooltip or "",
 				Sliders = {
 					{
-						Title = settings.Name or "Value",
+						Title = " ",
 						Range = { minValue, maxValue },
 						Increment = increment,
 						StarterValue = tonumber(settings.CurrentValue) or minValue,
@@ -1283,6 +1485,15 @@ return function(Core)
 		pcall(function()
 			page.CanvasSize = UDim2.new(0, 0, 0, 0)
 			page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+			page.ScrollBarThickness = 4
+			local pagePad = page:FindFirstChild("AlleralPagePad")
+			if not pagePad then
+				pagePad = Instance.new("UIPadding")
+				pagePad.Name = "AlleralPagePad"
+				pagePad.PaddingTop = UDim.new(0, 4)
+				pagePad.PaddingBottom = UDim.new(0, 12)
+				pagePad.Parent = page
+			end
 		end)
 
 		local row = Instance.new("Frame")
@@ -1375,10 +1586,10 @@ return function(Core)
 			title.Name = "GroupTitle"
 			title.BackgroundTransparency = 1
 			title.Size = UDim2.new(1, 0, 0, 22)
-			title.Font = Enum.Font.GothamBold
-			title.TextSize = 14
+			title.Font = Enum.Font.GothamMedium
+			title.TextSize = 12
 			title.TextXAlignment = Enum.TextXAlignment.Left
-			title.TextColor3 = Color3.fromRGB(235, 235, 245)
+			title.TextColor3 = STUDIO.colors.subtitle
 			title.Text = name
 			title.LayoutOrder = 0
 			title.Parent = group
@@ -1500,6 +1711,11 @@ return function(Core)
 		if not window._defaultTab then
 			window._defaultTab = rawTab
 		end
+		task.defer(function()
+			if window._rawWindow then
+				AlleralLayout.applyLayoutOnly(window._rawWindow, false)
+			end
+		end)
 		return wrapped
 	end
 

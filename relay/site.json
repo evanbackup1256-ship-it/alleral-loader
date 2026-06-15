@@ -6,7 +6,7 @@
   "loaderVersion": "8.3.1",
   "coreVersion": "2.9.5",
   "uiLibrary": "Syde",
-  "uiVersion": "4.0.1-syde",
+  "uiVersion": "4.1.0-studio",
   "sydePatch": 39,
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/hub/bootstrap.luau?t=\" .. tick(), true))()",
@@ -47,6 +47,15 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-15",
+      "title": "Alleral UI 4.1 — Apple Studio Layout",
+      "items": [
+        "Replaced sidebar tabs with horizontal segmented pill bar",
+        "Dark glass shell with rounded corners and full-width content",
+        "Fixed slider label overlap and improved two-column spacing"
+      ]
+    },
     {
       "date": "2026-06-15",
       "title": "Kick A Lucky Block 7.2.2 — Xeno Module & UI Fixes",

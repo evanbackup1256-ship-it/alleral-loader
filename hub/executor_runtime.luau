@@ -487,7 +487,7 @@ function ExecutorRuntime.buildProfile(detected)
 		isKnown = slug ~= "unknown",
 		tier = entry.tier or "standard",
 		ui = entry.ui or ExecutorRuntime.REGISTRY.unknown.ui,
-		layoutMode = "rail",
+		layoutMode = "studio",
 		env = ENV,
 		solara = solaraLib ~= nil or slug == "solara",
 		weao = detected.weao,
