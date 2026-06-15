@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.3.0"
+local LOADER_VERSION = "8.3.1"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -36,7 +36,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.3.0",
+	loader = "8.3.1",
 	core = "2.9.5",
 	ui = "Syde",
 	windui = "4.0.1-syde",
@@ -2722,7 +2722,7 @@ local GAMES = {
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
-		version = "7.1.0",
+		version = "7.2.0",
 		placeIds = { 89469502395769 },
 		universeIds = { 10004244222 },
 		scriptFiles = { "games/kick_a_lucky_block.luau", "kick_a_lucky_block.luau" },
@@ -2818,7 +2818,7 @@ local GAMES = {
 	{
 		id = "sell_lemons",
 		name = "Sell Lemons",
-		version = "1.0.0",
+		version = "2.0.0",
 		placeIds = { 79268393072444 },
 		scriptFiles = { "games/sell_lemons.luau", "sell_lemons.luau" },
 		scriptUrl = "games/sell_lemons.luau",
@@ -2834,7 +2834,7 @@ local GAMES = {
 	{
 		id = "grow_a_garden_2",
 		name = "Grow a Garden 2",
-		version = "1.0.0",
+		version = "2.0.0",
 		placeIds = { 95204935687527 },
 		scriptFiles = { "games/grow_a_garden_2.luau", "grow_a_garden_2.luau" },
 		scriptUrl = "games/grow_a_garden_2.luau",
@@ -3316,7 +3316,7 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.3.0"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.3.1"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then

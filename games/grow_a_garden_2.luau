@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "1.0.0"
+local VERSION = "2.0.0"
 local PLACE_ID = 95204935687527
 local state = getgenv().Alleral_State
 local G = (Core and Core.Game) or getgenv().Alleral_GameHelpers or {}
@@ -17,14 +17,7 @@ local ui
 local bootErr
 Core, ui, bootErr = Core.boot(state)
 if not Core or not ui then
-	local msg = bootErr or "boot failed"
-	getgenv().Alleral_StartupFailed = msg
-	local coreRef = Core or getgenv().Alleral_Core
-	if coreRef and type(coreRef.logWarn) == "function" then
-		coreRef.logWarn(msg)
-	else
-		warn("[Alleral] " .. tostring(msg))
-	end
+	getgenv().Alleral_StartupFailed = bootErr or "boot failed"
 	return
 end
 G = Core.Game or G
@@ -35,22 +28,38 @@ local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
 local SETTINGS_FILE = "grow_a_garden_2.json"
-local SETTINGS_EXCLUDE = {
-	HubRunning = true,
-	PlayerPlot = true,
-}
+local SETTINGS_EXCLUDE = { HubRunning = true, PlayerPlot = true }
 local defaults = {
 	HubRunning = true,
-	AutoPlantSeeds = false,
-	AutoHarvest = false,
-	AutoSell = false,
 	AntiAFK = true,
+	AAutoLoadConfig = false,
+	AutoLoadProfile = "default",
+	AutoPlantSeed = false,
+	AutoPlantAllSeeds = false,
+	AutoShovelSeed = false,
+	AutoCollectSeeds = false,
+	StopCollectWhenFull = true,
+	AutoWateringCan = false,
+	AutoSprinklerSystem = false,
+	AutoBuySeedShop = false,
+	AutoBuyCrate = false,
+	AutoBuyGearShop = false,
+	PlantSpeed = 1,
 	PlantInterval = 1,
-	HarvestInterval = 0.75,
-	SellInterval = 2,
+	ShovelInterval = 2,
+	CollectInterval = 0.75,
+	WaterAmount = 1,
+	WaterDelay = 1.5,
+	SprinklerAmount = 1,
+	SprinklerDelay = 2,
+	ShopInterval = 3,
 	TargetSeeds = { "Any" },
-	TargetCrops = { "Any" },
-	SellMode = "All",
+	TargetRarities = { "Any" },
+	TargetSprinklerSeeds = { "Any" },
+	TargetSeedShop = { "Any" },
+	TargetCrates = { "Any" },
+	TargetGearShop = { "Any" },
+	SprinklerVariant = "Any",
 }
 
 local savedKeys
@@ -62,16 +71,12 @@ local function notify(title, text, duration, notifyType)
 end
 
 local function waitChild(parent, name, timeout)
-	if G.waitChild then
-		return G.waitChild(parent, name, timeout)
-	end
+	if G.waitChild then return G.waitChild(parent, name, timeout) end
 	return Core.waitChild(parent, name, timeout)
 end
 
 local function leaderstat(name)
-	if G.leaderstatValue then
-		return G.leaderstatValue(LocalPlayer, name)
-	end
+	if G.leaderstatValue then return G.leaderstatValue(LocalPlayer, name) end
 	local folder = LocalPlayer:FindFirstChild("leaderstats")
 	local value = folder and folder:FindFirstChild(name)
 	if value and (value:IsA("IntValue") or value:IsA("NumberValue") or value:IsA("StringValue")) then
@@ -80,52 +85,64 @@ local function leaderstat(name)
 	return "?"
 end
 
-local runtime = {
-	remotes = {},
-	playerPlot = nil,
-	lastPlant = 0,
-	lastHarvest = 0,
-	lastSell = 0,
+local runtime = { remotes = {}, timers = {}, playerPlot = nil }
+
+local REMOTE_ALIASES = {
+	PlantSeed = { "PlantSeed", "Plant", "PlantCrop", "PlantAll" },
+	ShovelSeed = { "ShovelSeed", "Shovel", "RemoveSeed", "ClearSeed" },
+	CollectSeed = { "CollectSeed", "CollectSeeds", "PickupSeed", "HarvestSeed" },
+	Water = { "Water", "WateringCan", "UseWateringCan", "WaterPlot" },
+	Sprinkler = { "Sprinkler", "PlaceSprinkler", "UseSprinkler", "SprinklerSystem" },
+	BuySeed = { "BuySeed", "PurchaseSeed", "SeedShop", "BuySeedShop" },
+	BuyCrate = { "BuyCrate", "PurchaseCrate", "CrateShop" },
+	BuyGear = { "BuyGear", "PurchaseGear", "GearShop" },
 }
 
 local function refreshRemotes()
 	runtime.remotes = G.indexRemotes and G.indexRemotes(ReplicatedStorage, runtime.remotes) or runtime.remotes
-	local remotesFolder = waitChild(ReplicatedStorage, "Remotes", 3)
-	if remotesFolder then
-		runtime.remotes.PlantSeed = remotesFolder:FindFirstChild("PlantSeed")
-			or remotesFolder:FindFirstChild("Plant")
-			or runtime.remotes.PlantSeed
-		runtime.remotes.Harvest = remotesFolder:FindFirstChild("Harvest")
-			or remotesFolder:FindFirstChild("PickCrop")
-			or remotesFolder:FindFirstChild("CollectCrop")
-			or runtime.remotes.Harvest
-		runtime.remotes.Sell = remotesFolder:FindFirstChild("Sell")
-			or remotesFolder:FindFirstChild("SellAll")
-			or remotesFolder:FindFirstChild("SellCrops")
-			or runtime.remotes.Sell
+	local folder = waitChild(ReplicatedStorage, "Remotes", 3)
+	if not folder then return end
+	for key, names in pairs(REMOTE_ALIASES) do
+		for _, name in ipairs(names) do
+			local remote = folder:FindFirstChild(name)
+			if remote then
+				runtime.remotes[key] = remote
+				break
+			end
+		end
 	end
 end
-
 refreshRemotes()
 
-local function fireNamed(names, payloads)
-	return G.probeRemote and G.probeRemote(runtime.remotes, names, payloads) or false
+local function fireKey(key, ...)
+	local remote = runtime.remotes[key]
+	if remote and G.fireRemote then return G.fireRemote(remote, ...) end
+	if remote then
+		local ok = pcall(function()
+			if remote:IsA("RemoteEvent") then
+				remote:FireServer(...)
+			elseif remote:IsA("RemoteFunction") then
+				remote:InvokeServer(...)
+			end
+		end)
+		return ok
+	end
+	return G.probeRemote and G.probeRemote(runtime.remotes, REMOTE_ALIASES[key] or { key }, { ... }) or false
+end
+
+local function tickEvery(key, interval, fn)
+	runtime.timers[key] = runtime.timers[key] or 0
+	if tick() < runtime.timers[key] then return end
+	runtime.timers[key] = tick() + interval
+	fn()
 end
 
 local function resolvePlayerPlot()
-	if runtime.playerPlot and runtime.playerPlot.Parent then
-		return runtime.playerPlot
-	end
-	local plots = Workspace:FindFirstChild("Plots")
-		or Workspace:FindFirstChild("Farms")
-		or Workspace:FindFirstChild("Gardens")
-	if not plots then
-		return nil
-	end
+	if runtime.playerPlot and runtime.playerPlot.Parent then return runtime.playerPlot end
+	local plots = Workspace:FindFirstChild("Plots") or Workspace:FindFirstChild("Farms") or Workspace:FindFirstChild("Gardens")
+	if not plots then return nil end
 	for _, plot in ipairs(plots:GetChildren()) do
-		local owner = plot:GetAttribute("Owner")
-			or plot:GetAttribute("UserId")
-			or plot:GetAttribute("Player")
+		local owner = plot:GetAttribute("Owner") or plot:GetAttribute("UserId") or plot:GetAttribute("Player")
 		if owner == LocalPlayer.Name or owner == LocalPlayer.UserId or owner == tostring(LocalPlayer.UserId) then
 			runtime.playerPlot = plot
 			state.PlayerPlot = plot.Name
@@ -141,116 +158,109 @@ local function resolvePlayerPlot()
 	return nil
 end
 
-local function plotSlots(plot)
-	local slots = {}
-	if not plot then
-		return slots
-	end
-	for _, child in ipairs(plot:GetDescendants()) do
-		if child:IsA("BasePart") then
-			local lower = string.lower(child.Name)
-			if string.find(lower, "plot") or string.find(lower, "soil") or string.find(lower, "slot") or string.find(lower, "patch") then
-				table.insert(slots, child)
-			end
+local function inventoryFull()
+	local backpack = LocalPlayer:FindFirstChild("Backpack")
+	local char = LocalPlayer.Character
+	local count = 0
+	if backpack then count += #backpack:GetChildren() end
+	if char then
+		for _, item in ipairs(char:GetChildren()) do
+			if item:IsA("Tool") then count += 1 end
 		end
 	end
-	return slots
+	local max = LocalPlayer:GetAttribute("MaxInventory") or LocalPlayer:GetAttribute("InventoryCap") or 999
+	return count >= max
 end
 
-local function ripeCrops(plot)
-	local crops = {}
-	if not plot then
-		return crops
+local function selectionOk(selected, value)
+	local list = Core.normalizeMultiSelection(selected)
+	if #list == 0 or list[1] == "Any" then return true end
+	local lower = string.lower(tostring(value or ""))
+	for _, item in ipairs(list) do
+		if string.lower(item) == lower then return true end
 	end
-	for _, child in ipairs(plot:GetDescendants()) do
-		if child:IsA("Model") or child:IsA("BasePart") then
-			local lower = string.lower(child.Name)
-			if string.find(lower, "crop") or string.find(lower, "plant") or string.find(lower, "harvest") then
-				local ready = child:GetAttribute("Ready")
-					or child:GetAttribute("Ripe")
-					or child:GetAttribute("Grown")
-				if ready == true or ready == 1 or child:FindFirstChild("Ready") or child:FindFirstChild("HarvestPrompt") then
-					table.insert(crops, child)
-				end
-			end
+	return false
+end
+
+local function plantTick()
+	if not (state.AutoPlantSeed or state.AutoPlantAllSeeds) then return end
+	local interval = math.max(0.25, (state.PlantInterval or 1) / math.max(state.PlantSpeed or 1, 0.1))
+	tickEvery("plant", interval, function()
+		if state.AutoPlantAllSeeds then
+			fireKey("PlantSeed", "All")
+			return
 		end
-	end
-	return crops
-end
-
-local function plantSeedsTick()
-	if not state.AutoPlantSeeds or not state.HubRunning then
-		return
-	end
-	if tick() < runtime.lastPlant + (state.PlantInterval or 1) then
-		return
-	end
-	runtime.lastPlant = tick()
-	refreshRemotes()
-	local plot = resolvePlayerPlot()
-	local targets = Core.normalizeMultiSelection(state.TargetSeeds)
-	if #targets == 0 then
-		targets = { "Any" }
-	end
-	for _, seedName in ipairs(targets) do
-		if seedName == "Any" then
-			if not fireNamed({ "PlantSeed", "Plant", "PlantCrop" }) then
-				for _, slot in ipairs(plotSlots(plot)) do
-					fireNamed({ "PlantSeed", "Plant" }, { slot.Name })
-				end
-			end
+		local seeds = Core.normalizeMultiSelection(state.TargetSeeds)
+		if #seeds == 0 or seeds[1] == "Any" then
+			fireKey("PlantSeed")
 		else
-			fireNamed({ "PlantSeed", "Plant" }, { seedName })
+			for _, seed in ipairs(seeds) do fireKey("PlantSeed", seed) end
 		end
-	end
+	end)
 end
 
-local function harvestTick()
-	if not state.AutoHarvest or not state.HubRunning then
-		return
-	end
-	if tick() < runtime.lastHarvest + (state.HarvestInterval or 0.75) then
-		return
-	end
-	runtime.lastHarvest = tick()
+local function runAutomation()
+	if not state.HubRunning then return end
 	refreshRemotes()
-	local plot = resolvePlayerPlot()
-	local targets = Core.normalizeMultiSelection(state.TargetCrops)
-	if fireNamed({ "Harvest", "PickCrop", "CollectCrop", "HarvestAll" }) then
-		return
+	plantTick()
+
+	if state.AutoShovelSeed then
+		tickEvery("shovel", state.ShovelInterval or 2, function() fireKey("ShovelSeed") end)
 	end
-	for _, crop in ipairs(ripeCrops(plot)) do
-		local cropName = crop.Name
-		if #targets == 0 or targets[1] == "Any" or Core.listMatches and Core.listMatches(targets, cropName) then
-			fireNamed({ "Harvest", "PickCrop", "CollectCrop" }, { cropName })
-		end
+	if state.AutoCollectSeeds then
+		tickEvery("collect", state.CollectInterval or 0.75, function()
+			if state.StopCollectWhenFull and inventoryFull() then return end
+			fireKey("CollectSeed")
+		end)
+	end
+	if state.AutoWateringCan then
+		tickEvery("water", state.WaterDelay or 1.5, function()
+			for _ = 1, math.max(1, math.floor(state.WaterAmount or 1)) do
+				fireKey("Water")
+			end
+		end)
+	end
+	if state.AutoSprinklerSystem then
+		tickEvery("sprinkler", state.SprinklerDelay or 2, function()
+			local seeds = Core.normalizeMultiSelection(state.TargetSprinklerSeeds)
+			local variant = state.SprinklerVariant or "Any"
+			for _ = 1, math.max(1, math.floor(state.SprinklerAmount or 1)) do
+				if seeds[1] and seeds[1] ~= "Any" then
+					for _, seed in ipairs(seeds) do fireKey("Sprinkler", seed, variant) end
+				else
+					fireKey("Sprinkler", variant)
+				end
+			end
+		end)
+	end
+	if state.AutoBuySeedShop then
+		tickEvery("seedShop", state.ShopInterval or 3, function()
+			local targets = Core.normalizeMultiSelection(state.TargetSeedShop)
+			if targets[1] == "Any" or #targets == 0 then fireKey("BuySeed") else
+				for _, seed in ipairs(targets) do fireKey("BuySeed", seed) end
+			end
+		end)
+	end
+	if state.AutoBuyCrate then
+		tickEvery("crate", state.ShopInterval or 3, function()
+			local targets = Core.normalizeMultiSelection(state.TargetCrates)
+			if targets[1] == "Any" or #targets == 0 then fireKey("BuyCrate") else
+				for _, crate in ipairs(targets) do fireKey("BuyCrate", crate) end
+			end
+		end)
+	end
+	if state.AutoBuyGearShop then
+		tickEvery("gear", state.ShopInterval or 3, function()
+			local targets = Core.normalizeMultiSelection(state.TargetGearShop)
+			if targets[1] == "Any" or #targets == 0 then fireKey("BuyGear") else
+				for _, gear in ipairs(targets) do fireKey("BuyGear", gear) end
+			end
+		end)
 	end
 end
 
-local function sellTick()
-	if not state.AutoSell or not state.HubRunning then
-		return
-	end
-	if tick() < runtime.lastSell + (state.SellInterval or 2) then
-		return
-	end
-	runtime.lastSell = tick()
-	refreshRemotes()
-	local mode = state.SellMode or "All"
-	if mode == "All" then
-		fireNamed({ "SellAll", "Sell", "SellCrops", "SellInventory" })
-	else
-		fireNamed({ "Sell", "SellCrops" }, { mode })
-	end
-end
-
-Core.makeSupervisor(state, loops, loopControllers, "plantSeeds", state.PlantInterval or 1, plantSeedsTick)
-Core.makeSupervisor(state, loops, loopControllers, "harvest", state.HarvestInterval or 0.75, harvestTick)
-Core.makeSupervisor(state, loops, loopControllers, "sell", state.SellInterval or 2, sellTick)
-
-if state.AntiAFK ~= false then
-	Core.setupAntiAfk(LocalPlayer)
-end
+Core.makeSupervisor(state, loops, loopControllers, "mainLoop", 0.25, runAutomation)
+if state.AntiAFK ~= false then Core.setupAntiAfk(LocalPlayer) end
 
 local window = Core.buildUiWindow(ui, Core.uiWindowSettings({
 	Subtitle = "Grow a Garden 2 · v" .. VERSION,
@@ -259,148 +269,114 @@ local window = Core.buildUiWindow(ui, Core.uiWindowSettings({
 }))
 if not window or not window._rawWindow then
 	getgenv().Alleral_StartupFailed = "UI window failed"
-	Core.logWarn("UI window failed — aborting")
 	return
 end
+
 local section = Core.buildUiSection(window)
 Core.buildExploitHub(section, {
-	window = window,
-	ui = ui,
-	state = state,
-	loops = loopControllers,
-	version = VERSION,
-	scriptId = "grow_a_garden_2",
-	gameName = "Grow a Garden 2",
-	gameStats = { Coins = "?", Crops = "?", Plot = "?" },
+	window = window, ui = ui, state = state, loops = loopControllers,
+	version = VERSION, scriptId = "grow_a_garden_2", gameName = "Grow a Garden 2",
+	gameStats = { Coins = "?", Seeds = "?", Plot = "?" },
 	statsTick = function(status)
 		status:Update("Coins", leaderstat("Coins") or leaderstat("Money") or "?")
-		status:Update("Crops", leaderstat("Crops") or leaderstat("Harvested") or "?")
-		local plot = resolvePlayerPlot()
-		status:Update("Plot", plot and plot.Name or "?")
+		status:Update("Seeds", leaderstat("Seeds") or "?")
+		status:Update("Plot", (resolvePlayerPlot() and state.PlayerPlot) or "?")
 	end,
 	automationFlags = {
-		{ key = "AutoPlantSeeds", label = "Plant seeds" },
-		{ key = "AutoHarvest", label = "Harvest" },
-		{ key = "AutoSell", label = "Sell" },
+		{ key = "AutoPlantSeed", label = "Plant" },
+		{ key = "AutoCollectSeeds", label = "Collect seeds" },
+		{ key = "AutoWateringCan", label = "Water" },
+		{ key = "AutoSprinklerSystem", label = "Sprinkler" },
 	},
 	saveFn = saveSettings,
-	onRemoteScan = function()
-		refreshRemotes()
-	end,
+	onRemoteScan = refreshRemotes,
 })
+
 local farmTab = Core.buildUiTab(section, "Farm", 10734923214, 2, "farm")
-local autoTab = Core.buildUiTab(section, "Auto", 10723407389, 2, "auto")
+local waterTab = Core.buildUiTab(section, "Water", 10723407389, 1, "water")
+local shopTab = Core.buildUiTab(section, "Shop", 10734952479, 1, "shop")
 local settingsTab = Core.buildUiTab(section, "Settings", 10734950309, 1, "settings")
-
 local saveWrap = Core.onUiSave(saveSettings)
-local planting = Core.buildUiGroup(farmTab, "Planting", 1, saveWrap, nil, "plant")
-local harvestGroup = Core.buildUiGroup(farmTab, "Harvest", 2, saveWrap, nil, "harvest")
-local selling = Core.buildUiGroup(farmTab, "Selling", 1, saveWrap, nil, "sell")
-local timing = Core.buildUiGroup(autoTab, "Timing", 1, saveWrap, nil, "timing")
-local util = Core.buildUiGroup(autoTab, "Utilities", 2, saveWrap, nil, "util")
 
-planting:CreateToggle("Auto plant seeds", state.AutoPlantSeeds, "Plants seeds on open plot slots.", function(enabled)
-	state.AutoPlantSeeds = enabled
-end)
-planting:AddDropdown("Target seeds", {
+local plantGroup = Core.buildUiGroup(farmTab, "Planting", 1, saveWrap, nil, "plant")
+local collectGroup = Core.buildUiGroup(farmTab, "Seeds", 2, saveWrap, nil, "collect")
+local waterGroup = Core.buildUiGroup(waterTab, "Watering Can", 1, saveWrap, nil, "water")
+local sprinklerGroup = Core.buildUiGroup(waterTab, "Sprinkler", 2, saveWrap, nil, "sprinkler")
+local seedShop = Core.buildUiGroup(shopTab, "Seed Shop", 1, saveWrap, nil, "seedshop")
+local crateShop = Core.buildUiGroup(shopTab, "Crates", 2, saveWrap, nil, "crate")
+local gearShop = Core.buildUiGroup(shopTab, "Gear", 1, saveWrap, nil, "gear")
+
+plantGroup:CreateToggle("Auto plant seed", state.AutoPlantSeed, "Plants selected seeds on open slots.", function(v) state.AutoPlantSeed = v end)
+plantGroup:CreateToggle("Auto plant all seeds", state.AutoPlantAllSeeds, "Plants every seed in inventory.", function(v) state.AutoPlantAllSeeds = v end)
+plantGroup:CreateToggle("Auto shovel seed", state.AutoShovelSeed, "Removes unwanted planted seeds.", function(v) state.AutoShovelSeed = v end)
+plantGroup:AddDropdown("Seed filter", {
 	Text = "Seeds to plant",
-	Values = { "Any", "Carrot", "Corn", "Tomato", "Wheat", "Pumpkin" },
-	Default = state.TargetSeeds,
-	Multi = true,
-	Callback = function(selected)
-		state.TargetSeeds = Core.normalizeMultiSelection(selected)
-		if #state.TargetSeeds == 0 then
-			state.TargetSeeds = { "Any" }
-		end
-	end,
+	Values = { "Any", "Carrot", "Corn", "Tomato", "Wheat", "Pumpkin", "Common", "Rare", "Legendary" },
+	Default = state.TargetSeeds, Multi = true,
+	Callback = function(s) state.TargetSeeds = Core.normalizeMultiSelection(s) if #state.TargetSeeds == 0 then state.TargetSeeds = { "Any" } end end,
 })
-planting:CreateSlider("Plant delay", 0.5, 5, state.PlantInterval, function(value)
-	state.PlantInterval = value
-end, "Seconds between plant attempts.")
-
-harvestGroup:CreateToggle("Auto harvest", state.AutoHarvest, "Collects ripe crops from your plot.", function(enabled)
-	state.AutoHarvest = enabled
-end)
-harvestGroup:AddDropdown("Target crops", {
-	Text = "Crops to harvest",
-	Values = { "Any", "Carrot", "Corn", "Tomato", "Wheat", "Pumpkin" },
-	Default = state.TargetCrops,
-	Multi = true,
-	Callback = function(selected)
-		state.TargetCrops = Core.normalizeMultiSelection(selected)
-		if #state.TargetCrops == 0 then
-			state.TargetCrops = { "Any" }
-		end
-	end,
+plantGroup:AddDropdown("Rarity filter", {
+	Text = "Rarity",
+	Values = { "Any", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic" },
+	Default = state.TargetRarities, Multi = true,
+	Callback = function(s) state.TargetRarities = Core.normalizeMultiSelection(s) if #state.TargetRarities == 0 then state.TargetRarities = { "Any" } end end,
 })
-harvestGroup:CreateSlider("Harvest delay", 0.25, 5, state.HarvestInterval, function(value)
-	state.HarvestInterval = value
-end, "Seconds between harvest passes.")
+plantGroup:CreateSlider("Custom plant speed", 0.5, 5, state.PlantSpeed, function(v) state.PlantSpeed = v end, "Multiplier for plant loop speed.")
+plantGroup:CreateSlider("Plant delay", 0.25, 5, state.PlantInterval, function(v) state.PlantInterval = v end, "Base seconds between plant attempts.")
 
-selling:CreateToggle("Auto sell", state.AutoSell, "Sells harvested crops for coins.", function(enabled)
-	state.AutoSell = enabled
-end)
-selling:CreateDropdown("Sell mode", { "All", "Carrot", "Corn", "Tomato", "Wheat", "Pumpkin" }, state.SellMode, function(value)
-	state.SellMode = value
-end, "Which crops to sell when auto sell runs.")
-selling:CreateSlider("Sell delay", 1, 10, state.SellInterval, function(value)
-	state.SellInterval = value
-end, "Seconds between sell attempts.")
+collectGroup:CreateToggle("Auto collect seeds", state.AutoCollectSeeds, "Picks up seed drops on your plot.", function(v) state.AutoCollectSeeds = v end)
+collectGroup:CreateToggle("Stop when inventory full", state.StopCollectWhenFull, "Pauses seed collection at cap.", function(v) state.StopCollectWhenFull = v end)
+collectGroup:CreateSlider("Collect delay", 0.2, 5, state.CollectInterval, function(v) state.CollectInterval = v end, "Seconds between collection passes.")
 
-util:CreateToggle("Anti AFK", state.AntiAFK ~= false, "Prevents idle kicks.", function(enabled)
-	state.AntiAFK = enabled
-	if enabled then
-		Core.setupAntiAfk(LocalPlayer)
-	end
-end)
-util:CreateButton("Refresh plot", function()
-	runtime.playerPlot = nil
-	local plot = resolvePlayerPlot()
-	notify("Alleral", plot and ("Plot found: " .. plot.Name) or "No plot found yet.", 3)
-end)
-util:CreateButton("Scan remotes", function()
-	refreshRemotes()
-	local count = 0
-	for _ in pairs(runtime.remotes) do
-		count += 1
-	end
-	notify("Alleral", "Indexed " .. tostring(count) .. " remotes.", 3)
-end)
+waterGroup:CreateToggle("Auto watering can", state.AutoWateringCan, "Waters crops automatically.", function(v) state.AutoWateringCan = v end)
+waterGroup:CreateSlider("Water amount", 1, 10, state.WaterAmount, function(v) state.WaterAmount = v end, "Uses per watering pass.")
+waterGroup:CreateSlider("Water delay", 0.5, 10, state.WaterDelay, function(v) state.WaterDelay = v end, "Seconds between watering passes.")
 
-local config = Core.buildUiGroup(settingsTab, "Save / reset", 1, nil, nil, "config")
-config:CreateButton("Save now", saveSettings, "Write every toggle and slider to disk.")
-config:CreateButton("Reset settings", function()
-	local env = getgenv and getgenv() or {}
-	if type(env.delfile) == "function" then
-		pcall(env.delfile, "Alleral_Configs/" .. SETTINGS_FILE)
-	end
-	Core.mergeDefaults(state, defaults)
-	for key in pairs(SETTINGS_EXCLUDE) do
-		if key ~= "HubRunning" then
-			state[key] = defaults[key]
-		end
-	end
-	saveSettings()
-	notify("Alleral", "Settings reset. Re-open the script to refresh the UI.", 5)
-end, "Clears saved config and restores defaults.")
+sprinklerGroup:CreateToggle("Auto sprinkler system", state.AutoSprinklerSystem, "Places sprinklers on your plot.", function(v) state.AutoSprinklerSystem = v end)
+sprinklerGroup:AddDropdown("Sprinkler seeds", {
+	Text = "Seed selection",
+	Values = { "Any", "Carrot", "Corn", "Tomato", "Wheat", "Pumpkin" },
+	Default = state.TargetSprinklerSeeds, Multi = true,
+	Callback = function(s) state.TargetSprinklerSeeds = Core.normalizeMultiSelection(s) if #state.TargetSprinklerSeeds == 0 then state.TargetSprinklerSeeds = { "Any" } end end,
+})
+sprinklerGroup:CreateDropdown("Sprinkler variant", { "Any", "Basic", "Advanced", "Golden", "Diamond" }, state.SprinklerVariant, function(v) state.SprinklerVariant = v end, "Sprinkler type to place.")
+sprinklerGroup:CreateSlider("Sprinkler amount", 1, 10, state.SprinklerAmount, function(v) state.SprinklerAmount = v end, "Placements per pass.")
+sprinklerGroup:CreateSlider("Sprinkler delay", 0.5, 15, state.SprinklerDelay, function(v) state.SprinklerDelay = v end, "Seconds between sprinkler passes.")
+
+seedShop:CreateToggle("Auto buy seed shop", state.AutoBuySeedShop, "Purchases seeds from the shop.", function(v) state.AutoBuySeedShop = v end)
+seedShop:AddDropdown("Target seeds", {
+	Text = "Seeds to buy",
+	Values = { "Any", "Carrot", "Corn", "Tomato", "Wheat", "Pumpkin" },
+	Default = state.TargetSeedShop, Multi = true,
+	Callback = function(s) state.TargetSeedShop = Core.normalizeMultiSelection(s) if #state.TargetSeedShop == 0 then state.TargetSeedShop = { "Any" } end end,
+})
+
+crateShop:CreateToggle("Auto buy crate", state.AutoBuyCrate, "Purchases crates from the shop.", function(v) state.AutoBuyCrate = v end)
+crateShop:AddDropdown("Target crates", {
+	Text = "Crates to buy",
+	Values = { "Any", "Basic", "Premium", "Golden", "Diamond" },
+	Default = state.TargetCrates, Multi = true,
+	Callback = function(s) state.TargetCrates = Core.normalizeMultiSelection(s) if #state.TargetCrates == 0 then state.TargetCrates = { "Any" } end end,
+})
+
+gearShop:CreateToggle("Auto buy gear shop", state.AutoBuyGearShop, "Purchases gear upgrades.", function(v) state.AutoBuyGearShop = v end)
+gearShop:AddDropdown("Target gear", {
+	Text = "Gear to buy",
+	Values = { "Any", "Shovel", "WateringCan", "Sprinkler", "Backpack", "Speed" },
+	Default = state.TargetGearShop, Multi = true,
+	Callback = function(s) state.TargetGearShop = Core.normalizeMultiSelection(s) if #state.TargetGearShop == 0 then state.TargetGearShop = { "Any" } end end,
+})
+gearShop:CreateSlider("Shop delay", 1, 15, state.ShopInterval, function(v) state.ShopInterval = v end, "Seconds between shop purchase attempts.")
 
 settingsTab:BuildThemeGroupbox(1)
 Core.buildConfigProfileGroup(settingsTab, {
-	state = state,
-	savedKeys = savedKeys,
-	saveFn = saveSettings,
-	version = VERSION,
-	column = 2,
+	state = state, savedKeys = savedKeys, saveFn = saveSettings, version = VERSION, column = 1,
 })
 Core.buildStandardSettingsExtras(settingsTab, Core.settingsExtrasOptions(window, ui, state, savedKeys, saveSettings, SETTINGS_FILE, VERSION, {
-	gameId = "grow_a_garden_2",
-	placeId = PLACE_ID,
+	gameId = "grow_a_garden_2", placeId = PLACE_ID,
 }))
 
-Core.finalizeGameUi(window, ui, {
-	Subtitle = "Grow a Garden 2 · v" .. VERSION,
-})
-
+Core.finalizeGameUi(window, ui, { Subtitle = "Grow a Garden 2 · v" .. VERSION })
 saveSettings()
 
 state.Alleral_Unload = function()

@@ -34,7 +34,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "7.1.0"
+local VERSION = "7.2.0"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -2059,6 +2059,69 @@ local function approachWavePad(root, humanoid, kickReady)
 	task.wait(0.3)
 end
 
+local function kickPadCFrame(kickReady, yOffset)
+	if not kickReady then
+		return nil
+	end
+	return kickReady.CFrame * CFrame.new(0, yOffset or 3, 0)
+end
+
+local function isElevatedWorldPad(kickReady)
+	if not kickReady then
+		return false
+	end
+	return kickReady.Position.Y > 40
+end
+
+local function stabilizeOnKickPad(root, humanoid, kickReady)
+	local pad = kickPadCFrame(kickReady, 3)
+	if not root or not humanoid or not pad then
+		return
+	end
+	humanoid.PlatformStand = false
+	for i = 1, 6 do
+		if not root.Parent then
+			break
+		end
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.AssemblyAngularVelocity = Vector3.zero
+		root.CFrame = pad
+		task.wait(i == 1 and 0.12 or 0.06)
+	end
+	if isElevatedWorldPad(kickReady) then
+		root.CFrame = kickReady.CFrame * CFrame.new(0, -6, 0)
+		task.wait(0.1)
+		root.CFrame = pad
+		task.wait(0.08)
+		root.CFrame = pad
+	end
+	restoreCamera(humanoid)
+end
+
+local function currentRollPayload()
+	local inGame = LocalPlayer:GetAttribute("InGame") or ""
+	if inGame ~= "" then
+		return inGame
+	end
+	local waves = Workspace:FindFirstChild("Waves")
+	if not waves then
+		return ""
+	end
+	for _, wave in ipairs(waves:GetChildren()) do
+		local name = wave:GetAttribute("Brainrot")
+			or wave:GetAttribute("Name")
+			or wave:GetAttribute("Entity")
+			or (wave:IsA("Model") and wave.Name or nil)
+		if type(name) == "string" and name ~= "" and name ~= "Unknown" then
+			local mutation = normalizeMutation(wave:GetAttribute("Mutation") or "None")
+			local level = wave:GetAttribute("Level") or wave:GetAttribute("Weight") or 1
+			local rarity = wave:GetAttribute("Rarity") or ""
+			return tostring(name) .. "," .. mutation .. "," .. tostring(level) .. "," .. tostring(rarity)
+		end
+	end
+	return ""
+end
+
 local function resetForBadWaveRoll(character, humanoid, kickReady)
 	if runtime.waveResetBusy or not character or not humanoid or not kickReady then
 		return
@@ -2086,8 +2149,7 @@ local function resetForBadWaveRoll(character, humanoid, kickReady)
 		local newHumanoid = newCharacter and newCharacter:FindFirstChild("Humanoid")
 		local newRoot = newCharacter and newCharacter:FindFirstChild("HumanoidRootPart")
 		if newRoot and newHumanoid and kickReady.Parent then
-			newRoot.CFrame = kickReady.CFrame * CFrame.new(0, 3, 0)
-			restoreCamera(newHumanoid)
+			stabilizeOnKickPad(newRoot, newHumanoid, kickReady)
 		end
 		runtime.waveResetBusy = false
 	end)
@@ -5007,7 +5069,7 @@ makeSupervisor("Prediction", 1, function()
 	if not state.APredict or not ui.predictionStatus then
 		return
 	end
-	local inGame = LocalPlayer:GetAttribute("InGame") or ""
+	local inGame = currentRollPayload()
 	if inGame == "" then
 		runtime.lastPredictionKey = ""
 		ui.predictionStatus:Update("Roll",     "--")
@@ -5124,7 +5186,7 @@ makeSupervisor("AutoKick", 0.3, function()
 	end
 	local wavesFolder = Workspace:FindFirstChild("Waves")
 	local hasWave = wavesFolder and #wavesFolder:GetChildren() > 0
-	local inGame = LocalPlayer:GetAttribute("InGame") or ""
+	local inGame = currentRollPayload()
 	if state.ANotifyRare and inGame ~= "" then
 		local notifyParts = string.split(inGame, ",")
 		local notifyName = trim(notifyParts[1] or "")
