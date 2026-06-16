@@ -11,7 +11,15 @@ export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 export const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
+const RUNTIME_API =
+  typeof window !== "undefined" && window.location.hostname.includes("github.io")
+    ? PUBLIC_URL.replace(/\/$/, "")
+    : "";
+
 export function apiUrl(path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
-  return `${API_BASE}${normalized}`;
+  const base = API_BASE || RUNTIME_API;
+  if (base) return `${base.replace(/\/$/, "")}${normalized}`;
+  if (typeof window !== "undefined") return `${window.location.origin}${normalized}`;
+  return normalized;
 }

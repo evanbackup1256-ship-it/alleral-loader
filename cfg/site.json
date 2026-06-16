@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-16T01:19:41Z",
+  "updatedAt": "2026-06-16T01:37:46Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
   "loaderVersion": "8.8.1",
@@ -47,6 +47,17 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-16",
+      "title": "Alleral Hub 9.0 — Visual Revamp & Crash Fix",
+      "items": [
+        "Complete hub UI redesign — sharper glass panels, timeline updates, live sync badges",
+        "Fixed executor crash: thin bootstrap (v2.0.1) fetches loader again — works on all executors",
+        "Admin panel routing fixed — opens reliably from search and sidebar",
+        "Live site data refreshes every 30s from relay (no more stale baked snapshot)",
+        "Loader 8.8.1 · MacLib UI · faster status polling (3–5s)"
+      ]
+    },
     {
       "date": "2026-06-15",
       "title": "Alleral UI 4.1 — Apple Studio Layout",

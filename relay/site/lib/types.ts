@@ -66,6 +66,8 @@ export interface ResourceEntry {
 }
 
 export interface SitePayload {
+  version?: number;
+  updatedAt?: string;
   brand?: string;
   tagline?: string;
   announcement?: string;

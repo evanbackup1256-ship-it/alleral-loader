@@ -465,4 +465,196 @@
   .game-card-3d-thumb-float {
     animation: game-thumb-float 5s ease-in-out infinite;
   }
+
+  .sidebar-shell {
+    background: linear-gradient(180deg, rgba(14, 18, 28, 0.92), rgba(8, 10, 16, 0.88));
+    border-right: 1px solid var(--color-border);
+    box-shadow: 4px 0 40px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(24px);
+  }
+
+  .brand-mark {
+    background: linear-gradient(145deg, rgba(83, 252, 18, 0.22), rgba(0, 232, 255, 0.08));
+    border: 1px solid rgba(83, 252, 18, 0.35);
+    box-shadow: 0 0 28px rgba(83, 252, 18, 0.2);
+  }
+
+  .sidebar-action {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-border);
+    background: rgba(255, 255, 255, 0.02);
+    padding: 0.55rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-muted);
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+  }
+
+  .sidebar-action:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--color-text);
+  }
+
+  .sidebar-action-accent {
+    border-color: rgba(83, 252, 18, 0.28);
+    background: rgba(83, 252, 18, 0.06);
+    color: var(--color-accent-bright);
+  }
+
+  .sidebar-action-accent:hover {
+    background: rgba(83, 252, 18, 0.12);
+    border-color: rgba(83, 252, 18, 0.45);
+  }
+
+  .topbar-shell {
+    background: rgba(10, 14, 22, 0.75);
+    border-bottom: 1px solid var(--color-border);
+    backdrop-filter: blur(20px);
+  }
+
+  .cmdk-backdrop {
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(8px);
+  }
+
+  .cmdk-shell {
+    background: linear-gradient(165deg, rgba(18, 24, 38, 0.98), rgba(8, 12, 20, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1.25rem;
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(83, 252, 18, 0.08) inset;
+  }
+
+  .cmdk-group {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-muted-2);
+  }
+
+  .cmdk-item {
+    display: flex;
+    width: 100%;
+    cursor: pointer;
+    align-items: center;
+    gap: 0.65rem;
+    border-radius: 0.875rem;
+    padding: 0.65rem 0.85rem;
+    text-align: left;
+    font-size: 0.875rem;
+    color: var(--color-muted);
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .cmdk-item[aria-selected="true"],
+  .cmdk-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--color-text);
+  }
+
+  .cmdk-item-accent[aria-selected="true"],
+  .cmdk-item-accent:hover {
+    background: rgba(83, 252, 18, 0.1);
+    color: var(--color-accent-bright);
+  }
+
+  .changelog-hero {
+    border-color: rgba(0, 232, 255, 0.15);
+  }
+
+  .changelog-timeline {
+    position: relative;
+    padding-left: 0;
+    list-style: none;
+  }
+
+  .changelog-entry {
+    display: grid;
+    grid-template-columns: 2rem 1fr;
+    gap: 0 1.25rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .changelog-marker {
+    display: flex;
+    justify-content: center;
+    padding-top: 1.35rem;
+    position: relative;
+  }
+
+  .changelog-marker::after {
+    content: "";
+    position: absolute;
+    top: 2rem;
+    bottom: -0.5rem;
+    width: 2px;
+    background: linear-gradient(180deg, rgba(83, 252, 18, 0.35), rgba(255, 255, 255, 0.06));
+  }
+
+  .changelog-entry:last-child .changelog-marker::after {
+    display: none;
+  }
+
+  .changelog-dot,
+  .changelog-dot-live {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--color-muted-2);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.04);
+    z-index: 1;
+  }
+
+  .changelog-dot-live {
+    background: var(--color-accent);
+    box-shadow: 0 0 0 4px rgba(83, 252, 18, 0.15), 0 0 16px rgba(83, 252, 18, 0.5);
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+
+  .changelog-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 1.125rem;
+    padding: 1.25rem 1.35rem;
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+
+  .changelog-card-latest {
+    border-color: rgba(83, 252, 18, 0.28);
+    background: linear-gradient(145deg, rgba(83, 252, 18, 0.06), rgba(10, 14, 22, 0.85));
+    box-shadow: 0 0 40px rgba(83, 252, 18, 0.08);
+  }
+
+  .changelog-item {
+    position: relative;
+    padding-left: 1rem;
+  }
+
+  .changelog-item::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.55em;
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--color-accent-dim);
+  }
+
+  .hub-shell::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 70% 50% at 15% -10%, rgba(83, 252, 18, 0.09), transparent 55%),
+      radial-gradient(ellipse 60% 45% at 90% 5%, rgba(0, 232, 255, 0.07), transparent 50%),
+      radial-gradient(ellipse 50% 40% at 50% 100%, rgba(183, 148, 255, 0.05), transparent 55%);
+  }
 }

@@ -6,6 +6,9 @@ on:
     paths:
       - "relay/site/**"
       - "cfg/site.json"
+      - "cfg/release.json"
+      - "bootstrap.luau"
+      - "loader.luau"
       - ".github/workflows/deploy-site.yml"
   workflow_dispatch:
 

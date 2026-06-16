@@ -70,7 +70,7 @@ function ViewSkeleton({ label }: { label: string }) {
   );
 }
 
-function PlatformShell({ site, online }: { site: SitePayload; online?: boolean }) {
+function PlatformShell({ site, online, siteUpdatedAt, siteFetching, onRefreshSite }: { site: SitePayload; online?: boolean; siteUpdatedAt?: number; siteFetching?: boolean; onRefreshSite?: () => void }) {
   const activeView = usePlatformStore((s) => s.activeView);
   const workspace = usePlatformStore((s) => s.workspace);
   const mobileNavOpen = usePlatformStore((s) => s.mobileNavOpen);
@@ -99,9 +99,17 @@ function PlatformShell({ site, online }: { site: SitePayload; online?: boolean }
       <LiveAlerts online={online !== false} errorMessage={error?.message} data={data} />
       <ScrollProgress />
       <div className="relative z-10 flex h-[100dvh] min-h-0">
-        <Sidebar online={online} />
+        <Sidebar online={online} site={site} />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <TopBar online={online} workspace={workspace} dataUpdatedAt={dataUpdatedAt} />
+          <TopBar
+            site={site}
+            online={online}
+            workspace={workspace}
+            dataUpdatedAt={dataUpdatedAt}
+            siteUpdatedAt={siteUpdatedAt}
+            siteFetching={siteFetching}
+            onRefreshSite={onRefreshSite}
+          />
           <MainScroll>
             <ScrollContent
               className={`mx-auto w-full max-w-[1520px] ${mainPad} ${workspace === "wide" ? "max-w-[1680px]" : ""}`}
@@ -126,6 +134,7 @@ function PlatformShell({ site, online }: { site: SitePayload; online?: boolean }
         onCopyScript={() => void copyLoadstring()}
         onRefresh={() => {
           void refreshLive();
+          onRefreshSite?.();
           toast.message("Refreshing live data");
         }}
       />
@@ -169,7 +178,13 @@ function PlatformAppInner() {
 
   return (
     <CloudflareGate>
-      <PlatformShell site={site} online={online} />
+      <PlatformShell
+        site={site}
+        online={online}
+        siteUpdatedAt={siteQuery.dataUpdatedAt}
+        siteFetching={siteQuery.isFetching}
+        onRefreshSite={() => void siteQuery.refetch()}
+      />
     </CloudflareGate>
   );
 }

@@ -6,7 +6,7 @@ const siteDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || "").replace(/\/+$/, "");
 const prefix = basePath ? `${basePath}/` : "/";
 
-const STATIC_PAGES = ["admin.html", "manage.html", "dev.html"];
+const STATIC_PAGES = ["admin.html"];
 
 function patchHtml(html) {
   let out = html;

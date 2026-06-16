@@ -23,9 +23,11 @@ export function useSiteQuery() {
     queryKey: siteQueryKey,
     queryFn: fetchSite,
     initialData: SITE_SNAPSHOT,
-    staleTime: 30_000,
+    initialDataUpdatedAt: 0,
+    staleTime: 5_000,
     gcTime: 30 * 60_000,
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
+    refetchOnMount: "always",
     refetchOnWindowFocus: true,
   });
 }
