@@ -28,7 +28,7 @@ local LEGACY_UI_SOURCE_PATHS = {
 local MACLIB_SOURCE_PATH = UI .. "/maclib/source.luau"
 local MACLIB_SOURCE_MIN_BYTES = 150000
 local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-local MACLIB_VERSION = 5
+local MACLIB_VERSION = 6
 local MACLIB_REQUIRED_FN = "function MacLib:Window"
 local MACLIB_PATCHED_OVERRIDE_PATHS = {
 	"maclib_patched.luau",
@@ -60,7 +60,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "c10f6ef",
+	commit = "9e61dba",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {

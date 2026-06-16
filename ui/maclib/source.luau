@@ -767,8 +767,8 @@ function MacLib:Window(Settings)
 	base.BorderSizePixel = 0
 	base.Position = UDim2.fromScale(0.5, 0.5)
 	base.Size = Settings.Size or UDim2.fromOffset(868, 650)
-	if base.Size.Offset.X > 0 and base.Size.Offset.Y > 0 then
-		Resizer.baseDesignSize = Vector2.new(base.Size.Offset.X, base.Size.Offset.Y)
+	if base.Size.X.Offset > 0 and base.Size.Y.Offset > 0 then
+		Resizer.baseDesignSize = Vector2.new(base.Size.X.Offset, base.Size.Y.Offset)
 	end
 
 	local baseUIScale = Instance.new("UIScale")
