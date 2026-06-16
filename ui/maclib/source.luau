@@ -1,5 +1,5 @@
 -- Alleral vendored MacLib 1.2.6 (Alleral patch v13)
-local ALLERAL_MACLIB_VERSION = 15
+local ALLERAL_MACLIB_VERSION = 16
 
 local function udim2PixelSize(udim2, fallbackX, fallbackY)
 	if typeof(udim2) ~= "UDim2" then
@@ -3821,37 +3821,6 @@ function MacLib:Window(Settings)
 					dropdownName.ZIndex = 3
 					dropdownName.Parent = interact
 
-					local function getDropdownHeaderHeight()
-						return math.max(38, dropdownName.TextBounds.Y + 14)
-					end
-
-					local function syncDropdownHeader()
-						local headerH = getDropdownHeaderHeight()
-						interact.Size = UDim2.new(1, 0, 0, headerH)
-						dropdownImage.Position = UDim2.new(1, 0, 0, math.max(0, math.floor(headerH / 2) - 7))
-						if dropdownFrame then
-							dropdownFrame.Position = UDim2.new(0, 0, 0, headerH)
-						end
-						return headerH
-					end
-
-					local function notifyDropdownLayout()
-						task.defer(refreshTabScrollCanvas)
-					end
-
-					local function syncDropdownCollapsedHeight()
-						if dropdownFrame and dropdownFrame.Visible then
-							return
-						end
-						local headerH = syncDropdownHeader()
-						dropdown.Size = UDim2.new(1, 0, 0, headerH)
-						notifyDropdownLayout()
-					end
-					pcall(function()
-						dropdownName:GetPropertyChangedSignal("TextBounds"):Connect(syncDropdownCollapsedHeight)
-					end)
-					syncDropdownCollapsedHeight()
-
 					local dropdownUIStroke = Instance.new("UIStroke")
 					dropdownUIStroke.Name = "DropdownUIStroke"
 					dropdownUIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
@@ -3878,7 +3847,43 @@ function MacLib:Window(Settings)
 					dropdownImage.ZIndex = 4
 					dropdownImage.Parent = dropdown
 
-					local dropdownFrame = Instance.new("Frame")
+					local dropdownFrame
+					local dropdownFrameUIPadding
+					local dropdownFrameUIListLayout
+
+					local function getDropdownHeaderHeight()
+						return math.max(38, dropdownName.TextBounds.Y + 14)
+					end
+
+					local function syncDropdownHeader()
+						local headerH = getDropdownHeaderHeight()
+						interact.Size = UDim2.new(1, 0, 0, headerH)
+						if dropdownImage then
+							dropdownImage.Position = UDim2.new(1, 0, 0, math.max(0, math.floor(headerH / 2) - 7))
+						end
+						if dropdownFrame then
+							dropdownFrame.Position = UDim2.new(0, 0, 0, headerH)
+						end
+						return headerH
+					end
+
+					local function notifyDropdownLayout()
+						task.defer(refreshTabScrollCanvas)
+					end
+
+					local function syncDropdownCollapsedHeight()
+						if dropdownFrame and dropdownFrame.Visible then
+							return
+						end
+						local headerH = syncDropdownHeader()
+						dropdown.Size = UDim2.new(1, 0, 0, headerH)
+						notifyDropdownLayout()
+					end
+					pcall(function()
+						dropdownName:GetPropertyChangedSignal("TextBounds"):Connect(syncDropdownCollapsedHeight)
+					end)
+
+					dropdownFrame = Instance.new("Frame")
 					dropdownFrame.Name = "DropdownFrame"
 					dropdownFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					dropdownFrame.BackgroundTransparency = 1
@@ -3890,14 +3895,15 @@ function MacLib:Window(Settings)
 					dropdownFrame.Visible = false
 					dropdownFrame.AutomaticSize = Enum.AutomaticSize.Y
 					dropdownFrame.ZIndex = 1
+					dropdownFrame.Parent = dropdown
 
-					local dropdownFrameUIPadding = Instance.new("UIPadding")
+					dropdownFrameUIPadding = Instance.new("UIPadding")
 					dropdownFrameUIPadding.Name = "DropdownFrameUIPadding"
 					dropdownFrameUIPadding.PaddingTop = UDim.new(0, 0)
 					dropdownFrameUIPadding.PaddingBottom = UDim.new(0, 10)
 					dropdownFrameUIPadding.Parent = dropdownFrame
 
-					local dropdownFrameUIListLayout = Instance.new("UIListLayout")
+					dropdownFrameUIListLayout = Instance.new("UIListLayout")
 					dropdownFrameUIListLayout.Name = "DropdownFrameUIListLayout"
 					dropdownFrameUIListLayout.Padding = UDim.new(0, 5)
 					dropdownFrameUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
