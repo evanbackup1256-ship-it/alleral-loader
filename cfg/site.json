@@ -10,7 +10,7 @@
   "onyxVersion": 1,
   "irisVersion": 2,
   "announcement": "",
-  "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?v=2.0.3&t=\" .. tick(), true))()",
+  "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?v=2.0.4&t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",
   "branch": "main",
   "features": [

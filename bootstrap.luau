@@ -1,11 +1,13 @@
--- Alleral Bootstrap v2.0.3 — fetches loader.luau and runs it (one saved loadstring)
-local BOOTSTRAP_VERSION = "2.0.3"
-local LOADER_PIN_COMMIT = "1b4c5f6"
+-- Alleral Bootstrap v2.0.4 — fetches commit-pinned loader.luau (one saved loadstring)
+local BOOTSTRAP_VERSION = "2.0.4"
+local LOADER_PIN_COMMIT = "ae81dd8"
 local REPO = "evanbackup1256-ship-it/kick"
 local BRANCH = "main"
 local LOADER_MIN_BYTES = 50000
 local GITHUB_RAW = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH
-local JSDELIVR = "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. BRANCH
+local JSDELIVR = "https://cdn.jsdelivr.net/gh/" .. REPO
+local CDN_BASE = "https://alleral-telemetry-production.up.railway.app"
+local RELEASE_PATH = "cfg/release.json"
 
 print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Starting…")
 
@@ -97,21 +99,72 @@ local function stripUtf8Bom(text)
 	return text
 end
 
-local function fetchLoader()
-	local bust = "?v=" .. BOOTSTRAP_VERSION .. "&loader=8.8.12&t=" .. tostring(tick())
-	local urls = {
-		GITHUB_RAW .. "/" .. LOADER_PIN_COMMIT .. "/loader.luau" .. bust,
-		GITHUB_RAW .. "/loader.luau" .. bust,
-		JSDELIVR .. "/" .. LOADER_PIN_COMMIT .. "/loader.luau" .. bust,
-		JSDELIVR .. "/loader.luau" .. bust,
-	}
-	for _, url in ipairs(urls) do
-		local body, via = fetchUrl(url, LOADER_MIN_BYTES)
-		if type(body) == "string" and body:find("LOADER_VERSION", 1, true) then
-			return body, via
+local function parseRelease(body)
+	if type(body) ~= "string" then
+		return nil
+	end
+	local commit = body:match('"commit"%s*:%s*"([^"]+)"')
+	local loader = body:match('"loader"%s*:%s*"([^"]+)"')
+	if not commit and not loader then
+		return nil
+	end
+	return { commit = commit, loader = loader }
+end
+
+local function loaderVersionFromSource(body)
+	if type(body) ~= "string" then
+		return nil
+	end
+	return body:match('local%s+LOADER_VERSION%s*=%s*"([%d%.]+)"')
+		or body:match('LOADER_VERSION%s*=%s*"([%d%.]+)"')
+end
+
+local function acceptLoader(body, expectedVersion)
+	if type(body) ~= "string" or not body:find("LOADER_VERSION", 1, true) then
+		return false
+	end
+	if #body < LOADER_MIN_BYTES then
+		return false
+	end
+	if type(expectedVersion) == "string" and expectedVersion ~= "" then
+		local ver = loaderVersionFromSource(body)
+		if ver and ver ~= expectedVersion then
+			return false
 		end
 	end
-	return nil, "all sources failed"
+	return true
+end
+
+local function fetchRelease()
+	local bust = "?v=" .. BOOTSTRAP_VERSION .. "&t=" .. tostring(tick())
+	return parseRelease(fetchUrl(GITHUB_RAW .. "/" .. RELEASE_PATH .. bust, 20))
+end
+
+local function fetchLoader()
+	local bust = "?v=" .. BOOTSTRAP_VERSION .. "&t=" .. tostring(tick())
+	local release = fetchRelease()
+	local commit = (release and release.commit) or LOADER_PIN_COMMIT
+	local expectedLoader = release and release.loader
+
+	local urls = {
+		GITHUB_RAW .. "/" .. commit .. "/loader.luau" .. bust,
+		JSDELIVR .. "@" .. commit .. "/loader.luau" .. bust,
+		GITHUB_RAW .. "/" .. LOADER_PIN_COMMIT .. "/loader.luau" .. bust,
+		JSDELIVR .. "@" .. LOADER_PIN_COMMIT .. "/loader.luau" .. bust,
+		CDN_BASE .. "/api/loader/file/loader.luau" .. bust,
+	}
+	if not expectedLoader then
+		table.insert(urls, GITHUB_RAW .. "/loader.luau" .. bust)
+		table.insert(urls, JSDELIVR .. "@" .. BRANCH .. "/loader.luau" .. bust)
+	end
+
+	for _, url in ipairs(urls) do
+		local body, via = fetchUrl(url, LOADER_MIN_BYTES)
+		if acceptLoader(body, expectedLoader) then
+			return body, via, commit, expectedLoader
+		end
+	end
+	return nil, "stale or unavailable", commit, expectedLoader
 end
 
 local function hashAttest(placeId, jobId, at, commit)
@@ -130,15 +183,31 @@ if ENV._Alleral_BootstrapRunning then
 end
 ENV._Alleral_BootstrapRunning = true
 
-local src, via = fetchLoader()
+local src, via, pinCommit, expectedLoader = fetchLoader()
 if type(src) ~= "string" then
 	ENV._Alleral_BootstrapRunning = false
-	error("[Alleral Bootstrap] Could not download loader.luau (" .. tostring(via) .. "). Enable HTTP in your executor.")
+	local detail = tostring(via)
+	if type(expectedLoader) == "string" and expectedLoader ~= "" then
+		detail = detail .. " (need loader " .. expectedLoader .. " @ " .. tostring(pinCommit) .. ")"
+	end
+	error("[Alleral Bootstrap] Could not download loader.luau (" .. detail .. "). Enable HTTP in your executor.")
 end
 src = stripUtf8Bom(src)
 
-local ver = src:match('LOADER_VERSION%s*=%s*"([%d%.]+)"') or "?"
-print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Running loader v" .. ver .. " (" .. tostring(#src) .. "b via " .. tostring(via) .. ")")
+local ver = loaderVersionFromSource(src) or "?"
+print(
+	"[Alleral Bootstrap v"
+		.. BOOTSTRAP_VERSION
+		.. "] Running loader v"
+		.. ver
+		.. " ("
+		.. tostring(#src)
+		.. "b via "
+		.. tostring(via)
+		.. ", pin "
+		.. tostring(pinCommit)
+		.. ")"
+)
 
 local fn, err = loadStringFn(src, "Alleral/loader@" .. ver)
 if not fn then
@@ -154,8 +223,8 @@ local at = tick()
 ENV._Alleral_BootstrapVersion = BOOTSTRAP_VERSION
 ENV._Alleral_Bootstrapped = true
 ENV._Alleral_BootstrapAt = at
-ENV._Alleral_BootstrapCommit = nil
-ENV._Alleral_BootstrapToken = hashAttest(game.PlaceId, game.JobId, at, nil)
+ENV._Alleral_BootstrapCommit = pinCommit
+ENV._Alleral_BootstrapToken = hashAttest(game.PlaceId, game.JobId, at, pinCommit)
 ENV._Alleral_BootstrapTokenAt = at
 
 local ok, runErr = pcall(fn)
