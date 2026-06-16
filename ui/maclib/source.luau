@@ -1,5 +1,5 @@
--- Alleral vendored MacLib 1.2.6 (Alleral patch v7)
-local ALLERAL_MACLIB_VERSION = 7
+-- Alleral vendored MacLib 1.2.6 (Alleral patch v8)
+local ALLERAL_MACLIB_VERSION = 8
 
 local function udim2PixelSize(udim2, fallbackX, fallbackY)
 	if typeof(udim2) ~= "UDim2" then
@@ -112,7 +112,10 @@ function Effects.tweenInfo(duration, style, direction)
 	if Effects.config.reducedMotion then
 		return TweenInfo.new(0)
 	end
-	duration = duration or 0.2
+	if typeof(duration) == "TweenInfo" then
+		return duration
+	end
+	duration = tonumber(duration) or 0.2
 	if Effects.config.springMotion and style == nil then
 		style = Enum.EasingStyle.Quint
 	end
@@ -122,6 +125,11 @@ end
 function Effects.play(instance, duration, props, style, direction)
 	if not instance or not props then
 		return nil
+	end
+	if typeof(duration) == "TweenInfo" then
+		local tw = TweenService:Create(instance, duration, props)
+		tw:Play()
+		return tw
 	end
 	local info = Effects.tweenInfo(duration, style, direction)
 	local tw = TweenService:Create(instance, info, props)
@@ -5321,25 +5329,25 @@ function MacLib:Window(Settings)
 				end
 
 				for i, tabInfo in pairs(tabs) do
-					Effects.play(i, Effects.tweenInfo(easetime, easeStyle), {
+					Effects.play(i, easetime, {
 						BackgroundTransparency = (i == tabSwitcher and 0.98 or 1)
-					})
+					}, easeStyle)
 
 					if tabInfo.tabStroke then
-						Effects.play(tabInfo.tabStroke, Effects.tweenInfo(easetime, easeStyle), {
+						Effects.play(tabInfo.tabStroke, easetime, {
 							Transparency = (i == tabSwitcher and 0.95 or 1),
 							Color = i == tabSwitcher and Effects.accentColor or Color3.fromRGB(255, 255, 255),
-						})
+						}, easeStyle)
 					end
 					if tabInfo.switcherImage then
-						Effects.play(tabInfo.switcherImage, Effects.tweenInfo(easetime, easeStyle), {
+						Effects.play(tabInfo.switcherImage, easetime, {
 							ImageTransparency = (i == tabSwitcher and 0.1 or 0.5)
-						})
+						}, easeStyle)
 					end
 					if tabInfo.switcherName then
-						Effects.play(tabInfo.switcherName, Effects.tweenInfo(easetime, easeStyle), {
+						Effects.play(tabInfo.switcherName, easetime, {
 							TextTransparency = (i == tabSwitcher and 0.1 or 0.5)
-						})
+						}, easeStyle)
 					end
 				end
 

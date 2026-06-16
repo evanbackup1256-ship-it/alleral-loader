@@ -5,8 +5,8 @@
     "ui":  "Maclib",
     "windui":  "5.5.0-maclib",
     "alleral":  "5.5.0-maclib",
-    "commit":  "f41d471",
-    "updatedAt":  "2026-06-16T02:25:00Z",
+    "commit":  "2593aae",
+    "updatedAt":  "2026-06-16T02:28:51Z",
     "updatePollSeconds":  120,
     "autoUpdate":  true,
     "minLoader":  "8.2.0",
@@ -16,5 +16,5 @@
     "helpers":  "1.8",
     "security":  "1.3",
     "access":  "1.1",
-    "maclibVersion":  7
+    "maclibVersion":  8
 }

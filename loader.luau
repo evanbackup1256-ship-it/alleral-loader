@@ -28,7 +28,7 @@ local LEGACY_UI_SOURCE_PATHS = {
 local MACLIB_SOURCE_PATH = UI .. "/maclib/source.luau"
 local MACLIB_SOURCE_MIN_BYTES = 150000
 local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-local MACLIB_VERSION = 7
+local MACLIB_VERSION = 8
 local MACLIB_REQUIRED_FN = "function MacLib:Window"
 local MACLIB_PATCHED_OVERRIDE_PATHS = {
 	"maclib_patched.luau",
@@ -53,14 +53,14 @@ local RELEASE_FALLBACK = {
 	ui = "Maclib",
 	windui = "5.5.0-maclib",
 	alleral = "5.5.0-maclib",
-	maclibVersion = 7,
+	maclibVersion = 8,
 	analytics = "1.2",
 	telemetry = "3.4",
 	helpers = "1.8",
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "f41d471",
+	commit = "2593aae",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -980,7 +980,7 @@ do
 	end
 
 	local function maclibFetchUrls()
-		local bust = "?maclib=7&t=" .. tostring(tick())
+		local bust = "?maclib=8&t=" .. tostring(tick())
 		local urls = {
 			GITHUB_RAW .. "/" .. MACLIB_SOURCE_PATH .. bust,
 			"https://raw.githubusercontent.com/" .. REPO .. "/main/" .. MACLIB_SOURCE_PATH .. bust,
