@@ -22,7 +22,7 @@ export function ChangelogView({ site }: { site: SitePayload }) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search ship log…" />
+      <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search updates…" />
       {filtered.length === 0 ? <p className="text-sm text-muted">No matching entries.</p> : null}
       {filtered.map((entry, index) => (
         <Panel

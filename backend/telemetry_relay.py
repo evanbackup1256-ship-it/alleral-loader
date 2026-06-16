@@ -671,6 +671,7 @@ def build_public_site_payload() -> dict[str, Any]:
         "uiLibrary": site.get("uiLibrary") or "",
         "uiVersion": site.get("uiVersion") or "",
         "sydePatch": site.get("sydePatch") or 0,
+        "maclibVersion": site.get("maclibVersion") or 0,
         "loadstring": site.get("loadstring") or "",
         "features": site.get("features") or [],
         "faq": site.get("faq") or [],
@@ -2150,6 +2151,7 @@ def live_status():
             "ui": site.get("uiLibrary"),
             "uiVersion": site.get("uiVersion"),
             "sydePatch": site.get("sydePatch"),
+            "maclibVersion": site.get("maclibVersion"),
             "telemetry": site.get("telemetryVersion"),
         },
         "release": {

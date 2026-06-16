@@ -150,7 +150,7 @@ export const EventTimeline = memo(function EventTimeline({
       <div className="obs-panel-head shrink-0">
         <div>
           <p className="obs-kicker">Event timeline</p>
-          <h3 className="obs-title-sm">Activity & fault stream</h3>
+          <h3 className="obs-title-sm">Recent activity</h3>
         </div>
       </div>
       <SimpleScrollList
@@ -209,7 +209,7 @@ export const GameStatusStream = memo(function GameStatusStream({
                     {g.version ? ` · v${g.version}` : ""}
                   </p>
                   <p className={clsx("mt-1 text-[11px] leading-relaxed break-words", broken ? "text-red-200/90" : "text-muted")}>
-                    {g.message || (broken ? "Non-operational — check relay auto-status logs" : "Operational")}
+                    {g.message || (broken ? "Marked broken — check the Games tab" : "Working")}
                   </p>
                 </div>
                 <StatusPill kind={pillKind} size="sm" />

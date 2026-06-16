@@ -42,7 +42,7 @@ function SidebarNav({ online, collapsed }: { online?: boolean; collapsed: boolea
         {!collapsed ? (
           <div className="min-w-0">
             <p className="truncate text-sm font-bold tracking-tight">Alleral</p>
-            <p className="truncate text-[11px] text-muted">Neon script hub</p>
+            <p className="truncate text-[11px] text-muted">Script hub</p>
           </div>
         ) : null}
       </div>

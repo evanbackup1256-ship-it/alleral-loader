@@ -74,6 +74,7 @@ export interface SitePayload {
   uiLibrary?: string;
   uiVersion?: string;
   sydePatch?: number;
+  maclibVersion?: number;
   loadstring?: string;
   scriptsUpdatedAt?: string;
   siteUpdatedAt?: string;

@@ -47,12 +47,12 @@ export function LiveAlerts({
 
     if (p.online === true && online === false) {
       toast.custom(() => (
-        <AlertToast title="Relay went offline" detail={errorMessage || "Live status polling failed."} tone="error" />
+        <AlertToast title="Relay offline" detail={errorMessage || "Couldn't reach the status API."} tone="error" />
       ));
     }
 
     if (p.syncError !== syncError && syncError) {
-      toast.custom(() => <AlertToast title="Sync pipeline error" detail={syncError} tone="error" />);
+      toast.custom(() => <AlertToast title="Sync error" detail={syncError} tone="error" />);
     }
 
     const newBroken = broken.filter((id) => !(p.broken || []).includes(id));
@@ -63,7 +63,7 @@ export function LiveAlerts({
         .join(", ");
       toast.custom(() => (
         <AlertToast
-          title={`${newBroken.length} script${newBroken.length > 1 ? "s" : ""} degraded`}
+          title={`${newBroken.length} game${newBroken.length > 1 ? "s" : ""} not working`}
           detail={names}
           tone="warning"
         />

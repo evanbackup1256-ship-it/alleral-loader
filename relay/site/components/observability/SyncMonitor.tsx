@@ -26,14 +26,14 @@ export function SyncMonitor({
       kind: syncKind,
       value: syncKind === "healthy" ? "Healthy" : syncKind === "syncing" ? "Syncing" : syncKind === "error" ? "Fault" : "Idle",
       pulse: syncKind === "syncing",
-      detail: sync?.enabled ? (sync.autoStatus ? "Polling GitHub for script updates" : "Enabled but idle") : "Disabled in relay config",
+      detail: sync?.enabled ? (sync.autoStatus ? "Pulling script updates from GitHub" : "On but idle") : "Off in relay config",
     },
     {
       label: "Relay",
       kind: online === false ? ("offline" as const) : ("online" as const),
       value: online === false ? "Unreachable" : "Online",
       pulse: false,
-      detail: relayError || (online === false ? "Status API did not respond" : "Accepting live status requests"),
+      detail: relayError || (online === false ? "Status API didn't respond" : "Up and taking requests"),
     },
     {
       label: "Last Sync",
@@ -47,7 +47,7 @@ export function SyncMonitor({
       kind: sync?.lastError ? ("error" as const) : ("healthy" as const),
       value: sync?.lastError ? "Fault detected" : "None",
       pulse: false,
-      detail: sync?.lastError || "Pipeline clean — no sync errors in relay memory",
+      detail: sync?.lastError || "No sync errors right now",
     },
   ] as const;
 
@@ -55,8 +55,8 @@ export function SyncMonitor({
     <div className="obs-panel">
       <div className="obs-panel-head">
         <div>
-          <p className="obs-kicker">Sync Monitor</p>
-          <h3 className="obs-title-sm">Pipeline diagnostics</h3>
+          <p className="obs-kicker">GitHub sync</p>
+          <h3 className="obs-title-sm">Relay sync</h3>
         </div>
         <FreshnessChip dataUpdatedAt={dataUpdatedAt} live />
       </div>

@@ -20,7 +20,7 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Alleral — Script Hub",
-  description: "Roblox scripts that stay updated. Live fleet status, one-click loader, executor compatibility.",
+  description: "Roblox scripts that stay updated. Live game status, one loadstring, executor list from WEAO.",
 };
 
 export const viewport: Viewport = {

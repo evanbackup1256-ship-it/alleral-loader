@@ -34,7 +34,7 @@ const OverviewView = dynamic(
 
 const StatusView = dynamic(
   () => import("@/components/views/StatusView").then((m) => ({ default: m.StatusView })),
-  { loading: () => <ViewSkeleton label="Mission control" /> }
+  { loading: () => <ViewSkeleton label="Status" /> }
 );
 
 const GamesView = dynamic(
@@ -49,7 +49,7 @@ const ToolsView = dynamic(
 
 const ChangelogView = dynamic(
   () => import("@/components/views/ChangelogView").then((m) => ({ default: m.ChangelogView })),
-  { loading: () => <ViewSkeleton label="Ship log" /> }
+  { loading: () => <ViewSkeleton label="Updates" /> }
 );
 
 const SupportView = dynamic(

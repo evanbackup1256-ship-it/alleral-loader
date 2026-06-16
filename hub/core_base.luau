@@ -1055,12 +1055,12 @@ function Core.notifyExecutorCompat(profile)
 	if profile.weao then
 		msg = msg .. " — WEAO: " .. Core.weaoStatusLabel(profile.weao)
 		if profile.weao.detected then
-			msg = msg .. ". Consider a different executor if you get banned."
+			msg = msg .. ". Switch executors if you keep getting banned."
 		elseif not profile.weao.updateStatus then
-			msg = msg .. ". Update your executor for best results."
+			msg = msg .. ". Update your executor if things act weird."
 		end
 	elseif not profile.isKnown then
-		msg = msg .. " — universal mode (adaptive UI enabled)."
+		msg = msg .. " — unknown executor, using fallback UI."
 	else
 		msg = msg .. " — " .. tostring(profile.tier or "ready") .. " tier, rail layout."
 	end

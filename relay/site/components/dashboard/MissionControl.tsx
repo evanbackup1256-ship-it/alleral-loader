@@ -52,13 +52,13 @@ function MetricsRail({
       <div className="obs-panel flex items-center gap-4">
         <HealthRing kind={healthPct >= 80 ? "healthy" : healthPct >= 50 ? "warning" : "error"} value={healthPct} label="Health" />
         <div className="min-w-0">
-          <p className="obs-kicker">Fleet health</p>
+          <p className="obs-kicker">Relay</p>
           <p className="text-sm text-muted">
-            {working} of {total} scripts operational
+            {working} of {total} games working
           </p>
         </div>
       </div>
-      <MetricCard label="Working scripts" numeric={working} icon={Gamepad2} accent="green" sparkline={historyToSeries(history, "working")} trend="Live from relay" />
+      <MetricCard label="Working games" numeric={working} icon={Gamepad2} accent="green" sparkline={historyToSeries(history, "working")} trend="From relay" />
       <MetricCard label="Tracked games" numeric={total} icon={Layers} accent="violet" />
       <SyncMonitor sync={sync} dataUpdatedAt={dataUpdatedAt} online={online} relayError={relayError} />
     </div>
@@ -79,7 +79,7 @@ function ThroughputPanel({
       <div className="obs-panel-head shrink-0">
         <div>
           <p className="obs-kicker">Throughput</p>
-          <h3 className="obs-title-sm">Working scripts · rolling window</h3>
+          <h3 className="obs-title-sm">Working games over time</h3>
         </div>
         <Activity className="h-4 w-4 shrink-0 text-cyan-400" strokeWidth={1.75} />
       </div>
@@ -182,8 +182,8 @@ function MissionControlInner({ site }: { site: SitePayload }) {
     <div className="mission-control">
       <Reveal className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="obs-kicker">Observability</p>
-          <h2 className="obs-title">Mission control</h2>
+          <p className="obs-kicker">Status</p>
+          <h2 className="obs-title">Live status</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2 md:hidden">
           <StatusPill kind={relayKind} />

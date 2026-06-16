@@ -42,7 +42,7 @@ export function TelemetryAlertBanner({
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold text-text">
-                {!online ? "Relay unreachable" : syncError ? "Sync pipeline fault" : "Telemetry degraded"}
+                {!online ? "Can't reach the relay" : syncError ? "GitHub sync failed" : "Status data is stale"}
               </p>
               <StatusPill kind={relayKind} size="sm" />
               {syncKind === "error" ? <StatusPill kind="error" size="sm" label="Sync fault" /> : null}
@@ -56,7 +56,7 @@ export function TelemetryAlertBanner({
               </pre>
             ) : null}
             {!errorMessage && !syncError ? (
-              <p className="text-xs text-muted">Live polling returned partial data. Metrics may be stale until the relay recovers.</p>
+              <p className="text-xs text-muted">Live data might be old until the relay responds again.</p>
             ) : null}
           </div>
         </div>

@@ -25,33 +25,17 @@ func main() {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Requested-With"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Requested-With", "X-Alleral-Key", "X-Admin-Key"},
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
 
-	r.Get("/health", srv.Health)
-	r.Handle("/", static)
-	r.Handle("/app.html", static)
-
-	r.Route("/api", func(r chi.Router) {
-		r.Get("/health", srv.Health)
-		r.Get("/site", srv.Site)
-		r.Get("/live/status", srv.LiveStatus)
-		r.Get("/sync/status", srv.SyncStatus)
-		r.Post("/hub/visit", srv.HubVisit)
-
-		if cfg.PythonUpstream != "" {
-			proxy := srv.ProxyPython(cfg.PythonUpstream)
-			r.Handle("/", proxy)
-			r.Handle("/*", proxy)
-		} else {
-			r.NotFound(srv.ApiNotFound)
-		}
-	})
-
 	if cfg.PythonUpstream != "" {
 		proxy := srv.ProxyPython(cfg.PythonUpstream)
+		r.Handle("/health", proxy)
+		r.Route("/api", func(r chi.Router) {
+			r.Handle("/*", proxy)
+		})
 		r.Handle("/ingest", proxy)
 		r.Handle("/ingest/*", proxy)
 		r.Handle("/gate/*", proxy)
@@ -59,7 +43,20 @@ func main() {
 		r.Handle("/scripts/*", proxy)
 		r.Handle("/admin/bans", proxy)
 		r.Handle("/admin/bans/*", proxy)
+	} else {
+		r.Get("/health", srv.Health)
+		r.Route("/api", func(r chi.Router) {
+			r.Get("/health", srv.Health)
+			r.Get("/site", srv.Site)
+			r.Get("/live/status", srv.LiveStatus)
+			r.Get("/sync/status", srv.SyncStatus)
+			r.Post("/hub/visit", srv.HubVisit)
+			r.NotFound(srv.ApiNotFound)
+		})
 	}
+
+	r.Handle("/", static)
+	r.Handle("/app.html", static)
 
 	r.Handle("/*", static)
 

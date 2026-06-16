@@ -49,11 +49,11 @@ export const usePlatformStore = create<PlatformState>()(
 );
 
 export const VIEW_META: Record<PlatformView, { label: string; shortcut: string; desc: string }> = {
-  overview: { label: "Overview", shortcut: "O", desc: "Platform summary and loader" },
-  status: { label: "Mission Control", shortcut: "L", desc: "Observability command center" },
-  games: { label: "Games", shortcut: "G", desc: "Script library and status" },
-  tools: { label: "Executors", shortcut: "E", desc: "WEAO exploit tracker" },
-  changelog: { label: "Ship Log", shortcut: "H", desc: "Release history" },
-  support: { label: "Support", shortcut: "S", desc: "Bug reports and contact" },
-  credits: { label: "Team", shortcut: "T", desc: "Credits and contributors" },
+  overview: { label: "Overview", shortcut: "O", desc: "Loader, games, and quick links" },
+  status: { label: "Status", shortcut: "L", desc: "Relay health and game counts" },
+  games: { label: "Games", shortcut: "G", desc: "What works right now" },
+  tools: { label: "Executors", shortcut: "E", desc: "WEAO exploit list" },
+  changelog: { label: "Updates", shortcut: "H", desc: "Recent changes" },
+  support: { label: "Support", shortcut: "S", desc: "Bug reports and questions" },
+  credits: { label: "Team", shortcut: "T", desc: "Who built this" },
 };

@@ -2,40 +2,40 @@
   "version": 1,
   "updatedAt": "2026-06-16T00:04:15Z",
   "brand": "Alleral",
-  "tagline": "Roblox scripts that stay updated without babysitting.",
+  "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
   "loaderVersion": "8.7.1",
   "coreVersion": "2.9.5",
   "uiLibrary": "Maclib",
   "uiVersion": "5.5.0-maclib",
   "maclibVersion": 5,
   "announcement": "",
-  "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?v=1.0.11&t=\" .. tick(), true))()",
+  "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?v=1.0.12&t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",
   "branch": "main",
   "features": [
-    "Finds the right script when you inject",
-    "MacLib UI with live status on each game",
-    "Site and scripts pull from GitHub automatically",
-    "Game status comes from real inject data, not guesses",
-    "Updates land within about a minute of a push",
-    "Live executor compatibility via WEAO — every major exploit tracked"
+    "Picks the right game script when you inject",
+    "MacLib UI with a status readout per game",
+    "Site and scripts pull straight from GitHub",
+    "Game status comes from real injects, not guesses",
+    "Updates show up within about a minute of a push",
+    "Executor list from WEAO — updated when they update"
   ],
   "faq": [
     {
       "q": "How do I open the site?",
-      "a": "Any browser works - phone or PC. Grab the link from Share and bookmark it if you want. You don't need a Roblox account just to browse. Roblox and an executor only matter when you run the loadstring."
+      "a": "Any browser works — phone or PC. Bookmark the homepage link at the top if you want it handy. You don't need Roblox just to browse; you only need an executor when you run the loadstring."
     },
     {
       "q": "How do I load Alleral?",
-      "a": "Copy the bootstrap loadstring from the homepage once, save it in your executor, and run it in a supported game. It always pulls the latest loader and scripts from GitHub — you never replace the saved script after updates."
+      "a": "Copy the bootstrap loadstring from the homepage, save it once in your executor, and run it in a supported game. After that it pulls updates from GitHub on its own — you don't replace the saved script."
     },
     {
       "q": "Which games are supported?",
-      "a": "Check the Games tab - status updates live. Scripts only load when a game is marked Working or Testing."
+      "a": "Check the Games tab. Status updates live. Scripts only load when a game is marked Working or Testing."
     },
     {
       "q": "Why didn't the script load?",
-      "a": "Usually it's the wrong game, a weak executor, or the game is marked Broken/Maintenance."
+      "a": "Usually wrong game, a weak executor, or the game is marked Broken or Maintenance."
     },
     {
       "q": "Does it auto-update?",
@@ -43,7 +43,7 @@
     },
     {
       "q": "How do I report a bug?",
-      "a": "Use the Support section below. Reports go straight to Discord."
+      "a": "Use the Support tab below. Reports go to Discord."
     }
   ],
   "changelog": [
@@ -767,39 +767,39 @@
   "executors": [],
   "resources": [
     {
-      "title": "WEAO — Live executors",
-      "desc": "WhatExpsAre.Online status feed (same data as Tools)",
+      "title": "WEAO executors",
+      "desc": "Live exploit status (same feed as the Executors tab)",
       "url": "https://whatexpsare.online/",
       "icon": "pulse"
     },
     {
       "title": "Loader source",
-      "desc": "Raw loader.luau on GitHub",
+      "desc": "loader.luau on GitHub",
       "urlKey": "loaderRaw",
       "icon": "code"
     },
     {
       "title": "Repository",
-      "desc": "Full project + game scripts",
+      "desc": "Full repo with game scripts",
       "urlKey": "github",
       "icon": "github"
     },
     {
       "title": "Sync status",
-      "desc": "Live GitHub auto-sync JSON",
+      "desc": "GitHub auto-sync JSON",
       "url": "/api/sync/status",
       "icon": "sync"
     },
     {
       "title": "Health check",
-      "desc": "Relay uptime + commit hash",
+      "desc": "Relay uptime and commit hash",
       "url": "/health",
       "icon": "pulse"
     }
   ],
   "credits": {
     "headline": "Built by Sammy.",
-    "subheadline": "Alleral — loader, hub, game scripts, and everything on this site.",
+    "subheadline": "Loader, hub, game scripts, and this site.",
     "teams": [
       {
         "id": "creator",
@@ -810,7 +810,7 @@
             "displayName": "Sammy",
             "role": "Owner & Developer",
             "robloxUsername": "ProgrammerSammy",
-            "bio": "Everything you see here — loader architecture, telemetry relay, game scripts, and this hub.",
+            "bio": "Wrote the loader, relay, game scripts, and this site.",
             "featured": true,
             "accent": "#2997ff",
             "tags": ["Loader", "Backend", "Hub", "Games"],

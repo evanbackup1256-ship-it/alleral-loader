@@ -28,8 +28,8 @@ export function ServiceGraph({
     <>
       <div className="obs-panel-head shrink-0">
         <div>
-          <p className="obs-kicker">Dependency graph</p>
-          <h3 className="obs-title-sm">Hub → scripts · live topology</h3>
+          <p className="obs-kicker">Game map</p>
+          <h3 className="obs-title-sm">Status by game</h3>
         </div>
         <span className="font-mono text-[10px] text-muted-2">
           {games.length - broken.length}/{games.length} healthy
@@ -100,7 +100,7 @@ export function ServiceGraph({
                       {isBroken ? (
                         <span className="inline-flex items-start gap-1">
                           <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
-                          {g.message || "Script marked non-operational by relay auto-status."}
+                          {g.message || "Marked broken by relay auto-status."}
                         </span>
                       ) : (
                         g.message || "Operational — passing health checks"

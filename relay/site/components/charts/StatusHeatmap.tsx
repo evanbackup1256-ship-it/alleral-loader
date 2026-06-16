@@ -38,8 +38,8 @@ export function StatusHeatmap({
     <div className={clsx("obs-panel flex h-auto flex-col self-start", className)}>
       <div className="obs-panel-head shrink-0">
         <div>
-          <p className="obs-kicker">Status heatmap</p>
-          <h3 className="obs-title-sm">Script health distribution</h3>
+          <p className="obs-kicker">By status</p>
+          <h3 className="obs-title-sm">Game counts</h3>
         </div>
       </div>
       <div className="mt-3 grid min-w-0 grid-cols-5 gap-1">

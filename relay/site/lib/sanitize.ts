@@ -1,3 +1,4 @@
+import { apiUrl } from "./config";
 import type { FaqItem, ResourceEntry, SitePayload } from "./types";
 
 const BAN_KEYWORDS = /\bban(?:s|ned|ning| evasion| api| list| system| check| issue)?\b/i;
@@ -48,6 +49,7 @@ export function sanitizePublicSite(site: SitePayload): SitePayload {
 export function resolveResourceUrl(site: SitePayload, item: ResourceEntry): string | null {
   if (item.urlKey && site.links?.[item.urlKey]) return site.links[item.urlKey]!;
   if (item.url?.startsWith("http")) return item.url;
+  if (item.url?.startsWith("/api/") || item.url === "/health") return apiUrl(item.url);
   if (item.url?.startsWith("/")) return item.url;
   if (item.url?.startsWith("#")) return item.url;
   return item.url || null;

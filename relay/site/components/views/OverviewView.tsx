@@ -61,23 +61,23 @@ export function OverviewView({
               <Gamepad2 className="h-4 w-4" /> Games
             </Button>
             <Button variant="ghost" onClick={() => setView("status")}>
-              <Radio className="h-4 w-4" /> Live ops
+              <Radio className="h-4 w-4" /> Status
             </Button>
           </div>
         </div>
       </InViewReveal>
 
       <InViewReveal className="bento-stat" delay={0.05}>
-        <MetricCard label="Fleet online" numeric={working} suffix={` / ${total}`} accent="green" trend="Live game health" />
+        <MetricCard label="Working games" numeric={working} suffix={` / ${total}`} accent="green" trend="From relay" />
       </InViewReveal>
       <InViewReveal className="bento-stat" delay={0.1}>
-        <MetricCard label="Loader" value={`v${live?.versions?.loader || site.loaderVersion || "—"}`} accent="cyan" trend="Auto-update bootstrap" />
+        <MetricCard label="Loader" value={`v${live?.versions?.loader || site.loaderVersion || "—"}`} accent="cyan" trend="Auto-updates from GitHub" />
       </InViewReveal>
       <InViewReveal className="bento-stat" delay={0.15}>
-        <MetricCard label="Core" value={`v${live?.versions?.core || site.coreVersion || "—"}`} accent="violet" trend={`Syde patch ${site.sydePatch ?? "—"}`} />
+        <MetricCard label="Core" value={`v${live?.versions?.core || site.coreVersion || "—"}`} accent="violet" trend={`MacLib v${site.maclibVersion ?? live?.versions?.sydePatch ?? "—"}`} />
       </InViewReveal>
       <InViewReveal className="bento-stat" delay={0.2}>
-        <MetricCard label="UI stack" value={site.uiLibrary || "Syde"} accent="yellow" trend={site.uiVersion} />
+        <MetricCard label="UI" value={site.uiLibrary || "MacLib"} accent="yellow" trend={site.uiVersion} />
       </InViewReveal>
 
       {brokenGames.length ? (
@@ -108,7 +108,7 @@ export function OverviewView({
           {[
             { step: "1", title: "Copy loader", desc: "Save the bootstrap once in your executor." },
             { step: "2", title: "Join a game", desc: "Pick a Working game from the library." },
-            { step: "3", title: "Run & forget", desc: "Loader auto-updates — no manual replaces." },
+            { step: "3", title: "Let it run", desc: "Loader checks GitHub and updates on its own." },
           ].map((item) => (
             <li key={item.step} className="rounded-xl border border-border bg-bg-1/50 px-4 py-3">
               <p className="font-mono text-xs text-accent">Step {item.step}</p>
@@ -122,9 +122,9 @@ export function OverviewView({
       {latestLog.length ? (
         <InViewReveal className="bento-wide panel p-5 md:p-6" delay={0.09}>
           <div className="mb-4 flex items-center justify-between gap-2">
-            <h3 className="obs-title-sm">Recent ship log</h3>
+            <h3 className="obs-title-sm">Recent updates</h3>
             <Button variant="ghost" size="sm" onClick={() => setView("changelog")}>
-              Full log <ArrowRight className="h-3.5 w-3.5" />
+              All updates <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           </div>
           <div className="space-y-3">
@@ -150,7 +150,7 @@ export function OverviewView({
       <InViewReveal className="bento-wide panel p-5 md:p-6" delay={0.08}>
         <div className="mb-4 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-accent" />
-          <h3 className="obs-title-sm">Built for executors that move fast</h3>
+          <h3 className="obs-title-sm">What you get</h3>
         </div>
         <ul className="grid gap-2 sm:grid-cols-2">
           {(site.features || []).slice(0, 8).map((f) => (
@@ -168,7 +168,7 @@ export function OverviewView({
             <p className="obs-kicker flex items-center gap-1.5">
               <Terminal className="h-3.5 w-3.5" /> Bootstrap
             </p>
-            <h3 className="obs-title-sm mt-1">Save once — ships updates automatically</h3>
+            <h3 className="obs-title-sm mt-1">Save the loadstring once — updates come from GitHub</h3>
           </div>
           <Button size="sm" variant="ghost" onClick={onCopy}>
             Copy
