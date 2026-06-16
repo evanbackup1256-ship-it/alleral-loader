@@ -5,7 +5,7 @@
     "ui":  "Maclib",
     "windui":  "5.5.0-maclib",
     "alleral":  "5.5.0-maclib",
-    "commit":  "28579d0",
+    "commit":  "8f77aad",
     "updatedAt":  "2026-06-16T03:06:17Z",
     "updatePollSeconds":  120,
     "autoUpdate":  true,
