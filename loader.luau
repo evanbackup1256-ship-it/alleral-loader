@@ -957,6 +957,7 @@ local function cacheRemote(relativePath, src)
 	pcall(writeFileFn, relativePath, src)
 end
 
+local fetchBackendModule
 local ensureOnyxSource, onyxSourceValid
 do
 	local function requiredOnyxVersion()
@@ -1335,7 +1336,7 @@ local function stripUtf8Bom(text)
 	return text
 end
 
-local function fetchBackendModule(relativePath, minBytes)
+fetchBackendModule = function(relativePath, minBytes)
 	minBytes = minBytes or 0
 	local base = loaderCdnBase()
 	if not base then
