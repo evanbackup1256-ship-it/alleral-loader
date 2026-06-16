@@ -44,6 +44,7 @@ $loaderRaw = [regex]::Replace($loaderRaw, '(?m)^\tloader = "[^"]+"', ("`tloader 
 if ($null -ne $release.maclibVersion) {
     $maclibVersionVal = [int]$release.maclibVersion
     $loaderRaw = [regex]::Replace($loaderRaw, 'local MACLIB_VERSION = \d+', ('local MACLIB_VERSION = ' + $maclibVersionVal))
+    $loaderRaw = [regex]::Replace($loaderRaw, 'maclibVersion = \d+,', ('maclibVersion = ' + $maclibVersionVal + ','))
 }
 $fallbackFields = @(
     @{ Key = "core"; Prop = "core" },

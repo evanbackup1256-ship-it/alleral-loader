@@ -1,5 +1,18 @@
--- Alleral vendored MacLib 1.2.6 (Alleral patch v5)
-local ALLERAL_MACLIB_VERSION = 6
+-- Alleral vendored MacLib 1.2.6 (Alleral patch v7)
+local ALLERAL_MACLIB_VERSION = 7
+
+local function udim2PixelSize(udim2, fallbackX, fallbackY)
+	if typeof(udim2) ~= "UDim2" then
+		return fallbackX, fallbackY
+	end
+	local ok, xOff, yOff = pcall(function()
+		return udim2.X.Offset, udim2.Y.Offset
+	end)
+	if ok and type(xOff) == "number" and type(yOff) == "number" and xOff > 0 and yOff > 0 then
+		return xOff, yOff
+	end
+	return fallbackX, fallbackY
+end
 
 local function formatSliderPrecision(value, precision)
 	local digits = tonumber(precision)
@@ -767,8 +780,9 @@ function MacLib:Window(Settings)
 	base.BorderSizePixel = 0
 	base.Position = UDim2.fromScale(0.5, 0.5)
 	base.Size = Settings.Size or UDim2.fromOffset(868, 650)
-	if base.Size.X.Offset > 0 and base.Size.Y.Offset > 0 then
-		Resizer.baseDesignSize = Vector2.new(base.Size.X.Offset, base.Size.Y.Offset)
+	do
+		local w, h = udim2PixelSize(Settings.Size or base.Size, 868, 650)
+		Resizer.baseDesignSize = Vector2.new(w, h)
 	end
 
 	local baseUIScale = Instance.new("UIScale")

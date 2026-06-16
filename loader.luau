@@ -28,7 +28,7 @@ local LEGACY_UI_SOURCE_PATHS = {
 local MACLIB_SOURCE_PATH = UI .. "/maclib/source.luau"
 local MACLIB_SOURCE_MIN_BYTES = 150000
 local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
-local MACLIB_VERSION = 6
+local MACLIB_VERSION = 7
 local MACLIB_REQUIRED_FN = "function MacLib:Window"
 local MACLIB_PATCHED_OVERRIDE_PATHS = {
 	"maclib_patched.luau",
@@ -53,14 +53,14 @@ local RELEASE_FALLBACK = {
 	ui = "Maclib",
 	windui = "5.5.0-maclib",
 	alleral = "5.5.0-maclib",
-	maclibVersion = 5,
+	maclibVersion = 7,
 	analytics = "1.2",
 	telemetry = "3.4",
 	helpers = "1.8",
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "9e61dba",
+	commit = "b503281",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -979,7 +979,7 @@ do
 	end
 
 	local function maclibFetchUrls()
-		local bust = "?maclib=3&t=" .. tostring(tick())
+		local bust = "?maclib=7&t=" .. tostring(tick())
 		local urls = {
 			GITHUB_RAW .. "/" .. MACLIB_SOURCE_PATH .. bust,
 			"https://raw.githubusercontent.com/" .. REPO .. "/main/" .. MACLIB_SOURCE_PATH .. bust,
@@ -1009,6 +1009,9 @@ do
 		if not src:find(MACLIB_REQUIRED_FN, 1, true) then
 			return "missing " .. MACLIB_REQUIRED_FN
 		end
+		if src:find("Size%.Offset", 1, false) then
+			return "legacy Size.Offset bug"
+		end
 		local version = maclibVersionFromSource(src)
 		local need = requiredMaclibVersion()
 		if type(version) ~= "number" or version ~= need then
@@ -1024,6 +1027,7 @@ do
 			or not src:find(MACLIB_VERSION_MARKER, 1, true)
 			or not src:find(MACLIB_REQUIRED_FN, 1, true)
 			or not src:find("function MacLib:Window", 1, true)
+			or src:find("Size%.Offset", 1, false)
 			or not looksLikeLua(src) then
 			return false
 		end
@@ -1089,7 +1093,7 @@ do
 			local src = readLocal({ path }, 100)
 			if src then
 				local version = maclibVersionFromSource(src)
-				if type(version) ~= "number" or version ~= need then
+				if type(version) ~= "number" or version ~= need or src:find("Size%.Offset", 1, false) then
 					deleteWorkspaceFile(path, { silent = true, label = "stale MacLib" })
 					log(
 						"Purged stale MacLib source "
