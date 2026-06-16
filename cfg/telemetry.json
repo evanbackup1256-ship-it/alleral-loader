@@ -3,5 +3,8 @@
   "relayUrl": "https://alleral-telemetry-production.up.railway.app/ingest",
   "brand": "Alleral",
   "heartbeatMinutes": 15,
+  "heartbeatInitialDelaySec": 120,
+  "startupPingDelaySec": 15,
+  "minSendIntervalSec": 10,
   "logLevel": "info"
 }

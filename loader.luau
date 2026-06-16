@@ -14,6 +14,17 @@ local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
 local UI = "ui"
+local LEGACY_UI_SOURCE_PATHS = {
+	UI .. "/rayfield/source.luau",
+	"kick/" .. UI .. "/rayfield/source.luau",
+	".alleral/cache/" .. UI .. "/rayfield/source.luau",
+	UI .. "/syde/source.luau",
+	"kick/" .. UI .. "/syde/source.luau",
+	".alleral/cache/" .. UI .. "/syde/source.luau",
+	UI .. "/studio/source.luau",
+	"kick/" .. UI .. "/studio/source.luau",
+	".alleral/cache/" .. UI .. "/studio/source.luau",
+}
 local MACLIB_SOURCE_PATH = UI .. "/maclib/source.luau"
 local MACLIB_SOURCE_MIN_BYTES = 150000
 local MACLIB_VERSION_MARKER = "ALLERAL_MACLIB_VERSION"
@@ -49,7 +60,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "366e63f",
+	commit = "45bc7e3",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -946,18 +957,6 @@ end
 
 local ensureMaclibSource, maclibSourceValid
 do
-	local LEGACY_UI_SOURCE_PATHS = {
-		UI .. "/rayfield/source.luau",
-		"kick/" .. UI .. "/rayfield/source.luau",
-		".alleral/cache/" .. UI .. "/rayfield/source.luau",
-		UI .. "/syde/source.luau",
-		"kick/" .. UI .. "/syde/source.luau",
-		".alleral/cache/" .. UI .. "/syde/source.luau",
-		UI .. "/studio/source.luau",
-		"kick/" .. UI .. "/studio/source.luau",
-		".alleral/cache/" .. UI .. "/studio/source.luau",
-	}
-
 	local function requiredMaclibVersion()
 		local expected = ENV._Alleral_ExpectedVersions
 		if type(expected) == "table" then
@@ -3340,11 +3339,13 @@ local function buildManagedFiles()
 		},
 	}
 	for _, gameProfile in ipairs(GAMES) do
-		table.insert(managed, {
-			paths = gameProfile.scriptFiles,
-			gameId = gameProfile.id,
-			extract = "game",
-		})
+		if type(gameProfile.scriptFiles) == "table" then
+			table.insert(managed, {
+				paths = gameProfile.scriptFiles,
+				gameId = gameProfile.id,
+				extract = "game",
+			})
+		end
 	end
 	return managed
 end
@@ -3692,8 +3693,10 @@ local function collectAlleralPurgePaths()
 	add("Alleral/loader.luau")
 	add(INSTALL_MANIFEST)
 	for _, entry in ipairs(buildManagedFiles()) do
-		for _, path in ipairs(entry.paths) do
-			add(path)
+		if type(entry.paths) == "table" then
+			for _, path in ipairs(entry.paths) do
+				add(path)
+			end
 		end
 	end
 	return paths

@@ -1,5 +1,9 @@
 local Telemetry = {}
-Telemetry.Version = "3.4"
+Telemetry.Version = "3.5"
+
+local DEFAULT_STARTUP_PING_DELAY_SEC = 15
+local DEFAULT_MIN_SEND_INTERVAL_SEC = 10
+local DEFAULT_HEARTBEAT_INITIAL_DELAY_SEC = 120
 
 local ALLERAL_GREEN = 5489688
 local ALLERAL_SOFT = 3197370
@@ -436,9 +440,6 @@ function Telemetry:Configure(extra)
 	if self:IsEnabled() and not self._lifecycleHooked then
 		self:HookLifecycle()
 	end
-	if self:IsEnabled() and not self._heartbeatRunning then
-		self:StartHeartbeat()
-	end
 	return self._config
 end
 
@@ -812,6 +813,47 @@ function Telemetry:_send(event, contextExtra, errorInfo, notes)
 	return ok, err
 end
 
+function Telemetry:_queueSend(event, contextExtra, errorInfo, notes)
+	if not self:IsEnabled() then
+		return
+	end
+	self._sendQueue = self._sendQueue or {}
+	table.insert(self._sendQueue, {
+		event = event,
+		contextExtra = contextExtra,
+		errorInfo = errorInfo,
+		notes = notes,
+	})
+	if self._sendPumpRunning then
+		return
+	end
+	self._sendPumpRunning = true
+	task.spawn(function()
+		local cfg = self._config or {}
+		local startupDelay = tonumber(cfg.startupPingDelaySec) or DEFAULT_STARTUP_PING_DELAY_SEC
+		local minInterval = tonumber(cfg.minSendIntervalSec) or DEFAULT_MIN_SEND_INTERVAL_SEC
+		if not self._startupDelayDone then
+			task.wait(startupDelay)
+			self._startupDelayDone = true
+		end
+		while self._sendQueue and #self._sendQueue > 0 do
+			if not self:IsEnabled() then
+				break
+			end
+			local item = table.remove(self._sendQueue, 1)
+			local since = tick() - (self._lastSendAt or 0)
+			if since < minInterval then
+				task.wait(minInterval - since)
+			end
+			if self:IsEnabled() then
+				self._lastSendAt = tick()
+				self:_send(item.event, item.contextExtra, item.errorInfo, item.notes)
+			end
+		end
+		self._sendPumpRunning = false
+	end)
+end
+
 function Telemetry:ReportSessionStart(extra)
 	if not self:IsEnabled() then
 		return
@@ -820,9 +862,7 @@ function Telemetry:ReportSessionStart(extra)
 		return
 	end
 	self._sessionStarted = true
-	task.spawn(function()
-		self:_send("session_start", extra)
-	end)
+	self:_queueSend("session_start", extra)
 end
 
 function Telemetry:ReportInject(phase, extra)
@@ -851,9 +891,7 @@ function Telemetry:ReportInject(phase, extra)
 			end
 		end
 	end
-	task.spawn(function()
-		self:_send(event, contextExtra, errorInfo)
-	end)
+		self:_queueSend(event, contextExtra, errorInfo)
 end
 
 function Telemetry:ReportError(scope, err, details)
@@ -871,18 +909,16 @@ function Telemetry:ReportError(scope, err, details)
 	end
 	self._errorLastSent[signature] = now
 	self:_appendLog("error", tostring(scope or "Runtime"), tostring(err))
-	task.spawn(function()
-		self:_send("error", {
-			placeVersion = tonumber(game.PlaceVersion) or nil,
-		}, {
-			scope = tostring(scope or "Runtime"),
-			message = clip(err, 1200),
-			details = formatDetails(details),
-			stack = captureStack(3),
-			recentActions = recentEventSummary(self._eventLog, 8),
-			count = count,
-		})
-	end)
+	self:_queueSend("error", {
+		placeVersion = tonumber(game.PlaceVersion) or nil,
+	}, {
+		scope = tostring(scope or "Runtime"),
+		message = clip(err, 1200),
+		details = formatDetails(details),
+		stack = captureStack(3),
+		recentActions = recentEventSummary(self._eventLog, 8),
+		count = count,
+	})
 end
 
 function Telemetry:ReportPlaceUpdate(change)
@@ -898,14 +934,12 @@ function Telemetry:ReportPlaceUpdate(change)
 		tostring(change.placeId or game.PlaceId)
 	)
 	self:_appendLog("place_updated", note)
-	task.spawn(function()
-		self:_send("place_updated", {
-			placeId = change.placeId or game.PlaceId,
-			placeVersion = current,
-			previousPlaceVersion = previous,
-			gameRecentlyUpdated = true,
-		}, nil, note)
-	end)
+	self:_queueSend("place_updated", {
+		placeId = change.placeId or game.PlaceId,
+		placeVersion = current,
+		previousPlaceVersion = previous,
+		gameRecentlyUpdated = true,
+	}, nil, note)
 end
 
 function Telemetry:ReportEvent(category, message, data)
@@ -921,9 +955,7 @@ function Telemetry:ReportEvent(category, message, data)
 		return
 	end
 	local event = incoming >= 3 and "milestone" or "log"
-	task.spawn(function()
-		self:_send(event, data, nil, string.format("[%s] %s", tostring(category or "info"), clip(message, 500)))
-	end)
+	self:_queueSend(event, data, nil, string.format("[%s] %s", tostring(category or "info"), clip(message, 500)))
 end
 
 function Telemetry:ReportSessionEnd(reason)
@@ -932,12 +964,10 @@ function Telemetry:ReportSessionEnd(reason)
 	end
 	self._sessionEnded = true
 	self._heartbeatRunning = false
-	task.spawn(function()
-		self:_send("session_end", {
-			reason = reason or "unload",
-			uptimeSec = self._sessionStartedAt and math.floor(tick() - self._sessionStartedAt) or nil,
-		})
-	end)
+	self:_queueSend("session_end", {
+		reason = reason or "unload",
+		uptimeSec = self._sessionStartedAt and math.floor(tick() - self._sessionStartedAt) or nil,
+	})
 end
 
 function Telemetry:StartHeartbeat()
@@ -951,12 +981,11 @@ function Telemetry:StartHeartbeat()
 	end
 	self._heartbeatRunning = true
 	task.spawn(function()
+		local initialDelay = tonumber(cfg.heartbeatInitialDelaySec) or DEFAULT_HEARTBEAT_INITIAL_DELAY_SEC
+		task.wait(initialDelay)
 		while self._heartbeatRunning and self:IsEnabled() do
+			self:_queueSend("heartbeat", liveStats())
 			task.wait(minutes * 60)
-			if not self._heartbeatRunning then
-				break
-			end
-			self:_send("heartbeat", liveStats())
 		end
 	end)
 end
@@ -1011,6 +1040,9 @@ Telemetry._config = {
 	apiKey = "",
 	brand = "Alleral",
 	heartbeatMinutes = 15,
+	heartbeatInitialDelaySec = DEFAULT_HEARTBEAT_INITIAL_DELAY_SEC,
+	startupPingDelaySec = DEFAULT_STARTUP_PING_DELAY_SEC,
+	minSendIntervalSec = DEFAULT_MIN_SEND_INTERVAL_SEC,
 	logLevel = "info",
 }
 Telemetry:InitFromEnv()
