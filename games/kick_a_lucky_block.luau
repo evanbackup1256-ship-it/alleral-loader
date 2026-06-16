@@ -34,7 +34,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "7.2.7"
+local VERSION = "7.2.8"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -989,6 +989,7 @@ local function loadGameData()
 end
 
 local gameData = loadGameData()
+local modules
 
 local function withAny(options)
 	local output = { "Any" }
@@ -1023,6 +1024,9 @@ local function refreshGameDataDropdowns()
 end
 
 local function syncGameDataFromModules()
+	if type(modules) ~= "table" then
+		return
+	end
 	local changed = false
 	if modules.entitiesData and modules.entitiesData.Brainrots then
 		gameData.RarityMap = gameData.RarityMap or {}
@@ -1206,7 +1210,7 @@ local function rsChild(...)
 	return node
 end
 
-local modules = {
+modules = {
 	entitiesData = nil,
 	mutationData = nil,
 	weightsData = nil,
