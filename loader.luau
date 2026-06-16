@@ -49,7 +49,7 @@ local CP = {
 
 local RELEASE_FALLBACK = {
 	loader = "8.8.1",
-	core = "2.9.6",
+	core = "2.9.7",
 	ui = "Maclib",
 	windui = "5.5.0-maclib",
 	alleral = "5.5.0-maclib",
@@ -60,7 +60,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "c0f970d",
+	commit = "f41d471",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
