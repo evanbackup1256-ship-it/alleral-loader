@@ -105,6 +105,30 @@ return function(Core)
 		return type(version) == "number" and version == requiredMaclibVersion()
 	end
 
+	local function maclibIoFn(name)
+		if type(Core.execFunction) == "function" then
+			return Core.execFunction(name)
+		end
+		return nil
+	end
+
+	local function readMaclibFileAt(path)
+		local readFile = maclibIoFn("readfile")
+		local isFile = maclibIoFn("isfile")
+		if type(readFile) ~= "function" or type(isFile) ~= "function" then
+			if type(Core.readFile) == "function" then
+				return Core.readFile(path)
+			end
+			return nil
+		end
+		local okExists, exists = pcall(isFile, path)
+		if not (okExists and exists) then
+			return nil
+		end
+		local okRead, src = pcall(readFile, path)
+		return okRead and src or nil
+	end
+
 	local function purgeStaleMaclibFiles()
 		local need = requiredMaclibVersion()
 		local deleteFile = maclibIoFn("delfile") or maclibIoFn("deletefile")
@@ -128,27 +152,6 @@ return function(Core)
 				end
 			end
 		end
-	end
-
-	local function maclibIoFn(name)
-		if type(Core.execFunction) == "function" then
-			return Core.execFunction(name)
-		end
-		return nil
-	end
-
-	local function readMaclibFileAt(path)
-		local readFile = maclibIoFn("readfile")
-		local isFile = maclibIoFn("isfile")
-		if type(readFile) ~= "function" or type(isFile) ~= "function" then
-			return Core.readFile and Core.readFile(path)
-		end
-		local okExists, exists = pcall(isFile, path)
-		if not (okExists and exists) then
-			return nil
-		end
-		local okRead, src = pcall(readFile, path)
-		return okRead and src or nil
 	end
 
 	local function tryReadMaclibPath(relPath)
@@ -185,7 +188,7 @@ return function(Core)
 	end
 
 	local function readMaclibSource()
-		purgeStaleMaclibFiles()
+		pcall(purgeStaleMaclibFiles)
 		local need = requiredMaclibVersion()
 		local bestSrc, bestLabel, bestVersion = nil, nil, -1
 		local function consider(src, label)
