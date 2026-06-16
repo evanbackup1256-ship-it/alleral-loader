@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "1.5.1"
+local VERSION = "1.5.2"
 local state = getgenv().Alleral_State
 local connections = {}
 local loops = {}
@@ -39,7 +39,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local Lighting = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
 
 local SETTINGS_FILE = "slime_rng.json"
@@ -95,6 +94,9 @@ local savedKeys
 local saveSettings
 
 saveSettings, savedKeys = Core.initSettings(state, defaults, SETTINGS_FILE, SETTINGS_EXCLUDE)
+if state.FPSBoost == true and state.AFPSBoost ~= true then
+	state.AFPSBoost = true
+end
 
 local function resetSettings()
 	local env = getgenv and getgenv() or {}
@@ -472,34 +474,10 @@ local runtime = {
 	freecamSubject = nil,
 	aimlockConnection = nil,
 	noclipConnection = nil,
-	fpsBackup = nil,
 	musicBackup = {},
 	rollFailCount = 0,
 	lastGunShot = 0,
 }
-
-local function setFPSBoost(enabled)
-	if enabled then
-		if not runtime.fpsBackup then
-			runtime.fpsBackup = {
-				GlobalShadows = Lighting.GlobalShadows,
-				QualityLevel = settings().Rendering.QualityLevel,
-			}
-		end
-		Lighting.GlobalShadows = false
-		pcall(function()
-			settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-		end)
-	else
-		if runtime.fpsBackup then
-			Lighting.GlobalShadows = runtime.fpsBackup.GlobalShadows
-			pcall(function()
-				settings().Rendering.QualityLevel = runtime.fpsBackup.QualityLevel
-			end)
-			runtime.fpsBackup = nil
-		end
-	end
-end
 
 local function setMusicMuted(enabled)
 	if enabled then
@@ -1406,10 +1384,6 @@ Core.makeSupervisor(state, loops, loopControllers, "Noclip", 0.5, function()
 	setNoclip(state.Noclip)
 end)
 
-Core.makeSupervisor(state, loops, loopControllers, "FPSBoost", 1, function()
-	setFPSBoost(state.FPSBoost)
-end)
-
 Core.makeSupervisor(state, loops, loopControllers, "DisableMusic", 1, function()
 	setMusicMuted(state.DisableMusic)
 end)
@@ -1645,10 +1619,7 @@ movement:CreateToggle("Noclip", state.Noclip, "Walk through walls.", function(va
 	setNoclip(value)
 end)
 
-performance:CreateToggle("FPS boost", state.FPSBoost, "Turns off shadows and dials graphics down a bit.", function(value)
-	state.FPSBoost = value
-	setFPSBoost(value)
-end)
+Core.buildPerformanceControls(performance, { state = state, saveFn = saveSettings })
 performance:CreateToggle("Mute music", state.DisableMusic, "Kills in-game music.", function(value)
 	state.DisableMusic = value
 	setMusicMuted(value)
@@ -1683,6 +1654,7 @@ Core.buildConfigProfileGroup(settingsTab, {
 })
 Core.buildStandardSettingsExtras(settingsTab, Core.settingsExtrasOptions(window, ui, state, savedKeys, saveSettings, SETTINGS_FILE, VERSION, {
 	gameId = "slime_rng",
+	skipPerformanceControls = true,
 }))
 
 Core.finalizeGameUi(window, ui, {
@@ -1698,9 +1670,12 @@ state.Alleral_Unload = function()
 		setAutoGun(false)
 		setFreecam(false)
 		setNoclip(false)
-		setFPSBoost(false)
 		setMusicMuted(false)
 	end)
 end
+
+task.defer(function()
+	Core.applyPerformanceSettings(state)
+end)
 
 saveSettings()

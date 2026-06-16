@@ -34,7 +34,7 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
-local VERSION = "7.2.8"
+local VERSION = "7.3.0"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -90,6 +90,9 @@ local runtime = {
 	waveResetBusy = false,
 	nextPlotUpgrade = 0,
 	nextRebirthAttempt = 0,
+	nextClaim2x = 0,
+	nextBallCollect = 0,
+	webhookSendAt = {},
 	kickLevelBound = false,
 	rebirthLevelBound = false,
 }
@@ -241,6 +244,10 @@ local defaults = {
 	TBallFilter1 = { "Any" },
 	TBallFilter2 = { "Any" },
 	CustomMoveSpeed = 115,
+	AFPSBoost = false,
+	ARTXMod = false,
+	ABlackScreen = false,
+	AAutoEquipBestWeight = false,
 }
 
 local savedKeys = {
@@ -330,6 +337,10 @@ local savedKeys = {
 	"TBallFilter2",
 	"CustomMoveSpeed",
 	"NotifyOnError",
+	"AFPSBoost",
+	"ARTXMod",
+	"ABlackScreen",
+	"AAutoEquipBestWeight",
 }
 
 local function copyValue(value)
@@ -397,6 +408,15 @@ end
 local function rollPayloadString(value)
 	if type(value) == "string" then
 		return value
+	end
+	if type(value) == "table" then
+		local name = value.Brainrot or value.Name or value.Entity or value.Pet or value[1]
+		if type(name) == "string" and name ~= "" and name ~= "Unknown" then
+			local mutation = normalizeMutation(value.Mutation or value[2] or "None")
+			local level = value.Level or value.Weight or value[3] or 1
+			local rarity = value.Rarity or value[4] or ""
+			return tostring(name) .. "," .. mutation .. "," .. tostring(level) .. "," .. tostring(rarity)
+		end
 	end
 	if value == nil or value == false then
 		return ""
@@ -924,6 +944,11 @@ state.Alleral_Unload = function()
 	table.clear(runtime.remoteLookupCache)
 	runtime.lastStatusSnapshot = nil
 	restoreHumanoidMovement(LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid"))
+	if Core then
+		pcall(Core.setLowGraphics, false)
+		pcall(Core.setRtxGraphics, false)
+		pcall(Core.setBlackScreen, false)
+	end
 end
 
 local function loadLuaSource(source, label)
@@ -1155,6 +1180,12 @@ local function mainFilterMatches(brainrot, mutation)
 		mutationOk = false
 	end
 	return brainrotOk and rarityOk and mutationOk
+end
+
+local function ballFilterMatches(brainrot, mutation)
+	local brainrotOk = selectionMatches(state.TBallFilter1, brainrot, normalizeText)
+	local rarityOk = selectionMatches(state.TBallFilter2, rarityFor(brainrot, "Unknown"), normalizeText)
+	return brainrotOk and rarityOk
 end
 
 local function parseNumber(value)
@@ -1439,6 +1470,7 @@ local function refreshRemotes()
 	remotes.battleStart    = safeFindRemote(network, { "rev_bs_battle_start",  "ref_bs_battle_start",  "rev_battle_start",  "battle_start", "BattleStart", "StartBattle" })
 	remotes.kickStyle      = safeFindRemote(network, { "rev_KickStyle", "rev_KickStyleEquip", "KickStyleEquip", "EquipKickStyle" })
 	remotes.ballKick       = safeFindRemote(network, { "rev_BallKick", "BallKick", "rev_Ball", "BallEvent", "KickBall" })
+	remotes.ballCollect    = safeFindRemote(network, { "rev_BallCollect", "BallCollect", "CollectBall", "rev_CollectBall", "BallClaim" })
 	remotes.buyPotion      = safeFindRemote(network, { "rev_PotionBuy", "PotionBuy", "BuyPotion", "rev_BuyPotion" })
 	remotes.usePotion      = safeFindRemote(network, { "rev_PotionUse", "UsePotion", "PotionUse", "rev_UsePotion" })
 	remotes.buyCup         = safeFindRemote(network, { "rev_CupBuy", "CupBuy", "ShopCup", "BuyCup", "rev_ShopCup" })
@@ -1456,6 +1488,8 @@ local function refreshRemotes()
 				elseif not remotes.battleCreate and n:find("battle") and n:find("create")                       then remotes.battleCreate = child
 				elseif not remotes.battleInvite and n:find("battle") and n:find("invite")                       then remotes.battleInvite = child
 				elseif not remotes.battleStart  and n:find("battle") and n:find("start")                        then remotes.battleStart = child
+				elseif not remotes.ballCollect  and n:find("ball") and n:find("collect")                        then remotes.ballCollect = child
+				elseif not remotes.ballKick     and n:find("ball") and n:find("kick")                           then remotes.ballKick = child
 				end
 			end
 		end
@@ -2216,7 +2250,16 @@ local function currentRollPayload()
 		local name = wave:GetAttribute("Brainrot")
 			or wave:GetAttribute("Name")
 			or wave:GetAttribute("Entity")
+			or wave:GetAttribute("Pet")
 			or (wave:IsA("Model") and wave.Name or nil)
+		if (not name or name == "" or name == "Unknown") and wave:IsA("Model") then
+			for _, child in ipairs(wave:GetDescendants()) do
+				if child:IsA("StringValue") and child.Name:lower():find("brainrot") then
+					name = child.Value
+					break
+				end
+			end
+		end
 		if type(name) == "string" and name ~= "" and name ~= "Unknown" then
 			local mutation = normalizeMutation(wave:GetAttribute("Mutation") or "None")
 			local level = wave:GetAttribute("Level") or wave:GetAttribute("Weight") or 1
@@ -2412,6 +2455,18 @@ supervisorEnabled = {
 	Weather = function()
 		return state.AAutoSummonWeather and state.TTargetWeatherEvent ~= "None"
 	end,
+	BallFarm = function()
+		return state.AFarmBall
+	end,
+	ShopExtras = function()
+		return state.AAutoBuyShopCup
+			or state.AAutoBuyPotion
+			or state.AAutoUsePotion
+			or state.AAutoBuyUpgrade
+	end,
+	EquipBestWeight = function()
+		return state.AAutoEquipBestWeight and not state.ATrain
+	end,
 }
 
 local function makeSupervisor(name, interval, callback)
@@ -2485,24 +2540,32 @@ local function collectFromPlot()
 			break
 		end
 		local slotNumber = tonumber(button.Name:match("%d+"))
-		if button:IsA("BasePart") and slotNumber then
-			local slot = slots:FindFirstChild(button.Name)
-			local placed = slot and slot:FindFirstChild("PlacedPart")
-			if placed and placed:FindFirstChildOfClass("Model") then
-				root.CFrame = button.CFrame + Vector3.new(0, 3, 0)
-				task.wait(0.06)
-				safeFireTouch(root, button, 0)
-				task.wait(0.04)
-				safeFireTouch(root, button, 1)
-				safeCall("CollectCashRemote", function()
-					remotes.collect:FireServer(slotNumber)
-				end)
-				collected = collected + 1
-				task.wait(0.05)
-			end
+		if not slotNumber then
+			continue
 		end
+		local slot = slots:FindFirstChild(button.Name) or slots:FindFirstChild(tostring(slotNumber))
+		local placed = slot and slot:FindFirstChild("PlacedPart")
+		if not (placed and placed:FindFirstChildOfClass("Model")) then
+			continue
+		end
+		if button:IsA("BasePart") then
+			local horizontal = Vector3.new(root.Position.X, 0, root.Position.Z)
+				- Vector3.new(button.Position.X, 0, button.Position.Z)
+			if horizontal.Magnitude > 12 then
+				root.CFrame = button.CFrame + Vector3.new(0, 3, 0)
+				task.wait(0.08)
+			end
+			safeFireTouch(root, button, 0)
+			task.wait(0.05)
+			safeFireTouch(root, button, 1)
+		end
+		safeCall("CollectCashRemote", function()
+			remotes.collect:FireServer(slotNumber)
+		end)
+		collected = collected + 1
+		task.wait(0.06)
 	end
-	if root.Parent then
+	if root.Parent and (root.CFrame.Position - oldCFrame.Position).Magnitude > 2 then
 		root.CFrame = oldCFrame
 	end
 end
@@ -2598,7 +2661,7 @@ local function isProtectedBrainrot(name, mutation)
 end
 
 local function autoPlaceBest()
-	if not state.APlaceBest or state.IsPlacingPet then
+	if not state.APlaceBest or state.IsPlacingPet or state.IsFlashCollecting then
 		return
 	end
 	refreshRemotes()
@@ -2647,6 +2710,9 @@ local function autoPlaceBest()
 	end
 	for _, tool in ipairs(tools) do
 		local mutation = normalizeMutation(tool:GetAttribute("Mutation") or "None")
+		if isProtectedBrainrot(tool.Name, mutation) then
+			continue
+		end
 		local cps = brainrotCps(tool.Name, mutation, 1) or 0
 		if cps > bestCps then
 			bestCps = cps
@@ -2659,7 +2725,10 @@ local function autoPlaceBest()
 	elseif bestTool and weakestSlot and bestCps > weakestCps then
 		targetSlot = weakestSlot
 	end
-	if not targetSlot then
+	if not targetSlot or not bestTool then
+		return
+	end
+	if not emptySlot and bestCps <= weakestCps then
 		return
 	end
 	state.IsPlacingPet = true
@@ -3075,7 +3144,12 @@ local function handleClaimedTool(tool)
 	if webhookSeen(guid) then
 		return
 	end
-	task.wait(0.5)
+	local sendKey = guid or tool.Name
+	if runtime.webhookSendAt[sendKey] and tick() - runtime.webhookSendAt[sendKey] < 3 then
+		return
+	end
+	runtime.webhookSendAt[sendKey] = tick()
+	task.wait(0.35)
 	local name = tool.Name
 	local rarity = rarityFor(name, tool:GetAttribute("Rarity") or "Unknown")
 	local mutation = normalizeMutation(tool:GetAttribute("Mutation") or "None")
@@ -3395,7 +3469,8 @@ local weatherGroup = createUiGroup(eventsTab, "Weather", "rbxassetid://107097894
 local styleGroup = createUiGroup(shopTab, "Styles", "rbxassetid://10734952479", 1)
 local favoriteGroup = createUiGroup(shopTab, "Favorites", "rbxassetid://10734952479", 2)
 local serverGroup = createUiGroup(miscTab, "Server", "rbxassetid://10734950020", 1)
-local webhookGroup = createUiGroup(miscTab, "Webhooks", "rbxassetid://10734950020", 2)
+local performanceGroup = createUiGroup(miscTab, "Performance", "rbxassetid://10734950020", 2)
+local webhookGroup = createUiGroup(miscTab, "Webhooks", "rbxassetid://10734950020", 3)
 local configGroup = createUiGroup(configTab, "Alerts", "rbxassetid://10734950309", 1)
 local recoveryGroup = createUiGroup(configTab, "Stuck?", "rbxassetid://10734950309", 2)
 local tuningGroup = createUiGroup(configTab, "Speed tweaks", "rbxassetid://10734950309", 1)
@@ -3404,6 +3479,7 @@ local profileGroup = createUiGroup(configTab, "Save slots", "rbxassetid://107349
 configTab:BuildThemeGroupbox(2)
 Core.buildStandardSettingsExtras(configTab, Core.settingsExtrasOptions(uiWindow, ui, state, savedKeys, saveSettings, settingsFile, VERSION, {
 	scriptId = "kick_a_lucky_block",
+	skipPerformanceControls = true,
 	onApply = function()
 		syncTrackerConfig()
 		rebuildUpgradeBase()
@@ -4383,6 +4459,16 @@ upgradeGroup:CreateSlider(
 )
 
 economyGroup:CreateToggle(
+	"Auto equip best weight",
+	state.AAutoEquipBestWeight,
+	"Keeps your strongest owned weight equipped without running train.",
+	function(value)
+		state.AAutoEquipBestWeight = value
+		saveSettings()
+	end,
+	"AAutoEquipBestWeight"
+)
+economyGroup:CreateToggle(
 	"Buy best weight",
 	state.ABuyBest,
 	"Grabs the nicest weight you can afford and equips it.",
@@ -4726,6 +4812,58 @@ Core.buildJoinServerControls(serverGroup, {
 	saveSettings = saveSettings,
 	dividerFirst = false,
 })
+
+performanceGroup:CreateToggle(
+	"FPS boost",
+	state.AFPSBoost,
+	"Lowest quality, no shadows — best for weak PCs and executors.",
+	function(value)
+		state.AFPSBoost = value
+		if value then
+			state.ARTXMod = false
+			if Core.setRtxGraphics then
+				pcall(Core.setRtxGraphics, false)
+			end
+		end
+		if Core.setLowGraphics then
+			pcall(Core.setLowGraphics, value)
+		end
+		saveSettings()
+	end,
+	"AFPSBoost"
+)
+performanceGroup:CreateToggle(
+	"RTX mod",
+	state.ARTXMod,
+	"Future lighting, shadows, and higher render quality.",
+	function(value)
+		state.ARTXMod = value
+		if value then
+			state.AFPSBoost = false
+			if Core.setLowGraphics then
+				pcall(Core.setLowGraphics, false)
+			end
+		end
+		if Core.setRtxGraphics then
+			pcall(Core.setRtxGraphics, value)
+		end
+		saveSettings()
+	end,
+	"ARTXMod"
+)
+performanceGroup:CreateToggle(
+	"Black screen mode",
+	state.ABlackScreen,
+	"Hides the 3D world with a black overlay — UI stays visible.",
+	function(value)
+		state.ABlackScreen = value
+		if Core.setBlackScreen then
+			pcall(Core.setBlackScreen, value)
+		end
+		saveSettings()
+	end,
+	"ABlackScreen"
+)
 
 webhookGroup:CreateToggle(
 	"Discord alerts",
@@ -5093,7 +5231,65 @@ local function findBallPad()
 	if not areas then
 		return nil
 	end
-	return areas:FindFirstChild("Ball") or areas:FindFirstChild("BallReady") or areas:FindFirstChild("KickBall")
+	return areas:FindFirstChild("Ball")
+		or areas:FindFirstChild("BallReady")
+		or areas:FindFirstChild("KickBall")
+		or areas:FindFirstChild("BallKick")
+end
+
+local function findBallCollectPad()
+	local areas = Workspace:FindFirstChild("Areas")
+	if not areas then
+		return nil
+	end
+	return areas:FindFirstChild("BallCollect")
+		or areas:FindFirstChild("CollectBall")
+		or areas:FindFirstChild("BallReward")
+		or areas:FindFirstChild("BallClaim")
+end
+
+local function collectBallReward(character, humanoid, root)
+	if tick() < (runtime.nextBallCollect or 0) then
+		return
+	end
+	runtime.nextBallCollect = tick() + 0.35
+	refreshRemotes()
+	if remotes.ballCollect then
+		safeCall("BallCollectRemote", function()
+			fireRemote(remotes.ballCollect)
+		end)
+	end
+	local collectPad = findBallCollectPad()
+	if collectPad and root and collectPad:IsA("BasePart") then
+		local horizontal = Vector3.new(root.Position.X, 0, root.Position.Z)
+			- Vector3.new(collectPad.Position.X, 0, collectPad.Position.Z)
+		if horizontal.Magnitude > 6 then
+			fastMove(root, collectPad.CFrame * CFrame.new(0, 3, 0), state.CustomMoveSpeed or 115)
+		end
+		safeFireTouch(root, collectPad, 0)
+		task.wait(0.05)
+		safeFireTouch(root, collectPad, 1)
+	end
+	if not character or not humanoid or not root then
+		return
+	end
+	for _, descendant in ipairs(Workspace:GetDescendants()) do
+		if descendant:IsA("Tool") and descendant.Parent == Workspace then
+			local handle = descendant:FindFirstChild("Handle")
+			if handle and (handle.Position - root.Position).Magnitude < 30 then
+				if not hasWildcard(state.TBallFilter1) or not hasWildcard(state.TBallFilter2) then
+					local mutation = normalizeMutation(descendant:GetAttribute("Mutation") or "None")
+					if not ballFilterMatches(descendant.Name, mutation) then
+						continue
+					end
+				end
+				safeCall("BallPickupEquip", function()
+					humanoid:EquipTool(descendant)
+				end)
+				break
+			end
+		end
+	end
 end
 
 local function runBallFarm(character, humanoid, root)
@@ -5110,6 +5306,8 @@ local function runBallFarm(character, humanoid, root)
 	safeCall("BallKick", function()
 		remotes.ballKick:FireServer()
 	end)
+	task.wait(0.12)
+	collectBallReward(character, humanoid, root)
 end
 
 local function autoShopExtras()
@@ -5240,6 +5438,10 @@ makeSupervisor("Prediction", 1, function()
 	end
 
 	local matchesFilter = mainFilterMatches(name, mutation)
+	local ballMode = state.AFarmBall and (not hasWildcard(state.TBallFilter1) or not hasWildcard(state.TBallFilter2))
+	if ballMode and not ballFilterMatches(name, mutation) then
+		matchesFilter = false
+	end
 	if state.ANotifyRare and rarityMeetsThreshold(rarity, state.NotifyRarityThreshold) then
 		local signature = name .. "\0" .. mutation .. "\0" .. rarity
 		if runtime.lastRareNotify ~= signature then
@@ -5377,7 +5579,7 @@ makeSupervisor("AutoKick", 0.3, function()
 end)
 
 makeSupervisor("Train", 0.75, function()
-	if not state.ATrain and not state.ATrainCollect then
+	if not state.ATrain then
 		return
 	end
 	if state.IsPlacingPet or state.IsFlashCollecting then
@@ -5399,9 +5601,19 @@ makeSupervisor("Train", 0.75, function()
 	end
 end)
 
+makeSupervisor("EquipBestWeight", 2, function()
+	if not state.AAutoEquipBestWeight or state.ATrain or state.IsFlashCollecting then
+		return
+	end
+	pcall(equipBestOwnedWeight)
+end)
+
 makeSupervisor("AutoClaim2x", 2, function()
 	local connectionFetcher = getConnectionFetcher()
 	if not (state.A2xTrain or state.ATrainCollect) or state.IsFlashCollecting or not connectionFetcher then
+		return
+	end
+	if tick() < (runtime.nextClaim2x or 0) then
 		return
 	end
 	local gui = LocalPlayer:FindFirstChild("PlayerGui")
@@ -5410,15 +5622,22 @@ makeSupervisor("AutoClaim2x", 2, function()
 		return
 	end
 	for _, item in ipairs(kickUpgrades:GetChildren()) do
-		if item.Name == "Bonus" then
+		if item.Name == "Bonus" and item.Visible ~= false then
+			local claimed = false
 			safeCall("Claim2xReward", function()
 				for _, connection in pairs(connectionFetcher(item.MouseButton1Click)) do
 					connection:Fire()
+					claimed = true
 				end
 				for _, connection in pairs(connectionFetcher(item.Activated)) do
 					connection:Fire()
+					claimed = true
 				end
 			end)
+			if claimed then
+				runtime.nextClaim2x = tick() + 20
+			end
+			break
 		end
 	end
 end)
@@ -5441,6 +5660,9 @@ end)
 
 makeSupervisor("TrainCollect", 1, function()
 	if not state.ATrainCollect or tick() < (state.NextFlashCollect or 0) then
+		return
+	end
+	if state.IsPlacingPet then
 		return
 	end
 	local _, humanoid, root = characterParts()
@@ -5498,6 +5720,8 @@ local function economyTick()
 		if not ok then
 			logError("Economy:BuyBest", err)
 		end
+	elseif state.AAutoEquipBestWeight then
+		pcall(equipBestOwnedWeight)
 	elseif state.ABuyWeights and state.TTargetWeight ~= "None" then
 		local ok, err = pcall(equipWeight, state.TTargetWeight)
 		if not ok then
@@ -5991,6 +6215,21 @@ end)
 if state.AAutoFav then
 	scanTools()
 end
+
+task.defer(function()
+	if not state.HubRunning then
+		return
+	end
+	if state.AFPSBoost and Core.setLowGraphics then
+		pcall(Core.setLowGraphics, true)
+	end
+	if state.ARTXMod and Core.setRtxGraphics then
+		pcall(Core.setRtxGraphics, true)
+	end
+	if state.ABlackScreen and Core.setBlackScreen then
+		pcall(Core.setBlackScreen, true)
+	end
+end)
 
 Core.finalizeGameUi(uiHandles.window, ui, {
 	Subtitle = "Kick a Lucky Block · v" .. VERSION,

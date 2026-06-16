@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "0.1.0"
+local VERSION = "0.1.1"
 local PLACE_ID = 2753915549
 local SCRIPT_STATUS = "broken"
 local state = getgenv().Alleral_State
@@ -74,6 +74,7 @@ local PLANNED_FEATURES = {
 }
 
 local VERSION_HISTORY = {
+	{ version = "0.1.1", note = "Performance toggles (FPS/RTX/black screen) via shared Core helpers." },
 	{ version = "0.1.0", note = "Maintenance shell only. Automation disabled after game update." },
 	{ version = "0.0.1", note = "Internal prototype — never shipped publicly." },
 }

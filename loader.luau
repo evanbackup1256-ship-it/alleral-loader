@@ -60,7 +60,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "45bc7e3",
+	commit = "c10f6ef",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -2825,7 +2825,7 @@ local GAMES = {
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
-		version = "7.2.8",
+		version = "7.3.0",
 		placeIds = { 89469502395769 },
 		universeIds = { 10004244222 },
 		scriptFiles = { "games/kick_a_lucky_block.luau", "kick_a_lucky_block.luau" },
@@ -2850,7 +2850,7 @@ local GAMES = {
 	{
 		id = "speed_keyboard_escape",
 		name = "Speed Keyboard Escape",
-		version = "1.5.0",
+		version = "1.5.1",
 		placeIds = { 95082159892680 },
 		scriptFiles = { "games/speed_keyboard_escape.luau", "speed_keyboard_escape.luau" },
 		scriptUrl = "games/speed_keyboard_escape.luau",
@@ -2867,7 +2867,7 @@ local GAMES = {
 	{
 		id = "slime_rng",
 		name = "Slime RNG",
-		version = "1.5.1",
+		version = "1.5.2",
 		placeIds = { 92416421522960 },
 		universeIds = { 9792947201 },
 		scriptFiles = { "games/slime_rng.luau", "slime_rng.luau" },
@@ -2885,7 +2885,7 @@ local GAMES = {
 	{
 		id = "build_a_ring_farm",
 		name = "Build A Ring Farm",
-		version = "1.4.1",
+		version = "1.4.2",
 		placeIds = { 107646426076756 },
 		scriptFiles = { "games/build_a_ring_farm.luau", "build_a_ring_farm.luau" },
 		scriptUrl = "games/build_a_ring_farm.luau",
@@ -2904,7 +2904,7 @@ local GAMES = {
 	{
 		id = "survive_a_zombie_arena",
 		name = "Survive a Zombie Arena",
-		version = "2.3.1",
+		version = "2.3.2",
 		placeIds = { 114204398207377 },
 		scriptFiles = { "games/survive_a_zombie_arena.luau", "survive_a_zombie_arena.luau" },
 		scriptUrl = "games/survive_a_zombie_arena.luau",
@@ -2921,7 +2921,7 @@ local GAMES = {
 	{
 		id = "sell_lemons",
 		name = "Sell Lemons",
-		version = "2.0.0",
+		version = "2.1.0",
 		placeIds = { 79268393072444 },
 		scriptFiles = { "games/sell_lemons.luau", "sell_lemons.luau" },
 		scriptUrl = "games/sell_lemons.luau",
@@ -2937,7 +2937,7 @@ local GAMES = {
 	{
 		id = "grow_a_garden_2",
 		name = "Grow a Garden 2",
-		version = "2.0.0",
+		version = "2.1.0",
 		placeIds = { 95204935687527 },
 		scriptFiles = { "games/grow_a_garden_2.luau", "grow_a_garden_2.luau" },
 		scriptUrl = "games/grow_a_garden_2.luau",
@@ -2953,7 +2953,7 @@ local GAMES = {
 	{
 		id = "blox_fruit",
 		name = "Blox Fruit",
-		version = "0.1.0",
+		version = "0.1.1",
 		placeIds = { 2753915549 },
 		scriptFiles = { "games/blox_fruit.luau", "blox_fruit.luau" },
 		scriptUrl = "games/blox_fruit.luau",

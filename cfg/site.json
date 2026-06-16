@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-16T01:44:36Z",
+  "updatedAt": "2026-06-16T02:30:00+00:00",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
   "loaderVersion": "8.8.1",
@@ -47,6 +47,30 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-16",
+      "title": "All Games — Performance & Stability Pass",
+      "items": [
+        "Every game script now includes FPS boost, RTX mod, and black screen mode (Settings → Performance)",
+        "Kick A Lucky Block 7.3.0 — ball farm, train, place, webhook, and server join fixes",
+        "Slime RNG 1.5.2 — migrated to shared Core performance helpers",
+        "Sell Lemons 2.1.0 · Grow a Garden 2 2.1.0 · Speed Keyboard Escape 1.5.1",
+        "Build A Ring Farm 1.4.2 · Survive a Zombie Arena 2.3.2 · Blox Fruit 0.1.1",
+        "Server join retries on TeleportInitFailed (up to 3 attempts)"
+      ]
+    },
+    {
+      "date": "2026-06-15",
+      "title": "Kick A Lucky Block 7.3.0 — Performance, Ball Farm & System Fixes",
+      "items": [
+        "Added FPS boost, RTX mod, and black screen mode under Tools → Performance",
+        "Added auto equip best weight (standalone from train/buy loops)",
+        "Fixed auto collect ball — kick, collect remote, pad touch, and filtered pickup",
+        "Improved auto train, 2x claim cooldown, auto place best, and cash collect",
+        "Fixed auto prediction brainrot parsing (table InGame + wave attributes)",
+        "Webhook debounce and server join retry on TeleportInitFailed"
+      ]
+    },
     {
       "date": "2026-06-16",
       "title": "Alleral Hub 9.0 — Visual Revamp & Crash Fix",
@@ -421,6 +445,26 @@
           "name": "Custom move speed",
           "category": "Kick",
           "desc": "Adjust movement speed for auto kick and ball farming."
+        },
+        {
+          "name": "FPS boost",
+          "category": "Tools",
+          "desc": "Low graphics mode for weak PCs and executors."
+        },
+        {
+          "name": "RTX mod",
+          "category": "Tools",
+          "desc": "Future lighting and higher render quality."
+        },
+        {
+          "name": "Black screen mode",
+          "category": "Tools",
+          "desc": "Hides the 3D world while keeping the UI visible."
+        },
+        {
+          "name": "Auto equip best weight",
+          "category": "Economy",
+          "desc": "Equips your strongest owned weight without running train."
         }
       ]
     },

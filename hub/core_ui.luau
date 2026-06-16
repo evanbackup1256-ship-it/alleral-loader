@@ -1342,6 +1342,9 @@ function Core.stopAutomation(state, connections, loopControllers, loops, onStop)
 	if onStop then
 		pcall(onStop)
 	end
+	if type(Core.restorePerformanceSettings) == "function" then
+		pcall(Core.restorePerformanceSettings)
+	end
 end
 
 function Core.copyValue(value)
@@ -1376,6 +1379,9 @@ function Core.buildSavedKeys(defaults, exclude)
 end
 
 function Core.initSettings(state, defaults, filename, exclude)
+	if type(Core.mergePerformanceDefaults) == "function" then
+		Core.mergePerformanceDefaults(defaults)
+	end
 	Core.mergeDefaults(state, defaults)
 	local savedKeys = Core.buildSavedKeys(defaults, exclude)
 	Core.loadSettings(state, savedKeys, filename, defaults)

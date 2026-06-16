@@ -619,6 +619,196 @@ function Core.setLowGraphics(enabled)
 	end
 
 	ENV.Alleral_LowGraphics = enabled
+	if enabled and ENV.Alleral_RtxGraphics == true then
+		Core.setRtxGraphics(false)
+	end
+end
+
+function Core.setRtxGraphics(enabled)
+	enabled = enabled == true
+	local Lighting = game:GetService("Lighting")
+	local Terrain = workspace:FindFirstChildOfClass("Terrain")
+	local ENV = getgenv()
+
+	if enabled then
+		if ENV.Alleral_LowGraphics == true then
+			Core.setLowGraphics(false)
+		end
+		if ENV._Alleral_PrevRtxShadows == nil then
+			ENV._Alleral_PrevRtxShadows = Lighting.GlobalShadows
+		end
+		pcall(function()
+			if ENV._Alleral_PrevRtxTechnology == nil then
+				ENV._Alleral_PrevRtxTechnology = Lighting.Technology
+			end
+			Lighting.Technology = Enum.Technology.Future
+		end)
+		Lighting.GlobalShadows = true
+		pcall(function()
+			if Terrain and ENV._Alleral_PrevRtxDecoration == nil then
+				ENV._Alleral_PrevRtxDecoration = Terrain.Decoration
+			end
+			Terrain.Decoration = true
+		end)
+		pcall(function()
+			local gameSettings = UserSettings():GetService("UserGameSettings")
+			if ENV._Alleral_PrevRtxQuality == nil then
+				ENV._Alleral_PrevRtxQuality = gameSettings.SavedQualityLevel
+			end
+			gameSettings.SavedQualityLevel = Enum.SavedQualitySetting.Automatic
+		end)
+		pcall(function()
+			settings().Rendering.QualityLevel = Enum.QualityLevel.Level21
+			settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.High
+		end)
+		for _, effect in ipairs(Lighting:GetDescendants()) do
+			if effect:IsA("PostEffect") then
+				pcall(function()
+					effect.Enabled = true
+				end)
+			end
+		end
+	else
+		if ENV._Alleral_PrevRtxShadows ~= nil then
+			Lighting.GlobalShadows = ENV._Alleral_PrevRtxShadows
+			ENV._Alleral_PrevRtxShadows = nil
+		end
+		pcall(function()
+			if ENV._Alleral_PrevRtxTechnology ~= nil then
+				Lighting.Technology = ENV._Alleral_PrevRtxTechnology
+				ENV._Alleral_PrevRtxTechnology = nil
+			end
+		end)
+		pcall(function()
+			if Terrain and ENV._Alleral_PrevRtxDecoration ~= nil then
+				Terrain.Decoration = ENV._Alleral_PrevRtxDecoration
+				ENV._Alleral_PrevRtxDecoration = nil
+			end
+		end)
+		pcall(function()
+			local gameSettings = UserSettings():GetService("UserGameSettings")
+			if ENV._Alleral_PrevRtxQuality ~= nil then
+				gameSettings.SavedQualityLevel = ENV._Alleral_PrevRtxQuality
+				ENV._Alleral_PrevRtxQuality = nil
+			end
+		end)
+	end
+
+	ENV.Alleral_RtxGraphics = enabled
+end
+
+function Core.setBlackScreen(enabled)
+	enabled = enabled == true
+	local Players = game:GetService("Players")
+	local player = Players.LocalPlayer
+	if not player then
+		return
+	end
+	local gui = player:FindFirstChild("PlayerGui")
+	if not gui then
+		return
+	end
+	local screen = gui:FindFirstChild("AlleralBlackScreen")
+	if enabled then
+		if not screen then
+			screen = Instance.new("ScreenGui")
+			screen.Name = "AlleralBlackScreen"
+			screen.IgnoreGuiInset = true
+			screen.DisplayOrder = 999999
+			screen.ResetOnSpawn = false
+			local frame = Instance.new("Frame")
+			frame.Name = "Cover"
+			frame.Size = UDim2.fromScale(1, 1)
+			frame.BackgroundColor3 = Color3.new(0, 0, 0)
+			frame.BorderSizePixel = 0
+			frame.Parent = screen
+			screen.Parent = gui
+		end
+		screen.Enabled = true
+	elseif screen then
+		screen.Enabled = false
+	end
+	getgenv().Alleral_BlackScreen = enabled
+end
+
+function Core.mergePerformanceDefaults(defaults)
+	defaults = defaults or {}
+	if defaults.AFPSBoost == nil then
+		defaults.AFPSBoost = defaults.FPSBoost == true
+	end
+	if defaults.ARTXMod == nil then
+		defaults.ARTXMod = false
+	end
+	if defaults.ABlackScreen == nil then
+		defaults.ABlackScreen = false
+	end
+	return defaults
+end
+
+function Core.applyPerformanceSettings(state)
+	state = type(state) == "table" and state or ENV.Alleral_State or {}
+	if state.AFPSBoost == true then
+		Core.setLowGraphics(true)
+	end
+	if state.ARTXMod == true then
+		Core.setRtxGraphics(true)
+	end
+	if state.ABlackScreen == true then
+		Core.setBlackScreen(true)
+	end
+end
+
+function Core.restorePerformanceSettings()
+	pcall(Core.setLowGraphics, false)
+	pcall(Core.setRtxGraphics, false)
+	pcall(Core.setBlackScreen, false)
+end
+
+function Core.buildPerformanceControls(group, options)
+	options = type(options) == "table" and options or {}
+	local state = options.state or ENV.Alleral_State or {}
+	local saveFn = options.saveFn or options.saveSettings
+	Core.mergePerformanceDefaults(state)
+
+	group:CreateToggle("FPS boost", state.AFPSBoost == true, "Lowest quality, no shadows — best for weak PCs.", function(value)
+		state.AFPSBoost = value
+		if value then
+			state.ARTXMod = false
+			pcall(Core.setRtxGraphics, false)
+		end
+		pcall(Core.setLowGraphics, value)
+		if type(saveFn) == "function" then
+			saveFn()
+		end
+	end, "AFPSBoost")
+
+	group:CreateToggle("RTX mod", state.ARTXMod == true, "Future lighting, shadows, and higher render quality.", function(value)
+		state.ARTXMod = value
+		if value then
+			state.AFPSBoost = false
+			pcall(Core.setLowGraphics, false)
+		end
+		pcall(Core.setRtxGraphics, value)
+		if type(saveFn) == "function" then
+			saveFn()
+		end
+	end, "ARTXMod")
+
+	group:CreateToggle("Black screen mode", state.ABlackScreen == true, "Hides the 3D world with a black overlay — UI stays visible.", function(value)
+		state.ABlackScreen = value
+		pcall(Core.setBlackScreen, value)
+		if type(saveFn) == "function" then
+			saveFn()
+		end
+	end, "ABlackScreen")
+end
+
+function Core.buildPerformanceGroup(tab, options)
+	options = type(options) == "table" and options or {}
+	local column = options.column or 2
+	local group = Core.buildUiGroup(tab, options.title or "Performance", column, options.saveWrap, nil, "Performance")
+	Core.buildPerformanceControls(group, options)
+	return group
 end
 
 function Core.buildWebJoinUrl(placeId, jobId)
@@ -714,10 +904,41 @@ function Core.teleportToJoinInput(raw, defaultPlaceId)
 	end
 	local TeleportService = game:GetService("TeleportService")
 	local Players = game:GetService("Players")
-	local ok, err = pcall(function()
-		TeleportService:TeleportToPlaceInstance(placeId or game.PlaceId, jobId, Players.LocalPlayer)
+	local player = Players.LocalPlayer
+	local targetPlace = placeId or game.PlaceId
+	local attempts = 0
+	local maxAttempts = 3
+	local hopConn
+
+	local function tryHop()
+		attempts = attempts + 1
+		return pcall(function()
+			TeleportService:TeleportToPlaceInstance(targetPlace, jobId, player)
+		end)
+	end
+
+	hopConn = TeleportService.TeleportInitFailed:Connect(function(failedPlayer, _result, _message)
+		if failedPlayer ~= player or attempts >= maxAttempts then
+			return
+		end
+		task.delay(1.5 * attempts, function()
+			if player.Parent then
+				tryHop()
+			end
+		end)
+	end)
+
+	local ok, err = tryHop()
+	task.delay(45, function()
+		if hopConn then
+			hopConn:Disconnect()
+			hopConn = nil
+		end
 	end)
 	if not ok then
+		if hopConn then
+			hopConn:Disconnect()
+		end
 		return false, tostring(err)
 	end
 	return true
@@ -2149,6 +2370,14 @@ function Core.buildStandardSettingsExtras(tab, options)
 	Core.buildCustomizationStudioGroup(tab, options)
 	Core.buildSystemPanelGroup(tab, options)
 	Core.buildAdvancedHubGroup(tab, options)
+	if options.skipPerformanceControls ~= true then
+		Core.buildPerformanceGroup(tab, {
+			state = options.state,
+			saveFn = options.saveFn or options.saveSettings,
+			column = options.performanceColumn or 2,
+			saveWrap = options.saveWrap,
+		})
+	end
 	Core.buildQuickTogglesGroup(tab, options)
 	Core.buildUiPreferencesGroup(tab, options)
 	Core.buildErrorLogGroup(tab, options.errorColumn or 2)
@@ -2168,6 +2397,11 @@ function Core.buildStandardSettingsExtras(tab, options)
 			Core.repairUiWindow(options.window)
 		end)
 	end
+	if options.skipPerformanceControls ~= true then
+		task.defer(function()
+			Core.applyPerformanceSettings(options.state or ENV.Alleral_State)
+		end)
+	end
 end
 
 function stateHubStop()
@@ -2178,6 +2412,7 @@ function stateHubStop()
 			pcall(state.Alleral_Unload)
 		end
 	end
+	pcall(Core.restorePerformanceSettings)
 	local telemetry = ENV.Alleral_Telemetry
 	if type(telemetry) == "table" and type(telemetry.ReportSessionEnd) == "function" then
 		telemetry:ReportSessionEnd("stopped")
