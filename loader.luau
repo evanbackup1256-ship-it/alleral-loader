@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.8.1"
+local LOADER_VERSION = "8.8.2"
 local BOOTSTRAP_VERSION = "2.0.1"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
@@ -48,8 +48,8 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.8.1",
-	core = "2.9.7",
+	loader = "8.8.2",
+	core = "2.9.8",
 	ui = "Maclib",
 	windui = "5.5.0-maclib",
 	alleral = "5.5.0-maclib",
@@ -60,7 +60,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "7794a17",
+	commit = "05c969a",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -1067,13 +1067,26 @@ do
 
 	local function clearStaleMaclibRuntime()
 		local env = genv()
-		if type(env) ~= "table" or type(env._AlleralMaclib) ~= "table" then
+		if type(env) ~= "table" then
 			return
 		end
-		local version = env._AlleralMaclib.__AlleralPatch
-		if type(version) ~= "number" or version < requiredMaclibVersion() then
-			env._AlleralMaclib = nil
-			env._AlleralMaclibSourceKey = nil
+		local need = requiredMaclibVersion()
+		if type(env._AlleralMaclibSource) == "string" then
+			local srcVersion = maclibVersionFromSource(env._AlleralMaclibSource)
+			if type(srcVersion) ~= "number" or srcVersion ~= need then
+				env._AlleralMaclibSource = nil
+				env._AlleralMaclibSourceReady = false
+				env._AlleralMaclibSourceLabel = nil
+				env._AlleralMaclibSourceVersion = nil
+			end
+		end
+		if type(env._AlleralMaclib) == "table" then
+			local version = env._AlleralMaclib.__AlleralPatch
+			if type(version) ~= "number" or version ~= need then
+				env._AlleralMaclib = nil
+				env._AlleralMaclibSourceKey = nil
+				env.Alleral_UI = nil
+			end
 		end
 	end
 
@@ -3432,10 +3445,10 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.1"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.2"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.1"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.2"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then

@@ -232,6 +232,37 @@ return function(Core)
 		return bestSrc, bestLabel
 	end
 
+	local function applyMaclibRuntimePatches(MacLib)
+		local effects = type(MacLib) == "table" and MacLib.Effects
+		if type(effects) ~= "table" or effects._AlleralTweenPatch then
+			return
+		end
+		local TweenService = game:GetService("TweenService")
+		local origTweenInfo = effects.tweenInfo
+		local origPlay = effects.play
+		if type(origTweenInfo) ~= "function" or type(origPlay) ~= "function" then
+			return
+		end
+		function effects.tweenInfo(duration, style, direction)
+			if typeof(duration) == "TweenInfo" then
+				return duration
+			end
+			return origTweenInfo(tonumber(duration) or 0.2, style, direction)
+		end
+		function effects.play(instance, duration, props, style, direction)
+			if not instance or not props then
+				return nil
+			end
+			if typeof(duration) == "TweenInfo" then
+				local tw = TweenService:Create(instance, duration, props)
+				tw:Play()
+				return tw
+			end
+			return origPlay(instance, duration, props, style, direction)
+		end
+		effects._AlleralTweenPatch = true
+	end
+
 	local function loadMaclib()
 		if type(ENV._AlleralMaclib) == "table" then
 			local version = ENV._AlleralMaclib.__AlleralPatch
@@ -240,6 +271,7 @@ return function(Core)
 				ENV._AlleralMaclib = nil
 				ENV._AlleralMaclibSourceKey = nil
 			else
+				applyMaclibRuntimePatches(ENV._AlleralMaclib)
 				return ENV._AlleralMaclib
 			end
 		end
@@ -251,6 +283,7 @@ return function(Core)
 
 		local sourceKey = tostring(#source) .. ":" .. source:sub(1, 64)
 		if ENV._AlleralMaclibSourceKey == sourceKey and type(ENV._AlleralMaclib) == "table" then
+			applyMaclibRuntimePatches(ENV._AlleralMaclib)
 			return ENV._AlleralMaclib
 		end
 
@@ -269,16 +302,47 @@ return function(Core)
 			return nil, tostring(MacLib or "MacLib runtime failed")
 		end
 
-		if type(MacLib.__AlleralPatch) ~= "number" or MacLib.__AlleralPatch ~= requiredMaclibVersion() then
-			return nil, "MacLib version outdated (need v" .. tostring(requiredMaclibVersion()) .. ")"
+		local patch = MacLib.__AlleralPatch
+		local need = requiredMaclibVersion()
+		if type(patch) ~= "number" or patch ~= need then
+			if type(patch) == "number" and patch >= 7 and patch < need then
+				ENV._AlleralMaclibSource = nil
+				ENV._AlleralMaclibSourceReady = false
+				source, sourceLabel = readMaclibSource()
+				if not source then
+					return nil, "MacLib source missing (need v" .. tostring(need) .. ")"
+				end
+				sourceKey = tostring(#source) .. ":" .. source:sub(1, 64)
+				chunk, err = loadFn(source, "@MacLib/source")
+				if not chunk then
+					return nil, tostring(err or "MacLib compile failed")
+				end
+				ok, MacLib = pcall(chunk)
+				if not ok or type(MacLib) ~= "table" or type(MacLib.Window) ~= "function" then
+					return nil, tostring(MacLib or "MacLib runtime failed")
+				end
+				patch = MacLib.__AlleralPatch
+			end
+			if type(patch) ~= "number" or patch ~= need then
+				return nil, "MacLib version outdated (have v" .. tostring(patch or "?") .. ", need v" .. tostring(need) .. ")"
+			end
 		end
+
+		applyMaclibRuntimePatches(MacLib)
 
 		ENV._AlleralMaclibSourceKey = sourceKey
 		ENV._AlleralMaclib = MacLib
 		ENV._AlleralMaclibSource = source
 		ENV._AlleralMaclibSourceLabel = sourceLabel
 		if type(Core.say) == "function" then
-			Core.say("MacLib v" .. tostring(MacLib.__AlleralVersion or "1.2.6") .. " from " .. tostring(sourceLabel or "unknown"))
+			Core.say(
+				"MacLib patch v"
+					.. tostring(MacLib.__AlleralPatch or "?")
+					.. " ("
+					.. tostring(MacLib.__AlleralVersion or "1.2.6")
+					.. ") from "
+					.. tostring(sourceLabel or "unknown")
+			)
 		end
 		return MacLib
 	end

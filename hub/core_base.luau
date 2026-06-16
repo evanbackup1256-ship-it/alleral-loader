@@ -1,5 +1,5 @@
 local Core = {}
-Core.VERSION = "2.9.7"
+Core.VERSION = "2.9.8"
 Core._CORE_ARTIFACT = "base"
 Core.UI_LIBRARY = "Alleral"
 Core.ALLERAL_UI_VERSION = "5.3.0-maclib"

@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-16T02:28:51Z",
+  "updatedAt": "2026-06-16T02:33:46Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
-  "loaderVersion": "8.8.1",
-  "coreVersion": "2.9.7",
+  "loaderVersion": "8.8.2",
+  "coreVersion": "2.9.8",
   "uiLibrary": "Maclib",
   "uiVersion": "5.5.0-maclib",
   "maclibVersion": 8,
