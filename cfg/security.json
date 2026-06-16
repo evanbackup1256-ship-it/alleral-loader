@@ -4,5 +4,5 @@
   "banCheckUrl": "https://alleral-telemetry-production.up.railway.app/api/ban/check",
   "cacheSeconds": 300,
   "failClosedOnBan": true,
-  "failOpenOnError": false
+  "failOpenOnError": true
 }

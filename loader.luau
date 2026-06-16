@@ -2842,6 +2842,7 @@ local function grantPublicAccess()
 end
 
 local function enforceSecurityGate(profile, stage)
+	loadSecurityConfig()
 	local security = ENV.Alleral_Security
 	if type(security) ~= "table" or type(security.enforce) ~= "function" then
 		return true

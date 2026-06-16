@@ -252,7 +252,61 @@ local function getRequestFn()
 			return ENV[name]
 		end
 	end
+	for _, libName in ipairs({ "Wave", "Xeno", "Volt", "Electron", "Solara", "Cryptic" }) do
+		local lib = ENV[libName]
+		if type(lib) == "table" and type(lib.request) == "function" then
+			return lib.request
+		end
+	end
 	return nil
+end
+
+local function responseBodyText(response)
+	if type(response) == "string" then
+		return response
+	end
+	if type(response) ~= "table" then
+		return nil
+	end
+	local body = response.Body or response.body or response.Data or response.data
+	if type(body) == "string" then
+		return body
+	end
+	if type(body) == "table" then
+		return HttpService:JSONEncode(body)
+	end
+	return nil
+end
+
+local function responseStatusCode(response, parsed)
+	if type(response) ~= "table" then
+		return 0
+	end
+	local status = tonumber(response.StatusCode or response.status or response.Status or response.code or 0) or 0
+	if status > 0 then
+		return status
+	end
+	if type(parsed) == "table" then
+		local err = tostring(parsed.error or parsed.reason or ""):lower()
+		if err == "unauthorized" then
+			return 401
+		end
+		if err == "rate_limited" then
+			return 429
+		end
+		if err == "bad_request" then
+			return 400
+		end
+	end
+	return status
+end
+
+local function gateFailureMessage(reason)
+	local text = tostring(reason or "")
+	if text:find("gate", 1, true) or text:find("HTTP", 1, true) or text:find("misconfigured", 1, true) then
+		return "Alleral security check failed: " .. text
+	end
+	return "You are banned from Alleral: " .. text
 end
 
 local function decodeBody(body)
@@ -380,8 +434,11 @@ function Security.checkAccess(options)
 		return false, "Security gate unreachable"
 	end
 
-	local status = tonumber(response.StatusCode or response.status or response.Status or 0) or 0
-	local parsed = decodeBody(response.Body or response.body)
+	local parsed = decodeBody(responseBodyText(response))
+	if type(parsed) == "table" and type(parsed.Body) == "table" then
+		parsed = parsed.Body
+	end
+	local status = responseStatusCode(response, parsed)
 	if status == 403 or (parsed and parsed.allowed == false) then
 		local reason = (parsed and (parsed.reason or parsed.error)) or "Access denied"
 		local banType = parsed and (parsed.banType or parsed.ban_type)
@@ -414,10 +471,7 @@ function Security.enforce(options)
 	if allowed then
 		return true
 	end
-	local message = "You are banned from Alleral"
-	if reason and reason ~= "banned" and reason ~= "Access denied" then
-		message = message .. ": " .. tostring(reason)
-	end
+	local message = gateFailureMessage(reason)
 	ENV.Alleral_AccessDenied = {
 		reason = reason,
 		at = os.time(),
