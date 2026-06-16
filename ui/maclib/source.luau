@@ -1,5 +1,5 @@
--- Alleral vendored MacLib 1.2.6 (Alleral patch v9)
-local ALLERAL_MACLIB_VERSION = 9
+-- Alleral vendored MacLib 1.2.6 (Alleral patch v10)
+local ALLERAL_MACLIB_VERSION = 10
 
 local function udim2PixelSize(udim2, fallbackX, fallbackY)
 	if typeof(udim2) ~= "UDim2" then
@@ -432,9 +432,13 @@ function Resizer.computeLayout(profileName)
 	local profileScale = 1
 
 	if profile == "mobile" then
-		targetW = math.min(design.X, availW)
-		targetH = math.min(design.Y, math.floor(availH * 0.94))
-		profileScale = 0.9
+		marginX = 8
+		marginY = 14
+		availW = math.max(280, vp.X - marginX * 2)
+		availH = math.max(260, vp.Y - marginY * 2)
+		targetW = math.floor(availW)
+		targetH = math.floor(availH)
+		profileScale = 1
 	elseif profile == "compact" then
 		targetW = math.min(780, availW)
 		targetH = math.min(560, availH)
@@ -451,7 +455,11 @@ function Resizer.computeLayout(profileName)
 
 	local fitScale = math.min(availW / targetW, availH / targetH, 1.1) * profileScale
 	fitScale = fitScale * (tonumber(Resizer.config.userScaleMultiplier) or 1)
-	fitScale = math.clamp(fitScale, 0.72, 1.14)
+	if profile == "mobile" then
+		fitScale = 1
+	else
+		fitScale = math.clamp(fitScale, 0.72, 1.14)
+	end
 
 	return {
 		profile = profile,
@@ -556,6 +564,8 @@ function Resizer.applyEnv(env)
 	end
 	if env.Alleral_UiProfile ~= nil then
 		Resizer.config.profile = tostring(env.Alleral_UiProfile)
+	elseif UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+		Resizer.config.profile = "mobile"
 	end
 	if env.Alleral_UiScale ~= nil then
 		Resizer.config.userScaleMultiplier = tonumber(env.Alleral_UiScale) or 1
@@ -1371,8 +1381,15 @@ function MacLib:Window(Settings)
 	local maxSidebarWidth = 900
 
 	local function syncContentLayout()
-		local sidebarW = sidebar.AbsoluteSize.X
 		local baseW = math.max(base.AbsoluteSize.X, 320)
+		local profile = Resizer.resolveProfile(Resizer.config.profile)
+		if profile == "mobile" then
+			local sidebarW = math.clamp(math.floor(baseW * 0.26 + 0.5), 96, 128)
+			sidebar.Size = UDim2.new(0, sidebarW, 1, 0)
+		elseif sidebar.Size.X.Scale > 0 then
+			sidebar.Size = UDim2.fromScale(0.325, 1)
+		end
+		local sidebarW = sidebar.AbsoluteSize.X
 		maxSidebarWidth = math.max(minSidebarWidth, baseW - minSidebarWidth)
 		content.Position = UDim2.fromOffset(sidebarW, 0)
 		content.Size = UDim2.new(0, math.max(baseW - sidebarW, 120), 1, 0)
@@ -1679,6 +1696,8 @@ function MacLib:Window(Settings)
 	globalSettingsUIScale.Parent = globalSettings
 	globalSettings.Parent = base
 
+	local mobileUi = Resizer.resolveProfile(Resizer.config.profile) == "mobile"
+	local gripPx = mobileUi and 28 or 18
 	local resizeGrip = Instance.new("TextButton")
 	resizeGrip.Name = "ResizeGrip"
 	resizeGrip.AnchorPoint = Vector2.new(1, 1)
@@ -1687,7 +1706,7 @@ function MacLib:Window(Settings)
 	resizeGrip.BackgroundTransparency = 0.92
 	resizeGrip.BorderSizePixel = 0
 	resizeGrip.Position = UDim2.new(1, -4, 1, -4)
-	resizeGrip.Size = UDim2.fromOffset(18, 18)
+	resizeGrip.Size = UDim2.fromOffset(gripPx, gripPx)
 	resizeGrip.Text = ""
 	resizeGrip.ZIndex = 8
 
@@ -1763,8 +1782,13 @@ function MacLib:Window(Settings)
 		end
 		local mouse = UserInputService:GetMouseLocation()
 		local delta = mouse - resizeStartMouse
-		local newW = math.clamp(math.floor(resizeStartSize.X + delta.X + 0.5), 520, 1400)
-		local newH = math.clamp(math.floor(resizeStartSize.Y + delta.Y + 0.5), 380, 920)
+		local vp = Resizer.viewport()
+		local minW = mobileUi and 300 or 520
+		local minH = mobileUi and 280 or 380
+		local maxW = mobileUi and math.floor(vp.X - 8) or 1400
+		local maxH = mobileUi and math.floor(vp.Y - 12) or 920
+		local newW = math.clamp(math.floor(resizeStartSize.X + delta.X + 0.5), minW, maxW)
+		local newH = math.clamp(math.floor(resizeStartSize.Y + delta.Y + 0.5), minH, maxH)
 		base.Size = UDim2.fromOffset(newW, newH)
 		syncContentLayout()
 	end)
@@ -2361,49 +2385,10 @@ function MacLib:Window(Settings)
 			elementsScrolling.ClipsDescendants = false
 
 			local COLUMN_GAP = 10
-
-			local function refreshTabScrollCanvas()
-				task.defer(function()
-					if not elementsScrolling.Parent then
-						return
-					end
-					local layout = elementsScrolling:FindFirstChild("ElementsScrollingUIListLayout")
-					if not layout then
-						return
-					end
-					local contentH = layout.AbsoluteContentSize.Y + 28
-					local viewH = elementsScrolling.AbsoluteSize.Y
-					elementsScrolling.CanvasSize = UDim2.new(0, 0, 0, math.max(contentH, viewH + 1))
-				end)
-			end
-
-			local function columnSectionCount(colFrame)
-				local count = 0
-				for _, child in ipairs(colFrame:GetChildren()) do
-					if child:IsA("Frame") and child.Name == "Section" then
-						count += 1
-					end
-				end
-				return count
-			end
-
-			local function relayoutTabColumns()
-				local useCenter = columnSectionCount(center) > 0
-				center.Visible = useCenter
-				if useCenter then
-					local share = UDim2.new(1 / 3, -math.ceil(COLUMN_GAP * 2 / 3), 0, 0)
-					left.Size = share
-					center.Size = share
-					right.Size = share
-					center.LayoutOrder = 1
-					right.LayoutOrder = 2
-				else
-					left.Size = UDim2.new(0.5, -math.floor(COLUMN_GAP / 2), 0, 0)
-					right.Size = UDim2.new(0.5, -math.floor(COLUMN_GAP / 2), 0, 0)
-					right.LayoutOrder = 1
-				end
-				refreshTabScrollCanvas()
-			end
+			local left, center, right
+			local elementsScrollingUIListLayout
+			local refreshTabScrollCanvas
+			local relayoutTabColumns
 
 			local elementsScrollingUIPadding = Instance.new("UIPadding")
 			elementsScrollingUIPadding.Name = "ElementsScrollingUIPadding"
@@ -2413,21 +2398,18 @@ function MacLib:Window(Settings)
 			elementsScrollingUIPadding.PaddingTop = UDim.new(0, 5)
 			elementsScrollingUIPadding.Parent = elementsScrolling
 
-			local elementsScrollingUIListLayout = Instance.new("UIListLayout")
+			elementsScrollingUIListLayout = Instance.new("UIListLayout")
 			elementsScrollingUIListLayout.Name = "ElementsScrollingUIListLayout"
 			elementsScrollingUIListLayout.Padding = UDim.new(0, COLUMN_GAP)
 			elementsScrollingUIListLayout.FillDirection = Enum.FillDirection.Horizontal
 			elementsScrollingUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 			elementsScrollingUIListLayout.Parent = elementsScrolling
 
-			local left = Instance.new("Frame")
+			left = Instance.new("Frame")
 			left.Name = "Left"
 			left.AutomaticSize = Enum.AutomaticSize.Y
-			left.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 			left.BackgroundTransparency = 1
-			left.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			left.BorderSizePixel = 0
-			left.Position = UDim2.fromScale(0.512, 0)
 			left.Size = UDim2.new(0.5, -10, 0, 0)
 
 			local leftUIListLayout = Instance.new("UIListLayout")
@@ -2435,15 +2417,12 @@ function MacLib:Window(Settings)
 			leftUIListLayout.Padding = UDim.new(0, 15)
 			leftUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 			leftUIListLayout.Parent = left
-
 			left.Parent = elementsScrolling
 
-			local center = Instance.new("Frame")
+			center = Instance.new("Frame")
 			center.Name = "Center"
 			center.AutomaticSize = Enum.AutomaticSize.Y
-			center.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 			center.BackgroundTransparency = 1
-			center.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			center.BorderSizePixel = 0
 			center.LayoutOrder = 1
 			center.Size = UDim2.new(1 / 3, -math.ceil(COLUMN_GAP * 2 / 3), 0, 0)
@@ -2454,18 +2433,14 @@ function MacLib:Window(Settings)
 			centerUIListLayout.Padding = UDim.new(0, 15)
 			centerUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 			centerUIListLayout.Parent = center
-
 			center.Parent = elementsScrolling
 
-			local right = Instance.new("Frame")
+			right = Instance.new("Frame")
 			right.Name = "Right"
 			right.AutomaticSize = Enum.AutomaticSize.Y
-			right.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 			right.BackgroundTransparency = 1
-			right.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			right.BorderSizePixel = 0
 			right.LayoutOrder = 1
-			right.Position = UDim2.fromScale(0.512, 0)
 			right.Size = UDim2.new(0.5, -10, 0, 0)
 
 			local rightUIListLayout = Instance.new("UIListLayout")
@@ -2473,22 +2448,95 @@ function MacLib:Window(Settings)
 			rightUIListLayout.Padding = UDim.new(0, 15)
 			rightUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 			rightUIListLayout.Parent = right
-
 			right.Parent = elementsScrolling
+
+			local function columnSectionCount(colFrame)
+				if not colFrame then
+					return 0
+				end
+				local count = 0
+				for _, child in ipairs(colFrame:GetChildren()) do
+					if child:IsA("Frame") and child.Name == "Section" then
+						count += 1
+					end
+				end
+				return count
+			end
+
+			local function mobileLayout()
+				return Resizer.resolveProfile(Resizer.config.profile) == "mobile"
+			end
+
+			refreshTabScrollCanvas = function()
+				task.defer(function()
+					if not elementsScrolling or not elementsScrolling.Parent then
+						return
+					end
+					local layout = elementsScrollingUIListLayout
+					if not layout then
+						return
+					end
+					local pad = elementsScrollingUIPadding
+					local padY = 0
+					if pad then
+						padY = pad.PaddingTop.Offset + pad.PaddingBottom.Offset
+					end
+					local contentH = layout.AbsoluteContentSize.Y + padY + 28
+					local viewH = elementsScrolling.AbsoluteSize.Y
+					elementsScrolling.CanvasSize = UDim2.new(0, 0, 0, math.max(contentH, viewH + 1))
+				end)
+			end
+
+			relayoutTabColumns = function()
+				if not left or not center or not right or not elementsScrollingUIListLayout then
+					return
+				end
+				local mobile = mobileLayout()
+				if mobile then
+					elementsScrolling.ScrollBarThickness = 6
+					elementsScrollingUIListLayout.FillDirection = Enum.FillDirection.Vertical
+					local full = UDim2.new(1, 0, 0, 0)
+					left.Size = full
+					left.LayoutOrder = 1
+					center.Size = full
+					center.LayoutOrder = 2
+					center.Visible = columnSectionCount(center) > 0
+					right.Size = full
+					right.LayoutOrder = 3
+				else
+					elementsScrolling.ScrollBarThickness = 4
+					elementsScrollingUIListLayout.FillDirection = Enum.FillDirection.Horizontal
+					local useCenter = columnSectionCount(center) > 0
+					center.Visible = useCenter
+					left.LayoutOrder = 0
+					if useCenter then
+						local share = UDim2.new(1 / 3, -math.ceil(COLUMN_GAP * 2 / 3), 0, 0)
+						left.Size = share
+						center.Size = share
+						right.Size = share
+						center.LayoutOrder = 1
+						right.LayoutOrder = 2
+					else
+						left.Size = UDim2.new(0.5, -math.floor(COLUMN_GAP / 2), 0, 0)
+						right.Size = UDim2.new(0.5, -math.floor(COLUMN_GAP / 2), 0, 0)
+						right.LayoutOrder = 1
+					end
+				end
+				refreshTabScrollCanvas()
+			end
 
 			for _, colFrame in ipairs({ left, center, right }) do
 				local list = colFrame:FindFirstChildOfClass("UIListLayout")
 				if list then
 					pcall(function()
-						list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-							relayoutTabColumns()
-						end)
+						list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(relayoutTabColumns)
 					end)
 				end
 			end
 			pcall(function()
 				elementsScrolling:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshTabScrollCanvas)
 			end)
+			MacLib:RegisterLayoutRefresh("tab_" .. tostring(elements1), relayoutTabColumns)
 			relayoutTabColumns()
 
 			elementsScrolling.Parent = elements1
