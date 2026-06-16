@@ -3,7 +3,7 @@
   "updatedAt": "2026-06-16T03:31:01Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
-  "loaderVersion": "8.8.7",
+  "loaderVersion": "8.8.8",
   "coreVersion": "2.9.10",
   "uiLibrary": "Maclib",
   "uiVersion": "5.5.0-maclib",
@@ -47,6 +47,15 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-16",
+      "title": "Loader 8.8.8 — Fix Xeno boot loop",
+      "items": [
+        "Fixed infinite bootstrap relaunch when remote release.json lagged behind embedded MacLib v13",
+        "MacLib CDN now pins embedded commit instead of stale remote hash",
+        "Only auto-update when embedded MacLib is behind remote, not ahead"
+      ]
+    },
     {
       "date": "2026-06-16",
       "title": "MacLib v13 — Smart Resizer & Layout Fix",

@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.8.7"
+local LOADER_VERSION = "8.8.8"
 local BOOTSTRAP_VERSION = "2.0.1"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
@@ -48,7 +48,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.8.7",
+	loader = "8.8.8",
 	core = "2.9.10",
 	ui = "Maclib",
 	windui = "5.5.0-maclib",
@@ -960,11 +960,9 @@ local ensureMaclibSource, maclibSourceValid
 do
 	local function requiredMaclibVersion()
 		local expected = ENV._Alleral_ExpectedVersions
-		if type(expected) == "table" then
-			local version = tonumber(expected.maclibVersion)
-			if version then
-				return version
-			end
+		local remote = type(expected) == "table" and tonumber(expected.maclibVersion)
+		if remote and remote > MACLIB_VERSION then
+			return remote
 		end
 		return MACLIB_VERSION
 	end
@@ -980,17 +978,16 @@ do
 	end
 
 	local function maclibFetchUrls()
-		local bust = "?maclib=13&t=" .. tostring(tick())
+		local bust = "?maclib=" .. tostring(MACLIB_VERSION) .. "&t=" .. tostring(tick())
 		local urls = {
 			GITHUB_RAW .. "/" .. MACLIB_SOURCE_PATH .. bust,
 			"https://raw.githubusercontent.com/" .. REPO .. "/main/" .. MACLIB_SOURCE_PATH .. bust,
+			JSDELIVR .. "/" .. MACLIB_SOURCE_PATH .. bust,
 		}
-		local expected = ENV._Alleral_ExpectedVersions
-		local commit = type(expected) == "table" and expected.commit
-		if type(commit) == "string" and commit ~= "" then
-			table.insert(urls, "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. commit .. "/" .. MACLIB_SOURCE_PATH .. bust)
+		local pinCommit = RELEASE_FALLBACK.commit
+		if type(pinCommit) == "string" and pinCommit ~= "" then
+			table.insert(urls, 1, "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. pinCommit .. "/" .. MACLIB_SOURCE_PATH .. bust)
 		end
-		table.insert(urls, JSDELIVR .. "/" .. MACLIB_SOURCE_PATH .. bust)
 		return urls
 	end
 
@@ -3099,7 +3096,17 @@ fetchExpectedVersions = function(forceRefresh)
 		expected.windui = release.windui or expected.alleral or expected.windui
 		expected.commit = release.commit or expected.commit
 		expected.updatedAt = release.updatedAt or expected.updatedAt
-		expected.maclibVersion = tonumber(release.maclibVersion) or expected.maclibVersion
+		local remoteMaclib = tonumber(release.maclibVersion)
+		if remoteMaclib then
+			expected.maclibVersion = math.max(remoteMaclib, MACLIB_VERSION, tonumber(RELEASE_FALLBACK.maclibVersion) or 0)
+		end
+		if type(release.commit) == "string" and release.commit ~= "" and type(RELEASE_FALLBACK.commit) == "string" then
+			if release.commit ~= RELEASE_FALLBACK.commit then
+				expected.commit = RELEASE_FALLBACK.commit
+			else
+				expected.commit = release.commit
+			end
+		end
 		expected.minLoader = release.minLoader or expected.minLoader
 		expected.minCore = release.minCore or expected.minCore
 		if type(release.updatePollSeconds) == "number" then
@@ -3445,10 +3452,10 @@ local function isLegacyAlleralLoader(src)
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.7"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.8"', 1, true) then
 		return false
 	end
-	if src:find('local LOADER_VERSION = "8.8.7"', 1, true) then
+	if src:find('local LOADER_VERSION = "8.8.8"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then
@@ -4113,11 +4120,11 @@ local function main()
 		)
 	end
 	local needmaclibVersion = tonumber(expectedVersions.maclibVersion) or MACLIB_VERSION
-	if needmaclibVersion ~= MACLIB_VERSION then
+	if needmaclibVersion > MACLIB_VERSION then
 		log(
 			"Embedded MacLib v"
 				.. tostring(MACLIB_VERSION)
-				.. " != release v"
+				.. " is behind release v"
 				.. tostring(needmaclibVersion)
 				.. " — auto-updating via bootstrap"
 		)
