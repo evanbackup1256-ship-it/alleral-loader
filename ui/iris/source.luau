@@ -112,9 +112,9 @@ local function renderDropdown(element)
 
 	Iris.Text({ tostring(element.name or "Dropdown") })
 
-	-- Iris 2.x Combo should receive the preview text directly. Do not pass indexState here;
-	-- the Selectable calls handle selection. Passing the wrong state shape can corrupt Iris internals.
-	local combo = Iris.Combo({ previewText }, { isOpened = element.openState })
+	-- Combo needs both index and isOpened states for Iris internal tracking
+	local indexState = element.indexState or Iris.State(1)
+	local combo = Iris.Combo({ previewText }, { index = indexState, isOpened = element.openState })
 	local isOpen = combo and combo.state and combo.state.isOpened and stateValue(combo.state.isOpened) == true
 
 	if isOpen then
@@ -259,7 +259,7 @@ local function renderWindow(win)
 			end
 			if index < #(win.tabs or {}) then
 				Iris.SameLine()
-				Iris.End()
+				pcall(Iris.End)
 			end
 		end
 
