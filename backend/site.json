@@ -8,7 +8,7 @@
   "uiLibrary": "Iris",
   "uiVersion": "5.7.0-iris",
   "onyxVersion": 1,
-  "irisVersion": 2,
+  "irisVersion": 3,
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?v=2.0.4&t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",

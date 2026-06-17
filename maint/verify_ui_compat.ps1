@@ -43,7 +43,7 @@ if (Test-Path $irisSource) {
 }
 
 $irisContracts = @(
-    @{ Pattern = 'ALLERAL_IRIS_VERSION = 2'; Message = 'Iris exploit adapter version is 2' },
+    @{ Pattern = 'ALLERAL_IRIS_VERSION = 3'; Message = 'Iris exploit adapter version is 3' },
     @{ Pattern = 'MacLib\.__IrisExploitUi = true'; Message = 'Iris exploit overlay marker present' },
     @{ Pattern = 'AttachExploitMirror'; Message = 'Iris exploit mirror hook present' }
 )

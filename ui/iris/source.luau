@@ -1,5 +1,5 @@
 -- Alleral Iris — exploit ImGui overlay (GhostDuckyy Iris 2.0.4) + MacLib adapter
-local ALLERAL_IRIS_VERSION = 2
+local ALLERAL_IRIS_VERSION = 3
 local IRIS_VERSION = "2.0.4"
 local IRIS_BUNDLE_URL =
 	"https://raw.githubusercontent.com/GhostDuckyy/UI-Libraries/main/ImGui/Iris/Versions/2.0.4/Source.lua"
@@ -124,25 +124,26 @@ local function bootIris()
 				Title = win.title,
 				NoClose = false,
 				NoResize = false,
-			}, win.openState)
-			if opened then
+			}, { isOpened = win.openState })
+			if opened and opened.state and opened.state.isOpened and opened.state.isOpened.value ~= false then
 				for index, tab in ipairs(win.tabs) do
-					if Iris.Button({ tab.name .. "##tab_" .. tostring(index) }) then
+					local tabButton = Iris.Button({ tab.name .. "##tab_" .. tostring(index) })
+					if tabButton and tabButton.clicked and tabButton.clicked() then
 						win.activeTab = index
 					end
 					if index < #win.tabs then
-						pcall(Iris.SameLine, Iris)
+						pcall(Iris.SameLine)
 					end
 				end
 				Iris.Separator()
 				local tab = win.tabs[win.activeTab]
 				if tab then
 					for _, section in ipairs(tab.sections) do
-						local expanded = Iris.CollapsingHeader({ section.name }, section.openState)
-						if expanded then
+						local expanded = Iris.CollapsingHeader({ section.name }, { isUncollapsed = section.openState })
+						if expanded and expanded.state and expanded.state.isUncollapsed and expanded.state.isUncollapsed.value then
 							for _, element in ipairs(section.elements) do
 								if element.kind == "toggle" then
-									Iris.Checkbox({ element.name }, element.state)
+									Iris.Checkbox({ element.name }, { isChecked = element.state })
 									local value = element.state:get()
 									if value ~= element.last then
 										element.last = value
@@ -156,7 +157,7 @@ local function bootIris()
 										Min = element.min,
 										Max = element.max,
 										Increment = element.step,
-									}, element.state)
+									}, { number = element.state })
 									local value = element.state:get()
 									if value ~= element.last then
 										element.last = value
@@ -165,11 +166,12 @@ local function bootIris()
 										end
 									end
 								elseif element.kind == "button" then
-									if Iris.Button({ element.name }) and element.callback then
+									local button = Iris.Button({ element.name })
+									if button and button.clicked and button.clicked() and element.callback then
 										element.callback()
 									end
 								elseif element.kind == "input" then
-									Iris.InputText({ Text = element.name }, element.state)
+									Iris.InputText({ Text = element.name }, { text = element.state })
 									local value = element.state:get()
 									if value ~= element.last then
 										element.last = value
@@ -184,9 +186,11 @@ local function bootIris()
 								elseif element.kind == "dropdown" then
 									local previewText = type(element.previewFn) == "function" and element.previewFn() or element.preview
 									Iris.Text({ element.name })
-									if Iris.Combo({ Text = previewText }, element.openState) then
+									local combo = Iris.Combo({ Text = previewText }, { isOpened = element.openState, index = element.indexState })
+									if combo and combo.state and combo.state.isOpened and combo.state.isOpened.value then
 										for optIndex, option in ipairs(element.options) do
-											if Iris.Selectable({ option, optIndex }, element.indexState) then
+											local selectable = Iris.Selectable({ option, optIndex }, { index = element.indexState })
+											if selectable and selectable.selected and selectable.selected() then
 												element.indexState:set(optIndex)
 												if not element.multi then
 													element.selectedSingle = option
@@ -200,14 +204,14 @@ local function bootIris()
 												end
 											end
 										end
-										Iris.End()
 									end
 									Iris.End()
 								elseif element.kind == "keybind" then
 									if element.listening then
 										Iris.Text({ element.name .. ": press a key..." })
 									else
-										if Iris.Button({ element.name .. ": " .. tostring(element.keyName or "None") }) then
+										local keyButton = Iris.Button({ element.name .. ": " .. tostring(element.keyName or "None") })
+										if keyButton and keyButton.clicked and keyButton.clicked() then
 											element.listening = true
 										end
 									end
