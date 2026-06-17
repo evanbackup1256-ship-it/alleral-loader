@@ -985,7 +985,7 @@ local function loadRemoteLua(url, label)
 end
 
 local KICKBLOX_URLS = {
-	"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/games/data/kickblox.luau",
+	"https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/games/data/kickblox.luau",
 }
 local KICKBLOX_LOCAL_FILES = {
 	"games/data/kickblox.luau",

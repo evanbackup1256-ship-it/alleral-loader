@@ -16,7 +16,7 @@ return function(Core)
 	local ONYX_MIN_BYTES = 12000
 	local ONYX_REQUIRED_FN = "function MacLib:Window"
 	local ONYX_RAW_URLS = {
-		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/onyx/source.luau",
+		"https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/ui/onyx/source.luau",
 	}
 
 	local IRIS_SOURCE_PATH = "ui/iris/source.luau"
@@ -31,7 +31,7 @@ return function(Core)
 	local IRIS_REQUIRED_FN = "function MacLib:Window"
 	local IRIS_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
 	local IRIS_RAW_URLS = {
-		"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/ui/iris/source.luau",
+		"https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/ui/iris/source.luau",
 	}
 	local DEFAULT_ICON_ID = "18821914323"
 
