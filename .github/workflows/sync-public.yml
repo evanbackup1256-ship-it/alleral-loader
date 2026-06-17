@@ -30,50 +30,33 @@ jobs:
       - name: Build public bundle
         shell: bash
         run: |
+          rm -rf public_repo
           mkdir -p public_repo
-
-          # Loader core
-          cp loader.luau public_repo/
-          cp bootstrap.luau public_repo/
-
-          # Config files the loader fetches
-          cp cfg/release.json public_repo/
-          cp cfg/site.json public_repo/
-          cp cfg/access.json public_repo/
-          cp cfg/security.json public_repo/
-          cp cfg/telemetry.json public_repo/
-          cp cfg/weao.json public_repo/
-          cp cfg/scripts_manifest.json public_repo/
-
-          # Hub scripts
           mkdir -p public_repo/hub
-          cp hub/*.luau public_repo/hub/
-
-          # UI sources
           mkdir -p public_repo/ui/onyx
           mkdir -p public_repo/ui/iris
           mkdir -p public_repo/ui/flexui
+          mkdir -p public_repo/games/data
+
+          cp loader.luau bootstrap.luau public_repo/
+          cp cfg/release.json cfg/site.json cfg/access.json cfg/security.json cfg/telemetry.json cfg/weao.json cfg/scripts_manifest.json public_repo/
+          cp hub/*.luau public_repo/hub/
           cp ui/onyx/source.luau public_repo/ui/onyx/ 2>/dev/null || true
           cp ui/iris/source.luau public_repo/ui/iris/ 2>/dev/null || true
           cp ui/flexui/source.luau public_repo/ui/flexui/ 2>/dev/null || true
-
-          # Game scripts
-          mkdir -p public_repo/games
           cp games/*.luau public_repo/games/ 2>/dev/null || true
-          cp -r games/data public_repo/games/data 2>/dev/null || true
+          cp games/data/*.luau public_repo/games/data/ 2>/dev/null || true
 
       - name: Push to public repo
-        uses: peaceiris/actions-gh-pages@v4
-        if: env.SYNC_PAT != ''
-        env:
-          SYNC_PAT: ${{ secrets.SYNC_PAT }}
-        with:
-          personal_token: ${{ secrets.SYNC_PAT }}
-          external_repository: evanbackup1256-ship-it/-kick-loader
-          publish_branch: main
-          publish_dir: ./public_repo
-          force_orphan: true
-          enable_jekyll: false
-          user_name: "github-actions[bot]"
-          user_email: "41898282+github-actions[bot]@users.noreply.github.com"
-          commit_message: "Sync from evanbackup1256-ship-it/kick@${{ github.sha }}"
+        if: ${{ secrets.SYNC_PAT != '' }}
+        shell: bash
+        run: |
+          cd public_repo
+          git init
+          git checkout -b main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Sync from evanbackup1256-ship-it/kick@${{ github.sha }}"
+          git remote add origin https://x-access-token:${{ secrets.SYNC_PAT }}@github.com/evanbackup1256-ship-it/-kick-loader.git
+          git push -f origin main
