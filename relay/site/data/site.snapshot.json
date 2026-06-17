@@ -10,7 +10,7 @@
   "onyxVersion": 1,
   "irisVersion": 3,
   "announcement": "",
-  "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/bootstrap.luau?v=2.0.4&t=\" .. tick(), true))()",
+  "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/bootstrap.luau?v=2.0.4&t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",
   "branch": "main",
   "features": [
@@ -855,7 +855,7 @@
     "website": "https://alleral-telemetry-production.up.railway.app/",
     "mirror": "https://evanbackup1256-ship-it.github.io/kick/",
     "github": "https://github.com/evanbackup1256-ship-it/kick",
-    "loaderRaw": "https://raw.githubusercontent.com/evanbackup1256-ship-it/kick/main/loader.luau",
+    "loaderRaw": "https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/loader.luau",
     "relay": "https://alleral-telemetry-production.up.railway.app",
     "admin": "https://alleral-telemetry-production.up.railway.app/admin.html"
   },
