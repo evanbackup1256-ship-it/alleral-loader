@@ -1,7 +1,7 @@
--- Alleral Bootstrap v2.0.4 — fetches commit-pinned loader.luau (one saved loadstring)
+﻿-- Alleral Bootstrap v2.0.4 â€” fetches commit-pinned loader.luau (one saved loadstring)
 local BOOTSTRAP_VERSION = "2.0.4"
 local LOADER_PIN_COMMIT = "ae81dd8"
-local REPO = "evanbackup1256-ship-it/kick-loader"
+local REPO = "evanbackup1256-ship-it/-kick-loader"
 local BRANCH = "main"
 local LOADER_MIN_BYTES = 50000
 local GITHUB_RAW = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH
@@ -9,7 +9,7 @@ local JSDELIVR = "https://cdn.jsdelivr.net/gh/" .. REPO
 local CDN_BASE = "https://alleral-telemetry-production.up.railway.app"
 local RELEASE_PATH = "cfg/release.json"
 
-print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Starting…")
+print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Startingâ€¦")
 
 local function genv()
 	local ok, env = pcall(function()

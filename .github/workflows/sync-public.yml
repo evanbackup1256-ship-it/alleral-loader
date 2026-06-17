@@ -69,7 +69,7 @@ jobs:
           SYNC_PAT: ${{ secrets.SYNC_PAT }}
         with:
           personal_token: ${{ secrets.SYNC_PAT }}
-          external_repository: evanbackup1256-ship-it/kick-loader
+          external_repository: evanbackup1256-ship-it/-kick-loader
           publish_branch: main
           publish_dir: ./public_repo
           force_orphan: true
