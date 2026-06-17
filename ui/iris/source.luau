@@ -1,5 +1,6 @@
--- Alleral Iris — exploit ImGui overlay (GhostDuckyy Iris 2.0.4) + MacLib adapter
-local ALLERAL_IRIS_VERSION = 3
+-- Alleral Iris — ImGui overlay (GhostDuckyy Iris 2.0.4) + MacLib adapter
+-- Patch: safer Iris Begin/End stack handling + fixed dropdown selection
+local ALLERAL_IRIS_VERSION = 4
 local IRIS_VERSION = "2.0.4"
 local IRIS_BUNDLE_URL =
 	"https://raw.githubusercontent.com/GhostDuckyy/UI-Libraries/main/ImGui/Iris/Versions/2.0.4/Source.lua"
@@ -32,13 +33,64 @@ local menuKey = Enum.KeyCode.RightControl
 local exploitOverlayKey = Enum.KeyCode.RightShift
 local mirrorWindows = {}
 
+local function stateValue(state)
+	if type(state) == "table" and type(state.get) == "function" then
+		local ok, value = pcall(function()
+			return state:get()
+		end)
+		if ok then
+			return value
+		end
+	end
+	if type(state) == "table" and state.value ~= nil then
+		return state.value
+	end
+	return nil
+end
+
+local function safeCall(fn, ...)
+	if type(fn) ~= "function" then
+		return false, nil
+	end
+	return pcall(fn, ...)
+end
+
+local function safeEnd()
+	pcall(function()
+		Iris.End()
+	end)
+end
+
+local function wasClicked(widget)
+	if type(widget) ~= "table" then
+		return false
+	end
+	if type(widget.clicked) == "function" then
+		local ok, result = pcall(widget.clicked, widget)
+		if ok then
+			return result == true
+		end
+		ok, result = pcall(widget.clicked)
+		return ok and result == true
+	end
+	if type(widget.selected) == "function" then
+		local ok, result = pcall(widget.selected, widget)
+		if ok then
+			return result == true
+		end
+		ok, result = pcall(widget.selected)
+		return ok and result == true
+	end
+	return false
+end
+
 local function fetchBundle()
 	if type(ENV._AlleralIrisBundle) == "string" and #ENV._AlleralIrisBundle >= IRIS_BUNDLE_MIN_BYTES then
 		return ENV._AlleralIrisBundle
 	end
 	if type(ENV.Alleral_HTTP) == "table" and type(ENV.Alleral_HTTP.get) == "function" then
 		local src = ENV.Alleral_HTTP.get(IRIS_BUNDLE_URL .. "?t=" .. tostring(tick()), IRIS_BUNDLE_MIN_BYTES)
-		if type(src) == "string" then
+		if type(src) == "string" and #src >= IRIS_BUNDLE_MIN_BYTES then
 			ENV._AlleralIrisBundle = src
 			return src
 		end
@@ -46,36 +98,237 @@ local function fetchBundle()
 	return nil
 end
 
+local function renderDropdown(element)
+	local options = type(element.options) == "table" and element.options or {}
+	local previewText = "Select"
+	if type(element.previewFn) == "function" then
+		local ok, value = pcall(element.previewFn)
+		if ok and value ~= nil and tostring(value) ~= "" then
+			previewText = tostring(value)
+		end
+	elseif element.preview ~= nil then
+		previewText = tostring(element.preview)
+	end
+
+	Iris.Text({ tostring(element.name or "Dropdown") })
+
+	-- Iris 2.x Combo should receive the preview text directly. Do not pass indexState here;
+	-- the Selectable calls handle selection. Passing the wrong state shape can corrupt Iris internals.
+	local combo = Iris.Combo({ previewText }, { isOpened = element.openState })
+	local isOpen = combo and combo.state and combo.state.isOpened and stateValue(combo.state.isOpened) == true
+	if not isOpen then
+		return
+	end
+
+	for optIndex, option in ipairs(options) do
+		local optionText = tostring(option)
+		local selectedNow = false
+
+		if element.multi then
+			for _, value in ipairs(element.selectedValues or {}) do
+				if tostring(value) == optionText then
+					selectedNow = true
+					break
+				end
+			end
+		else
+			selectedNow = tostring(element.selectedSingle or "") == optionText
+		end
+
+		local selectedState = Iris.State(selectedNow)
+		local selectable = Iris.Selectable({ optionText }, { selected = selectedState })
+
+		if wasClicked(selectable) then
+			if element.multi then
+				element.selectedValues = element.selectedValues or {}
+				local foundIndex = nil
+				for index, value in ipairs(element.selectedValues) do
+					if tostring(value) == optionText then
+						foundIndex = index
+						break
+					end
+				end
+
+				if foundIndex then
+					table.remove(element.selectedValues, foundIndex)
+				else
+					table.insert(element.selectedValues, optionText)
+				end
+
+				if type(element.callback) == "function" then
+					element.callback(element.selectedValues)
+				end
+			else
+				element.selectedSingle = optionText
+				if element.indexState then
+					element.indexState:set(optIndex)
+				end
+				if element.openState then
+					element.openState:set(false)
+				end
+				if type(element.callback) == "function" then
+					element.callback(optionText)
+				end
+			end
+		end
+	end
+
+	safeEnd()
+end
+
+local function renderElement(element)
+	if type(element) ~= "table" then
+		return
+	end
+
+	if element.kind == "toggle" then
+		Iris.Checkbox({ tostring(element.name or "Toggle") }, { isChecked = element.state })
+		local value = element.state and element.state:get()
+		if value ~= element.last then
+			element.last = value
+			if type(element.callback) == "function" then
+				element.callback(value)
+			end
+		end
+	elseif element.kind == "slider" then
+		Iris.SliderNum({
+			Text = tostring(element.name or "Slider"),
+			Min = element.min,
+			Max = element.max,
+			Increment = element.step,
+		}, { number = element.state })
+		local value = element.state and element.state:get()
+		if value ~= element.last then
+			element.last = value
+			if type(element.callback) == "function" then
+				element.callback(value)
+			end
+		end
+	elseif element.kind == "button" then
+		local button = Iris.Button({ tostring(element.name or "Button") })
+		if wasClicked(button) and type(element.callback) == "function" then
+			element.callback()
+		end
+	elseif element.kind == "input" then
+		Iris.InputText({ Text = tostring(element.name or "Input") }, { text = element.state })
+		local value = element.state and element.state:get()
+		if value ~= element.last then
+			element.last = value
+			if type(element.callback) == "function" then
+				element.callback(value)
+			end
+		end
+	elseif element.kind == "label" then
+		Iris.Text({ tostring(element.text or "") })
+	elseif element.kind == "divider" then
+		Iris.Separator()
+	elseif element.kind == "dropdown" then
+		renderDropdown(element)
+	elseif element.kind == "keybind" then
+		if element.listening then
+			Iris.Text({ tostring(element.name or "Keybind") .. ": press a key..." })
+		else
+			local keyButton = Iris.Button({ tostring(element.name or "Keybind") .. ": " .. tostring(element.keyName or "None") })
+			if wasClicked(keyButton) then
+				element.listening = true
+			end
+		end
+	end
+end
+
+local function renderWindow(win)
+	if type(win) ~= "table" or win.visible == false then
+		return
+	end
+
+	local opened = Iris.Window({
+		Title = tostring(win.title or "Alleral"),
+		NoClose = false,
+		NoResize = false,
+	}, { isOpened = win.openState })
+
+	local windowOpen = true
+	if opened and opened.state and opened.state.isOpened then
+		windowOpen = stateValue(opened.state.isOpened) ~= false
+	end
+
+	if windowOpen then
+		for index, tab in ipairs(win.tabs or {}) do
+			local tabButton = Iris.Button({ tostring(tab.name or "Tab") .. "##tab_" .. tostring(index) })
+			if wasClicked(tabButton) then
+				win.activeTab = index
+			end
+			if index < #(win.tabs or {}) then
+				pcall(function()
+					Iris.SameLine()
+				end)
+			end
+		end
+
+		Iris.Separator()
+
+		local tab = win.tabs and win.tabs[win.activeTab]
+		if tab and type(tab.sections) == "table" then
+			for _, section in ipairs(tab.sections) do
+				local expanded = Iris.CollapsingHeader({ tostring(section.name or "Section") }, { isUncollapsed = section.openState })
+				local isExpanded = expanded and expanded.state and expanded.state.isUncollapsed and stateValue(expanded.state.isUncollapsed) == true
+
+				if isExpanded then
+					for _, element in ipairs(section.elements or {}) do
+						local ok, err = pcall(function()
+							renderElement(element)
+						end)
+						if not ok then
+							warn("[Alleral Iris] element render failed: " .. tostring(err))
+						end
+					end
+					safeEnd()
+				end
+			end
+		end
+	end
+
+	safeEnd()
+end
+
 local function bootIris()
 	if irisBooted and Iris then
 		return Iris
 	end
+
 	local src = fetchBundle()
 	if not src then
 		return nil, "Iris bundle missing"
 	end
+
 	local chunk = loadstring or load
 	if type(chunk) ~= "function" then
 		return nil, "loadstring unavailable"
 	end
+
 	local compiled, err = chunk(src, "@Iris/bundle")
 	if not compiled then
 		return nil, tostring(err or "Iris compile failed")
 	end
+
 	local ok, pkg = pcall(compiled)
 	if not ok or type(pkg) ~= "table" then
 		return nil, tostring(pkg or "Iris bundle runtime failed")
 	end
+
 	IrisModule = pkg
+
 	local player = Players.LocalPlayer
 	local parent = player and player:FindFirstChildOfClass("PlayerGui") or nil
 	if not parent then
 		return nil, "PlayerGui unavailable"
 	end
+
 	Iris = pkg.Init(parent, RunService.Heartbeat)
 	if type(Iris) ~= "table" then
 		return nil, "Iris.Init failed"
 	end
+
 	pcall(function()
 		Iris.UpdateGlobalConfig({
 			Color = {
@@ -117,128 +370,32 @@ local function bootIris()
 			},
 		})
 	end)
+
 	Iris:Connect(function()
 		for _, win in ipairs(windows) do
-			if win.visible ~= false then
-			local opened = Iris.Window({
-				Title = win.title,
-				NoClose = false,
-				NoResize = false,
-			}, { isOpened = win.openState })
-			if opened and opened.state and opened.state.isOpened and opened.state.isOpened.value ~= false then
-				for index, tab in ipairs(win.tabs) do
-					local tabButton = Iris.Button({ tab.name .. "##tab_" .. tostring(index) })
-					if tabButton and tabButton.clicked and tabButton.clicked() then
-						win.activeTab = index
-					end
-					if index < #win.tabs then
-						pcall(Iris.SameLine)
-					end
-				end
-				Iris.Separator()
-				local tab = win.tabs[win.activeTab]
-				if tab then
-					for _, section in ipairs(tab.sections) do
-						local expanded = Iris.CollapsingHeader({ section.name }, { isUncollapsed = section.openState })
-						if expanded and expanded.state and expanded.state.isUncollapsed and expanded.state.isUncollapsed.value then
-							for _, element in ipairs(section.elements) do
-								if element.kind == "toggle" then
-									Iris.Checkbox({ element.name }, { isChecked = element.state })
-									local value = element.state:get()
-									if value ~= element.last then
-										element.last = value
-										if element.callback then
-											element.callback(value)
-										end
-									end
-								elseif element.kind == "slider" then
-									Iris.SliderNum({
-										Text = element.name,
-										Min = element.min,
-										Max = element.max,
-										Increment = element.step,
-									}, { number = element.state })
-									local value = element.state:get()
-									if value ~= element.last then
-										element.last = value
-										if element.callback then
-											element.callback(value)
-										end
-									end
-								elseif element.kind == "button" then
-									local button = Iris.Button({ element.name })
-									if button and button.clicked and button.clicked() and element.callback then
-										element.callback()
-									end
-								elseif element.kind == "input" then
-									Iris.InputText({ Text = element.name }, { text = element.state })
-									local value = element.state:get()
-									if value ~= element.last then
-										element.last = value
-										if element.callback then
-											element.callback(value)
-										end
-									end
-								elseif element.kind == "label" then
-									Iris.Text({ element.text })
-								elseif element.kind == "divider" then
-									Iris.Separator()
-								elseif element.kind == "dropdown" then
-									local previewText = type(element.previewFn) == "function" and element.previewFn() or element.preview
-									Iris.Text({ element.name })
-									local combo = Iris.Combo({ Text = previewText }, { isOpened = element.openState, index = element.indexState })
-									if combo and combo.state and combo.state.isOpened and combo.state.isOpened.value then
-										for optIndex, option in ipairs(element.options) do
-											local selectable = Iris.Selectable({ option, optIndex }, { index = element.indexState })
-											if selectable and selectable.selected and selectable.selected() then
-												element.indexState:set(optIndex)
-												if not element.multi then
-													element.selectedSingle = option
-												end
-												if element.callback then
-													if element.multi then
-														element.callback(element.selected())
-													else
-														element.callback(option)
-													end
-												end
-											end
-										end
-									end
-									Iris.End()
-								elseif element.kind == "keybind" then
-									if element.listening then
-										Iris.Text({ element.name .. ": press a key..." })
-									else
-										local keyButton = Iris.Button({ element.name .. ": " .. tostring(element.keyName or "None") })
-										if keyButton and keyButton.clicked and keyButton.clicked() then
-											element.listening = true
-										end
-									end
-								end
-							end
-						end
-						Iris.End()
-					end
-				end
-			end
-			Iris.End()
+			local okRender, renderErr = pcall(function()
+				renderWindow(win)
+			end)
+			if not okRender then
+				warn("[Alleral Iris] window render failed: " .. tostring(renderErr))
 			end
 		end
 	end)
+
 	irisBooted = true
+
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		if gameProcessed or not irisBooted then
 			return
 		end
 		for _, win in ipairs(windows) do
-			for _, tab in ipairs(win.tabs) do
-				for _, section in ipairs(tab.sections) do
-					for _, element in ipairs(section.elements) do
+			for _, tab in ipairs(win.tabs or {}) do
+				for _, section in ipairs(tab.sections or {}) do
+					for _, element in ipairs(section.elements or {}) do
 						if element.kind == "keybind" and element.listening and input.UserInputType == Enum.UserInputType.Keyboard then
 							element.keyName = input.KeyCode.Name
 							element.listening = false
-							if element.callback then
+							if type(element.callback) == "function" then
 								element.callback(input.KeyCode)
 							end
 						end
@@ -247,6 +404,7 @@ local function bootIris()
 			end
 		end
 	end)
+
 	return Iris
 end
 
@@ -321,6 +479,7 @@ function MacLib:Window(Settings)
 
 	function WindowFunctions:TabGroup()
 		local TabGroupFunctions = {}
+
 		function TabGroupFunctions:Tab(TabSettings)
 			TabSettings = TabSettings or {}
 			local TabFunctions = { Settings = TabSettings, _sections = {} }
@@ -356,21 +515,26 @@ function MacLib:Window(Settings)
 				end
 
 				function SectionFunctions:Header(HS, _flag)
-					local text = (HS and (HS.Text or HS.Name)) or ""
-					addElement({ kind = "label", text = text, order = 0 })
+					local element = addElement({
+						kind = "label",
+						text = (HS and (HS.Text or HS.Name)) or "",
+						order = 0,
+					})
 					return {
 						UpdateName = function(_, value)
-							text = tostring(value)
+							element.text = tostring(value or "")
 						end,
 					}
 				end
 
 				function SectionFunctions:Label(LS, _flag)
-					local text = (LS and (LS.Text or LS.Name)) or ""
-					addElement({ kind = "label", text = text })
+					local element = addElement({
+						kind = "label",
+						text = (LS and (LS.Text or LS.Name)) or "",
+					})
 					return {
 						UpdateName = function(_, value)
-							text = tostring(value)
+							element.text = tostring(value or "")
 						end,
 					}
 				end
@@ -381,26 +545,27 @@ function MacLib:Window(Settings)
 				end
 
 				function SectionFunctions:Button(BS, _flag)
-					addElement({
+					local element = addElement({
 						kind = "button",
 						name = BS and BS.Name or "Button",
 						callback = BS and BS.Callback,
 					})
 					return {
 						UpdateName = function(_, value)
-							-- rendered next frame
+							element.name = tostring(value or "Button")
 						end,
 					}
 				end
 
 				function SectionFunctions:Toggle(TS, _flag)
-					local state = Iris.State(TS and TS.Default == true)
+					TS = TS or {}
+					local state = Iris.State(TS.Default == true)
 					local element = addElement({
 						kind = "toggle",
-						name = TS and TS.Name or "Toggle",
+						name = TS.Name or "Toggle",
 						state = state,
 						last = state:get(),
-						callback = TS and TS.Callback,
+						callback = TS.Callback,
 					})
 					return {
 						UpdateState = function(_, value)
@@ -414,19 +579,20 @@ function MacLib:Window(Settings)
 				end
 
 				function SectionFunctions:Slider(SS, _flag)
-					local minV = tonumber(SS and SS.Minimum) or 0
-					local maxV = tonumber(SS and SS.Maximum) or 100
-					local default = tonumber(SS and SS.Default) or minV
+					SS = SS or {}
+					local minV = tonumber(SS.Minimum) or 0
+					local maxV = tonumber(SS.Maximum) or 100
+					local default = tonumber(SS.Default) or minV
 					local state = Iris.State(default)
 					local element = addElement({
 						kind = "slider",
-						name = SS and SS.Name or "Slider",
+						name = SS.Name or "Slider",
 						min = minV,
 						max = maxV,
-						step = tonumber(SS and SS.Increment) or 1,
+						step = tonumber(SS.Increment) or 1,
 						state = state,
 						last = state:get(),
-						callback = SS and SS.Callback,
+						callback = SS.Callback,
 					})
 					return {
 						UpdateValue = function(_, value)
@@ -440,78 +606,122 @@ function MacLib:Window(Settings)
 				end
 
 				function SectionFunctions:Input(IS, _flag)
-					local state = Iris.State(IS and IS.Default or "")
+					IS = IS or {}
+					local state = Iris.State(IS.Default or "")
 					local element = addElement({
 						kind = "input",
-						name = IS and IS.Name or "Input",
+						name = IS.Name or "Input",
 						state = state,
 						last = state:get(),
-						callback = IS and IS.Callback,
+						callback = IS.Callback,
 					})
 					return {
 						UpdateText = function(_, value)
-							state:set(tostring(value))
+							state:set(tostring(value or ""))
 							element.last = state:get()
+						end,
+						GetText = function()
+							return state:get()
 						end,
 					}
 				end
 
 				function SectionFunctions:Dropdown(DS, _flag)
-					local options = DS and DS.Options or {}
-					local multi = DS and DS.Multi == true
+					DS = DS or {}
+					local options = type(DS.Options) == "table" and DS.Options or {}
+					local multi = DS.Multi == true
 					local indexState = Iris.State(1)
 					local openState = Iris.State(false)
 					local selected = {}
+
 					if multi and type(DS.Default) == "table" then
-						selected = DS.Default
-					elseif DS and DS.Default then
+						for _, value in ipairs(DS.Default) do
+							table.insert(selected, tostring(value))
+						end
+					elseif DS.Default ~= nil then
 						selected = { tostring(DS.Default) }
-					elseif options[1] then
+					elseif options[1] ~= nil then
 						selected = { tostring(options[1]) }
 					end
+
+					local element
 					local function previewText()
 						if multi then
-							return table.concat(selected, ", ")
+							if #(element and element.selectedValues or selected) == 0 then
+								return "Select"
+							end
+							return table.concat(element and element.selectedValues or selected, ", ")
 						end
-						return tostring(selected[1] or options[1] or "Select")
+						return tostring((element and element.selectedSingle) or selected[1] or options[1] or "Select")
 					end
-					addElement({
+
+					element = addElement({
 						kind = "dropdown",
-						name = DS and DS.Name or "Dropdown",
+						name = DS.Name or "Dropdown",
 						options = options,
 						multi = multi,
 						openState = openState,
 						indexState = indexState,
 						previewFn = previewText,
 						selectedSingle = selected[1],
+						selectedValues = selected,
 						selected = function()
-							return multi and selected or selected[1]
+							if multi then
+								return element.selectedValues
+							end
+							return element.selectedSingle
 						end,
-						callback = DS and DS.Callback,
+						callback = DS.Callback,
 					})
+
 					return {
-						Refresh = function() end,
+						Refresh = function(_, values)
+							if type(values) == "table" then
+								element.options = values
+							end
+						end,
 						SetValues = function(_, values)
-							options = values or options
+							if type(values) == "table" then
+								element.options = values
+							end
+						end,
+						SetValue = function(_, value)
+							if multi and type(value) == "table" then
+								element.selectedValues = {}
+								for _, v in ipairs(value) do
+									table.insert(element.selectedValues, tostring(v))
+								end
+							else
+								element.selectedSingle = tostring(value)
+							end
+						end,
+						GetValue = function()
+							return element.selected()
 						end,
 					}
 				end
 
 				function SectionFunctions:Keybind(KS, _flag)
-					addElement({
+					KS = KS or {}
+					local element = addElement({
 						kind = "keybind",
-						name = KS and KS.Name or "Keybind",
-						keyName = tostring(menuKey.Name),
+						name = KS.Name or "Keybind",
+						keyName = tostring((KS.Default and KS.Default.Name) or menuKey.Name),
 						listening = false,
-						callback = KS and KS.Callback,
+						callback = KS.Callback,
 					})
-					return {}
+					return {
+						SetKey = function(_, keyCode)
+							element.keyName = tostring(keyCode and keyCode.Name or keyCode or "None")
+						end,
+					}
 				end
 
 				table.insert(tabData.sections, sectionData)
 				table.sort(tabData.sections, function(a, b)
 					return (a.order or 0) < (b.order or 0)
 				end)
+				table.insert(TabFunctions._sections, SectionFunctions)
 				return SectionFunctions
 			end
 
@@ -522,6 +732,7 @@ function MacLib:Window(Settings)
 			table.insert(WindowFunctions._tabs, TabFunctions)
 			return TabFunctions
 		end
+
 		return TabGroupFunctions
 	end
 
@@ -547,6 +758,9 @@ function MacLib:Window(Settings)
 
 	function WindowFunctions:Unload()
 		WindowFunctions.visible = false
+		if WindowFunctions.openState then
+			WindowFunctions.openState:set(false)
+		end
 		for index, win in ipairs(windows) do
 			if win == WindowFunctions then
 				table.remove(windows, index)
