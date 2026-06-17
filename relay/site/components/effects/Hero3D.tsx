@@ -8,10 +8,11 @@ import * as THREE from "three";
 function Node({ position, color = "#00f0c8", size = 0.3 }: { position: [number, number, number]; color?: string; size?: number }) {
   const mesh = useRef<THREE.Mesh>(null);
   const phase = useRef(Math.random() * 10);
+  const start = useRef(performance.now());
 
-  useFrame(({ clock }) => {
+  useFrame(() => {
     if (!mesh.current) return;
-    const t = clock.getElapsedTime() + phase.current;
+    const t = (performance.now() - start.current) / 1000 + phase.current;
     const s = 1 + Math.sin(t * 1.2) * 0.12 + Math.sin(t * 0.7) * 0.06;
     mesh.current.scale.setScalar(s);
   });
@@ -36,7 +37,7 @@ function Packet({ from, to }: { from: [number, number, number]; to: [number, num
   ), [from, to]);
   const t = useRef(Math.random());
 
-  useFrame(({ clock }) => {
+  useFrame(() => {
     if (!ref.current) return;
     t.current = (t.current + 0.003) % 1;
     ref.current.position.copy(curve.getPoint(t.current));
