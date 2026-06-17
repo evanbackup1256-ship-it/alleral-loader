@@ -116,64 +116,63 @@ local function renderDropdown(element)
 	-- the Selectable calls handle selection. Passing the wrong state shape can corrupt Iris internals.
 	local combo = Iris.Combo({ previewText }, { isOpened = element.openState })
 	local isOpen = combo and combo.state and combo.state.isOpened and stateValue(combo.state.isOpened) == true
-	if not isOpen then
-		return
-	end
 
-	for optIndex, option in ipairs(options) do
-		local optionText = tostring(option)
-		local selectedNow = false
+	if isOpen then
+		for optIndex, option in ipairs(options) do
+			local optionText = tostring(option)
+			local selectedNow = false
 
-		if element.multi then
-			for _, value in ipairs(element.selectedValues or {}) do
-				if tostring(value) == optionText then
-					selectedNow = true
-					break
-				end
-			end
-		else
-			selectedNow = tostring(element.selectedSingle or "") == optionText
-		end
-
-		local selectedState = Iris.State(selectedNow)
-		local selectable = Iris.Selectable({ optionText }, { selected = selectedState })
-
-		if wasClicked(selectable) then
 			if element.multi then
-				element.selectedValues = element.selectedValues or {}
-				local foundIndex = nil
-				for index, value in ipairs(element.selectedValues) do
+				for _, value in ipairs(element.selectedValues or {}) do
 					if tostring(value) == optionText then
-						foundIndex = index
+						selectedNow = true
 						break
 					end
 				end
-
-				if foundIndex then
-					table.remove(element.selectedValues, foundIndex)
-				else
-					table.insert(element.selectedValues, optionText)
-				end
-
-				if type(element.callback) == "function" then
-					element.callback(element.selectedValues)
-				end
 			else
-				element.selectedSingle = optionText
-				if element.indexState then
-					element.indexState:set(optIndex)
-				end
-				if element.openState then
-					element.openState:set(false)
-				end
-				if type(element.callback) == "function" then
-					element.callback(optionText)
+				selectedNow = tostring(element.selectedSingle or "") == optionText
+			end
+
+			local selectedState = Iris.State(selectedNow)
+			local selectable = Iris.Selectable({ optionText }, { selected = selectedState })
+
+			if wasClicked(selectable) then
+				if element.multi then
+					element.selectedValues = element.selectedValues or {}
+					local foundIndex = nil
+					for index, value in ipairs(element.selectedValues) do
+						if tostring(value) == optionText then
+							foundIndex = index
+							break
+						end
+					end
+
+					if foundIndex then
+						table.remove(element.selectedValues, foundIndex)
+					else
+						table.insert(element.selectedValues, optionText)
+					end
+
+					if type(element.callback) == "function" then
+						element.callback(element.selectedValues)
+					end
+				else
+					element.selectedSingle = optionText
+					if element.indexState then
+						element.indexState:set(optIndex)
+					end
+					if element.openState then
+						element.openState:set(false)
+					end
+					if type(element.callback) == "function" then
+						element.callback(optionText)
+					end
 				end
 			end
 		end
 	end
 
-	safeEnd()
+	Iris.End()
 end
 
 local function renderElement(element)
@@ -259,9 +258,8 @@ local function renderWindow(win)
 				win.activeTab = index
 			end
 			if index < #(win.tabs or {}) then
-				pcall(function()
-					Iris.SameLine()
-				end)
+				Iris.SameLine()
+				Iris.End()
 			end
 		end
 
