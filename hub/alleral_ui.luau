@@ -287,6 +287,8 @@ return function(Core)
 		return MacLib
 	end
 
+	local loadIris
+
 	local function bootIrisOverlay(mainEngine)
 		if ENV.Alleral_IrisOverlay == false then
 			return
@@ -418,7 +420,7 @@ return function(Core)
 		return bestSrc, bestLabel
 	end
 
-	local function loadIris()
+	loadIris = function()
 		if type(ENV._AlleralIris) == "table" then
 			local version = ENV._AlleralIris.__AlleralPatch
 			local need = requiredIrisVersion()
