@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, ArrowRight, BadgeCheck, ChevronRight, Clipboard, Cpu, Gauge,
-  GitBranch, Globe, Layers, Lock, Monitor, Network, Rocket, ScrollText,
+  GitBranch, Globe, Layers, Lock, Monitor, Network, Radio, Rocket, ScrollText,
   Shield, Sparkles, Terminal, Zap, LogIn, type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -12,7 +12,6 @@ import type { GameEntry, SitePayload } from "@/lib/types";
 import { useLiveSyncMeta, useSiteQuery } from "@/lib/queries/hooks";
 import { formatFreshness, resolveRelayStatus } from "@/lib/status/resolve";
 import { useSecondsSince } from "@/lib/hooks/useSecondsSince";
-import { useCursorPosition } from "@/lib/hooks/useCursorPosition";
 import { CloudflareGate } from "@/components/gate/CloudflareGate";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { SITE_SNAPSHOT } from "@/lib/site-snapshot";
@@ -24,10 +23,13 @@ import { TelemetryCharts } from "@/components/effects/TelemetryCharts";
 import { GlobalTopology } from "@/components/effects/GlobalTopology";
 import { Hero3D } from "@/components/effects/Hero3D";
 import { SupportForm } from "@/components/support/SupportForm";
+import { TelemetryCenter } from "@/components/effects/TelemetryCenter";
+import { LiveEventStream } from "@/components/effects/LiveEventStream";
 import { CloudflareLayer } from "@/components/cloudflare/CloudflareLayer";
 
 const navItems = [
   { label: "Signal", href: "#signal" },
+  { label: "Telemetry", href: "#telemetry" },
   { label: "Topology", href: "#topology" },
   { label: "Games", href: "#games" },
   { label: "Pipeline", href: "#pipeline" },
@@ -191,6 +193,9 @@ function AlleralLanding({ site, online, siteUpdatedAt, siteFetching, onRefreshSi
                 {navItems.map((item) => (
                   <a key={item.href} href={item.href} className="py-2 text-sm text-muted hover:text-text" onClick={() => setMenuOpen(false)}>{item.label}</a>
                 ))}
+                <button className="py-2 text-sm text-muted hover:text-text flex items-center gap-2" onClick={() => { setMenuOpen(false); openAdmin(); }}>
+                  <Shield className="h-4 w-4" /> Admin
+                </button>
               </div>
             </div>
           )}
@@ -299,6 +304,8 @@ function AlleralLanding({ site, online, siteUpdatedAt, siteFetching, onRefreshSi
             ))}
           </div>
         </section>
+
+        <TelemetryCenter />
 
         <GlobalTopology />
 

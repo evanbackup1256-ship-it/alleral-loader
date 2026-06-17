@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Send, CheckCircle, Copy, ArrowRight, AlertTriangle, Loader2 } from "lucide-react";
+import { SupportSelect } from "./SupportSelect";
 
 export function SupportForm() {
   const [sending, setSending] = useState(false);
@@ -90,15 +91,7 @@ export function SupportForm() {
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2 mb-4">
-        <div>
-          <label className="block text-xs font-mono text-muted-2 uppercase tracking-wider mb-1.5">Issue Type</label>
-          <select value={issueType} onChange={(e) => setIssueType(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-bg-0/80 px-4 py-2.5 text-sm text-text outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/20">
-            {["Loader Issue", "Script Failure", "Runtime Issue", "Game Update Breakage", "Access Problem", "Bug Report", "Feature Request", "Other"].map((t) => (
-              <option key={t}>{t}</option>
-            ))}
-          </select>
-        </div>
+        <SupportSelect value={issueType} onChange={setIssueType} label="Issue Type" />
         <div>
           <label className="block text-xs font-mono text-muted-2 uppercase tracking-wider mb-1.5">Game / Script</label>
           <input className="w-full rounded-lg border border-white/10 bg-bg-0/80 px-4 py-2.5 text-sm text-text outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/20" />

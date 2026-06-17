@@ -6,7 +6,7 @@ import { TelemetryCharts } from "./TelemetryCharts";
 
 export function GlobalTopology() {
   return (
-    <section className="relative py-24 md:py-32">
+    <section id="topology" className="relative py-24 md:py-32">
       <div className="mx-auto max-w-7xl px-4 md:px-6">
         <div className="section-head">
           <div className="kicker"><Globe className="h-3 w-3" /> Global Runtime Topology</div>
