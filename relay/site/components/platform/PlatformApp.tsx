@@ -137,7 +137,7 @@ function AlleralLanding({ site, online, siteUpdatedAt, siteFetching, onRefreshSi
   }, [live, onRefreshSite]);
 
   const handleAdminLogin = useCallback(() => {
-    if (adminPass === "sammy2026") {
+    if (adminPass === "583716465") {
       sessionStorage.setItem("alleral_admin_auth", "true");
       setAdminAuthed(true);
       setShowAdminModal(false);

@@ -18,7 +18,7 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(() => {
-    if (password === "sammy2026") {
+    if (password === "583716465") {
       sessionStorage.setItem("alleral_admin_auth", "true");
       setAuthed(true);
       toast.success("Authenticated");
