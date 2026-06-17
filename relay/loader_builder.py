@@ -22,7 +22,7 @@ LOADER_MODULES = (
     "hub/alleral_ui.luau",
     "hub/core_hub_ui.luau",
     "ui/onyx/source.luau",
-    "ui/iris/source.luau",
+    "ui/rayfield/source.luau",
     "cfg/release.json",
 )
 

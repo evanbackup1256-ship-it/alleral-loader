@@ -33,12 +33,12 @@ foreach ($contract in $onyxContracts) {
     if ($onyx -match $contract.Pattern) { Pass $contract.Message } else { Fail $contract.Message }
 }
 
-$irisSource = Join-Path $root "ui/iris/source.luau"
+$irisSource = Join-Path $root "ui/rayfield/source.luau"
 if (Test-Path $irisSource) {
-    Pass "ui/iris source present"
+    Pass "ui/rayfield source present"
     $iris = Get-Content $irisSource -Raw
 } else {
-    Fail "ui/iris/source.luau missing"
+    Fail "ui/rayfield/source.luau missing"
     $iris = ""
 }
 

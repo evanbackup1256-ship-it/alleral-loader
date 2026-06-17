@@ -135,27 +135,27 @@ if ($release.irisVersion)
         Fail "loader.luau missing IRIS_VERSION"
     }
 
-    $irisSourcePath = Join-Path $root "ui/iris/source.luau"
+    $irisSourcePath = Join-Path $root "ui/rayfield/source.luau"
     if (Test-Path $irisSourcePath)
     {
         $irisSource = Get-Content $irisSourcePath -Raw
-        if ($irisSource -match 'local ALLERAL_IRIS_VERSION = (\d+)')
+        if ($irisSource -match 'local ALLERAL_RAYFIELD_VERSION = (\d+)')
         {
             $sourceVersion = [int]$Matches[1]
-            if ($sourceVersion -ne [int]$release.irisVersion)
+            if ($sourceVersion -ne [int]$release.rayfieldVersion)
             {
-                Fail "ui/iris/source.luau ALLERAL_IRIS_VERSION ($sourceVersion) != release.json ($($release.irisVersion))"
+                Fail "ui/rayfield/source.luau ALLERAL_RAYFIELD_VERSION ($sourceVersion) != release.json ($($release.rayfieldVersion))"
             } else
             {
-                Pass "iris source version $sourceVersion"
+                Pass "rayfield source version $sourceVersion"
             }
         } else
         {
-            Fail "ui/iris/source.luau missing ALLERAL_IRIS_VERSION"
+            Fail "ui/rayfield/source.luau missing ALLERAL_RAYFIELD_VERSION"
         }
     } else
     {
-        Fail "ui/iris/source.luau missing"
+        Fail "ui/rayfield/source.luau missing"
     }
 }
 
