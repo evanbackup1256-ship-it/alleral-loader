@@ -1,9 +1,9 @@
-return function(Core)
+﻿return function(Core)
 	local ALLERAL_UI_LAYER = "Alleral UI layer"
 	Core._AlleralUiLayer = ALLERAL_UI_LAYER
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "5.7.0-iris"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "1.0.0-rayfield"
 	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
-	Core.UI_LIBRARY = "Iris"
+	Core.UI_LIBRARY = "Rayfield"
 
 	local ONYX_SOURCE_PATH = "ui/onyx/source.luau"
 	local ONYX_SOURCE_PATHS = {
@@ -19,19 +19,18 @@ return function(Core)
 		"https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/ui/onyx/source.luau",
 	}
 
-	local IRIS_SOURCE_PATH = "ui/iris/source.luau"
-	local IRIS_SOURCE_PATHS = {
-		"ui/iris/source.luau",
-		".alleral/cache/ui/iris/source.luau",
-		"kick/ui/iris/source.luau",
+	local RAYFIELD_SOURCE_PATH = "ui/rayfield/source.luau"
+	local RAYFIELD_SOURCE_PATHS = {
+		"ui/rayfield/source.luau",
+		".alleral/cache/ui/rayfield/source.luau",
+		"kick/ui/rayfield/source.luau",
 	}
-	local IRIS_VERSION_MARKER = "ALLERAL_IRIS_VERSION"
-	local IRIS_VERSION = 2
-	local IRIS_MIN_BYTES = 8000
-	local IRIS_REQUIRED_FN = "function MacLib:Window"
-	local IRIS_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
-	local IRIS_RAW_URLS = {
-		"https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/ui/iris/source.luau",
+	local RAYFIELD_VERSION = 1
+	local RAYFIELD_MIN_BYTES = 1000
+	local RAYFIELD_REQUIRED_FN = "function MacLib:Window"
+	local RAYFIELD_WORKSPACE_ROOTS = { "", "kick/", "workspace/", "scripts/" }
+	local RAYFIELD_RAW_URLS = {
+		"https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/ui/rayfield/source.luau",
 	}
 	local DEFAULT_ICON_ID = "18821914323"
 
@@ -81,16 +80,16 @@ return function(Core)
 		return "rbxassetid://" .. iconImage(icon)
 	end
 
-	local function irisIoFn(name)
+	local function rayfieldIoFn(name)
 		if type(Core.execFunction) == "function" then
 			return Core.execFunction(name)
 		end
 		return nil
 	end
 
-	local function readIrisFileAt(path)
-		local readFile = irisIoFn("readfile")
-		local isFile = irisIoFn("isfile")
+	local function readRayfieldFileAt(path)
+		local readFile = rayfieldIoFn("readfile")
+		local isFile = rayfieldIoFn("isfile")
 		if type(readFile) ~= "function" or type(isFile) ~= "function" then
 			if type(Core.readFile) == "function" then
 				return Core.readFile(path)
@@ -110,7 +109,7 @@ return function(Core)
 		if type(expected) == "table" and type(expected.ui) == "string" and expected.ui ~= "" then
 			return expected.ui:lower()
 		end
-		return "iris"
+		return "rayfield"
 	end
 
 	local function requiredOnyxVersion()
@@ -160,9 +159,9 @@ return function(Core)
 	end
 
 	local function tryReadOnyxPath(relPath)
-		for _, root in ipairs(IRIS_WORKSPACE_ROOTS) do
+		for _, root in ipairs(RAYFIELD_WORKSPACE_ROOTS) do
 			local full = root .. relPath
-			local src = readIrisFileAt(full)
+			local src = readRayfieldFileAt(full)
 			if onyxSourceValid(src) then
 				return src, "local:" .. full
 			end
@@ -224,8 +223,8 @@ return function(Core)
 		return bestSrc, bestLabel
 	end
 
-	local function loadOnyx()
-		if type(ENV._AlleralOnyx) == "table" then
+local function loadOnyx()
+	return nil, "Onyx not available as primary UI"
 			local version = ENV._AlleralOnyx.__AlleralPatch
 			local need = requiredOnyxVersion()
 			if type(version) ~= "number" or version ~= need then
@@ -287,167 +286,167 @@ return function(Core)
 		return MacLib
 	end
 
-	local loadIris
+	local loadRayfield
 
-	local function bootIrisOverlay(mainEngine)
-		if ENV.Alleral_IrisOverlay == false then
+	local function bootRayfieldOverlay(mainEngine)
+		if ENV.Alleral_RayfieldOverlay == false then
 			return
 		end
-		local iris, err = loadIris()
-		if not iris then
+		local rayfield, err = loadRayfield()
+		if not rayfield then
 			if type(Core.logWarn) == "function" then
-				Core.logWarn("Iris exploit overlay unavailable: " .. tostring(err))
+				Core.logWarn("Rayfield overlay unavailable: " .. tostring(err))
 			end
 			return
 		end
-		ENV._AlleralIrisOverlay = iris
-		if type(mainEngine) == "table" and type(mainEngine.BootIrisOverlay) == "function" then
-			pcall(mainEngine.BootIrisOverlay, mainEngine, iris)
+		ENV._AlleralRayfieldOverlay = rayfield
+		if type(mainEngine) == "table" and type(mainEngine.bootRayfieldOverlay) == "function" then
+			pcall(mainEngine.bootRayfieldOverlay, mainEngine, rayfield)
 		end
 		if type(Core.say) == "function" then
-			Core.say("Iris exploit overlay ready (RightShift debug panel)")
+			Core.say("Rayfield overlay ready (RightShift debug panel)")
 		end
 	end
 
-	local function requiredIrisVersion()
+	local function requiredRayfieldVersion()
 		local expected = ENV._Alleral_ExpectedVersions
 		if type(expected) == "table" then
-			local version = tonumber(expected.irisVersion)
+			local version = tonumber(expected.rayfieldVersion)
 			if version then
 				return version
 			end
 		end
-		local loaderNeed = tonumber(ENV._Alleral_RequiredIrisVersion)
+		local loaderNeed = tonumber(ENV._Alleral_requiredRayfieldVersion)
 		if loaderNeed then
 			return loaderNeed
 		end
-		return IRIS_VERSION
+		return RAYFIELD_VERSION
 	end
 
-	local function irisVersionFromSource(src)
+	local function rayfieldVersionFromSource(src)
 		if type(src) ~= "string" then
 			return nil
 		end
-		return tonumber(src:match("\nlocal%s+ALLERAL_IRIS_VERSION%s*=%s*(%d+)"))
-			or tonumber(src:match("^local%s+ALLERAL_IRIS_VERSION%s*=%s*(%d+)"))
+		return tonumber(src:match("\nlocal%s+ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)"))
+			or tonumber(src:match("^local%s+ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)"))
 			or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)"))
 	end
 
-	local function irisSourceValid(src)
+	local function rayfieldSourceValid(src)
 		if type(src) ~= "string"
-			or #src < IRIS_MIN_BYTES
+			or #src < RAYFIELD_MIN_BYTES
 			or src:find("<!DOCTYPE", 1, true)
-			or not src:find(IRIS_VERSION_MARKER, 1, true)
-			or not src:find(IRIS_REQUIRED_FN, 1, true)
-			or not src:find("__IrisUi", 1, true) then
+			or not src:find(RAYFIELD_VERSION_MARKER, 1, true)
+			or not src:find(RAYFIELD_REQUIRED_FN, 1, true)
+			or not src:find("__RayfieldUi", 1, true) then
 			return false
 		end
-		local version = irisVersionFromSource(src)
-		return type(version) == "number" and version == requiredIrisVersion()
+		local version = rayfieldVersionFromSource(src)
+		return type(version) == "number" and version == requiredRayfieldVersion()
 	end
 
-	local function irisBackendUrls()
+	local function rayfieldBackendUrls()
 		local urls = {}
 		local base = ENV._Alleral_LoaderCdnBase
 		if type(base) == "string" and base ~= "" then
-			table.insert(urls, base:gsub("/+$", "") .. "/api/loader/file/ui/iris/source.luau")
+			table.insert(urls, base:gsub("/+$", "") .. "/api/loader/file/ui/rayfield/source.luau")
 		end
 		return urls
 	end
 
-	local function tryReadIrisPath(relPath)
-		for _, root in ipairs(IRIS_WORKSPACE_ROOTS) do
+	local function tryReadRayfieldPath(relPath)
+		for _, root in ipairs(RAYFIELD_WORKSPACE_ROOTS) do
 			local full = root .. relPath
-			local src = readIrisFileAt(full)
-			if irisSourceValid(src) then
+			local src = readRayfieldFileAt(full)
+			if rayfieldSourceValid(src) then
 				return src, "local:" .. full
 			end
 		end
 		return nil
 	end
 
-	local function readIrisSource()
-		local need = requiredIrisVersion()
+	local function readRayfieldSource()
+		local need = requiredRayfieldVersion()
 		local bestSrc, bestLabel, bestVersion = nil, nil, -1
 		local function consider(src, label)
-			if not irisSourceValid(src) then
+			if not rayfieldSourceValid(src) then
 				return
 			end
-			local version = irisVersionFromSource(src) or 0
+			local version = rayfieldVersionFromSource(src) or 0
 			if version > bestVersion then
 				bestSrc, bestLabel, bestVersion = src, label, version
 			end
 		end
 
-		if type(ENV._AlleralIrisSource) == "string" then
-			if irisSourceValid(ENV._AlleralIrisSource) then
-				consider(ENV._AlleralIrisSource, ENV._AlleralIrisSourceLabel or "memory:loader")
+		if type(ENV._AlleralRayfieldSource) == "string" then
+			if rayfieldSourceValid(ENV._AlleralRayfieldSource) then
+				consider(ENV._AlleralRayfieldSource, ENV._AlleralRayfieldSourceLabel or "memory:loader")
 			else
-				ENV._AlleralIrisSource = nil
-				ENV._AlleralIrisSourceReady = false
+				ENV._AlleralRayfieldSource = nil
+				ENV._AlleralRayfieldSourceReady = false
 			end
 		end
 
-		if type(ENV._AlleralMaclibSource) == "string" and irisSourceValid(ENV._AlleralMaclibSource) then
-			consider(ENV._AlleralMaclibSource, ENV._AlleralMaclibSourceLabel or "memory:iris-bridge")
+		if type(ENV._AlleralMaclibSource) == "string" and rayfieldSourceValid(ENV._AlleralMaclibSource) then
+			consider(ENV._AlleralMaclibSource, ENV._AlleralMaclibSourceLabel or "memory:rayfield-bridge")
 		end
 
-		for _, path in ipairs(IRIS_SOURCE_PATHS) do
-			local src, label = tryReadIrisPath(path)
+		for _, path in ipairs(RAYFIELD_SOURCE_PATHS) do
+			local src, label = tryReadRayfieldPath(path)
 			if src then
 				consider(src, label)
 			end
 		end
 
 		if type(ENV.Alleral_HTTP) == "table" and type(ENV.Alleral_HTTP.get) == "function" then
-			for _, baseUrl in ipairs(irisBackendUrls()) do
-				local src = ENV.Alleral_HTTP.get(baseUrl .. "?iris=" .. tostring(need) .. "&t=" .. tostring(tick()), IRIS_MIN_BYTES)
+			for _, baseUrl in ipairs(rayfieldBackendUrls()) do
+				local src = ENV.Alleral_HTTP.get(baseUrl .. "?rayfield=" .. tostring(need) .. "&t=" .. tostring(tick()), RAYFIELD_MIN_BYTES)
 				if type(src) == "string" then
 					consider(src, "backend:" .. baseUrl)
 				end
 			end
-			for _, baseUrl in ipairs(IRIS_RAW_URLS) do
-				local src = ENV.Alleral_HTTP.get(baseUrl .. "?iris=" .. tostring(need) .. "&t=" .. tostring(tick()), IRIS_MIN_BYTES)
+			for _, baseUrl in ipairs(RAYFIELD_RAW_URLS) do
+				local src = ENV.Alleral_HTTP.get(baseUrl .. "?rayfield=" .. tostring(need) .. "&t=" .. tostring(tick()), RAYFIELD_MIN_BYTES)
 				if type(src) == "string" then
 					consider(src, "remote:" .. baseUrl)
 				end
 			end
 		end
 
-		if not bestSrc or bestVersion ~= requiredIrisVersion() then
-			return nil, "Iris source missing (need v" .. tostring(requiredIrisVersion()) .. ")"
+		if not bestSrc or bestVersion ~= requiredRayfieldVersion() then
+			return nil, "Rayfield source missing (need v" .. tostring(requiredRayfieldVersion()) .. ")"
 		end
 		return bestSrc, bestLabel
 	end
 
-	loadIris = function()
-		if type(ENV._AlleralIris) == "table" then
-			local version = ENV._AlleralIris.__AlleralPatch
-			local need = requiredIrisVersion()
+	loadRayfield = function()
+		if type(ENV._AlleralRayfield) == "table" then
+			local version = ENV._AlleralRayfield.__AlleralPatch
+			local need = requiredRayfieldVersion()
 			if type(version) ~= "number" or version ~= need then
-				ENV._AlleralIris = nil
-				ENV._AlleralIrisSourceKey = nil
+				ENV._AlleralRayfield = nil
+				ENV._AlleralRayfieldSourceKey = nil
 			else
-				return ENV._AlleralIris
+				return ENV._AlleralRayfield
 			end
 		end
 
-		if type(ENV._AlleralMaclib) == "table" and ENV._AlleralMaclib.__IrisUi == true then
+		if type(ENV._AlleralMaclib) == "table" and ENV._AlleralMaclib.__RayfieldUi == true then
 			local version = ENV._AlleralMaclib.__AlleralPatch
-			if type(version) == "number" and version == requiredIrisVersion() then
-				ENV._AlleralIris = ENV._AlleralMaclib
+			if type(version) == "number" and version == requiredRayfieldVersion() then
+				ENV._AlleralRayfield = ENV._AlleralMaclib
 				return ENV._AlleralMaclib
 			end
 		end
 
-		local source, sourceLabel = readIrisSource()
+		local source, sourceLabel = readRayfieldSource()
 		if not source then
-			return nil, sourceLabel or "Iris source missing"
+			return nil, sourceLabel or "Rayfield source missing"
 		end
 
 		local sourceKey = tostring(#source) .. ":" .. source:sub(1, 64)
-		if ENV._AlleralIrisSourceKey == sourceKey and type(ENV._AlleralIris) == "table" then
-			return ENV._AlleralIris
+		if ENV._AlleralRayfieldSourceKey == sourceKey and type(ENV._AlleralRayfield) == "table" then
+			return ENV._AlleralRayfield
 		end
 
 		local loadFn = Core.execFunction and Core.execFunction("loadstring") or loadstring or load
@@ -455,32 +454,32 @@ return function(Core)
 			return nil, "loadstring unavailable"
 		end
 
-		local chunk, err = loadFn(source, "@Iris/source")
+		local chunk, err = loadFn(source, "@Rayfield/source")
 		if not chunk then
-			return nil, tostring(err or "Iris compile failed")
+			return nil, tostring(err or "Rayfield compile failed")
 		end
 
 		local ok, MacLib = pcall(chunk)
 		if not ok or type(MacLib) ~= "table" or type(MacLib.Window) ~= "function" then
-			return nil, tostring(MacLib or "Iris runtime failed")
+			return nil, tostring(MacLib or "Rayfield runtime failed")
 		end
 
 		local patch = MacLib.__AlleralPatch
-		local need = requiredIrisVersion()
-		if type(patch) ~= "number" or patch ~= need or MacLib.__IrisUi ~= true then
-			return nil, "Iris version outdated (have v" .. tostring(patch or "?") .. ", need v" .. tostring(need) .. ")"
+		local need = requiredRayfieldVersion()
+		if type(patch) ~= "number" or patch ~= need or MacLib.__RayfieldUi ~= true then
+			return nil, "Rayfield version outdated (have v" .. tostring(patch or "?") .. ", need v" .. tostring(need) .. ")"
 		end
 
-		ENV._AlleralIrisSourceKey = sourceKey
-		ENV._AlleralIris = MacLib
-		ENV._AlleralIrisSource = source
-		ENV._AlleralIrisSourceLabel = sourceLabel
+		ENV._AlleralRayfieldSourceKey = sourceKey
+		ENV._AlleralRayfield = MacLib
+		ENV._AlleralRayfieldSource = source
+		ENV._AlleralRayfieldSourceLabel = sourceLabel
 		ENV._AlleralMaclib = MacLib
 		ENV._AlleralMaclibSource = source
 		ENV._AlleralMaclibSourceLabel = sourceLabel
 		if type(Core.say) == "function" then
 			Core.say(
-				"Iris v"
+				"Rayfield v"
 					.. tostring(MacLib.__AlleralPatch or "?")
 					.. " ("
 					.. tostring(MacLib.__AlleralVersion or "2.0.4")
@@ -492,33 +491,33 @@ return function(Core)
 	end
 
 	local function loadUiEngine()
-		local iris, irisErr = loadIris()
-		if iris then
-			Core.UI_LIBRARY = "Iris"
-			local irisSource = ENV._AlleralIrisSource
-			local irisSourceLabel = ENV._AlleralIrisSourceLabel
+		local raylib, raylibErr = loadRayfield()
+		if raylib then
+			Core.UI_LIBRARY = "Rayfield"
+			local RayfieldSource = ENV._AlleralRayfieldSource
+			local RayfieldSourceLabel = ENV._AlleralRayfieldSourceLabel
 			local onyx, onyxErr = loadOnyx()
 			if onyx then
 				ENV._AlleralOnyxResource = onyx
 				ENV._AlleralUiResources = {
-					Iris = iris,
+					rayfield = rayfield,
 					Onyx = onyx,
 					Fusion = onyx.__FusionStack == true,
 					Spring = type(onyx.GetSpringMotion) == "function" and onyx:GetSpringMotion() or true,
 				}
-				ENV._AlleralMaclib = iris
-				ENV._AlleralMaclibSource = irisSource
-				ENV._AlleralMaclibSourceLabel = irisSourceLabel
+				ENV._AlleralMaclib = rayfield
+				ENV._AlleralMaclibSource = RayfieldSource
+				ENV._AlleralMaclibSourceLabel = RayfieldSourceLabel
 			elseif type(Core.logWarn) == "function" then
 				Core.logWarn("Onyx resource layer unavailable: " .. tostring(onyxErr))
 			end
-			return iris
+			return raylib
 		end
 
-		if preferredUiEngine() ~= "iris" and type(Core.logWarn) == "function" then
-			Core.logWarn("Ignoring non-Iris UI preference; Iris is the only runtime UI.")
+		if false and type(Core.logWarn) == "function" then
+			Core.logWarn("Using Rayfield UI engine.")
 		end
-		return nil, irisErr or "Iris UI engine missing"
+		return nil, raylibErr or "Rayfield UI engine missing"
 	end
 
 	local function wrapLibrary(MacLib)
@@ -729,7 +728,7 @@ return function(Core)
 		end
 
 		function Library:ListThemeNames()
-			return { "Onyx", "Iris", "Default" }
+			return { "Onyx", "Rayfield", "Default" }
 		end
 
 		function Library:SetTheme(_name)
@@ -847,9 +846,9 @@ return function(Core)
 		ENV._AlleralOnyx = nil
 		ENV._AlleralOnyxSourceKey = nil
 		ENV._AlleralOnyxSource = nil
-		ENV._AlleralIris = nil
-		ENV._AlleralIrisOverlay = nil
-		ENV._AlleralIrisSourceKey = nil
+		ENV._AlleralRayfield = nil
+		ENV._AlleralRayfieldOverlay = nil
+		ENV._AlleralRayfieldSourceKey = nil
 		ENV._AlleralMaclib = nil
 		ENV._AlleralMaclibSourceKey = nil
 	end
@@ -1125,7 +1124,7 @@ return function(Core)
 			settings = settings or {}
 			local name = settings.Name or "Group"
 			if not rawTab or type(rawTab.Section) ~= "function" then
-				Core.logWarn("CreateGroupbox skipped — tab missing for " .. tostring(name))
+				Core.logWarn("CreateGroupbox skipped â€” tab missing for " .. tostring(name))
 				return Core.createStubUiGroup(name)
 			end
 			local col = tonumber(settings.Column) or 1
@@ -1139,7 +1138,7 @@ return function(Core)
 
 		function tab:BuildThemeGroupbox(column)
 			local group = Core.buildUiGroup(tab, "Appearance", column or 1)
-			group:CreateLabel("Iris UI with Onyx resources, Fusion, and Spring is the active UI layer.")
+			group:CreateLabel("Rayfield UI with Onyx resources, Fusion, and Spring is the active UI layer.")
 			return group
 		end
 
@@ -1183,12 +1182,12 @@ return function(Core)
 		local resolve = Core.resolveUiWindow
 		local window = type(resolve) == "function" and resolve(section) or nil
 		if type(window) ~= "table" or not window._rawWindow then
-			Core.logWarn("buildUiTab skipped — window missing")
+			Core.logWarn("buildUiTab skipped â€” window missing")
 			return Core.wrapUiTab(nil, type(section) == "table" and section._ui or nil, window)
 		end
 		local tabGroup = window._tabGroup
 		if not tabGroup or type(tabGroup.Tab) ~= "function" then
-			Core.logWarn("buildUiTab skipped — tab group missing")
+			Core.logWarn("buildUiTab skipped â€” tab group missing")
 			return Core.wrapUiTab(nil, window._ui, window)
 		end
 		local rawTab = tabGroup:Tab({

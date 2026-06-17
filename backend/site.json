@@ -1,34 +1,34 @@
-{
+﻿{
   "version": 1,
   "updatedAt": "2026-06-17T01:17:59Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
   "loaderVersion": "8.11.1",
   "coreVersion": "2.9.10",
-  "uiLibrary": "Iris",
-  "uiVersion": "5.7.0-iris",
+  "uiLibrary": "Rayfield",
+  "uiVersion": "1.0.0-rayfield",
   "onyxVersion": 1,
-  "irisVersion": 3,
+  "rayfieldVersion": 1,
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/bootstrap.luau?v=2.0.4&t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",
   "branch": "main",
   "features": [
     "Picks the right game script when you inject",
-    "Iris UI main menu with Onyx resources, Fusion, and Spring",
+    "Rayfield UI main menu with Onyx resources, Fusion, and Spring",
     "Site and scripts pull straight from GitHub",
     "Game status comes from real injects, not guesses",
     "Updates show up within about a minute of a push",
-    "Executor list from WEAO — updated when they update"
+    "Executor list from WEAO â€” updated when they update"
   ],
   "faq": [
     {
       "q": "How do I open the site?",
-      "a": "Any browser works — phone or PC. Bookmark the homepage link at the top if you want it handy. You don't need Roblox just to browse; you only need an executor when you run the loadstring."
+      "a": "Any browser works â€” phone or PC. Bookmark the homepage link at the top if you want it handy. You don't need Roblox just to browse; you only need an executor when you run the loadstring."
     },
     {
       "q": "How do I load Alleral?",
-      "a": "Copy the bootstrap loadstring from the homepage, save it once in your executor, and run it in a supported game. After that it pulls updates from GitHub on its own — you don't replace the saved script."
+      "a": "Copy the bootstrap loadstring from the homepage, save it once in your executor, and run it in a supported game. After that it pulls updates from GitHub on its own â€” you don't replace the saved script."
     },
     {
       "q": "Which games are supported?",
@@ -50,7 +50,7 @@
   "changelog": [
     {
       "date": "2026-06-16",
-      "title": "Loader 8.8.8 — Fix Xeno boot loop",
+      "title": "Loader 8.8.8 â€” Fix Xeno boot loop",
       "items": [
         "Fixed infinite bootstrap relaunch when remote release.json lagged behind embedded MacLib v13",
         "MacLib CDN now pins embedded commit instead of stale remote hash",
@@ -59,19 +59,19 @@
     },
     {
       "date": "2026-06-16",
-      "title": "MacLib v13 — Smart Resizer & Layout Fix",
+      "title": "MacLib v13 â€” Smart Resizer & Layout Fix",
       "items": [
-        "Fixed section/card overlap — elements now get proper layout order automatically",
+        "Fixed section/card overlap â€” elements now get proper layout order automatically",
         "Rewrote auto-resizer: viewport-fill sizing, no double-shrink, smooth resize animations",
         "Hub exploit tools moved to Tools tab; game server/webhook controls on Misc tab",
-        "Default window 920×680 — scales cleanly from mobile to ultrawide"
+        "Default window 920Ã—680 â€” scales cleanly from mobile to ultrawide"
       ]
     },
     {
       "date": "2026-06-16",
-      "title": "MacLib v12 — Layout Fix & Premium Animations",
+      "title": "MacLib v12 â€” Layout Fix & Premium Animations",
       "items": [
-        "Fixed overlapping text in 3-column tabs — responsive stack when window is too narrow",
+        "Fixed overlapping text in 3-column tabs â€” responsive stack when window is too narrow",
         "Inputs and dropdowns now stack vertically with proper spacing (no more cramped filters)",
         "New animations: ripple clicks, header shimmer, tab parallax, staggered section reveals",
         "Mobile keeps animations but disables only heavy glow/blur loops for stability"
@@ -79,33 +79,33 @@
     },
     {
       "date": "2026-06-16",
-      "title": "MacLib v11 — Mobile Stability Fix",
+      "title": "MacLib v11 â€” Mobile Stability Fix",
       "items": [
         "Fixed mobile crash from layout feedback loops and heavy UI effects",
         "Mobile safe mode disables glow and blur loops automatically",
-        "Smaller capped window size on touch devices (680×500 max)",
+        "Smaller capped window size on touch devices (680Ã—500 max)",
         "Touch-safe sidebar and resize grip input handling"
       ]
     },
     {
       "date": "2026-06-16",
-      "title": "All Games — Performance & Stability Pass",
+      "title": "All Games â€” Performance & Stability Pass",
       "items": [
-        "Every game script now includes FPS boost, RTX mod, and black screen mode (Settings → Performance)",
-        "Kick A Lucky Block 7.3.0 — ball farm, train, place, webhook, and server join fixes",
-        "Slime RNG 1.5.2 — migrated to shared Core performance helpers",
-        "Sell Lemons 2.1.0 · Grow a Garden 2 2.1.0 · Speed Keyboard Escape 1.5.1",
-        "Build A Ring Farm 1.4.2 · Survive a Zombie Arena 2.3.2 · Blox Fruit 0.1.1",
+        "Every game script now includes FPS boost, RTX mod, and black screen mode (Settings â†’ Performance)",
+        "Kick A Lucky Block 7.3.0 â€” ball farm, train, place, webhook, and server join fixes",
+        "Slime RNG 1.5.2 â€” migrated to shared Core performance helpers",
+        "Sell Lemons 2.1.0 Â· Grow a Garden 2 2.1.0 Â· Speed Keyboard Escape 1.5.1",
+        "Build A Ring Farm 1.4.2 Â· Survive a Zombie Arena 2.3.2 Â· Blox Fruit 0.1.1",
         "Server join retries on TeleportInitFailed (up to 3 attempts)"
       ]
     },
     {
       "date": "2026-06-15",
-      "title": "Kick A Lucky Block 7.3.0 — Performance, Ball Farm & System Fixes",
+      "title": "Kick A Lucky Block 7.3.0 â€” Performance, Ball Farm & System Fixes",
       "items": [
-        "Added FPS boost, RTX mod, and black screen mode under Tools → Performance",
+        "Added FPS boost, RTX mod, and black screen mode under Tools â†’ Performance",
         "Added auto equip best weight (standalone from train/buy loops)",
-        "Fixed auto collect ball — kick, collect remote, pad touch, and filtered pickup",
+        "Fixed auto collect ball â€” kick, collect remote, pad touch, and filtered pickup",
         "Improved auto train, 2x claim cooldown, auto place best, and cash collect",
         "Fixed auto prediction brainrot parsing (table InGame + wave attributes)",
         "Webhook debounce and server join retry on TeleportInitFailed"
@@ -113,18 +113,18 @@
     },
     {
       "date": "2026-06-16",
-      "title": "Alleral Hub 9.0 — Visual Revamp & Crash Fix",
+      "title": "Alleral Hub 9.0 â€” Visual Revamp & Crash Fix",
       "items": [
-        "Complete hub UI redesign — sharper glass panels, timeline updates, live sync badges",
-        "Fixed executor crash: thin bootstrap (v2.0.1) fetches loader again — works on all executors",
-        "Admin panel routing fixed — opens reliably from search and sidebar",
+        "Complete hub UI redesign â€” sharper glass panels, timeline updates, live sync badges",
+        "Fixed executor crash: thin bootstrap (v2.0.1) fetches loader again â€” works on all executors",
+        "Admin panel routing fixed â€” opens reliably from search and sidebar",
         "Live site data refreshes every 30s from relay (no more stale baked snapshot)",
-        "Loader 8.8.1 · MacLib UI · faster status polling (3–5s)"
+        "Loader 8.8.1 Â· MacLib UI Â· faster status polling (3â€“5s)"
       ]
     },
     {
       "date": "2026-06-15",
-      "title": "Alleral UI 4.1 — Apple Studio Layout",
+      "title": "Alleral UI 4.1 â€” Apple Studio Layout",
       "items": [
         "Replaced sidebar tabs with horizontal segmented pill bar",
         "Dark glass shell with rounded corners and full-width content",
@@ -133,7 +133,7 @@
     },
     {
       "date": "2026-06-15",
-      "title": "Kick A Lucky Block 7.2.2 — Xeno Module & UI Fixes",
+      "title": "Kick A Lucky Block 7.2.2 â€” Xeno Module & UI Fixes",
       "items": [
         "Improved gameRequire v1.3 for Xeno and low-sUNC executors",
         "Stopped PrivateServerId client warnings and optional module log spam",
@@ -142,7 +142,7 @@
     },
     {
       "date": "2026-06-15",
-      "title": "Kick A Lucky Block 7.2.1 — Xeno UI & Module Loading Fix",
+      "title": "Kick A Lucky Block 7.2.1 â€” Xeno UI & Module Loading Fix",
       "items": [
         "Fixed Syde UI crash (HorizontalAlignment.Fill is invalid on Roblox)",
         "Improved game module loading under executor sandboxes (gameRequire v1.2)"
@@ -150,7 +150,7 @@
     },
     {
       "date": "2026-06-15",
-      "title": "Sell Lemons 2.0 — Full Farming Automation",
+      "title": "Sell Lemons 2.0 â€” Full Farming Automation",
       "items": [
         "Added Auto Collect Lemon",
         "Added Auto Collect Cash Drops",
@@ -181,7 +181,7 @@
     },
     {
       "date": "2026-06-15",
-      "title": "Grow A Garden 2 2.0 — Full Farming Automation",
+      "title": "Grow A Garden 2 2.0 â€” Full Farming Automation",
       "items": [
         "Added Auto Plant Seed",
         "Added Auto Plant All Seeds",
@@ -210,7 +210,7 @@
     },
     {
       "date": "2026-06-15",
-      "title": "Kick A Lucky Block 7.2 — Ball Farming & Prediction Fixes",
+      "title": "Kick A Lucky Block 7.2 â€” Ball Farming & Prediction Fixes",
       "items": [
         "Added Auto Farm Ball",
         "Added Auto Buy Upgrade",
@@ -224,7 +224,7 @@
     },
     {
       "date": "2026-06-14",
-      "title": "Kick A Lucky Block — Configuration & Custom Speed",
+      "title": "Kick A Lucky Block â€” Configuration & Custom Speed",
       "items": [
         "Kick a Lucky Block: Added Custom Speed",
         "Kick a Lucky Block: Added Configuration System",
@@ -238,53 +238,53 @@
     },
     {
       "date": "2026-06-12",
-      "title": "Loader 8.2.24 — core fix + hub live tracker",
+      "title": "Loader 8.2.24 â€” core fix + hub live tracker",
       "items": [
-        "Fix alleral_ui validation (Syde patch 18 sync) — Core failed on inject",
+        "Fix alleral_ui validation (Syde patch 18 sync) â€” Core failed on inject",
         "Hub website revamp with real-time live status dashboard (15s refresh)",
         "New public /api/live/status endpoint for versions, sync, and inject health"
       ]
     },
     {
       "date": "2026-06-12",
-      "title": "Loader 8.2.23 — version lock + relay fixes",
+      "title": "Loader 8.2.23 â€” version lock + relay fixes",
       "items": [
-        "Bootstrap v1.0.3 — commit-pinned loader only; rejects version/commit/syde patch mismatch",
+        "Bootstrap v1.0.3 â€” commit-pinned loader only; rejects version/commit/syde patch mismatch",
         "Loader syncs SYDE_PATCH + RELEASE_FALLBACK from release.json; exact syde patch required",
         "Fix telemetry_feed retention SQL and admin telemetry endpoints when auto_sync is unavailable"
       ]
     },
     {
       "date": "2026-06-12",
-      "title": "Syde patch 18 — fix empty UI / toggle keybind crash",
+      "title": "Syde patch 18 â€” fix empty UI / toggle keybind crash",
       "items": [
-        "Loader 8.2.22 · Syde patch 18 — stop renaming Render subtree (ToggleConfiguration KeyBind.Title)",
+        "Loader 8.2.22 Â· Syde patch 18 â€” stop renaming Render subtree (ToggleConfiguration KeyBind.Title)",
         "Fixes blank hub with no tabs when a toggle uses keybind configuration"
       ]
     },
     {
       "date": "2026-06-12",
-      "title": "Telemetry v3.3 — richer Discord + admin feed",
+      "title": "Telemetry v3.3 â€” richer Discord + admin feed",
       "items": [
-        "Loader 8.2.21 · telemetry 3.3 — place update events, bootstrap/commit/build context on every payload",
+        "Loader 8.2.21 Â· telemetry 3.3 â€” place update events, bootstrap/commit/build context on every payload",
         "Errors now include stack trace, recent session actions, place build, and longer detail text",
         "Admin Stats tab shows 48h inject/error/update counts plus a live telemetry feed"
       ]
     },
     {
       "date": "2026-06-12",
-      "title": "Loader 8.2.20 — commit sync, game update notice, legacy purge",
+      "title": "Loader 8.2.20 â€” commit sync, game update notice, legacy purge",
       "items": [
-        "Loader 8.2.20 — bump_release always mirrors RELEASE_FALLBACK.commit from release.json",
+        "Loader 8.2.20 â€” bump_release always mirrors RELEASE_FALLBACK.commit from release.json",
         "Bootstrap v1.0.2 warns when PlaceVersion changed; script still loads normally",
         "Bootstrap purges legacy v3/v4 loaders and obfuscated UI dumps from executor workspace"
       ]
     },
     {
       "date": "2026-06-12",
-      "title": "Loader 8.2.19 — register limit fix + commit-pinned bootstrap",
+      "title": "Loader 8.2.19 â€” register limit fix + commit-pinned bootstrap",
       "items": [
-        "Loader 8.2.19 — teleport/relaunch hooks moved to hub/loader_relaunch.luau to stay under Luau register cap",
+        "Loader 8.2.19 â€” teleport/relaunch hooks moved to hub/loader_relaunch.luau to stay under Luau register cap",
         "Bootstrap v1.0.1 fetches cfg/release.json first and pins loader.luau to the release commit",
         "Bootstrap rejects stale CDN copies when loader version does not match release.json"
       ]
@@ -293,9 +293,9 @@
       "date": "2026-06-12",
       "title": "Eternal bootstrap loadstring + Syde patch v17",
       "items": [
-        "Loader 8.2.18 — save the bootstrap loadstring once; updates pull from GitHub automatically",
+        "Loader 8.2.18 â€” save the bootstrap loadstring once; updates pull from GitHub automatically",
         "Workspace cache purged each reload so stale hub/loader files never run",
-        "Syde patch v17 — silent logging, Render template fix, compat-only Alleral layer"
+        "Syde patch v17 â€” silent logging, Render template fix, compat-only Alleral layer"
       ]
     },
     {
@@ -322,7 +322,7 @@
       "items": [
         "Replaced Obsidian with WindUI across all game scripts",
         "Alleral green accent on the open button and dark theme default",
-        "Same script API — toggles, sliders, dropdowns, and live status panels"
+        "Same script API â€” toggles, sliders, dropdowns, and live status panels"
       ]
     },
     {
@@ -511,7 +511,7 @@
     "sell_lemons": {
       "placeIds": [79268393072444],
       "robloxUrl": "https://www.roblox.com/games/79268393072444",
-      "description": "Full lemonade stand automation — collect, offers, evolution, events, and movement.",
+      "description": "Full lemonade stand automation â€” collect, offers, evolution, events, and movement.",
       "uiTabs": ["Farm", "Offers", "Progress", "Misc", "Settings"],
       "scriptFeatures": [
         { "name": "Auto collect lemon", "category": "Farm", "desc": "Collects lemons from your stand area." },
@@ -537,7 +537,7 @@
     "grow_a_garden_2": {
       "placeIds": [95204935687527],
       "robloxUrl": "https://www.roblox.com/games/95204935687527",
-      "description": "Full garden automation — plant, water, sprinkler systems, and shop buying.",
+      "description": "Full garden automation â€” plant, water, sprinkler systems, and shop buying.",
       "uiTabs": ["Farm", "Water", "Shop", "Settings"],
       "scriptFeatures": [
         { "name": "Auto plant seed", "category": "Farm", "desc": "Plants selected seeds on open slots." },
@@ -557,7 +557,7 @@
     "blox_fruit": {
       "placeIds": [2753915549],
       "robloxUrl": "https://www.roblox.com/games/2753915549",
-      "description": "Maintenance shell — automation disabled pending game remap after latest update.",
+      "description": "Maintenance shell â€” automation disabled pending game remap after latest update.",
       "uiTabs": ["Status", "Settings"],
       "scriptFeatures": []
     },
@@ -682,7 +682,7 @@
     "build_a_ring_farm": {
       "placeIds": [107646426076756],
       "robloxUrl": "https://www.roblox.com/games/107646426076756",
-      "description": "Full farm automation — planting, upgrades, pets, events, and honey.",
+      "description": "Full farm automation â€” planting, upgrades, pets, events, and honey.",
       "uiTabs": [
         "Farm",
         "Seeds",
@@ -770,7 +770,7 @@
     "survive_a_zombie_arena": {
       "placeIds": [114204398207377],
       "robloxUrl": "https://www.roblox.com/games/114204398207377",
-      "description": "Zombie arena combat — kill aura, auto farm preset, ESP, and safe zones.",
+      "description": "Zombie arena combat â€” kill aura, auto farm preset, ESP, and safe zones.",
       "uiTabs": ["Farm", "Combat", "Player", "Visual", "Misc", "Settings"],
       "scriptFeatures": [
         {
@@ -863,7 +863,7 @@
   "resources": [
     {
       "title": "Admin panel",
-      "desc": "Separate control site — scripts, bans, telemetry (Railway)",
+      "desc": "Separate control site â€” scripts, bans, telemetry (Railway)",
       "urlKey": "admin",
       "icon": "shield"
     },

@@ -36,17 +36,12 @@ jobs:
           rm -rf public_repo
           mkdir -p public_repo
           mkdir -p public_repo/hub
-          mkdir -p public_repo/ui/onyx
-          mkdir -p public_repo/ui/iris
-          mkdir -p public_repo/ui/flexui
-          mkdir -p public_repo/games/data
+          mkdir -p public_repo/ui/rayfield
 
           cp loader.luau bootstrap.luau public_repo/
           cp cfg/release.json cfg/site.json cfg/access.json cfg/security.json cfg/telemetry.json cfg/weao.json cfg/scripts_manifest.json public_repo/
           cp hub/*.luau public_repo/hub/
-          cp ui/onyx/source.luau public_repo/ui/onyx/ 2>/dev/null || true
-          cp ui/iris/source.luau public_repo/ui/iris/ 2>/dev/null || true
-          cp ui/flexui/source.luau public_repo/ui/flexui/ 2>/dev/null || true
+          cp ui/rayfield/source.luau public_repo/ui/rayfield/ 2>/dev/null || true
           cp games/*.luau public_repo/games/ 2>/dev/null || true
           cp games/data/*.luau public_repo/games/data/ 2>/dev/null || true
 
@@ -54,7 +49,7 @@ jobs:
         if: env.SYNC_PAT != ''
         shell: bash
         run: |
-          bash maint/obfuscate_scripts.sh public_repo/hub/*.luau public_repo/games/*.luau public_repo/ui/*/source.luau 2>/dev/null || true
+          bash maint/obfuscate_scripts.sh public_repo/hub/*.luau public_repo/games/*.luau public_repo/ui/rayfield/source.luau 2>/dev/null || true
 
       - name: Push to public repo
         if: env.SYNC_PAT != ''

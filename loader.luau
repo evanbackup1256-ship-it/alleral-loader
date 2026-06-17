@@ -30,12 +30,12 @@ local ONYX_SOURCE_MIN_BYTES = 12000
 local ONYX_VERSION_MARKER = "ALLERAL_ONYX_VERSION"
 local ONYX_VERSION = 1
 local ONYX_REQUIRED_FN = "function MacLib:Window"
-local IRIS_SOURCE_PATH = UI .. "/iris/source.luau"
+local RAYFIELD_SOURCE_PATH = UI .. "/rayfield/source.luau"
 local IRIS_SOURCE_MIN_BYTES = 8000
-local IRIS_VERSION_MARKER = "ALLERAL_IRIS_VERSION"
+local RAYFIELD_VERSION_MARKER = "ALLERAL_RAYFIELD_VERSION"
 local IRIS_VERSION = 3
-local IRIS_BUNDLE_MIN_BYTES = 250000
-local IRIS_REQUIRED_FN = "function MacLib:Window"
+local RAYFIELD_BUNDLE_MIN_BYTES = 250000
+local RAYFIELD_REQUIRED_FN = "function MacLib:Window"
 local MAX_RELAUNCHES = 3
 local RELAUNCH_COOLDOWN = 15
 local CP = {
@@ -49,11 +49,11 @@ local CP = {
 local RELEASE_FALLBACK = {
 	loader = "8.11.1",
 	core = "2.9.10",
-	ui = "Iris",
-	windui = "5.7.0-iris",
-	alleral = "5.7.0-iris",
+	ui = "Rayfield",
+	windui = "1.0.0-rayfield",
+	alleral = "1.0.0-rayfield",
 	onyxVersion = 1,
-	irisVersion = 3,
+	rayfieldVersion = 1,
 	analytics = "1.2",
 	telemetry = "3.5",
 	helpers = "1.8",
@@ -169,7 +169,7 @@ end)
 
 local ENV = genv()
 ENV._Alleral_RequiredOnyxVersion = ONYX_VERSION
-ENV._Alleral_RequiredIrisVersion = IRIS_VERSION
+ENV._Alleral_RequiredRayfieldVersion = IRIS_VERSION
 
 local function loaderRunEnv()
 	local env = genv()
@@ -1064,11 +1064,11 @@ end
 local ensureIrisSource, irisSourceValid
 do
 	local IRIS_BUNDLE_URL =
-		"https://raw.githubusercontent.com/GhostDuckyy/UI-Libraries/main/ImGui/Iris/Versions/2.0.4/Source.lua"
+		"https://raw.githubusercontent.com/shlexware/Rayfield/main/source"
 
 	local function requiredIrisVersion()
 		local expected = ENV._Alleral_ExpectedVersions
-		local remote = type(expected) == "table" and tonumber(expected.irisVersion)
+		local remote = type(expected) == "table" and tonumber(expected.rayfieldVersion)
 		if remote and remote > IRIS_VERSION then
 			return remote
 		end
@@ -1079,21 +1079,21 @@ do
 		if type(src) ~= "string" then
 			return nil
 		end
-		return tonumber(src:match("\nlocal%s+ALLERAL_IRIS_VERSION%s*=%s*(%d+)"))
-			or tonumber(src:match("^local%s+ALLERAL_IRIS_VERSION%s*=%s*(%d+)"))
+		return tonumber(src:match("\nlocal%s+ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)"))
+			or tonumber(src:match("^local%s+ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)"))
 			or tonumber(src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)"))
 	end
 
 	local function irisFetchUrls()
-		local bust = "?iris=" .. tostring(IRIS_VERSION) .. "&t=" .. tostring(tick())
+		local bust = "?rayfield=" .. tostring(RAYFIELD_VERSION) .. "&t=" .. tostring(tick())
 		local urls = {
-			GITHUB_RAW .. "/" .. IRIS_SOURCE_PATH .. bust,
-			"https://raw.githubusercontent.com/" .. REPO .. "/main/" .. IRIS_SOURCE_PATH .. bust,
-			JSDELIVR .. "/" .. IRIS_SOURCE_PATH .. bust,
+			GITHUB_RAW .. "/" .. RAYFIELD_SOURCE_PATH .. bust,
+			"https://raw.githubusercontent.com/" .. REPO .. "/main/" .. RAYFIELD_SOURCE_PATH .. bust,
+			JSDELIVR .. "/" .. RAYFIELD_SOURCE_PATH .. bust,
 		}
 		local pinCommit = RELEASE_FALLBACK.commit
 		if type(pinCommit) == "string" and pinCommit ~= "" then
-			table.insert(urls, 1, "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. pinCommit .. "/" .. IRIS_SOURCE_PATH .. bust)
+			table.insert(urls, 1, "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. pinCommit .. "/" .. RAYFIELD_SOURCE_PATH .. bust)
 		end
 		return urls
 	end
@@ -1108,14 +1108,14 @@ do
 		if not looksLikeLua(src) then
 			return "not lua (" .. tostring(#src) .. "b)"
 		end
-		if not src:find(IRIS_VERSION_MARKER, 1, true) then
+		if not src:find(RAYFIELD_VERSION_MARKER, 1, true) then
 			return "missing version marker"
 		end
-		if not src:find(IRIS_REQUIRED_FN, 1, true) then
-			return "missing " .. IRIS_REQUIRED_FN
+		if not src:find(RAYFIELD_REQUIRED_FN, 1, true) then
+			return "missing " .. RAYFIELD_REQUIRED_FN
 		end
-		if not src:find("__IrisUi", 1, true) then
-			return "missing Iris adapter marker"
+		if not src:find("__RayfieldUi", 1, true) then
+			return "missing Rayfield adapter marker"
 		end
 		local version = irisVersionFromSource(src)
 		local need = requiredIrisVersion()
@@ -1129,8 +1129,8 @@ do
 		if type(src) ~= "string"
 			or #src < IRIS_SOURCE_MIN_BYTES
 			or src:find("<!DOCTYPE", 1, true)
-			or not src:find(IRIS_VERSION_MARKER, 1, true)
-			or not src:find(IRIS_REQUIRED_FN, 1, true)
+			or not src:find(RAYFIELD_VERSION_MARKER, 1, true)
+			or not src:find(RAYFIELD_REQUIRED_FN, 1, true)
 			or not src:find("__IrisUi", 1, true)
 			or not looksLikeLua(src) then
 			return false
@@ -1169,15 +1169,15 @@ do
 	end
 
 	local function ensureIrisBundle()
-		if type(ENV._AlleralIrisBundle) == "string" and #ENV._AlleralIrisBundle >= IRIS_BUNDLE_MIN_BYTES then
-			return true, "memory:iris-bundle"
+		if type(ENV._AlleralIrisBundle) == "string" and #ENV._AlleralIrisBundle >= RAYFIELD_BUNDLE_MIN_BYTES then
+			return true, "memory:rayfield-bundle"
 		end
-		local body, via = httpGet(IRIS_BUNDLE_URL .. "?t=" .. tostring(tick()), IRIS_BUNDLE_MIN_BYTES)
-		if type(body) == "string" and #body >= IRIS_BUNDLE_MIN_BYTES then
+		local body, via = httpGet(IRIS_BUNDLE_URL .. "?t=" .. tostring(tick()), RAYFIELD_BUNDLE_MIN_BYTES)
+		if type(body) == "string" and #body >= RAYFIELD_BUNDLE_MIN_BYTES then
 			ENV._AlleralIrisBundle = body
 			return true, "remote:" .. tostring(via or "github")
 		end
-		return false, tostring(via or "Iris bundle unavailable")
+		return false, tostring(via or "rayfield bundle unavailable")
 	end
 
 	local function clearStaleIrisRuntime()
@@ -1242,19 +1242,19 @@ do
 		end
 
 		local localPaths = {
-			IRIS_SOURCE_PATH,
-			"kick/" .. IRIS_SOURCE_PATH,
+			RAYFIELD_SOURCE_PATH,
+			"kick/" .. RAYFIELD_SOURCE_PATH,
 		}
 		local cachePaths = {
-			".alleral/cache/" .. IRIS_SOURCE_PATH,
+			".alleral/cache/" .. RAYFIELD_SOURCE_PATH,
 		}
 
 		local function adoptIris(src, label)
 			if not src or not isIrisSourceValid(src) then
 				return nil
 			end
-			cacheRemote(IRIS_SOURCE_PATH, src)
-			cacheRemote(".alleral/cache/" .. IRIS_SOURCE_PATH, src)
+			cacheRemote(RAYFIELD_SOURCE_PATH, src)
+			cacheRemote(".alleral/cache/" .. RAYFIELD_SOURCE_PATH, src)
 			local version = irisVersionFromSource(src)
 			ENV._AlleralIrisSource = src
 			ENV._AlleralIrisSourceVersion = version
@@ -1267,7 +1267,7 @@ do
 		local cacheOk = cacheSrc and isIrisSourceValid(cacheSrc)
 		local cacheVersion = irisVersionFromSource(cacheSrc)
 
-		local backendSrc, backendLabel = fetchBackendModule(IRIS_SOURCE_PATH, IRIS_SOURCE_MIN_BYTES)
+		local backendSrc, backendLabel = fetchBackendModule(RAYFIELD_SOURCE_PATH, IRIS_SOURCE_MIN_BYTES)
 		local backendOk = backendSrc and isIrisSourceValid(backendSrc)
 		local backendVersion = irisVersionFromSource(backendSrc)
 
@@ -1288,7 +1288,7 @@ do
 				deleteWorkspaceFile(localPath)
 			end
 			if cacheOk and cachePath and (cacheVersion or 0) ~= (remoteVersion or 0) then
-				deleteWorkspaceFile(cachePath, { silent = true, label = "stale Iris cache" })
+				deleteWorkspaceFile(cachePath, { silent = true, label = "stale Rayfield cache" })
 			end
 			return adoptIris(remoteSrc, "remote:" .. tostring(remoteVia or "github"))
 		end
@@ -1304,9 +1304,9 @@ do
 		local fetchDetail = type(remoteVia) == "string" and remoteVia or irisSourceRejectReason(remoteSrc)
 		local bundleOk, bundleLabel = ensureIrisBundle()
 		if bundleOk then
-			log("Iris bundle cached (" .. tostring(bundleLabel) .. ")")
+			log("rayfield bundle cached (" .. tostring(bundleLabel) .. ")")
 		end
-		return false, "Iris source unavailable (need v" .. tostring(requiredIrisVersion()) .. "): " .. tostring(fetchDetail)
+		return false, "rayfield source unavailable (need v" .. tostring(requiredIrisVersion()) .. "): " .. tostring(fetchDetail)
 	end
 end
 
@@ -1315,7 +1315,7 @@ local function preferredUiEngine()
 	if type(expected) == "table" and type(expected.ui) == "string" and expected.ui ~= "" then
 		return expected.ui:lower()
 	end
-	return tostring(RELEASE_FALLBACK.ui or "Iris"):lower()
+	local u = RELEASE_FALLBACK.ui or "rayfield"; if type(u) == "string" then return u:lower() end; return "rayfield"
 end
 
 local function loaderCdnBase()
@@ -1411,7 +1411,7 @@ local function getSource(localPaths, remotePath, opts)
 end
 
 local function ensureUiSource()
-	if preferredUiEngine() == "iris" then
+	if preferredUiEngine() == "rayfield" then
 		local irisOk, irisLabel = ensureIrisSource()
 		task.spawn(function()
 			pcall(ensureOnyxSource)
@@ -2129,10 +2129,10 @@ local function extractFileVersion(src, kind)
 			or src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)")
 			or src:match("ALLERAL_ONYX_VERSION%s*=%s*(%d+)")
 	end
-	if kind == "iris" then
-		return src:match("local%s+ALLERAL_IRIS_VERSION%s*=%s*(%d+)")
+	if kind == "rayfield" then
+		return src:match("local%s+ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)")
 			or src:match("MacLib%.__AlleralPatch%s*=%s*(%d+)")
-			or src:match("ALLERAL_IRIS_VERSION%s*=%s*(%d+)")
+			or src:match("ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)")
 	end
 	if kind == "alleral" then
 		return src:match('Core%.ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
@@ -2534,7 +2534,7 @@ local function loadCore()
 		if studioOk then
 			log("UI source ready (" .. tostring(studioLabel) .. ")")
 		else
-			log("Iris source not cached yet: " .. tostring(studioLabel), true)
+			log("rayfield source not cached yet: " .. tostring(studioLabel), true)
 		end
 	end
 
@@ -3217,7 +3217,7 @@ local function fetchExpectedVersionsFast()
 		alleral = RELEASE_FALLBACK.alleral,
 		windui = RELEASE_FALLBACK.windui,
 		ui = RELEASE_FALLBACK.ui,
-		irisVersion = RELEASE_FALLBACK.irisVersion,
+		irisVersion = RELEASE_FALLBACK.rayfieldVersion,
 		onyxVersion = RELEASE_FALLBACK.onyxVersion,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
@@ -3267,7 +3267,7 @@ fetchExpectedVersions = function(forceRefresh)
 		alleral = RELEASE_FALLBACK.alleral,
 		windui = RELEASE_FALLBACK.windui,
 		ui = RELEASE_FALLBACK.ui,
-		irisVersion = RELEASE_FALLBACK.irisVersion,
+		irisVersion = RELEASE_FALLBACK.rayfieldVersion,
 		onyxVersion = RELEASE_FALLBACK.onyxVersion,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
@@ -3298,9 +3298,9 @@ fetchExpectedVersions = function(forceRefresh)
 		if remoteOnyx then
 			expected.onyxVersion = math.max(remoteOnyx, ONYX_VERSION, tonumber(RELEASE_FALLBACK.onyxVersion) or 0)
 		end
-		local remoteIris = tonumber(release.irisVersion)
+		local remoteIris = tonumber(release.rayfieldVersion)
 		if remoteIris then
-			expected.irisVersion = math.max(remoteIris, IRIS_VERSION, tonumber(RELEASE_FALLBACK.irisVersion) or 0)
+			expected.rayfieldVersion = math.max(remoteIris, IRIS_VERSION, tonumber(RELEASE_FALLBACK.rayfieldVersion) or 0)
 		end
 		if type(release.commit) == "string" and release.commit ~= "" and type(RELEASE_FALLBACK.commit) == "string" then
 			if release.commit ~= RELEASE_FALLBACK.commit then
@@ -3365,7 +3365,7 @@ local function buildUpdateFingerprint(expected, profile)
 		"weao=" .. tostring(expected.weao or ""),
 		"weaoCfg=" .. tostring((ENV.Alleral_WeaoConfig or {}).version or ""),
 		"onyxVersion=" .. tostring(expected.onyxVersion or ONYX_VERSION),
-		"irisVersion=" .. tostring(expected.irisVersion or IRIS_VERSION),
+		"irisVersion=" .. tostring(expected.rayfieldVersion or IRIS_VERSION),
 	}
 	if profile and profile.id then
 		table.insert(parts, "game=" .. tostring(profile.id) .. "@" .. tostring(expected.games and expected.games[profile.id] or profile.version or ""))
@@ -3426,11 +3426,11 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
-				IRIS_SOURCE_PATH,
-				".alleral/cache/" .. IRIS_SOURCE_PATH,
+				RAYFIELD_SOURCE_PATH,
+				".alleral/cache/" .. RAYFIELD_SOURCE_PATH,
 			},
 			expectedKey = "irisVersion",
-			extract = "iris",
+			extract = "rayfield",
 			isValid = irisSourceValid,
 		},
 		{
@@ -3600,14 +3600,14 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 		return type(installedLoader) == "string" and installedLoader ~= expected.loader
 	elseif entry.extract == "onyx" then
 		expectedVersion = tostring(ONYX_VERSION)
-	elseif entry.extract == "iris" then
+	elseif entry.extract == "rayfield" then
 		expectedVersion = tostring(IRIS_VERSION)
 	else
 		expectedVersion = expected[entry.expectedKey]
 	end
 
 	if type(expectedVersion) ~= "string" or expectedVersion == "" then
-		return entry.extract == "onyx" or entry.extract == "iris" or false
+		return entry.extract == "onyx" or entry.extract == "rayfield" or false
 	end
 
 	if type(src) ~= "string" or src == "" then
@@ -3624,7 +3624,7 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 
 	local foundVersion = extractFileVersion(src, entry.extract)
 	if type(foundVersion) == "string" and foundVersion ~= "" and type(expectedVersion) == "string" and expectedVersion ~= "" then
-		if entry.extract == "onyx" or entry.extract == "iris" then
+		if entry.extract == "onyx" or entry.extract == "rayfield" then
 			local foundNum = tonumber(foundVersion) or 0
 			local needVersion = tonumber(expectedVersion) or (entry.extract == "onyx" and ONYX_VERSION or IRIS_VERSION)
 			return foundNum < needVersion
@@ -4066,8 +4066,8 @@ local function checkForRemoteUpdate(profile, quiet)
 		reason = "loader v" .. tostring(expected.loader)
 	elseif expected.onyxVersion and not previous:find("onyxVersion=" .. tostring(expected.onyxVersion), 1, true) then
 		reason = "onyx v" .. tostring(expected.onyxVersion)
-	elseif expected.irisVersion and not previous:find("irisVersion=" .. tostring(expected.irisVersion), 1, true) then
-		reason = "iris v" .. tostring(expected.irisVersion)
+	elseif expected.rayfieldVersion and not previous:find("irisVersion=" .. tostring(expected.rayfieldVersion), 1, true) then
+		reason = "rayfield v" .. tostring(expected.rayfieldVersion)
 	elseif profile and expected.games and expected.games[profile.id] then
 		reason = profile.name .. " v" .. tostring(expected.games[profile.id])
 	end
@@ -4278,7 +4278,7 @@ local function main()
 	if studioPrefetchOk then
 		log("UI source ready (" .. tostring(studioPrefetchLabel) .. ")")
 	else
-		log("Iris source not cached yet: " .. tostring(studioPrefetchLabel), true)
+		log("rayfield source not cached yet: " .. tostring(studioPrefetchLabel), true)
 	end
 	refreshExpectedVersionsAsync()
 	if expectedVersions.loader and versionLt(LOADER_VERSION, expectedVersions.loader) then
@@ -4360,13 +4360,13 @@ local function main()
 		end)
 		return
 	end
-	local needIrisVersion = tonumber(expectedVersions.irisVersion) or IRIS_VERSION
-	if needIrisVersion > IRIS_VERSION then
+	local needRayfieldVersion = tonumber(expectedVersions.rayfieldVersion) or IRIS_VERSION
+	if needRayfieldVersion > IRIS_VERSION then
 		log(
-			"Embedded Iris v"
+			"Embedded Rayfield v"
 				.. tostring(IRIS_VERSION)
 				.. " is behind release v"
-				.. tostring(needIrisVersion)
+				.. tostring(needRayfieldVersion)
 				.. " Ã¢â‚¬â€ auto-updating via bootstrap"
 		)
 		ENV.Alleral_LoaderRunning = false
@@ -4374,11 +4374,11 @@ local function main()
 			local count = tonumber(ENV._Alleral_RelaunchCount) or 0
 			local last = tonumber(ENV._Alleral_LastRelaunch) or 0
 			if count >= MAX_RELAUNCHES or os.time() - last < RELAUNCH_COOLDOWN then
-				warn("[Alleral v" .. LOADER_VERSION .. "] Skipping iris-version relaunch (count=" .. count .. ")")
+				warn("[Alleral v" .. LOADER_VERSION .. "] Skipping rayfield-version relaunch (count=" .. count .. ")")
 				pcall(function()
 					game:GetService("StarterGui"):SetCore("SendNotification", {
 						Title = "Alleral",
-						Text = "Iris UI version mismatch Ã¢â‚¬â€ reload the script to update UI.",
+						Text = "rayfield UI version mismatch Ã¢â‚¬â€ reload the script to update UI.",
 						Duration = 8,
 					})
 				end)
@@ -4387,7 +4387,7 @@ local function main()
 			ENV._Alleral_RelaunchCount = count + 1
 			ENV._Alleral_LastRelaunch = os.time()
 			if type(ENV._Alleral_RelaunchViaBootstrap) == "function" then
-				ENV._Alleral_RelaunchViaBootstrap("iris-version-sync")
+				ENV._Alleral_RelaunchViaBootstrap("rayfield-version-sync")
 			end
 		end)
 		return
