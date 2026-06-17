@@ -25,7 +25,6 @@ import { Hero3D } from "@/components/effects/Hero3D";
 import { SupportForm } from "@/components/support/SupportForm";
 import { TelemetryCenter } from "@/components/effects/TelemetryCenter";
 import { LiveEventStream } from "@/components/effects/LiveEventStream";
-import { CloudflareLayer } from "@/components/cloudflare/CloudflareLayer";
 
 const navItems = [
   { label: "Signal", href: "#signal" },
@@ -33,7 +32,6 @@ const navItems = [
   { label: "Topology", href: "#topology" },
   { label: "Games", href: "#games" },
   { label: "Pipeline", href: "#pipeline" },
-  { label: "Cloudflare", href: "#cloudflare" },
   { label: "Support", href: "#support" },
   { label: "Access", href: "#access" },
 ];
@@ -364,8 +362,6 @@ function AlleralLanding({ site, online, siteUpdatedAt, siteFetching, onRefreshSi
             </div>
           </div>
         </section>
-
-        <CloudflareLayer />
 
         {/* ── Support ── */}
         <section id="support" className="relative mx-auto max-w-5xl px-4 py-24 md:px-6">
