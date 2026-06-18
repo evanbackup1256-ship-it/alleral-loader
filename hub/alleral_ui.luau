@@ -37,15 +37,57 @@ return function(Core)
 		if type(ENV._AlleralRayfieldBundle) == "string" and #ENV._AlleralRayfieldBundle > 1000 then
 			return ENV._AlleralRayfieldBundle
 		end
-		local httpGet = ENV.Alleral_HTTP and ENV.Alleral_HTTP.get
-		if type(httpGet) == "function" then
-			local src = httpGet(RAYFIELD_SOURCE_URL .. "?t=" .. tostring(tick()), 1000)
-			if type(src) == "string" and #src > 1000 then
-				ENV._AlleralRayfieldBundle = src
-				return src
+
+		if type(ENV._AlleralIrisBundle) == "string" and #ENV._AlleralIrisBundle > 1000 then
+			ENV._AlleralRayfieldBundle = ENV._AlleralIrisBundle
+			return ENV._AlleralRayfieldBundle
+		end
+
+		local body
+
+		if type(game) == "Instance" and type(game.HttpGet) == "function" then
+			local ok = pcall(function()
+				body = game:HttpGet(RAYFIELD_SOURCE_URL .. "?t=" .. tostring(tick()), true)
+			end)
+			if not ok then body = nil end
+		end
+
+		if type(body) ~= "string" or #body <= 1000 then
+			if type(game) == "Instance" and type(game.HttpGet) == "function" then
+				local ok = pcall(function()
+					body = game:HttpGet(RAYFIELD_SOURCE_URL .. "?t=" .. tostring(tick()))
+				end)
+				if not ok then body = nil end
 			end
 		end
-		return nil
+
+		if type(body) ~= "string" or #body <= 1000 then
+			local httpGet = ENV.Alleral_HTTP and ENV.Alleral_HTTP.get
+			if type(httpGet) == "function" then
+				body = httpGet(RAYFIELD_SOURCE_URL .. "?t=" .. tostring(tick()), 1000)
+			end
+		end
+
+		if type(body) ~= "string" or #body <= 1000 then
+			if type(Core.httpGet) == "function" then
+				body = Core.httpGet(RAYFIELD_SOURCE_URL .. "?t=" .. tostring(tick()))
+			end
+		end
+
+		if type(body) ~= "string" or #body <= 1000 then
+			return nil
+		end
+
+		body = body:gsub("^%s+", ""):gsub("%s+$", "")
+		if body:sub(1, 2) ~= "--" and body:find("<!DOCTYPE", 1, true) then
+			if type(Core.logWarn) == "function" then
+				Core.logWarn("Rayfield source fetch returned HTML, not Lua")
+			end
+			return nil
+		end
+
+		ENV._AlleralRayfieldBundle = body
+		return body
 	end
 
 	local function bootRayfield()
@@ -62,6 +104,7 @@ return function(Core)
 		end
 
 		ENV.loadstring = ENV.loadstring or loadstring or load
+		ENV.game = ENV.game or game
 		if type(task) == "table" then
 			ENV.task = task
 			ENV.task.spawn = ENV.task.spawn or function(f) coroutine.wrap(f)() end
@@ -69,20 +112,11 @@ return function(Core)
 			ENV.task.wait = ENV.task.wait or task.wait
 			ENV.task.cancel = ENV.task.cancel or function() end
 		end
-		ENV.game = ENV.game or game
 
 		local src = fetchRayfieldSource()
 		if not src then return nil, "Rayfield source unavailable" end
 
-		local loadFn = Core.execFunction and Core.execFunction("loadstring") or loadstring or load
-		if type(loadFn) ~= "function" then return nil, "loadstring unavailable" end
-
-		ENV.loadstring = ENV.loadstring or loadstring or load
-		ENV.task = ENV.task or task
-		ENV.debug = ENV.debug or debug
-		ENV.coroutine = ENV.coroutine or coroutine
-
-		local chunk, err = loadFn(src, "@Rayfield/source")
+		local chunk, err = ENV.loadstring(src, "@Rayfield/source")
 		if not chunk then return nil, "Rayfield compile: " .. tostring(err) end
 
 		if setfenv then pcall(setfenv, chunk, ENV) end
@@ -90,10 +124,11 @@ return function(Core)
 		local ok, pkg = pcall(chunk)
 		if not ok then
 			local errMsg = tostring(pkg)
-			if type(Core.logWarn) == "function" then Core.logWarn("Rayfield runtime error: " .. errMsg) end
+			if type(Core.logWarn) == "function" then Core.logWarn("Rayfield runtime: " .. errMsg) end
 			return nil, "Rayfield runtime: " .. errMsg
 		end
 		if type(pkg) ~= "table" or type(pkg.CreateWindow) ~= "function" then
+			if type(Core.logWarn) == "function" then Core.logWarn("Rayfield returned: " .. type(pkg)) end
 			return nil, "Rayfield returned non-window: " .. type(pkg)
 		end
 
