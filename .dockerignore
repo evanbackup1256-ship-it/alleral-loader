@@ -1,0 +1,43 @@
+node_modules/
+__pycache__/
+*.pyc
+.env
+dist/
+build/
+.cache/
+*.db
+.cursor/
+.git/
+.github/
+.vscode/
+.zed/
+.kilo/
+.agents/
+.opencode/
+.cursorignore
+.idea/
+
+# Next.js build artifacts
+relay/site/.next/
+relay/site/out/
+relay/site/node_modules/
+backend/site/
+supabase/.temp/
+backend/data/
+
+# Local artifacts
+.alleral/
+runtime_secrets.json
+obfusctated_uilibrary.luau
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+railway.toml
+
+# Large directories
+games/
+maint/
+scripts/
+Alleral-Private/

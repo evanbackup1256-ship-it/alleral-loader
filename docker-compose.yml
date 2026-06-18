@@ -1,0 +1,31 @@
+services:
+  alleral:
+    build: .
+    image: alleral
+    container_name: alleral
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - GITHUB_REPO=evanbackup1256-ship-it/-kick-loader
+      - GITHUB_BRANCH=main
+      - AUTO_SYNC_ENABLED=1
+      - GITHUB_SYNC_SECONDS=30
+      - ALLERAL_DATA_DIR=/app/data
+      - TELEMETRY_HOST=0.0.0.0
+      - SCRIPTS_MANIFEST_PATH=/app/scripts_manifest.json
+      - SITE_CONFIG_PATH=/app/site.json
+      - RELEASE_CONFIG_PATH=/app/release.json
+      - LOADER_MODULES_ROOT=/app/loader_src
+      - BAN_DB_PATH=/app/data/bans.db
+    volumes:
+      - alleral_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  alleral_data:
