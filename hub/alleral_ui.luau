@@ -62,9 +62,16 @@ return function(Core)
 		local chunk, err = loadFn(src, "@Rayfield/source")
 		if not chunk then return nil, "Rayfield compile: " .. tostring(err) end
 
+		if setfenv then pcall(setfenv, chunk, ENV) end
+
 		local ok, pkg = pcall(chunk)
-		if not ok or type(pkg) ~= "table" or type(pkg.CreateWindow) ~= "function" then
-			return nil, tostring(pkg or "Rayfield runtime failed")
+		if not ok then
+			local errMsg = tostring(pkg)
+			if type(Core.logWarn) == "function" then Core.logWarn("Rayfield runtime error: " .. errMsg) end
+			return nil, "Rayfield runtime: " .. errMsg
+		end
+		if type(pkg) ~= "table" or type(pkg.CreateWindow) ~= "function" then
+			return nil, "Rayfield returned non-window: " .. type(pkg)
 		end
 
 		ENV._AlleralRayfield = pkg
