@@ -41,7 +41,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "626bd14",
+	commit = "6ec4230",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -2883,6 +2883,7 @@ local function fetchExpectedVersionsFast()
 		helpers = RELEASE_FALLBACK.helpers,
 		weao = RELEASE_FALLBACK.weao,
 		uiVersion = RELEASE_FALLBACK.uiVersion,
+		fluentVersion = RELEASE_FALLBACK.fluentVersion,
 		ui = RELEASE_FALLBACK.ui,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
@@ -2930,6 +2931,7 @@ fetchExpectedVersions = function(forceRefresh)
 		helpers = RELEASE_FALLBACK.helpers,
 		weao = RELEASE_FALLBACK.weao,
 		uiVersion = RELEASE_FALLBACK.uiVersion,
+		fluentVersion = RELEASE_FALLBACK.fluentVersion,
 		ui = RELEASE_FALLBACK.ui,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",

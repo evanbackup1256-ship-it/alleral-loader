@@ -5,11 +5,11 @@ local REPO = "evanbackup1256-ship-it/-kick-loader"
 local BRANCH = "main"
 local LOADER_MIN_BYTES = 50000
 
--- CDN sources ordered by speed/priority
+-- Sources ordered for freshness first; jsDelivr is kept as a last-resort mirror.
 local SOURCES = {
-	{ name = "jsDelivr",  base = "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. BRANCH },
 	{ name = "GitHub",    base = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH },
 	{ name = "Railway",   base = "https://alleral-telemetry-production.up.railway.app" },
+	{ name = "jsDelivr",  base = "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. BRANCH },
 }
 
 local function safeCall(name, fn)
@@ -191,8 +191,8 @@ for _, entry in ipairs(urls) do
 		if release and release.loader then
 			local ver = loaderVersion(body)
 			if ver and ver ~= release.loader then
-				-- Try pinned commit version from CDN
-				local pinUrl = "https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. (release.commit or "main") .. "/loader.luau"
+				-- Try the release-pinned loader directly from GitHub before accepting a stale mirror.
+				local pinUrl = "https://raw.githubusercontent.com/" .. REPO .. "/" .. (release.commit or "main") .. "/loader.luau"
 				local pinned = fetchUrl(pinUrl, LOADER_MIN_BYTES)
 				if acceptLoader(pinned) then body = pinned end
 			end
