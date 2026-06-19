@@ -3,7 +3,7 @@ Core.VERSION = "2.9.10"
 Core._CORE_ARTIFACT = "base"
 Core.UI_LIBRARY = "Fluent"
 Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "3.0.0-fluent"
-Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
+Core.UI_VERSION = Core.ALLERAL_UI_VERSION
 
 local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
@@ -299,15 +299,15 @@ function Core.installResilience()
 	end
 end
 
-function Core.getWindUi()
+function Core.getUiRuntime()
 	local ui = ENV.Alleral_UI
 	if type(ui) ~= "table" then return nil end
 	return ui.Library or ui.Alleral
 end
 
-function Core.notifyWindUi(payload)
-	local windUi = Core.getWindUi()
-	if not windUi then return false end
+function Core.notifyUi(payload)
+	local uiRuntime = Core.getUiRuntime()
+	if not uiRuntime then return false end
 	local notifyPayload = type(payload) == "table" and payload or { Description = tostring(payload) }
 	if notifyPayload.Content and not notifyPayload.Description then
 		notifyPayload.Description = notifyPayload.Content
@@ -315,11 +315,11 @@ function Core.notifyWindUi(payload)
 	if notifyPayload.Duration and not notifyPayload.Lifetime then
 		notifyPayload.Lifetime = notifyPayload.Duration
 	end
-	if type(windUi.Notification) == "function" then
-		return pcall(windUi.Notification, windUi, notifyPayload)
+	if type(uiRuntime.Notification) == "function" then
+		return pcall(uiRuntime.Notification, uiRuntime, notifyPayload)
 	end
-	if type(windUi.Notify) == "function" then
-		return pcall(windUi.Notify, windUi, notifyPayload)
+	if type(uiRuntime.Notify) == "function" then
+		return pcall(uiRuntime.Notify, uiRuntime, notifyPayload)
 	end
 	return false
 end
@@ -339,7 +339,7 @@ function Core.flushPendingNotifications()
 	end
 	ENV._AlleralPendingNotifies = {}
 	for _, payload in ipairs(queue) do
-		Core.notifyWindUi(payload)
+		Core.notifyUi(payload)
 	end
 end
 
@@ -381,11 +381,11 @@ function Core.notify(title, text, duration, notifyType)
 		Type = notifyType,
 	}
 
-	if Core.notifyWindUi(payload) then
+	if Core.notifyUi(payload) then
 		return
 	end
 
-	if Core.getWindUi() then
+	if Core.getUiRuntime() then
 		Core.queueNotification(payload)
 		return
 	end

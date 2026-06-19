@@ -118,7 +118,7 @@ if ($release.fluentVersion)
     }
 }
 
-foreach ($field in @("telemetry", "analytics", "helpers", "security", "access", "weao", "core", "alleral", "windui", "ui"))
+foreach ($field in @("telemetry", "analytics", "helpers", "security", "access", "weao", "core", "uiVersion", "ui"))
 {
     $expected = $release.$field
     if (-not $expected)
@@ -303,14 +303,6 @@ if ($site.coreVersion -ne $release.core)
 {
     Pass "site coreVersion $($site.coreVersion)"
 }
-if ($release.rayfieldVersion -and $site.rayfieldVersion -ne $release.rayfieldVersion)
-{
-    Fail "site.json rayfieldVersion ($($site.rayfieldVersion)) != release.json ($($release.rayfieldVersion))"
-} elseif ($release.rayfieldVersion)
-{
-    Pass "site rayfieldVersion $($site.rayfieldVersion)"
-}
-
 $analyticsPath = Join-Path $root "hub/analytics.luau"
 $analytics = Get-Content $analyticsPath -Raw
 if ($analytics -match 'Analytics\.Version = "([^"]+)"')
@@ -442,37 +434,48 @@ foreach ($pattern in $legacyPatterns)
     }
 }
 
-Get-ChildItem -Path $root -Recurse -Include *.luau,*.lua,*.json,*.md,*.ps1 -File |
-    Where-Object { $_.FullName -notmatch '\\ui\\' -and $_.Name -ne 'verify_versions.ps1' } |
+$trackedTextFiles = git -C $root ls-files -- '*.luau' '*.lua' '*.json' '*.md' '*.ps1' |
+    Where-Object { $_ -notmatch '^kick/' -and $_ -notmatch '^node_modules/' -and $_ -notmatch '\.next/' -and $_ -notmatch '^backend/site/' }
+
+$trackedTextFiles |
     ForEach-Object {
-        $text = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
+        $rel = $_
+        $full = Join-Path $root $rel
+        $name = Split-Path $rel -Leaf
+        if ($rel -match '(^|/)ui/') { return }
+        if ($name -eq 'verify_versions.ps1') { return }
+        $text = Get-Content $full -Raw -ErrorAction SilentlyContinue
         if (-not $text)
         { return
         }
-        if ($_.Name -ne 'loader.luau' -and $_.Name -ne 'bootstrap.luau' -and $text -match 'kick@main')
+        if ($name -ne 'loader.luau' -and $name -ne 'bootstrap.luau' -and $text -match 'kick@main')
         {
-            Fail "$($_.FullName.Replace($root + '\', '')) contains legacy mirror path kick@main"
+            Fail "$rel contains legacy mirror path kick@main"
         }
-        if ($_.Name -ne 'loader.luau' -and $_.Name -ne 'bootstrap.luau' -and $text -match '\.net/gh/')
+        if ($name -ne 'loader.luau' -and $name -ne 'bootstrap.luau' -and $text -match '\.net/gh/')
         {
-            Fail "$($_.FullName.Replace($root + '\', '')) contains legacy .net/gh/ mirror URL"
+            Fail "$rel contains legacy .net/gh/ mirror URL"
         }
     }
 
-Get-ChildItem -Path $root -Recurse -Include *.luau,*.lua,*.ps1 -File |
-    Where-Object { ($_.FullName -notmatch '\\ui\\') -and ($_.Name -ne 'loader.luau') -and ($_.Name -ne 'bootstrap.luau') -and ($_.Name -ne 'verify_versions.ps1') } |
+$trackedTextFiles |
+    Where-Object { $_ -match '\.(luau|lua|ps1)$' } |
     ForEach-Object {
-        $text = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
+        $rel = $_
+        $full = Join-Path $root $rel
+        $name = Split-Path $rel -Leaf
+        if ($rel -match '(^|/)ui/' -or $name -eq 'loader.luau' -or $name -eq 'bootstrap.luau' -or $name -eq 'verify_versions.ps1') { return }
+        $text = Get-Content $full -Raw -ErrorAction SilentlyContinue
         if (-not $text)
         { return
         }
         if ($text -match '\[Alleral Loader v3\.' -or $text -match 'LOADER_VERSION = "3\.')
         {
-            Fail "$($_.FullName.Replace($root + '\', '')) contains v3.x loader markers"
+            Fail "$rel contains v3.x loader markers"
         }
         if ($text -match 'EMBEDDED_LOADER =')
         {
-            Fail "$($_.FullName.Replace($root + '\', '')) contains EMBEDDED_LOADER"
+            Fail "$rel contains EMBEDDED_LOADER"
         }
     }
 

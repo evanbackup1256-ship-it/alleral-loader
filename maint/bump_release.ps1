@@ -54,8 +54,7 @@ $fallbackFields = @(
     @{ Key = "weao"; Prop = "weao" },
     @{ Key = "security"; Prop = "security" },
     @{ Key = "access"; Prop = "access" },
-    @{ Key = "alleral"; Prop = "alleral" },
-    @{ Key = "windui"; Prop = "windui" },
+    @{ Key = "uiVersion"; Prop = "uiVersion" },
     @{ Key = "ui"; Prop = "ui" }
 )
 foreach ($field in $fallbackFields) {
@@ -95,20 +94,8 @@ $siteRaw = [regex]::Replace($siteRaw, 'bootstrap\.luau\?v=[^"&]+', ('bootstrap.l
 $siteRaw = [regex]::Replace($siteRaw, '"coreVersion"\s*:\s*"[^"]*"', ('"coreVersion": "' + $release.core + '"'))
 $uiLibrary = if ($release.ui) { $release.ui } else { "Fluent" }
 $siteRaw = [regex]::Replace($siteRaw, '"uiLibrary"\s*:\s*"[^"]*"', ('"uiLibrary": "' + $uiLibrary + '"'))
-$uiVersion = if ($release.alleral) { $release.alleral } elseif ($release.windui) { $release.windui } else { "2.0.0-rayfield" }
+$uiVersion = if ($release.uiVersion) { $release.uiVersion } else { "3.0.0-fluent" }
 $siteRaw = [regex]::Replace($siteRaw, '"uiVersion"\s*:\s*"[^"]*"', ('"uiVersion": "' + $uiVersion + '"'))
-if ($null -ne $release.rayfieldVersion) {
-    $rayfieldVersionVal = [int]$release.rayfieldVersion
-    if ($siteRaw -match '"rayfieldVersion"\s*:\s*\d+') {
-        $siteRaw = [regex]::Replace($siteRaw, '"rayfieldVersion"\s*:\s*\d+', ('"rayfieldVersion": ' + $rayfieldVersionVal))
-    } else {
-        $siteRaw = [regex]::Replace(
-            $siteRaw,
-            '("uiVersion"\s*:\s*"[^"]*"\s*,)',
-            ('$1' + "`n  ""rayfieldVersion"": " + $rayfieldVersionVal + ",")
-        )
-    }
-}
 if ($hashBumpNeeded) {
     $siteRaw = [regex]::Replace($siteRaw, '"updatedAt"\s*:\s*"[^"]*"', ('"updatedAt": "' + $updatedAt + '"'))
 }

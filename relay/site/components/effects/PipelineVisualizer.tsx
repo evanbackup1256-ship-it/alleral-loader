@@ -6,7 +6,7 @@ import { StatusDot } from "./StatusDot";
 const steps = [
   { icon: Globe, title: "Fetch", desc: "Loader requests the release manifest from the relay.", color: "#00f0c8" },
   { icon: Lock, title: "Verify", desc: "Versions, commit hashes, and runtime integrity are checked.", color: "#00d4ff" },
-  { icon: Layers, title: "Compose", desc: "Iris runtime, Onyx resources, and capability stack are assembled.", color: "#7c3aed" },
+  { icon: Layers, title: "Compose", desc: "Fluent runtime and capability stack are assembled.", color: "#7c3aed" },
   { icon: Zap, title: "Launch", desc: "Access, security, and telemetry modules resolve before inject.", color: "#00f0c8" },
 ];
 

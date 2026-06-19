@@ -43,7 +43,7 @@ return function(Core)
 			signalBootFailure(msg)
 			return nil, nil, msg
 		end
-		for _, fnName in ipairs({ "buildUiWindow", "buildUiTab", "buildUiGroup", "wrapUiGroup", "createWindUiGroupbox" }) do
+		for _, fnName in ipairs({ "buildUiWindow", "buildUiTab", "buildUiGroup", "wrapUiGroup", "createUiGroupbox" }) do
 			if type(core[fnName]) ~= "function" then
 				local msg = "Core outdated -- missing " .. fnName
 				signalBootFailure(msg)
@@ -273,7 +273,7 @@ return function(Core)
 		return icon
 	end
 
-	Core.windUiIcon = Core.windUiIcon or function(icon)
+	Core.uiIcon = Core.uiIcon or function(icon)
 		return icon
 	end
 

@@ -518,10 +518,8 @@ function Telemetry:_context(extra)
 		telemetryVersion = Telemetry.Version,
 		releaseCommit = loaderMeta.releaseCommit or expected.commit,
 		coreVersion = type(core) == "table" and core.VERSION or expected.core,
-		windUiVersion = type(core) == "table" and (core.ALLERAL_UI_VERSION or core.WINDUI_VERSION) or nil,
-		alleralUiVersion = type(core) == "table" and core.ALLERAL_UI_VERSION or nil,
+		uiVersion = type(core) == "table" and core.ALLERAL_UI_VERSION or nil,
 		uiLibrary = type(core) == "table" and core.UI_LIBRARY or expected.ui,
-		sydePatch = expected.sydePatch,
 		gameId = loaderMeta.profile,
 		gameName = placeName,
 		scriptName = loaderMeta.profile,
@@ -615,7 +613,7 @@ function Telemetry:_buildEmbed(payload)
 				"core v%s · %s v%s",
 				tostring(context.coreVersion or "?"),
 				tostring(context.uiLibrary or "UI"),
-				tostring(context.alleralUiVersion or context.windUiVersion or "?")
+				tostring(context.uiVersion or "?")
 			),
 			true
 		)

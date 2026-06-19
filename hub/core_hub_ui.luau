@@ -247,7 +247,7 @@ function Core.repairUiWindow(window)
 	if type(window) ~= "table" or not window._rawWindow then
 		return false
 	end
-	local lib = window._library or Core.getWindUi()
+	local lib = window._library or Core.getUiRuntime()
 	if not lib or type(lib.RepairWindow) ~= "function" then
 		return false
 	end
@@ -1363,7 +1363,7 @@ function Core.buildUiPreferencesGroup(tab, options)
 	if not uiBundle and type(options.window) == "table" then
 		uiBundle = options.window._ui
 	end
-	local windUi = uiBundle and (uiBundle.WindUI or uiBundle.Library)
+	local uiRuntime = uiBundle and (uiBundle.UiRuntime or uiBundle.Library)
 	local group = Core.buildUiGroup(tab, "UI tools", column, nil, nil, "UiPreferences")
 
 	group:CreateButton("Test success toast", function()
@@ -1375,8 +1375,8 @@ function Core.buildUiPreferencesGroup(tab, options)
 	end, "Fire a warning toast.")
 
 	group:CreateButton("Clear all toasts", function()
-		if windUi and type(windUi.ClearNotifications) == "function" then
-			local cleared = windUi:ClearNotifications()
+		if uiRuntime and type(uiRuntime.ClearNotifications) == "function" then
+			local cleared = uiRuntime:ClearNotifications()
 			Core.notify("Alleral", "cleared " .. tostring(cleared or 0), 2, "info")
 		else
 			Core.notify("Alleral", "Clear unavailable.", 3, "warn")
@@ -1384,8 +1384,8 @@ function Core.buildUiPreferencesGroup(tab, options)
 	end, "Dismiss visible toasts.")
 
 	group:CreateButton("Repair UI chrome", function()
-		if windUi and type(windUi.RepairWindow) == "function" then
-			local ok = windUi:RepairWindow()
+		if uiRuntime and type(uiRuntime.RepairWindow) == "function" then
+			local ok = uiRuntime:RepairWindow()
 			Core.notify("Alleral", ok and "UI repaired." or "Repair failed.", 3, ok and "success" or "error")
 		else
 			Core.notify("Alleral", "Repair unavailable.", 3, "warn")
@@ -1398,9 +1398,9 @@ function Core.buildUiPreferencesGroup(tab, options)
 		"Move toasts to the bottom-right.",
 		function(value)
 			ENV.Alleral_NotifyLower = value == true
-			if windUi and type(windUi.SetNotificationLower) == "function" then
+			if uiRuntime and type(uiRuntime.SetNotificationLower) == "function" then
 				pcall(function()
-					windUi:SetNotificationLower(value)
+					uiRuntime:SetNotificationLower(value)
 				end)
 			end
 		end
@@ -1486,15 +1486,15 @@ function Core.hsvToColor(h, s, v)
 	return Color3.new(r + m, g + m, b + m)
 end
 
-function Core.applyThemeAccent(windUi, color)
-	if type(windUi) ~= "table" or typeof(color) ~= "Color3" then
+function Core.applyThemeAccent(uiRuntime, color)
+	if type(uiRuntime) ~= "table" or typeof(color) ~= "Color3" then
 		return false
 	end
-	if type(windUi.SetAccentColor) == "function" then
+	if type(uiRuntime.SetAccentColor) == "function" then
 		pcall(function()
-			windUi:SetAccentColor(color)
-			if type(windUi.FlashAccent) == "function" then
-				windUi:FlashAccent()
+			uiRuntime:SetAccentColor(color)
+			if type(uiRuntime.FlashAccent) == "function" then
+				uiRuntime:FlashAccent()
 			end
 		end)
 		return true
@@ -1509,7 +1509,7 @@ function Core.buildThemeStudioGroup(tab, options)
 	if not uiBundle and type(options.window) == "table" then
 		uiBundle = options.window._ui
 	end
-	local windUi = uiBundle and (uiBundle.WindUI or uiBundle.Library)
+	local uiRuntime = uiBundle and (uiBundle.UiRuntime or uiBundle.Library)
 	local group = Core.buildUiGroup(tab, "Theme studio", column, nil, nil, "ThemeStudio")
 
 	ENV.Alleral_AccentHue = tonumber(ENV.Alleral_AccentHue) or 108
@@ -1519,7 +1519,7 @@ function Core.buildThemeStudioGroup(tab, options)
 
 	local function pushAccent()
 		local color = Core.hsvToColor(ENV.Alleral_AccentHue, ENV.Alleral_AccentSat, ENV.Alleral_AccentVal)
-		Core.applyThemeAccent(windUi, color)
+		Core.applyThemeAccent(uiRuntime, color)
 	end
 
 	group:CreateToggle("Live preview", ENV.Alleral_UiRgbLive ~= false, "Update accent while dragging sliders.", function(value)
@@ -1553,9 +1553,9 @@ function Core.buildThemeStudioGroup(tab, options)
 		local win = options.window
 		if type(win) == "table" and win._rawWindow and type(win._rawWindow.SetTheme) == "function" then
 			win._rawWindow:SetTheme(value)
-		elseif windUi and type(windUi.SetTheme) == "function" then
+		elseif uiRuntime and type(uiRuntime.SetTheme) == "function" then
 			pcall(function()
-				windUi:SetTheme(value)
+				uiRuntime:SetTheme(value)
 			end)
 		end
 		Core.notify("Alleral", "Theme: " .. tostring(value), 2)
@@ -1566,11 +1566,11 @@ function Core.buildThemeStudioGroup(tab, options)
 		ENV.Alleral_AccentHue = 108
 		ENV.Alleral_AccentSat = 0.92
 		ENV.Alleral_AccentVal = 0.96
-		if windUi and type(windUi.ApplyAccentPreset) == "function" then
+		if uiRuntime and type(uiRuntime.ApplyAccentPreset) == "function" then
 			pcall(function()
-				windUi:ApplyAccentPreset("Mint")
-				if type(windUi.FlashAccent) == "function" then
-					windUi:FlashAccent()
+				uiRuntime:ApplyAccentPreset("Mint")
+				if type(uiRuntime.FlashAccent) == "function" then
+					uiRuntime:FlashAccent()
 				end
 			end)
 		else
@@ -1588,18 +1588,18 @@ function Core.buildCustomizationStudioGroup(tab, options)
 	if not uiBundle and type(options.window) == "table" then
 		uiBundle = options.window._ui
 	end
-	local windUi = uiBundle and (uiBundle.WindUI or uiBundle.Library)
+	local uiRuntime = uiBundle and (uiBundle.UiRuntime or uiBundle.Library)
 	local group = Core.buildUiGroup(tab, "Customization V2", column, nil, nil, "CustomizationV2")
 
-	if not windUi or type(windUi.SetMotionProfile) ~= "function" then
+	if not uiRuntime or type(uiRuntime.SetMotionProfile) ~= "function" then
 		group:CreateLabel("Fluent native UI engine with config saving.")
 		return group
 	end
 
 	local motionProfiles = { "fluid", "snappy", "bouncy", "cinematic", "reduced" }
-	if type(windUi.ListMotionProfiles) == "function" then
+	if type(uiRuntime.ListMotionProfiles) == "function" then
 		local ok, listed = pcall(function()
-			return windUi:ListMotionProfiles()
+			return uiRuntime:ListMotionProfiles()
 		end)
 		if ok and type(listed) == "table" and #listed > 0 then
 			motionProfiles = listed
@@ -1607,9 +1607,9 @@ function Core.buildCustomizationStudioGroup(tab, options)
 	end
 
 	local layoutProfiles = { "auto", "desktop", "mobile", "compact", "cinema", "ultrawide", "minimal", "accessibility", "performance" }
-	if type(windUi.ListProfiles) == "function" then
+	if type(uiRuntime.ListProfiles) == "function" then
 		local ok, listed = pcall(function()
-			return windUi:ListProfiles()
+			return uiRuntime:ListProfiles()
 		end)
 		if ok and type(listed) == "table" and #listed > 0 then
 			layoutProfiles = { "auto" }
@@ -1628,7 +1628,7 @@ function Core.buildCustomizationStudioGroup(tab, options)
 		"ArrrelNeon",
 		"ArrrelMidnight",
 		"ArrrelAurora",
-		"ArrrelObsidian",
+		"ArrrelShadow",
 		"ArrrelSynth",
 		"ArrrelOcean",
 		"ArrrelEmber",
@@ -1636,9 +1636,9 @@ function Core.buildCustomizationStudioGroup(tab, options)
 		"ArrrelPaper",
 		"ArrrelVoid",
 	}
-	if type(windUi.ListThemeNames) == "function" then
+	if type(uiRuntime.ListThemeNames) == "function" then
 		local ok, listed = pcall(function()
-			return windUi:ListThemeNames()
+			return uiRuntime:ListThemeNames()
 		end)
 		if ok and type(listed) == "table" and #listed > 0 then
 			v2Themes = listed
@@ -1647,9 +1647,9 @@ function Core.buildCustomizationStudioGroup(tab, options)
 
 	group:CreateDropdown("Layout profile", layoutProfiles, ENV.Alleral_UiProfile or "auto", function(selected)
 		ENV.Alleral_UiProfile = tostring(selected or "auto")
-		if type(windUi.ApplyProfile) == "function" then
+		if type(uiRuntime.ApplyProfile) == "function" then
 			pcall(function()
-				windUi:ApplyProfile(ENV.Alleral_UiProfile)
+				uiRuntime:ApplyProfile(ENV.Alleral_UiProfile)
 			end)
 		end
 		Core.notify("Alleral V2", "Layout: " .. tostring(selected), 2, "success")
@@ -1657,12 +1657,12 @@ function Core.buildCustomizationStudioGroup(tab, options)
 
 	group:CreateToggle("Smart auto resize", ENV.Alleral_UiAutoResize ~= false, "AI-fit the menu to your screen and rotation.", function(value)
 		ENV.Alleral_UiAutoResize = value ~= false
-		if type(windUi.SetAutoResize) == "function" then
+		if type(uiRuntime.SetAutoResize) == "function" then
 			pcall(function()
-				windUi:SetAutoResize(value)
+				uiRuntime:SetAutoResize(value)
 			end)
 		end
-		local info = type(windUi.GetLayoutInfo) == "function" and windUi:GetLayoutInfo() or nil
+		local info = type(uiRuntime.GetLayoutInfo) == "function" and uiRuntime:GetLayoutInfo() or nil
 		if info and info.profile then
 			Core.notify("Alleral", "Fit: " .. tostring(info.profile) .. " · " .. string.format("%.0f%%", (info.scale or 1) * 100), 2, "info")
 		end
@@ -1670,19 +1670,19 @@ function Core.buildCustomizationStudioGroup(tab, options)
 
 	group:CreateSlider("UI scale boost", 85, 115, math.floor((tonumber(ENV.Alleral_UiScale) or 1) * 100), function(value)
 		ENV.Alleral_UiScale = value / 100
-		if type(windUi.SetUiScale) == "function" then
+		if type(uiRuntime.SetUiScale) == "function" then
 			pcall(function()
-				windUi:SetUiScale(value / 100)
+				uiRuntime:SetUiScale(value / 100)
 			end)
 		end
 	end, "Fine-tune on top of smart auto resize.", 1)
 
 	group:CreateButton("Recalculate layout", function()
-		if type(windUi.ApplyProfile) == "function" then
+		if type(uiRuntime.ApplyProfile) == "function" then
 			local ok, profile = pcall(function()
-				return windUi:ApplyProfile(ENV.Alleral_UiProfile or "auto")
+				return uiRuntime:ApplyProfile(ENV.Alleral_UiProfile or "auto")
 			end)
-			local info = type(windUi.GetLayoutInfo) == "function" and windUi:GetLayoutInfo() or nil
+			local info = type(uiRuntime.GetLayoutInfo) == "function" and uiRuntime:GetLayoutInfo() or nil
 			if ok and info then
 				Core.notify(
 					"Alleral",
@@ -1696,137 +1696,137 @@ function Core.buildCustomizationStudioGroup(tab, options)
 		end
 	end, "Re-run the smart fit for your current viewport.")
 
-	group:CreateDropdown("Motion feel", motionProfiles, (type(windUi.GetMotionProfile) == "function" and windUi:GetMotionProfile()) or "fluid", function(selected)
-		if type(windUi.SetMotionProfile) == "function" then
-			windUi:SetMotionProfile(selected)
+	group:CreateDropdown("Motion feel", motionProfiles, (type(uiRuntime.GetMotionProfile) == "function" and uiRuntime:GetMotionProfile()) or "fluid", function(selected)
+		if type(uiRuntime.SetMotionProfile) == "function" then
+			uiRuntime:SetMotionProfile(selected)
 		end
 		Core.notify("Alleral V2", "Motion: " .. tostring(selected), 2, "info")
 	end, "Spring personality for tabs, toggles, and panels.")
 
-	group:CreateSlider("Glass intensity", 0, 100, math.floor(((type(windUi.GetGlassIntensity) == "function" and windUi:GetGlassIntensity()) or 0.55) * 100), function(value)
-		if type(windUi.SetGlassIntensity) == "function" then
-			windUi:SetGlassIntensity(value / 100)
+	group:CreateSlider("Glass intensity", 0, 100, math.floor(((type(uiRuntime.GetGlassIntensity) == "function" and uiRuntime:GetGlassIntensity()) or 0.55) * 100), function(value)
+		if type(uiRuntime.SetGlassIntensity) == "function" then
+			uiRuntime:SetGlassIntensity(value / 100)
 		end
 	end, "Sidebar veil and ambient glass strength.", 1)
 
 	group:CreateSlider("Chrome depth", 0, 100, math.floor((tonumber(ENV.Alleral_ChromeDepth) or 0.65) * 100), function(value)
 		ENV.Alleral_ChromeDepth = value / 100
-		if type(windUi.SetChromeDepth) == "function" then
-			windUi:SetChromeDepth(value / 100)
+		if type(uiRuntime.SetChromeDepth) == "function" then
+			uiRuntime:SetChromeDepth(value / 100)
 		end
 	end, "Glow spread and section elevation.", 1)
 
-	group:CreateDropdown("Tooltip style", { "minimal", "card", "rich" }, (type(windUi.GetTooltipStyle) == "function" and windUi:GetTooltipStyle()) or "rich", function(selected)
-		if type(windUi.SetTooltipStyle) == "function" then
-			windUi:SetTooltipStyle(selected)
+	group:CreateDropdown("Tooltip style", { "minimal", "card", "rich" }, (type(uiRuntime.GetTooltipStyle) == "function" and uiRuntime:GetTooltipStyle()) or "rich", function(selected)
+		if type(uiRuntime.SetTooltipStyle) == "function" then
+			uiRuntime:SetTooltipStyle(selected)
 		end
 	end, "Hover hint presentation.")
 
-	group:CreateDropdown("Toast style", { "glass", "rail", "banner", "pill" }, (type(windUi.GetNotificationStyle) == "function" and windUi:GetNotificationStyle()) or "glass", function(selected)
-		if type(windUi.SetNotificationStyle) == "function" then
-			windUi:SetNotificationStyle(selected)
+	group:CreateDropdown("Toast style", { "glass", "rail", "banner", "pill" }, (type(uiRuntime.GetNotificationStyle) == "function" and uiRuntime:GetNotificationStyle()) or "glass", function(selected)
+		if type(uiRuntime.SetNotificationStyle) == "function" then
+			uiRuntime:SetNotificationStyle(selected)
 		end
 	end, "Notification chrome variant.")
 
 	group:CreateToggle("Ambient window glow", ENV.Alleral_AmbientGlow ~= false, "Soft accent halo behind the window.", function(value)
 		ENV.Alleral_AmbientGlow = value ~= false
-		if type(windUi.SetAmbientGlow) == "function" then
-			windUi:SetAmbientGlow(value)
+		if type(uiRuntime.SetAmbientGlow) == "function" then
+			uiRuntime:SetAmbientGlow(value)
 		end
 	end)
 
 	group:CreateToggle("Tab aurora rail", ENV.Alleral_TabAurora ~= false, "Accent pulse on sidebar tabs.", function(value)
 		ENV.Alleral_TabAurora = value ~= false
-		if type(windUi.SetTabAurora) == "function" then
-			windUi:SetTabAurora(value)
+		if type(uiRuntime.SetTabAurora) == "function" then
+			uiRuntime:SetTabAurora(value)
 		end
 	end)
 
 	group:CreateToggle("Section lift", ENV.Alleral_SectionLift ~= false, "Elevated cards with accent edge glow.", function(value)
 		ENV.Alleral_SectionLift = value ~= false
-		if type(windUi.SetSectionLift) == "function" then
-			windUi:SetSectionLift(value)
+		if type(uiRuntime.SetSectionLift) == "function" then
+			uiRuntime:SetSectionLift(value)
 		end
 	end)
 
 	group:CreateToggle("UIStroke glow", ENV.Alleral_StrokeGlow ~= false, "Animated accent pulse on borders.", function(value)
 		ENV.Alleral_StrokeGlow = value ~= false
-		if type(windUi.SetStrokeGlow) == "function" then
-			windUi:SetStrokeGlow(value)
+		if type(uiRuntime.SetStrokeGlow) == "function" then
+			uiRuntime:SetStrokeGlow(value)
 		end
 	end)
 
 	group:CreateSlider("Glow intensity", 0, 100, math.floor((tonumber(ENV.Alleral_StrokeGlowIntensity) or 0.65) * 100), function(value)
 		ENV.Alleral_StrokeGlowIntensity = value / 100
-		if type(windUi.SetStrokeGlowIntensity) == "function" then
-			windUi:SetStrokeGlowIntensity(value / 100)
+		if type(uiRuntime.SetStrokeGlowIntensity) == "function" then
+			uiRuntime:SetStrokeGlowIntensity(value / 100)
 		end
 	end, "How strong the UIStroke pulse feels.", 1)
 
 	group:CreateToggle("Dropdown animations", ENV.Alleral_DropdownAnimations ~= false, "Smooth expand/collapse on menus.", function(value)
 		ENV.Alleral_DropdownAnimations = value ~= false
-		if type(windUi.SetDropdownAnimations) == "function" then
-			windUi:SetDropdownAnimations(value)
+		if type(uiRuntime.SetDropdownAnimations) == "function" then
+			uiRuntime:SetDropdownAnimations(value)
 		end
 	end)
 
 	group:CreateToggle("Slider animations", ENV.Alleral_SliderAnimations ~= false, "Glow and thumb bounce while dragging.", function(value)
 		ENV.Alleral_SliderAnimations = value ~= false
-		if type(windUi.SetSliderAnimations) == "function" then
-			windUi:SetSliderAnimations(value)
+		if type(uiRuntime.SetSliderAnimations) == "function" then
+			uiRuntime:SetSliderAnimations(value)
 		end
 	end)
 
 	group:CreateToggle("Toggle animations", ENV.Alleral_ToggleAnimations ~= false, "Springy switch motion.", function(value)
 		ENV.Alleral_ToggleAnimations = value ~= false
-		if type(windUi.SetToggleAnimations) == "function" then
-			windUi:SetToggleAnimations(value)
+		if type(uiRuntime.SetToggleAnimations) == "function" then
+			uiRuntime:SetToggleAnimations(value)
 		end
 	end)
 
 	group:CreateToggle("Button hover FX", ENV.Alleral_ButtonHover ~= false, "Highlight labels on hover.", function(value)
 		ENV.Alleral_ButtonHover = value ~= false
-		if type(windUi.SetButtonHoverEffects) == "function" then
-			windUi:SetButtonHoverEffects(value)
+		if type(uiRuntime.SetButtonHoverEffects) == "function" then
+			uiRuntime:SetButtonHoverEffects(value)
 		end
 	end)
 
 	group:CreateToggle("Button click FX", ENV.Alleral_ButtonClick ~= false, "Press scale on buttons.", function(value)
 		ENV.Alleral_ButtonClick = value ~= false
-		if type(windUi.SetButtonClickEffects) == "function" then
-			windUi:SetButtonClickEffects(value)
+		if type(uiRuntime.SetButtonClickEffects) == "function" then
+			uiRuntime:SetButtonClickEffects(value)
 		end
 	end)
 
 	group:CreateToggle("Tab switch FX", ENV.Alleral_TabSwitchAnimation ~= false, "Slide/fade when changing tabs.", function(value)
 		ENV.Alleral_TabSwitchAnimation = value ~= false
-		if type(windUi.SetTabSwitchAnimation) == "function" then
-			windUi:SetTabSwitchAnimation(value)
+		if type(uiRuntime.SetTabSwitchAnimation) == "function" then
+			uiRuntime:SetTabSwitchAnimation(value)
 		end
 	end)
 
 	group:CreateToggle("Notification FX", ENV.Alleral_NotificationAnimations ~= false, "Slide and scale on toasts.", function(value)
 		ENV.Alleral_NotificationAnimations = value ~= false
-		if type(windUi.SetNotificationAnimations) == "function" then
-			windUi:SetNotificationAnimations(value)
+		if type(uiRuntime.SetNotificationAnimations) == "function" then
+			uiRuntime:SetNotificationAnimations(value)
 		end
 	end)
 
 	group:CreateDropdown("V2 theme", v2Themes, ENV.Alleral_ActiveTheme or "Arrrel", function(selected)
-		if type(windUi.SetTheme) == "function" then
+		if type(uiRuntime.SetTheme) == "function" then
 			pcall(function()
-				windUi:SetTheme(selected)
-				if type(windUi.FlashAccent) == "function" then
-					windUi:FlashAccent()
+				uiRuntime:SetTheme(selected)
+				if type(uiRuntime.FlashAccent) == "function" then
+					uiRuntime:FlashAccent()
 				end
 			end)
 		end
 	end, "Full V2 theme presets including Synth, Ocean, and Void.")
 
 	group:CreateButton("Cycle V2 themes", function()
-		if type(windUi.CycleV2Theme) == "function" then
+		if type(uiRuntime.CycleV2Theme) == "function" then
 			local ok, nextTheme = pcall(function()
-				return windUi:CycleV2Theme(1)
+				return uiRuntime:CycleV2Theme(1)
 			end)
 			if ok and nextTheme then
 				Core.notify("Alleral V2", "Theme: " .. tostring(nextTheme), 2, "success")
@@ -1835,9 +1835,9 @@ function Core.buildCustomizationStudioGroup(tab, options)
 	end, "Step through the expanded V2 palette.")
 
 	group:CreateButton("Export look", function()
-		if type(windUi.ExportCustomization) == "function" then
+		if type(uiRuntime.ExportCustomization) == "function" then
 			local ok, payload = pcall(function()
-				return windUi:ExportCustomization()
+				return uiRuntime:ExportCustomization()
 			end)
 			if ok and type(payload) == "table" and Core.setClipboard then
 				local encoded = game:GetService("HttpService"):JSONEncode(payload)
@@ -1891,9 +1891,9 @@ function Core.buildAdvancedHubGroup(tab, options)
 	)
 	group:CreateButton("Repair UI", function()
 		local ui = ENV.Alleral_UI
-		local windUi = ui and (ui.WindUI or ui.Library)
-		if windUi and type(windUi.RepairWindow) == "function" then
-			local ok = windUi:RepairWindow()
+		local uiRuntime = ui and (ui.UiRuntime or ui.Library)
+		if uiRuntime and type(uiRuntime.RepairWindow) == "function" then
+			local ok = uiRuntime:RepairWindow()
 			Core.notify("Arrrel", ok and "UI repaired." or "Repair failed.", 3, ok and "success" or "error")
 		else
 			Core.notify("Arrrel", "Repair unavailable.", 3, "warn")

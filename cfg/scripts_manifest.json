@@ -14,7 +14,7 @@
 
       "version": "7.3.2",
 
-      "message": "Mobile UI layout (stacked columns, fullscreen sizing) and MacLib column crash fix.",
+      "message": "Mobile UI layout with stacked columns and fullscreen sizing.",
 
       "updatedAt": "2026-06-16T03:05:00+00:00",
 
@@ -137,4 +137,3 @@
   }
 
 }
-

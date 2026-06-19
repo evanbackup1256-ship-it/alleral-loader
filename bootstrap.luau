@@ -1,4 +1,4 @@
-﻿-- Alleral Bootstrap v2.1.0 -- universal loadstring, never needs changing
+-- Alleral Bootstrap v2.1.0 -- universal loadstring, never needs changing
 -- Fetches the latest loader.luau from multiple CDN sources. No hardcoded pins.
 local BOOTSTRAP_VERSION = "2.1.0"
 local REPO = "evanbackup1256-ship-it/-kick-loader"

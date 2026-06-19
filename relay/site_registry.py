@@ -26,7 +26,6 @@ class SiteRegistry:
         "coreVersion",
         "uiLibrary",
         "uiVersion",
-        "sydePatch",
         "features",
         "faq",
         "changelog",

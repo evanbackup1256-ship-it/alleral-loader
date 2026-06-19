@@ -76,7 +76,6 @@ func (s *Server) LiveStatus(w http.ResponseWriter, r *http.Request) {
 			"core":      site["coreVersion"],
 			"ui":        site["uiLibrary"],
 			"uiVersion": site["uiVersion"],
-			"sydePatch": site["sydePatch"],
 		},
 		"release": map[string]any{
 			"commit":    firstNonEmpty(asString(release["commit"], ""), asString(site["githubCommit"], "")),

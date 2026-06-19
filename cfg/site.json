@@ -1,20 +1,19 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-17T01:17:59Z",
+  "updatedAt": "2026-06-19T23:24:58Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
   "loaderVersion": "8.11.1",
   "coreVersion": "2.9.10",
   "uiLibrary": "Fluent",
-  "uiVersion": "1.0.0-rayfield",
-  "rayfieldVersion": 1,
+  "uiVersion": "3.0.0-fluent",
   "announcement": "",
   "loadstring": "loadstring(game:HttpGet(\"https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/bootstrap.luau?v=2.0.4&t=\" .. tick(), true))()",
   "repo": "evanbackup1256-ship-it/kick",
   "branch": "main",
   "features": [
     "Picks the right game script when you inject",
-    "Rayfield UI main menu with Onyx resources, Fusion, and Spring",
+    "Fluent UI main menu with one active runtime",
     "Site and scripts pull straight from GitHub",
     "Game status comes from real injects, not guesses",
     "Updates show up within about a minute of a push",
@@ -49,45 +48,6 @@
   "changelog": [
     {
       "date": "2026-06-16",
-      "title": "Loader 8.8.8 — Fix Xeno boot loop",
-      "items": [
-        "Fixed infinite bootstrap relaunch when remote release.json lagged behind embedded MacLib v13",
-        "MacLib CDN now pins embedded commit instead of stale remote hash",
-        "Only auto-update when embedded MacLib is behind remote, not ahead"
-      ]
-    },
-    {
-      "date": "2026-06-16",
-      "title": "MacLib v13 — Smart Resizer & Layout Fix",
-      "items": [
-        "Fixed section/card overlap — elements now get proper layout order automatically",
-        "Rewrote auto-resizer: viewport-fill sizing, no double-shrink, smooth resize animations",
-        "Hub exploit tools moved to Tools tab; game server/webhook controls on Misc tab",
-        "Default window 920×680 — scales cleanly from mobile to ultrawide"
-      ]
-    },
-    {
-      "date": "2026-06-16",
-      "title": "MacLib v12 — Layout Fix & Premium Animations",
-      "items": [
-        "Fixed overlapping text in 3-column tabs — responsive stack when window is too narrow",
-        "Inputs and dropdowns now stack vertically with proper spacing (no more cramped filters)",
-        "New animations: ripple clicks, header shimmer, tab parallax, staggered section reveals",
-        "Mobile keeps animations but disables only heavy glow/blur loops for stability"
-      ]
-    },
-    {
-      "date": "2026-06-16",
-      "title": "MacLib v11 — Mobile Stability Fix",
-      "items": [
-        "Fixed mobile crash from layout feedback loops and heavy UI effects",
-        "Mobile safe mode disables glow and blur loops automatically",
-        "Smaller capped window size on touch devices (680×500 max)",
-        "Touch-safe sidebar and resize grip input handling"
-      ]
-    },
-    {
-      "date": "2026-06-16",
       "title": "All Games — Performance & Stability Pass",
       "items": [
         "Every game script now includes FPS boost, RTX mod, and black screen mode (Settings → Performance)",
@@ -117,8 +77,7 @@
         "Complete hub UI redesign — sharper glass panels, timeline updates, live sync badges",
         "Fixed executor crash: thin bootstrap (v2.0.1) fetches loader again — works on all executors",
         "Admin panel routing fixed — opens reliably from search and sidebar",
-        "Live site data refreshes every 30s from relay (no more stale baked snapshot)",
-        "Loader 8.8.1 · MacLib UI · faster status polling (3–5s)"
+        "Live site data refreshes every 30s from relay (no more stale baked snapshot)"
       ]
     },
     {
@@ -135,15 +94,13 @@
       "title": "Kick A Lucky Block 7.2.2 — Xeno Module & UI Fixes",
       "items": [
         "Improved gameRequire v1.3 for Xeno and low-sUNC executors",
-        "Stopped PrivateServerId client warnings and optional module log spam",
-        "Fixed Syde sidebar/page clipping on Xeno (wider rail + layout stretch)"
+        "Stopped PrivateServerId client warnings and optional module log spam"
       ]
     },
     {
       "date": "2026-06-15",
       "title": "Kick A Lucky Block 7.2.1 — Xeno UI & Module Loading Fix",
       "items": [
-        "Fixed Syde UI crash (HorizontalAlignment.Fill is invalid on Roblox)",
         "Improved game module loading under executor sandboxes (gameRequire v1.2)"
       ]
     },
@@ -239,7 +196,6 @@
       "date": "2026-06-12",
       "title": "Loader 8.2.24 — core fix + hub live tracker",
       "items": [
-        "Fix alleral_ui validation (Syde patch 18 sync) — Core failed on inject",
         "Hub website revamp with real-time live status dashboard (15s refresh)",
         "New public /api/live/status endpoint for versions, sync, and inject health"
       ]
@@ -248,17 +204,7 @@
       "date": "2026-06-12",
       "title": "Loader 8.2.23 — version lock + relay fixes",
       "items": [
-        "Bootstrap v1.0.3 — commit-pinned loader only; rejects version/commit/syde patch mismatch",
-        "Loader syncs SYDE_PATCH + RELEASE_FALLBACK from release.json; exact syde patch required",
         "Fix telemetry_feed retention SQL and admin telemetry endpoints when auto_sync is unavailable"
-      ]
-    },
-    {
-      "date": "2026-06-12",
-      "title": "Syde patch 18 — fix empty UI / toggle keybind crash",
-      "items": [
-        "Loader 8.2.22 · Syde patch 18 — stop renaming Render subtree (ToggleConfiguration KeyBind.Title)",
-        "Fixes blank hub with no tabs when a toggle uses keybind configuration"
       ]
     },
     {
@@ -289,42 +235,6 @@
       ]
     },
     {
-      "date": "2026-06-12",
-      "title": "Eternal bootstrap loadstring + Syde patch v17",
-      "items": [
-        "Loader 8.2.18 — save the bootstrap loadstring once; updates pull from GitHub automatically",
-        "Workspace cache purged each reload so stale hub/loader files never run",
-        "Syde patch v17 — silent logging, Render template fix, compat-only Alleral layer"
-      ]
-    },
-    {
-      "date": "2026-06-12",
-      "title": "Syde UI (upstream + compat fixes)",
-      "items": [
-        "Loader 8.2.16 ships essencejs Syde with a thin Alleral compat layer (patch v15)",
-        "Dropdown, modal, template casing, and Volt asset sanitization fixes kept",
-        "Syde fetch uses jsDelivr commit mirror + in-memory cache when workspace write fails"
-      ]
-    },
-    {
-      "date": "2026-06-12",
-      "title": "Maclib UI integration",
-      "items": [
-        "Loader 8.2.0 replaces custom hub/ui stack with Maclib 1.2.6",
-        "Removed Neverlose, WindUI, Fusion, OnyxUI vendor bootstrap modules",
-        "Core 2.9.0 keeps existing game script UI API via Maclib adapters"
-      ]
-    },
-    {
-      "date": "2026-06-11",
-      "title": "WindUI revamp",
-      "items": [
-        "Replaced Obsidian with WindUI across all game scripts",
-        "Alleral green accent on the open button and dark theme default",
-        "Same script API — toggles, sliders, dropdowns, and live status panels"
-      ]
-    },
-    {
       "date": "2026-06-11",
       "title": "Ban API rework",
       "items": [
@@ -343,15 +253,6 @@
         "Live/Offline indicator in the nav",
         "Bug reports from the site"
       ]
-    },
-    {
-      "date": "2026-06-10",
-      "title": "Obsidian UI",
-      "items": [
-        "Dropped Rayfield for Obsidian",
-        "Manifest-driven script list",
-        "Loader auto-update bumped to v7.2"
-      ]
     }
   ],
   "bugCategories": [
@@ -364,11 +265,22 @@
   ],
   "games": {
     "kick_a_lucky_block": {
-      "placeIds": [89469502395769],
-      "universeIds": [10004244222],
+      "placeIds": [
+        89469502395769
+      ],
+      "universeIds": [
+        10004244222
+      ],
       "robloxUrl": "https://www.roblox.com/games/89469502395769",
       "description": "Kick automation, plot tools, live roll filters, and full economy loops.",
-      "uiTabs": ["Kick", "Plot", "Events", "Inventory", "Tools", "Settings"],
+      "uiTabs": [
+        "Kick",
+        "Plot",
+        "Events",
+        "Inventory",
+        "Tools",
+        "Settings"
+      ],
       "scriptFeatures": [
         {
           "name": "Auto kick",
@@ -508,63 +420,211 @@
       ]
     },
     "sell_lemons": {
-      "placeIds": [79268393072444],
+      "placeIds": [
+        79268393072444
+      ],
       "robloxUrl": "https://www.roblox.com/games/79268393072444",
       "description": "Full lemonade stand automation — collect, offers, evolution, events, and movement.",
-      "uiTabs": ["Farm", "Offers", "Progress", "Misc", "Settings"],
+      "uiTabs": [
+        "Farm",
+        "Offers",
+        "Progress",
+        "Misc",
+        "Settings"
+      ],
       "scriptFeatures": [
-        { "name": "Auto collect lemon", "category": "Farm", "desc": "Collects lemons from your stand area." },
-        { "name": "Auto collect cash drops", "category": "Farm", "desc": "Grabs cash bags and coin drops." },
-        { "name": "Auto collect cash vine", "category": "Farm", "desc": "Collects vine cash nodes." },
-        { "name": "Auto wake income", "category": "Farm", "desc": "Wakes idle income generators." },
-        { "name": "Auto accept offer", "category": "Offers", "desc": "Accepts incoming offers automatically." },
-        { "name": "Haggle before accepting", "category": "Offers", "desc": "Runs haggle before accepting deals." },
-        { "name": "Auto buy button", "category": "Shop", "desc": "Purchases stand button upgrades." },
-        { "name": "Auto upgrade manage", "category": "Shop", "desc": "Buys manage-tab upgrades with filters." },
-        { "name": "Auto evolve", "category": "Progress", "desc": "Evolves lemons up to max level." },
-        { "name": "Auto ascend", "category": "Progress", "desc": "Ascends when available." },
-        { "name": "Auto rebirth", "category": "Progress", "desc": "Rebirths on a configurable minute delay." },
-        { "name": "Auto solve sewer", "category": "Events", "desc": "Completes sewer minigame." },
-        { "name": "Auto claim void altar", "category": "Events", "desc": "Claims void altar rewards." },
-        { "name": "Auto lemon dash", "category": "Events", "desc": "Runs lemon dash event." },
-        { "name": "Auto lemon trade", "category": "Events", "desc": "Runs lemon trade event." },
-        { "name": "Walk speed", "category": "Misc", "desc": "Custom local walkspeed." },
-        { "name": "Infinite jump", "category": "Misc", "desc": "Jump again while airborne." },
-        { "name": "Config profiles", "category": "Settings", "desc": "Save, load, and delete named setups." }
+        {
+          "name": "Auto collect lemon",
+          "category": "Farm",
+          "desc": "Collects lemons from your stand area."
+        },
+        {
+          "name": "Auto collect cash drops",
+          "category": "Farm",
+          "desc": "Grabs cash bags and coin drops."
+        },
+        {
+          "name": "Auto collect cash vine",
+          "category": "Farm",
+          "desc": "Collects vine cash nodes."
+        },
+        {
+          "name": "Auto wake income",
+          "category": "Farm",
+          "desc": "Wakes idle income generators."
+        },
+        {
+          "name": "Auto accept offer",
+          "category": "Offers",
+          "desc": "Accepts incoming offers automatically."
+        },
+        {
+          "name": "Haggle before accepting",
+          "category": "Offers",
+          "desc": "Runs haggle before accepting deals."
+        },
+        {
+          "name": "Auto buy button",
+          "category": "Shop",
+          "desc": "Purchases stand button upgrades."
+        },
+        {
+          "name": "Auto upgrade manage",
+          "category": "Shop",
+          "desc": "Buys manage-tab upgrades with filters."
+        },
+        {
+          "name": "Auto evolve",
+          "category": "Progress",
+          "desc": "Evolves lemons up to max level."
+        },
+        {
+          "name": "Auto ascend",
+          "category": "Progress",
+          "desc": "Ascends when available."
+        },
+        {
+          "name": "Auto rebirth",
+          "category": "Progress",
+          "desc": "Rebirths on a configurable minute delay."
+        },
+        {
+          "name": "Auto solve sewer",
+          "category": "Events",
+          "desc": "Completes sewer minigame."
+        },
+        {
+          "name": "Auto claim void altar",
+          "category": "Events",
+          "desc": "Claims void altar rewards."
+        },
+        {
+          "name": "Auto lemon dash",
+          "category": "Events",
+          "desc": "Runs lemon dash event."
+        },
+        {
+          "name": "Auto lemon trade",
+          "category": "Events",
+          "desc": "Runs lemon trade event."
+        },
+        {
+          "name": "Walk speed",
+          "category": "Misc",
+          "desc": "Custom local walkspeed."
+        },
+        {
+          "name": "Infinite jump",
+          "category": "Misc",
+          "desc": "Jump again while airborne."
+        },
+        {
+          "name": "Config profiles",
+          "category": "Settings",
+          "desc": "Save, load, and delete named setups."
+        }
       ]
     },
     "grow_a_garden_2": {
-      "placeIds": [95204935687527],
+      "placeIds": [
+        95204935687527
+      ],
       "robloxUrl": "https://www.roblox.com/games/95204935687527",
       "description": "Full garden automation — plant, water, sprinkler systems, and shop buying.",
-      "uiTabs": ["Farm", "Water", "Shop", "Settings"],
+      "uiTabs": [
+        "Farm",
+        "Water",
+        "Shop",
+        "Settings"
+      ],
       "scriptFeatures": [
-        { "name": "Auto plant seed", "category": "Farm", "desc": "Plants selected seeds on open slots." },
-        { "name": "Auto plant all seeds", "category": "Farm", "desc": "Plants every seed in inventory." },
-        { "name": "Seed & rarity filters", "category": "Farm", "desc": "Dropdown filters for planting." },
-        { "name": "Custom plant speed", "category": "Farm", "desc": "Adjust plant loop speed multiplier." },
-        { "name": "Auto shovel seed", "category": "Farm", "desc": "Removes unwanted planted seeds." },
-        { "name": "Auto collect seeds", "category": "Farm", "desc": "Picks up seed drops on your plot." },
-        { "name": "Auto watering can", "category": "Water", "desc": "Waters crops automatically." },
-        { "name": "Auto sprinkler system", "category": "Water", "desc": "Places sprinklers with variant filters." },
-        { "name": "Auto buy seed shop", "category": "Shop", "desc": "Purchases seeds from the shop." },
-        { "name": "Auto buy crate", "category": "Shop", "desc": "Purchases crates with target filters." },
-        { "name": "Auto buy gear shop", "category": "Shop", "desc": "Purchases gear upgrades." },
-        { "name": "Config profiles", "category": "Settings", "desc": "Save, load, and delete named setups." }
+        {
+          "name": "Auto plant seed",
+          "category": "Farm",
+          "desc": "Plants selected seeds on open slots."
+        },
+        {
+          "name": "Auto plant all seeds",
+          "category": "Farm",
+          "desc": "Plants every seed in inventory."
+        },
+        {
+          "name": "Seed & rarity filters",
+          "category": "Farm",
+          "desc": "Dropdown filters for planting."
+        },
+        {
+          "name": "Custom plant speed",
+          "category": "Farm",
+          "desc": "Adjust plant loop speed multiplier."
+        },
+        {
+          "name": "Auto shovel seed",
+          "category": "Farm",
+          "desc": "Removes unwanted planted seeds."
+        },
+        {
+          "name": "Auto collect seeds",
+          "category": "Farm",
+          "desc": "Picks up seed drops on your plot."
+        },
+        {
+          "name": "Auto watering can",
+          "category": "Water",
+          "desc": "Waters crops automatically."
+        },
+        {
+          "name": "Auto sprinkler system",
+          "category": "Water",
+          "desc": "Places sprinklers with variant filters."
+        },
+        {
+          "name": "Auto buy seed shop",
+          "category": "Shop",
+          "desc": "Purchases seeds from the shop."
+        },
+        {
+          "name": "Auto buy crate",
+          "category": "Shop",
+          "desc": "Purchases crates with target filters."
+        },
+        {
+          "name": "Auto buy gear shop",
+          "category": "Shop",
+          "desc": "Purchases gear upgrades."
+        },
+        {
+          "name": "Config profiles",
+          "category": "Settings",
+          "desc": "Save, load, and delete named setups."
+        }
       ]
     },
     "blox_fruit": {
-      "placeIds": [2753915549],
+      "placeIds": [
+        2753915549
+      ],
       "robloxUrl": "https://www.roblox.com/games/2753915549",
       "description": "Maintenance shell — automation disabled pending game remap after latest update.",
-      "uiTabs": ["Status", "Settings"],
+      "uiTabs": [
+        "Status",
+        "Settings"
+      ],
       "scriptFeatures": []
     },
     "speed_keyboard_escape": {
-      "placeIds": [95082159892680],
+      "placeIds": [
+        95082159892680
+      ],
       "robloxUrl": "https://www.roblox.com/games/95082159892680",
       "description": "Step farming, win routes, shop automation, and treadmill tweaks.",
-      "uiTabs": ["Main", "Auto", "Shop", "Misc", "Settings"],
+      "uiTabs": [
+        "Main",
+        "Auto",
+        "Shop",
+        "Misc",
+        "Settings"
+      ],
       "scriptFeatures": [
         {
           "name": "Step farm",
@@ -604,11 +664,21 @@
       ]
     },
     "slime_rng": {
-      "placeIds": [92416421522960],
-      "universeIds": [9792947201],
+      "placeIds": [
+        92416421522960
+      ],
+      "universeIds": [
+        9792947201
+      ],
       "robloxUrl": "https://www.roblox.com/games/92416421522960",
       "description": "Slime rolls, crafting, pets, potions, and zone farming.",
-      "uiTabs": ["Main", "Auto", "Inventory", "Misc", "Settings"],
+      "uiTabs": [
+        "Main",
+        "Auto",
+        "Inventory",
+        "Misc",
+        "Settings"
+      ],
       "scriptFeatures": [
         {
           "name": "Farm best zone",
@@ -665,7 +735,11 @@
           "category": "Pets",
           "desc": "Drinks potions from your list."
         },
-        { "name": "Noclip", "category": "Misc", "desc": "Walk through walls." },
+        {
+          "name": "Noclip",
+          "category": "Misc",
+          "desc": "Walk through walls."
+        },
         {
           "name": "Freecam",
           "category": "Misc",
@@ -679,7 +753,9 @@
       ]
     },
     "build_a_ring_farm": {
-      "placeIds": [107646426076756],
+      "placeIds": [
+        107646426076756
+      ],
       "robloxUrl": "https://www.roblox.com/games/107646426076756",
       "description": "Full farm automation — planting, upgrades, pets, events, and honey.",
       "uiTabs": [
@@ -763,14 +839,27 @@
           "category": "Pets",
           "desc": "Feeds, equips best pets, and sells extras."
         },
-        { "name": "Fly", "category": "Misc", "desc": "Fly around the map." }
+        {
+          "name": "Fly",
+          "category": "Misc",
+          "desc": "Fly around the map."
+        }
       ]
     },
     "survive_a_zombie_arena": {
-      "placeIds": [114204398207377],
+      "placeIds": [
+        114204398207377
+      ],
       "robloxUrl": "https://www.roblox.com/games/114204398207377",
       "description": "Zombie arena combat — kill aura, auto farm preset, ESP, and safe zones.",
-      "uiTabs": ["Farm", "Combat", "Player", "Visual", "Misc", "Settings"],
+      "uiTabs": [
+        "Farm",
+        "Combat",
+        "Player",
+        "Visual",
+        "Misc",
+        "Settings"
+      ],
       "scriptFeatures": [
         {
           "name": "Auto farm preset",
@@ -913,8 +1002,15 @@
             "bio": "Wrote the loader, relay, game scripts, and this site.",
             "featured": true,
             "accent": "#2997ff",
-            "tags": ["Loader", "Backend", "Hub", "Games"],
-            "links": { "github": "https://github.com/evanbackup1256-ship-it" }
+            "tags": [
+              "Loader",
+              "Backend",
+              "Hub",
+              "Games"
+            ],
+            "links": {
+              "github": "https://github.com/evanbackup1256-ship-it"
+            }
           }
         ]
       }

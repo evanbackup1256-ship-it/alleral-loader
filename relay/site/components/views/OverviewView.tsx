@@ -74,10 +74,10 @@ export function OverviewView({
         <MetricCard label="Loader" value={`v${live?.versions?.loader || site.loaderVersion || "—"}`} accent="cyan" trend="Auto-updates from GitHub" />
       </InViewReveal>
       <InViewReveal className="bento-stat" delay={0.15}>
-        <MetricCard label="Core" value={`v${live?.versions?.core || site.coreVersion || "—"}`} accent="violet" trend={`MacLib v${site.maclibVersion ?? live?.versions?.sydePatch ?? "—"}`} />
+        <MetricCard label="Core" value={`v${live?.versions?.core || site.coreVersion || "—"}`} accent="violet" trend="Fluent runtime" />
       </InViewReveal>
       <InViewReveal className="bento-stat" delay={0.2}>
-        <MetricCard label="UI" value={site.uiLibrary || "MacLib"} accent="yellow" trend={site.uiVersion} />
+        <MetricCard label="UI" value={site.uiLibrary || "Fluent"} accent="yellow" trend={site.uiVersion} />
       </InViewReveal>
 
       {brokenGames.length ? (

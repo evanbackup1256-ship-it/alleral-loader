@@ -38,8 +38,8 @@ const navItems = [
 
 const stats = [
   { label: "Loader", value: "8.11.1", detail: "remote pinned" },
-  { label: "UI Runtime", value: "Iris", detail: "active layer" },
-  { label: "Resources", value: "Onyx", detail: "Fusion + Spring" },
+  { label: "UI Runtime", value: "Fluent", detail: "active layer" },
+  { label: "Motion", value: "Native", detail: "single stack" },
   { label: "Poll Loop", value: "~60s", detail: "release checks" },
 ];
 
@@ -159,7 +159,7 @@ function AlleralLanding({ site, online, siteUpdatedAt, siteFetching, onRefreshSi
               </span>
               <span className="hidden sm:block">
                 <strong className="block text-sm font-semibold leading-none">{site.brand || "Alleral"}</strong>
-                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-2">Iris runtime</span>
+                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-2">Fluent runtime</span>
               </span>
             </a>
             <div className="hidden items-center gap-8 md:flex">
@@ -210,13 +210,13 @@ function AlleralLanding({ site, online, siteUpdatedAt, siteFetching, onRefreshSi
           <div className="relative z-10">
             <div className="kicker">
               <Sparkles className="h-3 w-3" />
-              {relayKind === "online" ? "Relay live" : "Relay monitored"} · {site.uiLibrary || "Iris"} active
+              {relayKind === "online" ? "Relay live" : "Relay monitored"} · {site.uiLibrary || "Fluent"} active
             </div>
             <h1 className="heading-xl mt-8">
               Scripts that <span className="gradient-text gradient-text-shimmer">stay fresh</span> without a second loadstring.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-muted md:text-xl">
-              {site.tagline || "One loader, live game routing, automatic release pins, and an Iris UI powered by Onyx resources, Fusion, and Spring."}
+              {site.tagline || "One loader, live game routing, automatic release pins, and a Fluent UI runtime."}
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <button className="btn btn-primary" onClick={copyLoadstring}>
@@ -252,17 +252,17 @@ function AlleralLanding({ site, online, siteUpdatedAt, siteFetching, onRefreshSi
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg border border-white/6 bg-white/[0.03] p-4">
                   <Monitor className="h-5 w-5 text-cyan" />
-                  <p className="mt-4 text-2xl font-bold">{site.uiLibrary || "Iris"}</p>
+                  <p className="mt-4 text-2xl font-bold">{site.uiLibrary || "Fluent"}</p>
                   <p className="text-xs text-muted">visible UI</p>
                 </div>
                 <div className="rounded-lg border border-white/6 bg-white/[0.03] p-4">
                   <Layers className="h-5 w-5 text-violet" />
-                  <p className="mt-4 text-2xl font-bold">Onyx</p>
-                  <p className="text-xs text-muted">resources</p>
+                  <p className="mt-4 text-2xl font-bold">Native</p>
+                  <p className="text-xs text-muted">motion</p>
                 </div>
               </div>
               <div className="mt-4 space-y-2">
-                {["Iris-only visible UI", "Onyx resources retained", "Fusion stack available", "Spring motion available"].map((m) => (
+                {["Fluent-only visible UI", "Single notification system", "Single config profile system", "Single theme runtime"].map((m) => (
                   <div key={m} className="flex items-center gap-3 rounded-lg bg-bg-0/50 px-3 py-2">
                     <BadgeCheck className="h-4 w-4 shrink-0 text-accent" />
                     <span className="text-sm text-muted">{m}</span>
@@ -383,8 +383,8 @@ function AlleralLanding({ site, online, siteUpdatedAt, siteFetching, onRefreshSi
               <h2 className="heading-lg mt-6">{latestChange?.title || "Built for fast fixes and clear releases."}</h2>
               <div className="mt-8 grid gap-3 md:grid-cols-2">
                 {(latestChange?.items || [
-                  "Iris-only visible UI", "Onyx resources retained",
-                  "Fusion stack available", "Spring motion available",
+                  "Fluent-only visible UI", "Single notification system",
+                  "Single config profile system", "Single theme runtime",
                   "GitHub release pinning", "Live site snapshot",
                 ]).slice(0, 6).map((item: string) => (
                   <div key={item} className="flex gap-3 rounded-lg border border-white/6 bg-bg-2/60 p-3">

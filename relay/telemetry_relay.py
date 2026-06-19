@@ -670,8 +670,6 @@ def build_public_site_payload() -> dict[str, Any]:
         "coreVersion": site.get("coreVersion") or "",
         "uiLibrary": site.get("uiLibrary") or "",
         "uiVersion": site.get("uiVersion") or "",
-        "sydePatch": site.get("sydePatch") or 0,
-        "maclibVersion": site.get("maclibVersion") or 0,
         "loadstring": site.get("loadstring") or "",
         "features": site.get("features") or [],
         "faq": site.get("faq") or [],
@@ -1114,7 +1112,7 @@ def build_embed(payload: dict) -> dict:
         field("Core", context.get("coreVersion"), True),
         field(
             "UI",
-            f"{context.get('uiLibrary', '?')} v{context.get('alleralUiVersion') or context.get('windUiVersion') or '?'}",
+            f"{context.get('uiLibrary', '?')} v{context.get('uiVersion') or '?'}",
             True,
         ),
         field("Game", context.get("gameName") or context.get("gameId"), True),
@@ -2202,8 +2200,6 @@ def live_status():
             "core": site.get("coreVersion"),
             "ui": site.get("uiLibrary"),
             "uiVersion": site.get("uiVersion"),
-            "sydePatch": site.get("sydePatch"),
-            "maclibVersion": site.get("maclibVersion"),
             "telemetry": site.get("telemetryVersion"),
         },
         "release": {

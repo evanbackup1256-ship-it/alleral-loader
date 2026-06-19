@@ -1,7 +1,7 @@
 return function(Core)
 	Core._AlleralUiLayer = "Alleral Fluent UI layer"
 	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "3.0.0-fluent"
-	Core.WINDUI_VERSION = Core.ALLERAL_UI_VERSION
+	Core.UI_VERSION = Core.ALLERAL_UI_VERSION
 	Core.UI_LIBRARY = "Fluent"
 
 	local FLUENT_SOURCE_PATH = "ui/fluent/source.luau"
@@ -34,7 +34,7 @@ return function(Core)
 		if type(icon) == "number" then return tostring(icon) end
 		local digits = tostring(icon):match("(%d+)$")
 		if digits then return digits end
-		local fn = Core.windUiIcon or Core.uiIcon
+		local fn = Core.uiIcon or Core.uiIcon
 		if type(fn) == "function" then
 			local r = fn(icon)
 			if type(r) == "string" and r ~= "" then
@@ -78,7 +78,6 @@ return function(Core)
 			local urls = {
 				"https://raw.githubusercontent.com/dawid-scripts/Fluent/main/Built.lua",
 				"https://raw.githubusercontent.com/dawid-scripts/Fluent/refs/heads/main/Built.lua",
-				"https://cdn.jsdelivr.net/gh/dawid-scripts/Fluent@main/Built.lua",
 			}
 			for _, url in ipairs(urls) do
 				if type(game) == "Instance" and type(game.HttpGet) == "function" then
@@ -303,7 +302,7 @@ return function(Core)
 		return bundle.Alleral or bundle.Library
 	end
 
-	function Core.createWindUiGroupbox(section, _uiBundle)
+	function Core.createUiGroupbox(section, _uiBundle)
 		section = type(section) == "table" and section or {}
 		local serial = 0
 
@@ -689,7 +688,7 @@ return function(Core)
 			elseif rawTab.CreateSection then
 				pcall(rawTab.CreateSection, rawTab, name)
 			end
-			return Core.createWindUiGroupbox(rawTab, uiBundle)
+			return Core.createUiGroupbox(rawTab, uiBundle)
 		end
 
 		function tab:Select()
@@ -806,7 +805,7 @@ return function(Core)
 		return true
 	end
 
-	Core.notifyWindUi = function(info)
+	Core.notifyUi = function(info)
 		local ui = ENV.Alleral_UI
 		if ui and type(ui.Notify) == "function" then pcall(ui.Notify, ui, info) end
 	end

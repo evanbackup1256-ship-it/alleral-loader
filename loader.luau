@@ -1,4 +1,4 @@
-﻿--!nocheck
+--!nocheck
 local LOADER_VERSION = "8.11.1"
 local BOOTSTRAP_VERSION = "2.1.0"
 local MIN_CORE = "2.7.0"
@@ -14,17 +14,6 @@ local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
 local UI = "ui"
-local LEGACY_UI_SOURCE_PATHS = {
-	UI .. "/rayfield/source.luau",
-	"kick/" .. UI .. "/rayfield/source.luau",
-	".alleral/cache/" .. UI .. "/rayfield/source.luau",
-	UI .. "/syde/source.luau",
-	"kick/" .. UI .. "/syde/source.luau",
-	".alleral/cache/" .. UI .. "/syde/source.luau",
-	UI .. "/studio/source.luau",
-	"kick/" .. UI .. "/studio/source.luau",
-	".alleral/cache/" .. UI .. "/studio/source.luau",
-}
 local FLUENT_SOURCE_PATH = UI .. "/fluent/source.luau"
 local FLUENT_SOURCE_MIN_BYTES = 1000
 local FLUENT_VERSION_MARKER = "ALLERAL_FLUENT_VERSION"
@@ -44,9 +33,7 @@ local RELEASE_FALLBACK = {
 	loader = "8.11.1",
 	core = "2.9.10",
 	ui = "Fluent",
-	windui = "3.0.0-fluent",
-	alleral = "3.0.0-fluent",
-	rayfieldVersion = 3,
+	uiVersion = "3.0.0-fluent",
 	fluentVersion = 1,
 	analytics = "1.2",
 	telemetry = "3.5",
@@ -54,7 +41,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "a992896",
+	commit = "626bd14",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -1647,7 +1634,7 @@ local function alleralUiValid(src)
 	if not src:find("function Core.loadUi", 1, true) then
 		return false
 	end
-	if not src:find("createWindUiGroupbox", 1, true) or not src:find("buildUiWindow", 1, true) then
+	if not src:find("createUiGroupbox", 1, true) or not src:find("buildUiWindow", 1, true) then
 		return false
 	end
 	if not src:find("Alleral UI layer", 1, true) then
@@ -1770,7 +1757,7 @@ local function alleralUiRejectReason(src)
 	if not src:find("return function(Core)", 1, true) then
 		return "missing return function(Core) wrapper"
 	end
-	if not src:find("createWindUiGroupbox", 1, true) or not src:find("buildUiWindow", 1, true) then
+	if not src:find("createUiGroupbox", 1, true) or not src:find("buildUiWindow", 1, true) then
 		return "missing Alleral UI helpers"
 	end
 	if not src:find("Alleral UI layer", 1, true) then
@@ -1801,8 +1788,7 @@ local VERSION_PATTERNS = {
 	access = 'Access%.VERSION%s*=%s*"([%d%.]+)"',
 	loader = 'LOADER_VERSION%s*=%s*"([%d%.]+)"',
 	bootstrap = 'BOOTSTRAP_VERSION%s*=%s*"([%d%.]+)"',
-	windui = 'ALLERAL_UI_VERSION%s*=%s*"([^"]+)"',
-	alleral = 'ALLERAL_UI_VERSION%s*=%s*"([^"]+)"',
+	uiVersion = 'ALLERAL_UI_VERSION%s*=%s*"([^"]+)"',
 	game = 'local VERSION%s*=%s*"([%d%.]+)"',
 }
 
@@ -1839,8 +1825,8 @@ local function expectedVersionForKind(expected, kind)
 	if type(expected) ~= "table" then
 		return nil
 	end
-	if kind == "windui" or kind == "alleral" then
-		return expected.alleral or expected.windui
+	if kind == "uiVersion" or kind == "alleral" then
+		return expected.uiVersion
 	end
 	return expected[kind] or expected.core
 end
@@ -2896,10 +2882,8 @@ local function fetchExpectedVersionsFast()
 		telemetry = RELEASE_FALLBACK.telemetry,
 		helpers = RELEASE_FALLBACK.helpers,
 		weao = RELEASE_FALLBACK.weao,
-		alleral = RELEASE_FALLBACK.alleral,
-		windui = RELEASE_FALLBACK.windui,
+		uiVersion = RELEASE_FALLBACK.uiVersion,
 		ui = RELEASE_FALLBACK.ui,
-		rayfieldVersion = RELEASE_FALLBACK.rayfieldVersion,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
@@ -2945,10 +2929,8 @@ fetchExpectedVersions = function(forceRefresh)
 		telemetry = RELEASE_FALLBACK.telemetry,
 		helpers = RELEASE_FALLBACK.helpers,
 		weao = RELEASE_FALLBACK.weao,
-		alleral = RELEASE_FALLBACK.alleral,
-		windui = RELEASE_FALLBACK.windui,
+		uiVersion = RELEASE_FALLBACK.uiVersion,
 		ui = RELEASE_FALLBACK.ui,
-		rayfieldVersion = RELEASE_FALLBACK.rayfieldVersion,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
@@ -2969,15 +2951,11 @@ fetchExpectedVersions = function(forceRefresh)
 		expected.telemetry = release.telemetry or expected.telemetry
 		expected.helpers = release.helpers or expected.helpers
 		expected.weao = release.weao or expected.weao
-		expected.alleral = release.alleral or release.windui or expected.alleral
-		expected.windui = release.windui or expected.alleral or expected.windui
+		expected.uiVersion = release.uiVersion or expected.uiVersion
 		expected.ui = release.ui or expected.ui
 		expected.commit = release.commit or expected.commit
 		expected.updatedAt = release.updatedAt or expected.updatedAt
-		local remoteRayfield = tonumber(release.rayfieldVersion)
-		if remoteRayfield then
-			expected.rayfieldVersion = math.max(remoteRayfield, tonumber(RELEASE_FALLBACK.rayfieldVersion) or 0, tonumber(FLUENT_VERSION) or 0)
-		end
+		expected.fluentVersion = tonumber(release.fluentVersion) or expected.fluentVersion
 		if type(release.commit) == "string" and release.commit ~= "" and type(RELEASE_FALLBACK.commit) == "string" then
 			if release.commit ~= RELEASE_FALLBACK.commit then
 				expected.commit = RELEASE_FALLBACK.commit
@@ -3040,13 +3018,12 @@ local function buildUpdateFingerprint(expected, profile)
 		"helpers=" .. tostring(expected.helpers or ""),
 		"weao=" .. tostring(expected.weao or ""),
 		"weaoCfg=" .. tostring((ENV.Alleral_WeaoConfig or {}).version or ""),
-		"fluentVersion=" .. tostring(expected.fluentVersion or expected.rayfieldVersion or FLUENT_VERSION),
+		"fluentVersion=" .. tostring(expected.fluentVersion or FLUENT_VERSION),
 	}
 	if profile and profile.id then
 		table.insert(parts, "game=" .. tostring(profile.id) .. "@" .. tostring(expected.games and expected.games[profile.id] or profile.version or ""))
 	end
-	table.insert(parts, "alleral=" .. tostring(expected.alleral or ""))
-	table.insert(parts, "windui=" .. tostring(expected.windui or ""))
+	table.insert(parts, "uiVersion=" .. tostring(expected.uiVersion or ""))
 	return table.concat(parts, "|")
 end
 
@@ -3104,19 +3081,6 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
-				UI .. "/alleral_maclib/init.luau",
-				UI .. "/alleral_maclib/util.luau",
-				UI .. "/alleral_maclib/theme.luau",
-				UI .. "/alleral_maclib/notify.luau",
-				UI .. "/alleral_maclib/elements.luau",
-				UI .. "/alleral_maclib/section.luau",
-				UI .. "/alleral_maclib/window.luau",
-				".alleral/cache/" .. UI .. "/alleral_maclib/init.luau",
-			},
-			alwaysDelete = true,
-		},
-		{
-			paths = {
 				HUB .. "/ui_premium.luau",
 				".alleral/cache/" .. HUB .. "/ui_premium.luau",
 			},
@@ -3164,24 +3128,6 @@ local function buildManagedFiles()
 		},
 		{
 			paths = LEGACY_HUB_UI_FILES,
-			alwaysDelete = true,
-		},
-		{
-			paths = {
-				UI .. "/neverlose/library.lua",
-				".alleral/cache/" .. UI .. "/neverlose/library.lua",
-			},
-			alwaysDelete = true,
-		},
-		{
-			paths = {
-				UI .. "/windui/main.lua",
-				UI .. "/windui/bootstrap.lua",
-				UI .. "/windui/aller.luau",
-				UI .. "/windui/arrrel.luau",
-				UI .. "/windui/autoscale.luau",
-				UI .. "/windui/v2/boost.luau",
-			},
 			alwaysDelete = true,
 		},
 		{
@@ -3640,7 +3586,6 @@ local function purgeAlleralWorkspace(opts)
 		if lower:find("alleral", 1, true)
 			or lower:find("loader%.luau$")
 			or lower:find("bootstrap%.luau$")
-			or lower:find("syde", 1, true)
 		then
 			tryDelete(path)
 		end
@@ -3727,8 +3672,8 @@ local function checkForRemoteUpdate(profile, quiet)
 		reason = "commit " .. tostring(expected.commit)
 	elseif expected.loader and not previous:find("loader=" .. tostring(expected.loader), 1, true) then
 		reason = "loader v" .. tostring(expected.loader)
-	elseif (expected.fluentVersion or expected.rayfieldVersion) and not previous:find("fluentVersion=" .. tostring(expected.fluentVersion or expected.rayfieldVersion), 1, true) then
-		reason = "fluent v" .. tostring(expected.fluentVersion or expected.rayfieldVersion)
+	elseif expected.fluentVersion and not previous:find("fluentVersion=" .. tostring(expected.fluentVersion), 1, true) then
+		reason = "fluent v" .. tostring(expected.fluentVersion)
 	elseif profile and expected.games and expected.games[profile.id] then
 		reason = profile.name .. " v" .. tostring(expected.games[profile.id])
 	end
@@ -3995,7 +3940,7 @@ local function main()
 				.. " Ã¢â‚¬â€ continuing (bootstrap may refresh on next relaunch)"
 		)
 	end
-	local needFluentVersion = tonumber(expectedVersions.fluentVersion) or tonumber(expectedVersions.rayfieldVersion) or FLUENT_VERSION
+	local needFluentVersion = tonumber(expectedVersions.fluentVersion) or FLUENT_VERSION
 	if needFluentVersion > FLUENT_VERSION then
 		log(
 			"Embedded Fluent v"
