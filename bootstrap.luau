@@ -232,7 +232,18 @@ ENV._Alleral_BootstrapVersion = BOOTSTRAP_VERSION
 ENV._Alleral_Bootstrapped = true
 ENV._Alleral_BootstrapAt = at
 ENV._Alleral_BootstrapCommit = release and release.commit or ""
-ENV._Alleral_BootstrapToken = string.format("ab_%x_%x", 0, 0)
+
+local function hashAttest(placeId, jobId, t, commit)
+	local text = "AlleralBootstrapGate-v5|" .. tostring(placeId) .. "|" .. tostring(jobId) .. "|" .. tostring(t) .. "|" .. tostring(commit or "")
+	local h1, h2 = 5381, 0
+	for i = 1, #text do
+		local b = string.byte(text, i)
+		h1 = (h1 * 33 + b) % 2147483647
+		h2 = (h2 * 31 + b * (i % 7 + 1)) % 2147483647
+	end
+	return string.format("ab_%x_%x", h1, h2)
+end
+ENV._Alleral_BootstrapToken = hashAttest(game.PlaceId, game.JobId, at, ENV._Alleral_BootstrapCommit)
 ENV._Alleral_BootstrapTokenAt = at
 
 print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Executing loader...")
