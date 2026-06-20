@@ -2,7 +2,7 @@
   "ok": true,
   "generatedAt": "2026-06-19T23:36:22Z",
   "release": {
-    "loader": "8.11.1",
+    "loader": "8.12.0",
     "core": "2.9.10",
     "weao": "1.1",
 "ui": "Linoria",
@@ -61,12 +61,6 @@
       "bytes": 101681,
       "sha256": "cf960b3b66549c21fae9c88021bd27c83836cf4e0775f37e0dd360a8ca929399",
       "versionMarker": null
-    },
-    {
-      "path": "ui/linoria/source.luau",
-      "bytes": 3161,
-      "sha256": "2c8f739a025af0a0e1d9c36920d48836425b18bfe2bcde30c969df3c42611500",
-      "versionMarker": 1
     },
     {
       "path": "cfg/release.json",

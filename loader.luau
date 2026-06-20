@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.11.1"
+local LOADER_VERSION = "8.12.0"
 local BOOTSTRAP_VERSION = "2.1.0"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
@@ -2127,6 +2127,18 @@ end
 
 local function loadCore()
 	ENV.Alleral_Core = nil
+	if ENV._AlleralRayfieldSource or ENV._AlleralRayfieldSourceReady then
+		log("ABORT: legacy Rayfield runtime detected — clearing", true)
+		ENV._AlleralRayfieldSource = nil
+		ENV._AlleralRayfieldSourceReady = nil
+		ENV._AlleralRayfieldSourceLabel = nil
+	end
+	if ENV._AlleralSydeSource or ENV._AlleralSydeSourceReady then
+		log("ABORT: legacy Syde runtime detected — clearing", true)
+		ENV._AlleralSydeSource = nil
+		ENV._AlleralSydeSourceReady = nil
+		ENV._AlleralSydeSourceLabel = nil
+	end
 	pcall(purgeStaleCorePaths)
 	pcall(purgeStaleHubPaths)
 	pcall(purgeLegacyHubUiFiles)
@@ -3877,7 +3889,9 @@ local function main()
 	local expectedVersions = fetchExpectedVersions(true)
 	ENV._Alleral_ExpectedVersions = expectedVersions
 	loadTelemetryConfig(false)
-	purgeAlleralWorkspace({ reason = "boot" })
+	if type(PREVIOUS_LOADER_VERSION) == "string" and versionLt(PREVIOUS_LOADER_VERSION, LOADER_VERSION) then
+		purgeAlleralWorkspace({ reason = "boot", label = "stale" })
+	end
 	ENV.Alleral_HTTP = ENV.Alleral_HTTP or {}
 	ENV.Alleral_HTTP.get = httpGet
 	refreshExpectedVersionsAsync()
@@ -4176,7 +4190,18 @@ local function main()
 		notify("Alleral", ENV._Alleral_GameUpdateMessage, 10)
 		ENV._Alleral_GameRecentlyUpdated = nil
 	end
-	log("ready")
+
+	local uiRuntime = ENV.Alleral_UI and (ENV.Alleral_UI.Library or ENV.Alleral_UI.Alleral)
+	local uiEngine = (type(uiRuntime) == "table" and uiRuntime.GetLayoutInfo and uiRuntime:GetLayoutInfo().engine) or (Core and Core.UI_LIBRARY) or "Linoria"
+	log("=== Alleral Ready ===")
+	log("  Bootstrap: v" .. tostring(ENV._Alleral_BootstrapVersion or BOOTSTRAP_VERSION))
+	log("  Loader:    v" .. LOADER_VERSION)
+	log("  Core:      v" .. tostring(ENV.Alleral_Core and ENV.Alleral_Core.VERSION or "?"))
+	log("  UI:        " .. uiEngine .. (ENV._AlleralUiLibrary and " active" or ""))
+	log("  Game:      " .. profile.name .. " v" .. profile.version)
+	log("  Executor:  " .. EXECUTOR.name .. " (" .. EXECUTOR.slug .. ")")
+	log("  Legacy UI: none detected")
+	log("=====================")
 end
 
 publishConsoleApi("Alleral_Bootstrap", function(reason)
