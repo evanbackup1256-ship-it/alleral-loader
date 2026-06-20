@@ -3896,6 +3896,11 @@ local function main()
 
 	local expectedVersions = fetchExpectedVersions(true)
 	ENV._Alleral_ExpectedVersions = expectedVersions
+	pcall(function()
+		if type(isFile) == "function" and type(deleteFileFn) == "function" then
+			purgeAlleralWorkspace({ reason = "boot", quiet = true })
+		end
+	end)
 	loadTelemetryConfig(false)
 
 	ENV.Alleral_HTTP = ENV.Alleral_HTTP or {}
