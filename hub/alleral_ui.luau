@@ -508,7 +508,11 @@ return function(Core)
 		end
 
 		function groupbox:AddLabel(text)
+			if not section or type(section.AddLabel) ~= "function" then
+				return { SetText = function() end, Set = function() end, Visible = true }
+			end
 			return safeCall("AddLabel", function() return section:AddLabel(textOf(text)) end)
+				or { SetText = function() end, Set = function() end, Visible = true }
 		end
 
 		function groupbox:CreateLabel(settings, id)
