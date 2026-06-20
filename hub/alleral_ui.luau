@@ -549,9 +549,11 @@ return function(Core)
 				return result
 			end
 			return function(...)
-				local ok, r1 = pcall(callbackWrapper, label, guarded, ...)
-				if ok then return r1 end
-				return callbackWrapper(guarded, ...)
+				local ok, wrapped = pcall(callbackWrapper, label, guarded)
+				if ok and type(wrapped) == "function" then
+					return wrapped(...)
+				end
+				return guarded(...)
 			end
 		end
 		local group = {}
