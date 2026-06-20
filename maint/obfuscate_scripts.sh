@@ -44,73 +44,25 @@ for f in "${OBFUSCATE_FILES[@]}"; do
     return if length($src) < 50;
     my ($version_marker) = $src =~ /local\s+VERSION\s*=\s*"([^"]+)"/;
 
-    my %rename; my %used;
-
-    # Collect and rename local variables (1-2 char names)
-    while ($src =~ /^\s*local\s+([a-zA-Z_]\w*)/gm) {
-      my $v = $1;
-      next if $v =~ /^(game|workspace|Players|RunService|UserInputService|StarterGui|ENV|_G|script|Instance|Vector[23]|Color3|UDim2?|CFrame|Ray|Region3|NumberRange|NumberSequence|ColorSequence|BrickColor|TweenInfo|Random|Rect|DateTime|tick|time|wait|spawn|delay|pcall|xpcall|print|warn|error|assert|type|typeof|tostring|tonumber|next|pairs|ipairs|select|unpack|setmetatable|getmetatable|rawget|rawset|rawlen|string|table|math|coroutine|debug|os|io|bit32|buffer|utf8|require|loadstring|load|getfenv|setfenv|getgenv|getrenv|getreg|hookfunction|clonefunction|checkcaller|newcclosure|iscclosure|islclosure|syn|crypt|Drawing|WebSocket|HttpService|TweenService|ContentProvider|InsertService|ScriptContext|LogService|NetworkClient|TeleportService|VirtualUser|VRService)$/;
-      next if length($v) <= 2;
-      next if exists $rename{$v};
-      my $n;
-      while (1) {
-        my $len = 1 + int(rand(2));
-        $n = join("", map { chr(int(rand(26)) + (rand() < 0.5 ? 97 : 65)) } (1..$len));
-        last if !$used{$n}++;
-      }
-      $rename{$v} = $n;
+    my $eq = "";
+    while (index($src, "]$eq]") >= 0) {
+      $eq .= "=";
     }
-
-    foreach my $old (keys %rename) {
-      my $new = $rename{$old};
-      $src =~ s/\b\Q$old\E\b/$new/g;
-    }
-
-    # Remove block and single-line comments
-    $src =~ s/--\[\[.*?\]\]//gs;
-    $src =~ s/(?:^|[ \t])--[^\n]*//gm;
-
-    # Obfuscate short string literals
-    $src =~ s{"([^"]{1,12})"}{ "string.char(" . join(",", map { ord($_) } split("", $1)) . ")" }ge;
-
-    # Obfuscate number literals
-    $src =~ s{\b(\d+)\b}{
-      my $n = $1;
-      if ($n >= 0 && $n <= 255) {
-        if (rand() < 0.5) { sprintf("0x%X", $n) }
-        else { my $a = 1 + int(rand($n+4)); ($a+$n) . "-$a" }
-      } else { sprintf("0x%X", $n) }
-    }ge;
-
-    # Insert junk locals (opaque predicates)
-    my $junk_count = 1 + int(rand(2));
-    for (1..$junk_count) {
-      my $maxpos = length($src) - 100;
-      next if $maxpos < 10;
-      my $jv1 = 1 + int(rand(998));
-      my $jv2 = 1 + int(rand(998));
-      my $jv3 = 1 + int(rand(998));
-      my $js = $jv1 + $jv2 - $jv3;
-      my $jn = "j" . int(rand(99999));
-      my $junk = "local $jn=$jv1+$jv2-$jv3;if $jn~=$js then return end;";
-      my $pos = int(rand($maxpos)) + 5;
-      substr($src, $pos, 0, $junk);
-    }
-
-    # Heavy minify
-    $src =~ s/^\s+//gm;
-    $src =~ s/\s+$//gm;
-    $src =~ s/\n(?!\n)/ /g;
-    $src =~ s/[ \t]+/ /g;
-    $src =~ s/\s*=\s*/=/g;
-    $src =~ s/\s*,\s*/,/g;
-    $src =~ s/\(\s*/\(/g;
-    $src =~ s/\s*\)/\)/g;
-    $src =~ s/\s*\.\.\s*/\.\./g;
-
-    if (defined $version_marker && $version_marker ne "") {
-      $src = "-- ALLERAL_VERSION: $version_marker\n" . $src;
-    }
+    my $open = "[" . $eq . "[";
+    my $close = "]" . $eq . "]";
+    my $marker = defined $version_marker && $version_marker ne ""
+      ? "-- ALLERAL_VERSION: $version_marker\n"
+      : "";
+    $src = $marker
+      . "local __alleral_source = " . $open . "\n"
+      . $src
+      . "\n" . $close . "\n"
+      . "local __alleral_load = (getgenv and getgenv().loadstring) or loadstring or load\n"
+      . "if type(__alleral_load) ~= \"function\" then error(\"loadstring unavailable\") end\n"
+      . "local __alleral_chunk, __alleral_err = __alleral_load(__alleral_source, \"Alleral/game-source\")\n"
+      . "if type(__alleral_chunk) ~= \"function\" then error(tostring(__alleral_err or \"compile failed\")) end\n"
+      . "if setfenv and getfenv then pcall(setfenv, __alleral_chunk, getfenv()) end\n"
+      . "return __alleral_chunk()\n";
 
     $_ = $src;
   ' "$f"
