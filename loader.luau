@@ -14,11 +14,7 @@ local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
 local UI = "ui"
-local RAYFIELD_SOURCE_PATH = UI .. "/rayfield/source.luau"
-local RAYFIELD_SOURCE_MIN_BYTES = 1000
-local RAYFIELD_VERSION_MARKER = "ALLERAL_RAYFIELD_VERSION"
-local RAYFIELD_VERSION = 1
-local RAYFIELD_BUNDLE_MIN_BYTES = 50000
+-- Rayfield removed — Linoria is the only UI library
 local MAX_RELAUNCHES = 3
 local RELAUNCH_COOLDOWN = 15
 local CP = {
@@ -30,11 +26,10 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.11.1",
+	loader = "8.12.0",
 	core = "2.9.10",
-	ui = "Rayfield",
-	uiVersion = "4.0.0-rayfield",
-	rayfieldVersion = 1,
+	ui = "Linoria",
+	uiVersion = "5.1.0",
 	analytics = "1.2",
 	telemetry = "3.5",
 	helpers = "1.8",
@@ -147,8 +142,6 @@ pcall(function()
 end)
 
 local ENV = genv()
-ENV._Alleral_RequiredRayfieldVersion = RAYFIELD_VERSION
-
 local function loaderRunEnv()
 	local env = genv()
 	if typeof(env.game) ~= "Instance" then
@@ -938,89 +931,6 @@ local function cacheRemote(relativePath, src)
 end
 
 local fetchBackendModule
-local ensureRayfieldSource
-do
-	local function rayfieldVersionFromSource(src)
-		if type(src) ~= "string" then return nil end
-		return tonumber(src:match("\nlocal%s+ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)"))
-			or tonumber(src:match("^local%s+ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)"))
-			or tonumber(src:match("Version%s*=%s*(%d+)"))
-	end
-
-	local function isRayfieldSourceValid(src)
-		if type(src) ~= "string" or #src < RAYFIELD_SOURCE_MIN_BYTES
-			or src:find("<!DOCTYPE", 1, true) then
-			return false
-		end
-		local version = rayfieldVersionFromSource(src)
-		return type(version) == "number" and version >= RAYFIELD_VERSION
-	end
-
-	local function fetchRemoteRayfield()
-		for attempt = 1, 3 do
-			local bust = "?t=" .. tostring(tick()) .. "&attempt=" .. tostring(attempt)
-			local urls = {
-				GITHUB_RAW .. "/" .. RAYFIELD_SOURCE_PATH .. bust,
-				JSDELIVR .. "/" .. RAYFIELD_SOURCE_PATH .. bust,
-			}
-			for _, url in ipairs(urls) do
-				local body, via = httpGet(url, RAYFIELD_SOURCE_MIN_BYTES)
-				if body and isRayfieldSourceValid(body) then
-					return body, url .. " via " .. tostring(via)
-				end
-			end
-			if attempt < 3 then task.wait(0.3 * attempt) end
-		end
-		return nil, "rayfield source fetch failed after 3 retries"
-	end
-
-	ensureRayfieldSource = function()
-		ENV._AlleralRayfieldSource = nil
-		if ENV._AlleralRayfieldSourceReady then
-			return true, ENV._AlleralRayfieldSourceLabel or "already ready"
-		end
-
-		local localPaths = { RAYFIELD_SOURCE_PATH, "kick/" .. RAYFIELD_SOURCE_PATH }
-		local cachePaths = { ".alleral/cache/" .. RAYFIELD_SOURCE_PATH }
-
-		local function adopt(src, label)
-			if not isRayfieldSourceValid(src) then return nil end
-			cacheRemote(RAYFIELD_SOURCE_PATH, src)
-			ENV._AlleralRayfieldSource = src
-			ENV._AlleralRayfieldSourceLabel = label
-			ENV._AlleralRayfieldSourceReady = true
-			log("Rayfield source ready (" .. tostring(label) .. ")")
-			return true, label
-		end
-
-		local backendSrc, backendLabel = fetchBackendModule(RAYFIELD_SOURCE_PATH, RAYFIELD_SOURCE_MIN_BYTES)
-		if backendSrc and isRayfieldSourceValid(backendSrc) then
-			return adopt(backendSrc, backendLabel or "backend")
-		end
-
-		local remoteSrc, remoteVia = fetchRemoteRayfield()
-		if remoteSrc then
-			return adopt(remoteSrc, "remote:" .. tostring(remoteVia))
-		end
-
-		local localSrc, localPath = readLocal(localPaths, RAYFIELD_SOURCE_MIN_BYTES)
-		if localSrc and isRayfieldSourceValid(localSrc) then
-			return adopt(localSrc, "local:" .. tostring(localPath))
-		end
-
-		local cacheSrc, cachePath = readLocal(cachePaths, RAYFIELD_SOURCE_MIN_BYTES)
-		if cacheSrc and isRayfieldSourceValid(cacheSrc) then
-			return adopt(cacheSrc, "cache:" .. tostring(cachePath))
-		end
-
-		log("Rayfield source unavailable (need v" .. tostring(RAYFIELD_VERSION) .. ") - will retry during UI boot", true)
-		return false, "Rayfield source unavailable (need v" .. tostring(RAYFIELD_VERSION) .. ")"
-	end
-end
-
-local function ensureUiSource()
-	return ensureRayfieldSource()
-end
 
 local function loaderCdnBase()
 	local base = ENV._Alleral_LoaderCdnBase
@@ -1758,10 +1668,10 @@ local function alleralUiValid(src)
 	if not src:find("createUiGroupbox", 1, true) or not src:find("buildUiWindow", 1, true) then
 		return false
 	end
-	if not src:find("Alleral UI layer", 1, true) and not src:find("Alleral Rayfield UI layer", 1, true) then
+	if not src:find("Alleral UI layer", 1, true) then
 		return false
 	end
-	if not src:find("Rayfield", 1, true) then
+	if not src:find("Linoria", 1, true) then
 		return false
 	end
 	if compileCoreSource(src, "Alleral/alleral_ui") then
@@ -1881,11 +1791,11 @@ local function alleralUiRejectReason(src)
 	if not src:find("createUiGroupbox", 1, true) or not src:find("buildUiWindow", 1, true) then
 		return "missing Alleral UI helpers"
 	end
-	if not src:find("Alleral UI layer", 1, true) and not src:find("Alleral Rayfield UI layer", 1, true) then
+	if not src:find("Alleral UI layer", 1, true) then
 		return "missing Alleral UI layer marker"
 	end
-	if not src:find("Rayfield", 1, true) then
-		return "missing Rayfield bootstrap"
+	if not src:find("Linoria", 1, true) then
+		return "missing Linoria bootstrap"
 	end
 	if not looksLikeLua(src) then
 		return "invalid lua body"
@@ -1916,12 +1826,6 @@ local VERSION_PATTERNS = {
 local function extractFileVersion(src, kind)
 	if type(src) ~= "string" then
 		return nil
-	end
-	if kind == "rayfield" then
-		return src:match("\nlocal%s+ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)")
-			or src:match("^local%s+ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)")
-			or src:match("ALLERAL_RAYFIELD_VERSION%s*=%s*(%d+)")
-			or src:match("Version%s*=%s*(%d+)")
 	end
 	if kind == "alleral" then
 		return src:match('Core%.ALLERAL_UI_VERSION%s*=%s*"([^"]+)"')
@@ -2319,15 +2223,6 @@ local function loadCore()
 	if not alleralUiSrc then
 		ENV.Alleral_Core = nil
 		return false, alleralUiLabel or "Alleral UI layer download failed"
-	end
-
-	if not ENV._AlleralRayfieldSourceReady then
-		local studioOk, studioLabel = ensureUiSource()
-		if studioOk then
-			log("Rayfield source pre-cached (" .. tostring(studioLabel) .. ")")
-		else
-			log("Rayfield source not pre-cached (" .. tostring(studioLabel) .. ") - will fetch during UI boot", true)
-		end
 	end
 
 	if not hubUiSrc then
@@ -3007,7 +2902,6 @@ local function fetchExpectedVersionsFast()
 		helpers = RELEASE_FALLBACK.helpers,
 		weao = RELEASE_FALLBACK.weao,
 		uiVersion = RELEASE_FALLBACK.uiVersion,
-		rayfieldVersion = RELEASE_FALLBACK.rayfieldVersion,
 		ui = RELEASE_FALLBACK.ui,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
@@ -3055,7 +2949,6 @@ fetchExpectedVersions = function(forceRefresh)
 		helpers = RELEASE_FALLBACK.helpers,
 		weao = RELEASE_FALLBACK.weao,
 		uiVersion = RELEASE_FALLBACK.uiVersion,
-		rayfieldVersion = RELEASE_FALLBACK.rayfieldVersion,
 		ui = RELEASE_FALLBACK.ui,
 		commit = RELEASE_FALLBACK.commit,
 		updatedAt = "",
@@ -3081,7 +2974,6 @@ fetchExpectedVersions = function(forceRefresh)
 		expected.ui = release.ui or expected.ui
 		expected.commit = release.commit or expected.commit
 		expected.updatedAt = release.updatedAt or expected.updatedAt
-		expected.rayfieldVersion = tonumber(release.rayfieldVersion) or expected.rayfieldVersion
 		if type(release.commit) == "string" and release.commit ~= "" and type(RELEASE_FALLBACK.commit) == "string" then
 			if release.commit ~= RELEASE_FALLBACK.commit then
 				expected.commit = RELEASE_FALLBACK.commit
@@ -3144,7 +3036,7 @@ local function buildUpdateFingerprint(expected, profile)
 		"helpers=" .. tostring(expected.helpers or ""),
 		"weao=" .. tostring(expected.weao or ""),
 		"weaoCfg=" .. tostring((ENV.Alleral_WeaoConfig or {}).version or ""),
-		"rayfieldVersion=" .. tostring(expected.rayfieldVersion or RAYFIELD_VERSION),
+		"uiVersion=" .. tostring(expected.uiVersion or ""),
 	}
 	if profile and profile.id then
 		table.insert(parts, "game=" .. tostring(profile.id) .. "@" .. tostring(expected.games and expected.games[profile.id] or profile.version or ""))
@@ -3195,18 +3087,10 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
-				RAYFIELD_SOURCE_PATH,
-				".alleral/cache/" .. RAYFIELD_SOURCE_PATH,
-			},
-			expectedKey = "rayfieldVersion",
-			extract = "rayfield",
-		},
-		{
-			paths = LEGACY_UI_SOURCE_PATHS,
-			alwaysDelete = true,
-		},
-		{
-			paths = {
+				"ui/rayfield/",
+				"ui/syde/",
+				".alleral/cache/ui/rayfield/",
+				".alleral/cache/ui/syde/",
 				HUB .. "/ui_premium.luau",
 				".alleral/cache/" .. HUB .. "/ui_premium.luau",
 			},
@@ -3335,14 +3219,12 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 	elseif entry.purgeOnLoaderChange then
 		local installedLoader = installedManifest and installedManifest.loader
 		return type(installedLoader) == "string" and installedLoader ~= expected.loader
-	elseif entry.extract == "rayfield" then
-		expectedVersion = tostring(RAYFIELD_VERSION)
 	else
 		expectedVersion = expected[entry.expectedKey]
 	end
 
 	if type(expectedVersion) ~= "string" or expectedVersion == "" then
-		return entry.extract == "rayfield" or false
+		return false
 	end
 
 	if type(src) ~= "string" or src == "" then
@@ -3359,11 +3241,6 @@ local function shouldDeleteCachedFile(src, entry, expected, installedManifest)
 
 	local foundVersion = extractFileVersion(src, entry.extract)
 	if type(foundVersion) == "string" and foundVersion ~= "" and type(expectedVersion) == "string" and expectedVersion ~= "" then
-		if entry.extract == "rayfield" then
-			local foundNum = tonumber(foundVersion) or 0
-			local needVersion = tonumber(expectedVersion) or RAYFIELD_VERSION
-			return foundNum < needVersion
-		end
 		return foundVersion ~= expectedVersion
 	end
 
@@ -3798,8 +3675,6 @@ local function checkForRemoteUpdate(profile, quiet)
 		reason = "commit " .. tostring(expected.commit)
 	elseif expected.loader and not previous:find("loader=" .. tostring(expected.loader), 1, true) then
 		reason = "loader v" .. tostring(expected.loader)
-	elseif expected.rayfieldVersion and not previous:find("rayfieldVersion=" .. tostring(expected.rayfieldVersion), 1, true) then
-		reason = "rayfield v" .. tostring(expected.rayfieldVersion)
 	elseif profile and expected.games and expected.games[profile.id] then
 		reason = profile.name .. " v" .. tostring(expected.games[profile.id])
 	end
@@ -4005,12 +3880,6 @@ local function main()
 	purgeAlleralWorkspace({ reason = "boot" })
 	ENV.Alleral_HTTP = ENV.Alleral_HTTP or {}
 	ENV.Alleral_HTTP.get = httpGet
-	local studioPrefetchOk, studioPrefetchLabel = ensureUiSource()
-	if studioPrefetchOk then
-		log("UI source ready (" .. tostring(studioPrefetchLabel) .. ")")
-	else
-		log("UIC source not cached yet: " .. tostring(studioPrefetchLabel), true)
-	end
 	refreshExpectedVersionsAsync()
 	if expectedVersions.loader and versionLt(LOADER_VERSION, expectedVersions.loader) then
 		log(
@@ -4066,39 +3935,6 @@ local function main()
 				.. " Ã¢â‚¬â€ continuing (bootstrap may refresh on next relaunch)"
 		)
 	end
-	local needRayfieldVersion = tonumber(expectedVersions.rayfieldVersion) or RAYFIELD_VERSION
-	if needRayfieldVersion > RAYFIELD_VERSION then
-		log(
-			"Embedded Rayfield v"
-				.. tostring(RAYFIELD_VERSION)
-				.. " is behind release v"
-				.. tostring(needRayfieldVersion)
-				.. " — auto-updating via bootstrap"
-		)
-		ENV.Alleral_LoaderRunning = false
-		task.defer(function()
-			local count = tonumber(ENV._Alleral_RelaunchCount) or 0
-			local last = tonumber(ENV._Alleral_LastRelaunch) or 0
-			if count >= MAX_RELAUNCHES or os.time() - last < RELAUNCH_COOLDOWN then
-				warn("[Alleral v" .. LOADER_VERSION .. "] Skipping rayfield-version relaunch (count=" .. count .. ")")
-				pcall(function()
-					game:GetService("StarterGui"):SetCore("SendNotification", {
-						Title = "Alleral",
-						Text = "Rayfield UI version mismatch — reload the script to update UI.",
-						Duration = 8,
-					})
-				end)
-				return
-			end
-			ENV._Alleral_RelaunchCount = count + 1
-			ENV._Alleral_LastRelaunch = os.time()
-			if type(ENV._Alleral_RelaunchViaBootstrap) == "function" then
-				ENV._Alleral_RelaunchViaBootstrap("rayfield-version-sync")
-			end
-		end)
-		return
-	end
-
 	task.spawn(function()
 		pcall(loadWeaoStack)
 		pcall(function()

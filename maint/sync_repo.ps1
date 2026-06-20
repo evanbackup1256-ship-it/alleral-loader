@@ -29,7 +29,6 @@ if ($AutoCommit)
             "cfg/release.json",
             "cfg/site.json",
             "loader.luau",
-            "ui/rayfield/source.luau",
             "relay/site.json",
             "relay/scripts_manifest.json",
             "backend/GENERATED.txt",

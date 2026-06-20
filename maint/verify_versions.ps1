@@ -77,47 +77,6 @@ if ($loader -match 'LOADER_VERSION = "([^"]+)"')
     Fail "loader.luau missing LOADER_VERSION"
 }
 
-if ($release.rayfieldVersion)
-{
-    if ($loader -match 'local RAYFIELD_VERSION = (\d+)')
-    {
-        $rayfieldVersion = [int]$Matches[1]
-        if ($rayfieldVersion -ne [int]$release.rayfieldVersion)
-        {
-            Fail "loader RAYFIELD_VERSION ($rayfieldVersion) != release.json ($($release.rayfieldVersion))"
-        } else
-        {
-            Pass "loader rayfield version $rayfieldVersion"
-        }
-    } else
-    {
-        Fail "loader.luau missing RAYFIELD_VERSION"
-    }
-
-    $rayfieldSourcePath = Join-Path $root "ui/rayfield/source.luau"
-    if (Test-Path $rayfieldSourcePath)
-    {
-        $rayfieldSource = Get-Content $rayfieldSourcePath -Raw
-        if ($rayfieldSource -match 'local ALLERAL_RAYFIELD_VERSION = (\d+)')
-        {
-            $sourceVersion = [int]$Matches[1]
-            if ($sourceVersion -ne [int]$release.rayfieldVersion)
-            {
-                Fail "ui/rayfield/source.luau ALLERAL_RAYFIELD_VERSION ($sourceVersion) != release.json ($($release.rayfieldVersion))"
-            } else
-            {
-                Pass "rayfield source version $sourceVersion"
-            }
-        } else
-        {
-            Fail "ui/rayfield/source.luau missing ALLERAL_RAYFIELD_VERSION"
-        }
-    } else
-    {
-        Fail "ui/rayfield/source.luau missing"
-    }
-}
-
 foreach ($field in @("telemetry", "analytics", "helpers", "security", "access", "weao", "core", "uiVersion", "ui"))
 {
     $expected = $release.$field

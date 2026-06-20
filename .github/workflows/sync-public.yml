@@ -41,7 +41,7 @@ jobs:
         id: changed
         if: env.SYNC_PAT != ''
         run: |
-          mkdir -p public_repo/hub public_repo/ui/rayfield public_repo/games public_repo/games/data
+          mkdir -p public_repo/hub public_repo/games public_repo/games/data
 
           # Build list of all source paths to sync
           SOURCES=(
@@ -60,9 +60,6 @@ jobs:
           for f in hub/*.luau; do
             [ -f "$f" ] && SOURCES+=("$f")
           done
-
-          # Add UI files
-          [ -f ui/rayfield/source.luau ] && SOURCES+=("ui/rayfield/source.luau")
 
           # Add game files
           for f in games/*.luau; do
@@ -101,7 +98,7 @@ jobs:
 
           # Compare source vs public repo via sha256
           # Obfuscation targets: games/*.luau
-          # Plain copy: loader.luau, bootstrap.luau, hub/*.luau, ui/rayfield/source.luau, cfg/*
+          # Plain copy: loader.luau, bootstrap.luau, hub/*.luau, cfg/*
           CHANGED=""
           PLAIN=""
           OBFUSCATE=""

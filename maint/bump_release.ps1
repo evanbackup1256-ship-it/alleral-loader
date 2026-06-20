@@ -41,11 +41,6 @@ $loaderPath = Join-Path $root "loader.luau"
 $loaderRaw = Get-Content $loaderPath -Raw -Encoding UTF8
 $loaderRaw = [regex]::Replace($loaderRaw, 'local LOADER_VERSION = "[^"]+"', ('local LOADER_VERSION = "' + $release.loader + '"'))
 $loaderRaw = [regex]::Replace($loaderRaw, '(?m)^\tloader = "[^"]+"', ("`tloader = `"$($release.loader)`""), 1)
-if ($null -ne $release.rayfieldVersion) {
-    $rayfieldVersionVal = [int]$release.rayfieldVersion
-    $loaderRaw = [regex]::Replace($loaderRaw, 'local RAYFIELD_VERSION = \d+', ('local RAYFIELD_VERSION = ' + $rayfieldVersionVal))
-    $loaderRaw = [regex]::Replace($loaderRaw, 'rayfieldVersion = \d+,', ('rayfieldVersion = ' + $rayfieldVersionVal + ','))
-}
 $fallbackFields = @(
     @{ Key = "core"; Prop = "core" },
     @{ Key = "telemetry"; Prop = "telemetry" },
@@ -93,9 +88,9 @@ $siteRaw = [regex]::Replace($siteRaw, '"loaderVersion"\s*:\s*"[^"]*"', ('"loader
 $siteRaw = [regex]::Replace($siteRaw, 'bootstrap\.luau\?v=[^"&]+&t=', 'bootstrap.luau?t=')
 $siteRaw = [regex]::Replace($siteRaw, 'bootstrap\.luau\?v=[^"&]+', 'bootstrap.luau')
 $siteRaw = [regex]::Replace($siteRaw, '"coreVersion"\s*:\s*"[^"]*"', ('"coreVersion": "' + $release.core + '"'))
-$uiLibrary = if ($release.ui) { $release.ui } else { "Rayfield" }
+$uiLibrary = if ($release.ui) { $release.ui } else { "Linoria" }
 $siteRaw = [regex]::Replace($siteRaw, '"uiLibrary"\s*:\s*"[^"]*"', ('"uiLibrary": "' + $uiLibrary + '"'))
-$uiVersion = if ($release.uiVersion) { $release.uiVersion } else { "4.0.0-rayfield" }
+$uiVersion = if ($release.uiVersion) { $release.uiVersion } else { "5.1.0" }
 $siteRaw = [regex]::Replace($siteRaw, '"uiVersion"\s*:\s*"[^"]*"', ('"uiVersion": "' + $uiVersion + '"'))
 if ($hashBumpNeeded) {
     $siteRaw = [regex]::Replace($siteRaw, '"updatedAt"\s*:\s*"[^"]*"', ('"updatedAt": "' + $updatedAt + '"'))

@@ -13,7 +13,7 @@ from typing import Any
 
 BOM = b"\xef\xbb\xbf"
 
-# Core boot chain + Rayfield UI runtime
+# Core boot chain + Linoria UI runtime
 LOADER_MODULES = (
     "bootstrap.luau",
     "loader.luau",
@@ -21,7 +21,6 @@ LOADER_MODULES = (
     "hub/core_ui.luau",
     "hub/alleral_ui.luau",
     "hub/core_hub_ui.luau",
-    "ui/rayfield/source.luau",
     "cfg/release.json",
 )
 
@@ -70,12 +69,12 @@ def parse_release(root: Path | None = None) -> dict[str, Any]:
 
 def module_version_marker(text: str) -> int | None:
     for pattern in (
-        r"local\s+ALLERAL_RAYFIELD_VERSION\s*=\s*(\d+)",
-        r"Version\s*=\s*(\d+)",
+        r'Core\.ALLERAL_UI_VERSION\s*=\s*"[^"]+"',
+        r'local\s+LOADER_VERSION\s*=\s*"([^"]+)"',
     ):
         match = re.search(pattern, text)
-        if match:
-            return int(match.group(1))
+        if match and match.groups():
+            return None
     loader = re.search(r'local\s+LOADER_VERSION\s*=\s*"([^"]+)"', text)
     if loader:
         return None
@@ -104,9 +103,8 @@ def build_manifest(root: Path | None = None) -> dict[str, Any]:
         "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "release": release,
         "loader": release.get("loader"),
-        "ui": release.get("ui", "Rayfield"),
+        "ui": release.get("ui", "Linoria"),
         "uiVersion": release.get("uiVersion"),
-        "rayfieldVersion": release.get("rayfieldVersion"),
         "commit": release.get("commit"),
         "modules": modules,
     }
