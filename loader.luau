@@ -9,7 +9,7 @@ local CORE_BASE_MIN_BYTES = 30000
 local CORE_BASE_MAX_BYTES = 45000
 local CORE_UI_MIN_BYTES = 8000
 local CORE_HUB_UI_MIN_BYTES = 60000
-local CORE_ALLERAL_UI_MIN_BYTES = 12000
+local CORE_ALLERAL_UI_MIN_BYTES = 16000
 local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
@@ -1671,6 +1671,9 @@ local function alleralUiValid(src)
 	if not src:find("Alleral UI layer", 1, true) then
 		return false
 	end
+	if not src:find("5.1.0-ga", 1, true) then
+		return false
+	end
 	if not src:find("Linoria", 1, true) then
 		return false
 	end
@@ -1793,6 +1796,9 @@ local function alleralUiRejectReason(src)
 	end
 	if not src:find("Alleral UI layer", 1, true) then
 		return "missing Alleral UI layer marker"
+	end
+	if not src:find("5.1.0-ga", 1, true) then
+		return "outdated alleral_ui (needs v5.1.0-ga marker)"
 	end
 	if not src:find("Linoria", 1, true) then
 		return "missing Linoria bootstrap"
@@ -2061,8 +2067,8 @@ local function purgeStaleHubPaths()
 		expected = fetchExpectedVersions()
 	end
 	local hubPaths = {
-		{ paths = { HUB .. "/alleral_ui.luau", CP.alleral }, valid = alleralUiValid, kind = "alleral" },
-		{ paths = { HUB .. "/core_base.luau", CP.base }, valid = coreBaseValid, kind = "core" },
+		{ paths = { HUB .. "/alleral_ui.luau", CP.alleral, ".alleral/cache/" .. HUB .. "/alleral_ui.luau", ".alleral/cache/" .. CP.alleral }, valid = alleralUiValid, kind = "alleral" },
+		{ paths = { HUB .. "/core_base.luau", CP.base, ".alleral/cache/" .. HUB .. "/core_base.luau", ".alleral/cache/" .. CP.base }, valid = coreBaseValid, kind = "core" },
 	}
 	for _, entry in ipairs(hubPaths) do
 		for _, path in ipairs(entry.paths) do
@@ -3103,6 +3109,7 @@ local function buildManagedFiles()
 				"ui/syde/",
 				".alleral/cache/ui/rayfield/",
 				".alleral/cache/ui/syde/",
+				".alleral/cache/linoria.lua",
 				HUB .. "/ui_premium.luau",
 				".alleral/cache/" .. HUB .. "/ui_premium.luau",
 			},

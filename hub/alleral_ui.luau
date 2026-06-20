@@ -1,5 +1,5 @@
 return function(Core)
-	Core._AlleralUiLayer = "Alleral UI layer — Linoria"
+	Core._AlleralUiLayer = "Alleral UI layer — Linoria v5.1.0-ga"
 	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "5.1.0"
 	Core.UI_VERSION = Core.ALLERAL_UI_VERSION
 	Core.UI_LIBRARY = "Linoria"
