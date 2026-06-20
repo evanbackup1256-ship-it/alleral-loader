@@ -1674,9 +1674,6 @@ local function alleralUiValid(src)
 	if not src:find("Alleral UI layer", 1, true) then
 		return false
 	end
-	if not src:find("5.1.0-ga", 1, true) then
-		return false
-	end
 	if not src:find("Linoria", 1, true) then
 		return false
 	end
@@ -1799,9 +1796,6 @@ local function alleralUiRejectReason(src)
 	end
 	if not src:find("Alleral UI layer", 1, true) then
 		return "missing Alleral UI layer marker"
-	end
-	if not src:find("5.1.0-ga", 1, true) then
-		return "outdated alleral_ui (needs v5.1.0-ga marker)"
 	end
 	if not src:find("Linoria", 1, true) then
 		return "missing Linoria bootstrap"
