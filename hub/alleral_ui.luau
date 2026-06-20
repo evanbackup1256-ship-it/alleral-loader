@@ -49,81 +49,173 @@ return function(Core)
 		return "rbxassetid://" .. iconImage(icon)
 	end
 
+	local function deepClone(value, seen)
+		if type(value) ~= "table" then return value end
+		seen = seen or {}
+		if seen[value] then return seen[value] end
+		local copy = {}
+		seen[value] = copy
+		for k, v in pairs(value) do
+			copy[deepClone(k, seen)] = deepClone(v, seen)
+		end
+		return copy
+	end
+
+	local function sanitizeFluentSource(src)
+		if type(src) ~= "string" then return src end
+		src = src:gsub("table%.freeze%b()", "function(t) return t end")
+		src = src:gsub("table%.freeze", "function(t) return t end")
+		src = src:gsub("setreadonly%b()", "function(t) return t end")
+		src = src:gsub("make_readonly%b()", "function(t) return t end")
+		src = src:gsub("set_readonly%b()", "function(t) return t end")
+		return src
+	end
+
+	local function createFluentSandbox(baseEnv)
+		local sandbox = {}
+		local protected = {
+			getgenv = true, getfenv = true, setfenv = true,
+			getrawmetatable = true, setrawmetatable = true,
+			newcclosure = true, hookfunction = true,
+			hookmetamethod = true, getnamecallmethod = true,
+		}
+		setmetatable(sandbox, {
+			__index = function(_, k)
+				if protected[k] then return nil end
+				local tv = baseEnv[k]
+				if tv ~= nil then return tv end
+				return rawget(_G, k)
+			end,
+			__newindex = function(_, k, v)
+				rawset(sandbox, k, v)
+			end,
+		})
+		return sandbox
+	end
+
 	local function bootFluent()
 		if type(ENV._AlleralFluent) == "table" and type(ENV._AlleralFluent.CreateWindow) == "function" then
+			if type(Core.say) == "function" then Core.say("[Bootstrap] Fluent already booted, reusing") end
 			return ENV._AlleralFluent
 		end
+
+		if type(Core.say) == "function" then Core.say("[Bootstrap] Loading Fluent") end
 
 		local loadStringFn = ENV.loadstring or loadstring or load
 		if type(loadStringFn) ~= "function" then
 			return nil, "loadstring not available"
 		end
-		ENV.loadstring = loadStringFn
-		ENV.game = ENV.game or game
-
-		if type(task) == "table" then
-			ENV.task = task
-			ENV.task.spawn = ENV.task.spawn or function(f) coroutine.wrap(f)() end
-			ENV.task.delay = ENV.task.delay or function(t, f) ENV.task.spawn(function() task.wait(t); f() end) end
-			ENV.task.wait = ENV.task.wait or task.wait
-		end
 
 		local body
-		if type(ENV._AlleralFluentBundle) == "string" and #ENV._AlleralFluentBundle > 1000 then
-			body = ENV._AlleralFluentBundle
-		elseif type(ENV._AlleralFluentSource) == "string" and #ENV._AlleralFluentSource > 1000 then
-			ENV._AlleralFluentBundle = ENV._AlleralFluentSource
-			body = ENV._AlleralFluentBundle
-		else
-			local urls = {
-				"https://github.com/ActualMasterOogway/Fluent-Renewed/releases/download/v1.0.8/Fluent.luau",
-			}
-			for _, url in ipairs(urls) do
-				if type(game) == "Instance" and type(game.HttpGet) == "function" then
-					body = safeCall("HttpGet Fluent", function()
-						local ok, b = pcall(game.HttpGet, game, url .. "?t=" .. tostring(tick()), true)
-						if ok and type(b) == "string" and #b > 1000 then return b end
-						ok, b = pcall(game.HttpGet, game, url .. "?t=" .. tostring(tick()))
-						if ok and type(b) == "string" and #b > 1000 then return b end
-						return nil
-					end)
-					if body then break end
-				end
-				if ENV.Alleral_HTTP and type(ENV.Alleral_HTTP.get) == "function" then
-					body = safeCall("HTTP Fluent", function()
-						return ENV.Alleral_HTTP.get(url .. "?t=" .. tostring(tick()), 5000)
-					end)
-					if body then break end
-				end
-				if not ENV._Alleral_InLoaderHttpGet and type(Core.httpGet) == "function" then
-					body = safeCall("Core.httpGet Fluent", function()
-						return Core.httpGet(url .. "?t=" .. tostring(tick()))
-					end)
-					if body then break end
+		local sourceLabel = "unknown"
+		local maxRetries = 3
+
+		for attempt = 1, maxRetries do
+			if type(ENV._AlleralFluentBundle) == "string" and #ENV._AlleralFluentBundle > 1000 then
+				body = ENV._AlleralFluentBundle
+				sourceLabel = "cached bundle"
+			elseif type(ENV._AlleralFluentSource) == "string" and #ENV._AlleralFluentSource > 1000 then
+				body = ENV._AlleralFluentSource
+				sourceLabel = "loader cache"
+			else
+				local urls = {
+					{ url = "https://github.com/ActualMasterOogway/Fluent-Renewed/releases/download/v1.0.8/Fluent.luau", name = "primary" },
+					{ url = "https://raw.githubusercontent.com/ActualMasterOogway/Fluent-Renewed/main/Fluent.luau", name = "raw" },
+				}
+				for _, entry in ipairs(urls) do
+					local bust = "?t=" .. tostring(tick()) .. "&attempt=" .. tostring(attempt)
+					if type(game) == "Instance" and type(game.HttpGet) == "function" then
+						body = safeCall("HttpGet " .. entry.name, function()
+							local ok, b = pcall(game.HttpGet, game, entry.url .. bust, true)
+							if ok and type(b) == "string" and #b > 1000 then return b end
+							ok, b = pcall(game.HttpGet, game, entry.url .. bust)
+							if ok and type(b) == "string" and #b > 1000 then return b end
+							return nil
+						end)
+						if body then sourceLabel = entry.name; break end
+					end
+					if not body and ENV.Alleral_HTTP and type(ENV.Alleral_HTTP.get) == "function" then
+						body = safeCall("Alleral_HTTP " .. entry.name, function()
+							return ENV.Alleral_HTTP.get(entry.url .. bust, 5000)
+						end)
+						if body then sourceLabel = entry.name .. "-http"; break end
+					end
+					if not body and not ENV._Alleral_InLoaderHttpGet and type(Core.httpGet) == "function" then
+						body = safeCall("Core.httpGet " .. entry.name, function()
+							return Core.httpGet(entry.url .. bust)
+						end)
+						if body then sourceLabel = entry.name .. "-core"; break end
+					end
 				end
 			end
+
+			if type(body) == "string" and #body > 1000 then break end
+
+			if ENV._AlleralFluentBundle then ENV._AlleralFluentBundle = nil end
+			if ENV._AlleralFluentSource then ENV._AlleralFluentSource = nil end
+			if attempt < maxRetries then task.wait(0.5 * attempt) end
 		end
 
 		if type(body) ~= "string" or #body <= 100 then
-			return nil, "Fluent source download empty (HTTP blocked or URLs unreachable)"
+			return nil, "Fluent source unavailable (tried " .. tostring(maxRetries) .. "x, HTTP may be blocked)"
 		end
 
 		body = body:gsub("^%s+", ""):gsub("%s+$", "")
 		if body:find("<!DOCTYPE", 1, true) or body:find("<html", 1, true) then
-			return nil, "Fluent source is HTML, not Lua"
+			return nil, "Fluent source is HTML, not Lua (check URL / network)"
 		end
+
+		if type(Core.say) == "function" then Core.say("[Bootstrap] Source Downloaded (" .. tostring(#body) .. "b from " .. sourceLabel .. ")") end
+
+		local originalBody = body
+		local sanitized = sanitizeFluentSource(body)
+		if sanitized ~= originalBody then
+			if type(Core.say) == "function" then Core.say("[Bootstrap] Source sanitized (stripped readonly protections)") end
+		end
+		body = sanitized
+
+		if type(Core.say) == "function" then Core.say("[Bootstrap] Source Verified") end
 
 		ENV._AlleralFluentBundle = body
 
-		local chunk, err = loadStringFn(body, "@Fluent/source")
-		if type(chunk) ~= "function" then
-			return nil, "Fluent compile: " .. tostring(err)
+		local sandbox = createFluentSandbox(ENV)
+		sandbox.game = sandbox.game or game
+		sandbox.loadstring = loadStringFn
+		if type(task) == "table" then
+			sandbox.task = task
+			sandbox.task.spawn = sandbox.task.spawn or function(f) coroutine.wrap(f)() end
+			sandbox.task.delay = sandbox.task.delay or function(t, f) sandbox.task.spawn(function() task.wait(t); f() end) end
+			sandbox.task.wait = sandbox.task.wait or task.wait
 		end
 
-		if setfenv then pcall(setfenv, chunk, ENV) end
+		local function tryCompile(src)
+			local chunk, err = loadStringFn(src, "@Fluent/source")
+			if type(chunk) == "function" then return chunk end
+			if type(load) == "function" then
+				chunk, err = load(src, "@Fluent/source")
+				if type(chunk) == "function" then return chunk end
+			end
+			return nil, err
+		end
+
+		local chunk, compileErr = tryCompile(body)
+		if type(chunk) ~= "function" then
+			return nil, "Fluent compile failed: " .. tostring(compileErr)
+		end
+
+		if type(Core.say) == "function" then Core.say("[Bootstrap] Source Compiled") end
+
+		if setfenv then pcall(setfenv, chunk, sandbox) end
 
 		local ok, pkg = pcall(chunk)
 		if not ok then
+			if ENV._AlleralFluentBundle then
+				ENV._AlleralFluentBundle = nil
+				if type(Core.logWarn) == "function" then
+					Core.logWarn("[Bootstrap Error] Fluent runtime: " .. tostring(pkg))
+					Core.logWarn("[Bootstrap Error] " .. tostring(debug.traceback()))
+				end
+			end
 			return nil, "Fluent runtime: " .. tostring(pkg)
 		end
 		if type(pkg) ~= "table" then
@@ -133,7 +225,10 @@ return function(Core)
 			return nil, "Fluent missing CreateWindow (got " .. type(pkg.CreateWindow) .. ")"
 		end
 
+		if type(Core.say) == "function" then Core.say("[Bootstrap] Fluent module booted") end
+
 		ENV._AlleralFluent = pkg
+		ENV._AlleralFluentBooted = true
 		return pkg
 	end
 
@@ -193,7 +288,10 @@ return function(Core)
 		function Library:Notify(info) Library:Notification(info) end
 
 		function Library:CreateWindow(settings)
-			settings = type(settings) == "table" and settings or {}
+			settings = deepClone(type(settings) == "table" and settings or {})
+
+			if type(Core.say) == "function" then Core.say("[Bootstrap] Window Creation Started") end
+
 			local fl, err = bootFluent()
 			if not fl then
 				local msg = "UI boot failed: " .. tostring(err)
@@ -201,6 +299,9 @@ return function(Core)
 				if type(Core.pushErrorLog) == "function" then Core.pushErrorLog("UI", msg) end
 				return nil
 			end
+
+			assert(type(fl) == "table", "Fluent is not a table")
+			assert(type(fl.CreateWindow) == "function", "Fluent.CreateWindow missing")
 
 			local title = settings.Title or settings.Name or "Alleral"
 			local subtitle = settings.Subtitle or settings.Author or ""
@@ -210,7 +311,7 @@ return function(Core)
 			local acrylic = settings.Acrylic or true
 			local minimizeKey = settings.MinimizeKey or Enum.KeyCode.RightControl
 
-			local flWindow = fl:CreateWindow({
+			local flWindowConfig = deepClone({
 				Title = title,
 				SubTitle = subtitle,
 				TabWidth = tabWidth,
@@ -219,10 +320,19 @@ return function(Core)
 				Theme = theme,
 				MinimizeKey = minimizeKey,
 			})
-			if not flWindow then
-				if type(Core.logWarn) == "function" then Core.logWarn("Fluent:CreateWindow returned nil") end
+
+			local flWindow
+			local windowOk, windowErr = pcall(function()
+				flWindow = fl:CreateWindow(flWindowConfig)
+			end)
+			if not windowOk or not flWindow then
+				local msg = "Fluent CreateWindow failed: " .. tostring(windowErr or "returned nil")
+				if type(Core.logWarn) == "function" then Core.logWarn("[Bootstrap Error] " .. msg) end
+				if type(Core.pushErrorLog) == "function" then Core.pushErrorLog("UI", msg) end
 				return nil
 			end
+
+			if type(Core.say) == "function" then Core.say("[Bootstrap] Window Created") end
 
 			local window = {
 				_flWindow = flWindow,
@@ -232,21 +342,28 @@ return function(Core)
 			}
 
 			function window:AddTab(name, icon)
-				local flTab = flWindow:AddTab({ Title = name, Icon = icon or "" })
-				if flTab then
+				local tabOk, flTab = pcall(function()
+					return flWindow:AddTab(deepClone({ Title = name, Icon = icon or "" }))
+				end)
+				if tabOk and flTab then
 					table.insert(window._fTabs, flTab)
+					if type(Core.say) == "function" then Core.say("[Bootstrap] Tab Registered: " .. tostring(name)) end
+				else
+					if type(Core.logWarn) == "function" then Core.logWarn("[Bootstrap Error] Failed to add tab: " .. tostring(name) .. " - " .. tostring(flTab)) end
 				end
 				return flTab, window
 			end
 
 			function window:Notify(payload)
-				payload = type(payload) == "table" and payload or {}
+				payload = deepClone(type(payload) == "table" and payload or {})
 				if fl and type(fl.Notify) == "function" then
-					fl:Notify({
-						Title = payload.Title or "Alleral",
-						Content = payload.Description or payload.Content or "",
-						Duration = payload.Lifetime or payload.Duration or 4,
-					})
+					pcall(function()
+						fl:Notify({
+							Title = payload.Title or "Alleral",
+							Content = payload.Description or payload.Content or "",
+							Duration = payload.Lifetime or payload.Duration or 4,
+						})
+					end)
 				end
 			end
 
@@ -264,6 +381,9 @@ return function(Core)
 			window._macTabGroup = window
 
 			ENV.Alleral_UiWindow = window
+
+			if type(Core.say) == "function" then Core.say("[Bootstrap] Theme Loaded") end
+
 			return window
 		end
 
@@ -273,6 +393,7 @@ return function(Core)
 	function Core.loadUi()
 		local cached = ENV.Alleral_UI
 		if type(cached) == "table" and type(cached.Library) == "table" and type(cached.CreateWindow) == "function" then
+			if type(Core.say) == "function" then Core.say("[Bootstrap] UI already loaded, reusing") end
 			return cached
 		end
 
@@ -288,7 +409,7 @@ return function(Core)
 
 		ENV.Alleral_UI = bundle
 		if getgenv then getgenv().Alleral_UI = bundle end
-		if type(Core.say) == "function" then Core.say("Alleral UI " .. tostring(Library:GetArrrelVersion()) .. " (Fluent)") end
+		if type(Core.say) == "function" then Core.say("[Bootstrap] Script Ready - Alleral UI " .. tostring(Library:GetArrrelVersion()) .. " (Fluent)") end
 		return bundle
 	end
 

@@ -956,31 +956,50 @@ do
 		return type(version) == "number" and version >= FLUENT_VERSION
 	end
 
+	local function sanitizeFluentSource(src)
+		if type(src) ~= "string" then return src end
+		src = src:gsub("table%.freeze%b()", "function(t) return t end")
+		src = src:gsub("table%.freeze", "function(t) return t end")
+		src = src:gsub("setreadonly%b()", "function(t) return t end")
+		src = src:gsub("make_readonly%b()", "function(t) return t end")
+		src = src:gsub("set_read_only%b()", "function(t) return t end")
+		return src
+	end
+
 	local function fetchRemoteFluent()
-		local bust = "?t=" .. tostring(tick())
-		local urls = {
-			GITHUB_RAW .. "/" .. FLUENT_SOURCE_PATH .. bust,
-			JSDELIVR .. "/" .. FLUENT_SOURCE_PATH .. bust,
-		}
-		for _, url in ipairs(urls) do
-			local body, via = httpGet(url, FLUENT_SOURCE_MIN_BYTES)
-			if body and isFluentSourceValid(body) then
-				return body, url .. " via " .. tostring(via)
+		for attempt = 1, 3 do
+			local bust = "?t=" .. tostring(tick()) .. "&attempt=" .. tostring(attempt)
+			local urls = {
+				GITHUB_RAW .. "/" .. FLUENT_SOURCE_PATH .. bust,
+				JSDELIVR .. "/" .. FLUENT_SOURCE_PATH .. bust,
+			}
+			for _, url in ipairs(urls) do
+				local body, via = httpGet(url, FLUENT_SOURCE_MIN_BYTES)
+				if body and isFluentSourceValid(body) then
+					return sanitizeFluentSource(body), url .. " via " .. tostring(via)
+				end
 			end
+			if attempt < 3 then task.wait(0.3 * attempt) end
 		end
-		return nil, "fluent source fetch failed"
+		return nil, "fluent source fetch failed after 3 retries"
 	end
 
 	ensureFluentSource = function()
+		if ENV._AlleralFluentSourceReady then
+			return true, ENV._AlleralFluentSourceLabel or "already ready"
+		end
+
 		local localPaths = { FLUENT_SOURCE_PATH, "kick/" .. FLUENT_SOURCE_PATH }
 		local cachePaths = { ".alleral/cache/" .. FLUENT_SOURCE_PATH }
 
 		local function adopt(src, label)
 			if not isFluentSourceValid(src) then return nil end
+			src = sanitizeFluentSource(src)
 			cacheRemote(FLUENT_SOURCE_PATH, src)
 			ENV._AlleralFluentSource = src
 			ENV._AlleralFluentSourceLabel = label
 			ENV._AlleralFluentSourceReady = true
+			log("Fluent source ready (" .. tostring(label) .. ")")
 			return true, label
 		end
 
@@ -1004,6 +1023,7 @@ do
 			return adopt(cacheSrc, "cache:" .. tostring(cachePath))
 		end
 
+		log("Fluent source unavailable (need v" .. tostring(FLUENT_VERSION) .. ") - will retry during UI boot", true)
 		return false, "Fluent source unavailable (need v" .. tostring(FLUENT_VERSION) .. ")"
 	end
 end
@@ -2314,9 +2334,9 @@ local function loadCore()
 	if not ENV._AlleralFluentSourceReady then
 		local studioOk, studioLabel = ensureUiSource()
 		if studioOk then
-			log("UI source ready (" .. tostring(studioLabel) .. ")")
+			log("Fluent source pre-cached (" .. tostring(studioLabel) .. ")")
 		else
-			log("fluent source not cached yet: " .. tostring(studioLabel), true)
+			log("Fluent source not pre-cached (" .. tostring(studioLabel) .. ") - will fetch during UI boot", true)
 		end
 	end
 
