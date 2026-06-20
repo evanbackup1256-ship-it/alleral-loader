@@ -1327,7 +1327,7 @@ function Core.setupHubKeybinds(options)
 	local panicKey = options.panicKey or Enum.KeyCode.Delete
 	local uiKey = options.uiKey or Enum.KeyCode.RightControl
 	local insertKey = options.insertKey or Enum.KeyCode.Insert
-	local libraryHandlesUiKeybind = Core.UI_LIBRARY == "Rayfield"
+	local libraryHandlesUiKeybind = Core.UI_LIBRARY == "Linoria"
 	ENV._Alleral_KeybindConn = UserInputService.InputBegan:Connect(function(input, processed)
 		if processed or input.UserInputType ~= Enum.UserInputType.Keyboard then
 			return
@@ -1866,7 +1866,7 @@ function Core.buildSystemPanelGroup(tab, options)
 	}
 	local status = group:CreateStatus("Runtime", stats)
 	group:CreateButton("Refresh system info", function()
-		status:Update("Hub", Core.UI_LIBRARY or "Arrrel")
+		status:Update("Hub", Core.UI_LIBRARY or "Alleral")
 		status:Update("UI", Core.ALLERAL_UI_VERSION or "--")
 		status:Update("Core", Core.VERSION or "--")
 		status:Update("Loader", tostring(ENV.Alleral_LoaderVersion or "--"))
