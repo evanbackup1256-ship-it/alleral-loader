@@ -4138,6 +4138,13 @@ uiToggle(
 		restoreCamera(select(2, characterParts()))
 	end
 )
+local _debugLabel = kickGroup:AddLabel("AFarm: " .. tostring(state.AFarm))
+task.spawn(function()
+	while state.HubRunning do
+		_debugLabel:SetText("AFarm: " .. tostring(state.AFarm) .. " | ATrain: " .. tostring(state.ATrain))
+		task.wait(1)
+	end
+end)
 kickGroup:CreateSlider(
 	"Custom move speed",
 	50,
