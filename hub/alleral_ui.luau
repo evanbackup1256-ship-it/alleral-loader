@@ -108,8 +108,7 @@ return function(Core)
 			else
 				local urls = {
 					{ url = "https://sirius.menu/rayfield", name = "primary" },
-					{ url = "https://raw.githubusercontent.com/shlexware/Rayfield/main/source", name = "github" },
-					{ url = "https://raw.githubusercontent.com/shlexware/Rayfield/main/source.lua", name = "github-lua" },
+					{ url = "https://raw.githubusercontent.com/jensonhirst/Rayfield/main/source", name = "github" },
 				}
 				for _, entry in ipairs(urls) do
 					local bust = "?t=" .. tostring(tick()) .. "&attempt=" .. tostring(attempt)
@@ -200,6 +199,15 @@ return function(Core)
 					pkg = candidate
 					if type(Core.say) == "function" then Core.say("[UI] Found Rayfield in global scope") end
 					break
+				end
+			end
+			-- Fallback: try calling pkg as a function (nested loadstring pattern)
+			if (type(pkg) ~= "table" or type(pkg.CreateWindow) ~= "function") and type(pkg) == "function" then
+				if type(Core.say) == "function" then Core.say("[UI] Trying nested call pattern...") end
+				local ok2, pkg2 = pcall(pkg)
+				if ok2 and type(pkg2) == "table" and type(pkg2.CreateWindow) == "function" then
+					pkg = pkg2
+					if type(Core.say) == "function" then Core.say("[UI] Rayfield loaded via nested call") end
 				end
 			end
 		end
@@ -338,7 +346,11 @@ return function(Core)
 			function window:AddTab(name, icon)
 				local iconId = rayfieldIcon(icon)
 				local tabOk, rfTab = pcall(function()
-					return rfWindow:CreateTab(name, iconId)
+					if iconId then
+						return rfWindow:CreateTab(name, iconId)
+					else
+						return rfWindow:CreateTab(name)
+					end
 				end)
 				if tabOk and rfTab then
 					table.insert(window._fTabs, rfTab)
@@ -805,10 +817,14 @@ return function(Core)
 				return type(Core.createStubUiGroup) == "function" and Core.createStubUiGroup(name) or {}
 			end
 			tab._sectionIndex = (tab._sectionIndex or 0) + 1
+			local sectionObj = rawTab
 			if rawTab.CreateSection then
-				pcall(rawTab.CreateSection, rawTab, name)
+				local ok, created = pcall(rawTab.CreateSection, rawTab, name)
+				if ok and type(created) == "table" then
+					sectionObj = created
+				end
 			end
-			return Core.createUiGroupbox(rawTab, uiBundle)
+			return Core.createUiGroupbox(sectionObj, uiBundle)
 		end
 
 		function tab:Select()
@@ -865,7 +881,7 @@ return function(Core)
 			if type(Core.logWarn) == "function" then Core.logWarn("buildUiTab: tab group missing") end
 			return Core.wrapUiTab(nil, window._ui, window)
 		end
-		local rawTab, _ = tabGroup:AddTab(name, icon)
+		local rawTab, _ = tabGroup:AddTab(name, icon or "")
 		local wrapped = Core.wrapUiTab(rawTab, window._ui or (type(section) == "table" and section._ui) or nil, window)
 		wrapped._columnCount = math.max(1, tonumber(columns) or 2)
 		if not window._defaultTab then window._defaultTab = rawTab end
