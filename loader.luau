@@ -4276,7 +4276,6 @@ end)
 publishConsoleApi("Alleral_PurgeCache", function()
 	local ok, err = pcall(function()
 		purgeAlleralWorkspace({ reason = "manual" })
-		checkForRemoteUpdate(ENV._Alleral_ActiveProfile, false)
 	end)
 	if not ok then
 		warn("[Alleral v" .. LOADER_VERSION .. "] Purge failed: " .. tostring(err))
