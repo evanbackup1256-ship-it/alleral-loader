@@ -72,6 +72,33 @@ jobs:
             [ -f "$f" ] && SOURCES+=("$f")
           done
 
+          # Stamp public release metadata with the commit that triggered this sync.
+          # Local release files are committed before the final SHA exists, so the
+          # public loader repo must be corrected here to avoid one-release-behind pins.
+          RELEASE_COMMIT="${GITHUB_SHA::7}"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          commit = os.environ["RELEASE_COMMIT"]
+          release_path = Path("cfg/release.json")
+          loader_path = Path("loader.luau")
+
+          release = json.loads(release_path.read_text(encoding="utf-8"))
+          release["commit"] = commit
+          release_path.write_text(json.dumps(release, indent=2) + "\n", encoding="utf-8")
+
+          loader = loader_path.read_text(encoding="utf-8")
+          loader = __import__("re").sub(
+              r'(?m)^\tcommit = "[^"]+"',
+              f'\tcommit = "{commit}"',
+              loader,
+              count=1,
+          )
+          loader_path.write_text(loader, encoding="utf-8")
+          PY
+
           # Compare source vs public repo via sha256
           # Obfuscation targets: games/*.luau
           # Plain copy: loader.luau, bootstrap.luau, hub/*.luau, ui/fluent/source.luau, cfg/*
