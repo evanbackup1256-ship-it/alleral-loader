@@ -1,7 +1,7 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
-watchPatterns = ["relay/**", "cfg/**", "Dockerfile", "railway.toml", "hub/**", "games/**", "bootstrap.luau", "loader.luau"]
+watchPatterns = ["relay/**", "cfg/**", "go/**", "docker/**", "Dockerfile", "railway.toml", "hub/**", "games/**", "bootstrap.luau", "loader.luau"]
 
 [deploy]
 healthcheckPath = "/health"

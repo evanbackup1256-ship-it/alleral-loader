@@ -1,4 +1,4 @@
-module github.com/evanbackup1256-ship-it/-kick-loader/go
+module alleral.local/kick-loader/go
 
 go 1.23
 
