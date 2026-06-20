@@ -3449,6 +3449,61 @@ local function uiSlider(group, key, name, min, max, tooltip, increment, callback
 	end, tooltip, increment, key)
 end
 
+
+local function buildLocalStatusDisplay(group, title, values)
+	local status = {
+		Labels = {},
+		LastValues = {},
+		Visible = true,
+	}
+
+	local function setLabelText(label, text)
+		if not label then
+			return
+		end
+		if type(label.SetText) == "function" then
+			pcall(label.SetText, label, text)
+		elseif type(label.Set) == "function" then
+			pcall(label.Set, label, { Text = text, Name = text })
+		end
+	end
+
+	local function addLabel(text)
+		if group and type(group.AddLabel) == "function" then
+			return group:AddLabel(text)
+		end
+		if group and type(group._rawGroupbox) == "table" and type(group._rawGroupbox.AddLabel) == "function" then
+			return group._rawGroupbox:AddLabel(text)
+		end
+		return nil
+	end
+
+	local header = addLabel(tostring(title or "Status"))
+	status.Header = header
+
+	for key, value in pairs(values or {}) do
+		local rendered = tostring(value)
+		status.LastValues[key] = rendered
+		status.Labels[key] = addLabel(tostring(key) .. ": " .. rendered)
+	end
+
+	function status:Update(key, value)
+		local rendered = tostring(value)
+		if self.LastValues[key] == rendered then
+			return
+		end
+		self.LastValues[key] = rendered
+		setLabelText(self.Labels[key], tostring(key) .. ": " .. rendered)
+	end
+
+	function status:SetVisible(visible)
+		self.Visible = visible == true
+	end
+
+	return status
+end
+
+
 local mainTab = createUiTab("Kick", "rbxassetid://10723407389")
 local autoTab = createUiTab("Plot", "rbxassetid://10734923214")
 local eventsTab = createUiTab("Events", "rbxassetid://10709789407", 3)
@@ -3488,7 +3543,7 @@ Core.buildStandardSettingsExtras(configTab, Core.settingsExtrasOptions(uiWindow,
 local protectedDropdown
 local upgradeDropdown
 
-local diagnosticsStatus = Core.buildStatusDisplay(diagnosticsGroup, "Live stats", {
+local diagnosticsStatus = buildLocalStatusDisplay(diagnosticsGroup, "Live stats", {
 	Executor    = "checking...",
 	FPS         = "--",
 	Perf        = "--",
@@ -3502,39 +3557,14 @@ local diagnosticsStatus = Core.buildStatusDisplay(diagnosticsGroup, "Live stats"
 	Log         = appendFile and logFile or "n/a",
 })
 
-Core.buildExploitHub(uiSection, {
-	window = uiWindow,
-	ui = ui,
-	state = state,
-	loops = loops,
-	version = VERSION,
-	scriptId = "kick_a_lucky_block",
-	gameName = "Kick a Lucky Block",
-	gameStats = {
-		FPS = "--",
-		Tasks = "0",
-		Errors = "0",
-		Build = VERSION,
-	},
-	statsTick = function(status)
-		if not diagnosticsStatus or not diagnosticsStatus.LastValues then
-			return
-		end
-		for key, value in pairs(diagnosticsStatus.LastValues) do
-			status:Update(key, value)
-		end
-	end,
-	automationFlags = {
-		{ key = "AFarm", label = "Kick" },
-		{ key = "APlaceBest", label = "Place" },
-		{ key = "AAutoUpgrade", label = "Upgrade" },
-		{ key = "AAutoFav", label = "Favorite" },
-		{ key = "ATrain", label = "Train" },
-		{ key = "ACollect", label = "Collect" },
-		{ key = "AAutoBattle", label = "Battle" },
-		{ key = "AAutoMastery", label = "Mastery" },
-	},
-	saveFn = saveSettings,
+
+-- Removed Core.shared hub dashboard builder because the shared hub builder still calls legacy legacy status method internally.
+-- These pure Linoria label statuses replace that dashboard path without using legacy status method.
+local exploitHubStatus = buildLocalStatusDisplay(diagnosticsGroup, "Hub status", {
+	Version = VERSION,
+	Script = "kick_a_lucky_block",
+	Game = "Kick a Lucky Block",
+	State = "Ready",
 })
 
 local profileFolder = "Alleral_Configs/Profiles"
@@ -4184,7 +4214,7 @@ kickGroup:CreateToggle(
 	end,
 	"APredict"
 )
-predictionStatus = Core.buildStatusDisplay(kickGroup, "Live roll", {
+predictionStatus = buildLocalStatusDisplay(kickGroup, "Live roll", {
 	Roll       = "--",
 	Rarity     = "--",
 	Mutation   = "--",
@@ -4192,7 +4222,7 @@ predictionStatus = Core.buildStatusDisplay(kickGroup, "Live roll", {
 	["vs plot"]  = "--",
 	Result     = "--",
 })
-local sessionStatus = Core.buildStatusDisplay(kickGroup, "This session", {
+local sessionStatus = buildLocalStatusDisplay(kickGroup, "This session", {
 	Runtime    = "0:00",
 	Kicks      = "0",
 	["Per min"]  = "0",
@@ -4751,7 +4781,7 @@ masteryGroup:CreateDropdown(
 		saveSettings()
 	end
 )
-masteryStatus = Core.buildStatusDisplay(masteryGroup, "Mastery", {
+masteryStatus = buildLocalStatusDisplay(masteryGroup, "Mastery", {
 	Status     = "Off",
 	["Reset"]  = state.MasteryResetMethod,
 	["Last"]   = "--",
