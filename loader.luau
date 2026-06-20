@@ -4274,8 +4274,17 @@ publishConsoleApi("Alleral_ScanLegacy", function()
 end)
 
 publishConsoleApi("Alleral_PurgeCache", function()
-	local ok, err = pcall(function()
+	if type(isFile) ~= "function" or type(deleteFileFn) ~= "function" then
+		warn("[Alleral] Filesystem not available — cannot purge cache")
+		return false
+	end
+	local ok, err = xpcall(function()
 		purgeAlleralWorkspace({ reason = "manual" })
+	end, function(err)
+		if type(debug) == "table" and type(debug.traceback) == "function" then
+			return debug.traceback(tostring(err), 2)
+		end
+		return tostring(err)
 	end)
 	if not ok then
 		warn("[Alleral v" .. LOADER_VERSION .. "] Purge failed: " .. tostring(err))
