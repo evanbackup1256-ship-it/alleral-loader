@@ -61,17 +61,16 @@ return function(Core)
 	}
 
 	local function log(level, message)
-		local prefix = "[" .. level .. "]"
-		local fullMsg = prefix .. " " .. message
+		local fullMsg = "[" .. level .. "] " .. message
 		if type(Core.say) == "function" then Core.say(fullMsg) end
 		if type(Core.logWarn) == "function" and level == "WARN" then Core.logWarn(fullMsg) end
 		table.insert(STATE.errorLog, { level = level, message = message, time = os.date("%H:%M:%S") })
 	end
 
 	local function safeCall(name, fn, fallback)
-		if type(fn) ~= "function" then log("WARN", name .. ": Invalid function"); return fallback or nil end
+		if type(fn) ~= "function" then return fallback or nil end
 		local ok, result = pcall(fn)
-		if not ok then log("ERROR", name .. ": " .. tostring(result)); return fallback or nil end
+		if not ok then log("WARN", name .. ": " .. tostring(result)); return fallback or nil end
 		return result
 	end
 
@@ -97,20 +96,18 @@ return function(Core)
 	end
 
 	local function tryReadLocal(path)
-		local fn = ENV.readfile
-		local isFileFn = ENV.isfile
-		if type(fn) ~= "function" or type(isFileFn) ~= "function" then return nil end
-		local ok, exists = pcall(isFileFn, path)
+		local fn = ENV.readfile; local isf = ENV.isfile
+		if type(fn) ~= "function" or type(isf) ~= "function" then return nil end
+		local ok, exists = pcall(isf, path)
 		if not ok or not exists then return nil end
 		local okRead, data = pcall(fn, path)
 		return okRead and data or nil
 	end
 
 	local function tryWriteLocal(path, data)
-		local fn = ENV.writefile
-		if type(fn) ~= "function" then return false end
+		if type(ENV.writefile) ~= "function" then return false end
 		if ENV.makefolder then pcall(ENV.makefolder, CONFIG.CACHE_FOLDER) end
-		return pcall(fn, path, data)
+		return pcall(ENV.writefile, path, data)
 	end
 
 	local function fetchUrl(url)
@@ -136,17 +133,14 @@ return function(Core)
 	local function parseNotificationInfo(info, fallbackTime)
 		local text = ""
 		local duration = CONFIG.NOTIFICATION.DURATION
-		if type(info) == "string" then
-			text = info
+		if type(info) == "string" then text = info
 		elseif type(info) == "table" then
 			local title = textOf(info.Title or info.Name or "")
 			local body = textOf(info.Description or info.Content or info.Text or info.Message or "")
 			if title ~= "" and body ~= "" then text = title .. "\n" .. body
 			else text = title ~= "" and title or body end
 			duration = tonumber(info.Duration or info.Lifetime or info.Time or fallbackTime or CONFIG.NOTIFICATION.DURATION)
-		else
-			text = textOf(info)
-		end
+		else text = textOf(info) end
 		return text, math.max(1, duration)
 	end
 
@@ -208,23 +202,16 @@ return function(Core)
 			if type(text) == "table" then Library:Notification(text)
 			else Library:Notification({ Description = text, Duration = duration }) end
 		end
-		function Library:NotifySuccess(text, duration) Library:Notification({ Description = text, Duration = duration, Type = "success" }) end
-		function Library:NotifyError(text, duration) Library:Notification({ Description = text, Duration = duration, Type = "error" }) end
+
 		function Library:CreateWindow(settings)
 			settings = deepClone(type(settings) == "table" and settings or {})
 			local li = loadLinoriaSource()
-			if not li then log("ERROR", "Linoria boot failed"); return nil end
+			if not li then return nil end
 			local title = settings.Title or settings.Name or "Alleral"
 			local liWindow
-			local winCfg = {
-				Title = title,
-				Center = settings.Center ~= false,
-				AutoShow = settings.AutoShow ~= false,
-				Size = settings.Size or UDim2.fromOffset(720, 520),
-				Position = settings.Position or UDim2.fromOffset(120, 40),
-			}
+			local winCfg = { Title = title, Center = settings.Center ~= false, AutoShow = settings.AutoShow ~= false, Size = settings.Size or UDim2.fromOffset(720, 520) }
 			local okW, errW = pcall(function() liWindow = li:CreateWindow(winCfg) end)
-			if not okW or not liWindow then log("ERROR", "CreateWindow failed: " .. tostring(errW or "nil")); return nil end
+			if not okW or not liWindow then return nil end
 			local window = { _liWindow = liWindow, _linoria = li, _library = Library, _tabs = {}, _settings = settings, _title = title }
 			function window:AddTab(name, icon)
 				STATE.tabCount = STATE.tabCount + 1
@@ -235,8 +222,7 @@ return function(Core)
 			end
 			function window:Notify(payload) payload = type(payload) == "table" and payload or {}; Library:Notification(payload) end
 			function window:Unload() pcall(function() liWindow:Destroy() end) end
-			function window:SetState() end
-			function window:GetState() return true end
+			function window:SetState() end; function window:GetState() return true end
 			STATE.windowCount = STATE.windowCount + 1
 			ENV.Alleral_UiWindow = window
 			return window
@@ -249,7 +235,6 @@ return function(Core)
 		if type(cached) == "table" and type(cached.Library) == "table" then return cached end
 		local Linoria = loadLinoriaSource()
 		if not Linoria then
-			log("ERROR", "Linoria unavailable")
 			local stub = { Library = { Version = CONFIG.VERSION }, CreateWindow = function() return nil end, Notify = function() end }
 			ENV.Alleral_UI = stub; if getgenv then getgenv().Alleral_UI = stub end; return stub
 		end
@@ -257,7 +242,6 @@ return function(Core)
 		ENV._AlleralUiLibrary = Library
 		local bundle = { Library = Library, Alleral = Library, CreateWindow = function(_, s) return Library:CreateWindow(s) end, Notify = function(_, i, t) Library:Notify(i, t) end, _linoria = Linoria }
 		ENV.Alleral_UI = bundle; if getgenv then getgenv().Alleral_UI = bundle end
-		log("INFO", CONFIG.LIB_NAME .. " v" .. CONFIG.VERSION .. " loaded")
 		return bundle
 	end
 
@@ -267,12 +251,9 @@ return function(Core)
 	function Core.uiWindowSettings(extra)
 		extra = type(extra) == "table" and extra or {}
 		return {
-			Title = extra.Title or extra.Name or "Alleral",
-			Name = extra.Title or extra.Name or "Alleral",
-			Subtitle = extra.Subtitle or extra.Author or "",
-			Icon = extra.Icon or "sparkles",
-			Theme = extra.Theme or "Default",
-			Size = extra.Size or UDim2.fromOffset(720, 520),
+			Title = extra.Title or extra.Name or "Alleral", Name = extra.Title or extra.Name or "Alleral",
+			Subtitle = extra.Subtitle or extra.Author or "", Icon = extra.Icon or "sparkles",
+			Theme = extra.Theme or "Default", Size = extra.Size or UDim2.fromOffset(720, 520),
 			TabWidth = tonumber(extra.TabWidth) or 160,
 			FileSettings = { RootFolder = extra.configFolder or "Alleral_Configs", ConfigFolder = extra.FileName or "Interface" },
 		}
@@ -452,10 +433,10 @@ return function(Core)
 	function Core.buildUiWindow(ui, settings)
 		settings = settings or {}
 		local lib = ui and ui.Library
-		if not lib then log("ERROR", "buildUiWindow: lib nil"); return nil end
-		if type(lib.CreateWindow) ~= "function" then log("ERROR", "buildUiWindow: CreateWindow missing"); return nil end
+		if not lib then return nil end
+		if type(lib.CreateWindow) ~= "function" then return nil end
 		local rawWindow = lib:CreateWindow(settings)
-		if not rawWindow then log("ERROR", "buildUiWindow: CreateWindow nil"); return nil end
+		if not rawWindow then return nil end
 		local window = { _rawWindow = rawWindow, _ui = ui, _library = lib, _initialized = false, _tabGroup = rawWindow, _alleralSettings = settings }
 		if type(Core.registerUiWindow) == "function" then Core.registerUiWindow(window) end
 		if type(Core.flushPendingNotifications) == "function" then Core.flushPendingNotifications() end
@@ -503,19 +484,10 @@ return function(Core)
 		return window
 	end
 
-	function Core.repairUiWindow(window)
-		window = window or ENV.Alleral_UiWindow
-		return type(window) == "table" and window._rawWindow ~= nil
-	end
-
+	function Core.repairUiWindow(window) window = window or ENV.Alleral_UiWindow; return type(window) == "table" and window._rawWindow ~= nil end
 	function Core.refreshAllTabColumns() return true end
-
 	function Core.notifyUi(info) local ui = ENV.Alleral_UI; if ui and type(ui.Notify) == "function" then pcall(ui.Notify, ui, info) end end
-
-	function Core.releaseAlleralRuntime()
-		ENV._AlleralUiLibrary = nil; ENV._AlleralUI = nil; ENV.Alleral_UiWindow = nil
-		STATE.linoriaInstance = nil; STATE.notificationQueue = {}; STATE.activeNotifications = {}
-	end
+	function Core.releaseAlleralRuntime() ENV._AlleralUiLibrary = nil; ENV._AlleralUI = nil; ENV.Alleral_UiWindow = nil; STATE.linoriaInstance = nil; STATE.notificationQueue = {}; STATE.activeNotifications = {} end
 
 	log("INFO", CONFIG.LIB_NAME .. " v" .. CONFIG.VERSION .. " initialized")
 end
