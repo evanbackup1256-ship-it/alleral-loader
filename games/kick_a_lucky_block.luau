@@ -3488,19 +3488,31 @@ Core.buildStandardSettingsExtras(configTab, Core.settingsExtrasOptions(uiWindow,
 local protectedDropdown
 local upgradeDropdown
 
-local diagnosticsStatus = Core.buildStatusDisplay(diagnosticsGroup, "Live stats", {
-	Executor    = "checking...",
-	FPS         = "--",
-	Perf        = "--",
-	Tasks       = "0",
-	Remotes     = "--",
-	Build       = "--",
-	Updated     = "--",
-	Errors      = "0",
-	Latest      = "--",
-	Previous    = "--",
-	Log         = appendFile and logFile or "n/a",
-})
+runtime._diagLabels = {}
+runtime._diagLabels.Executor = diagnosticsGroup:AddLabel("Executor: checking...")
+runtime._diagLabels.FPS = diagnosticsGroup:AddLabel("FPS: --")
+runtime._diagLabels.Perf = diagnosticsGroup:AddLabel("Perf: --")
+runtime._diagLabels.Tasks = diagnosticsGroup:AddLabel("Tasks: 0")
+runtime._diagLabels.Remotes = diagnosticsGroup:AddLabel("Remotes: --")
+runtime._diagLabels.Build = diagnosticsGroup:AddLabel("Build: --")
+runtime._diagLabels.Updated = diagnosticsGroup:AddLabel("Updated: --")
+runtime._diagLabels.Errors = diagnosticsGroup:AddLabel("Errors: 0")
+runtime._diagLabels.Latest = diagnosticsGroup:AddLabel("Latest: --")
+runtime._diagLabels.Previous = diagnosticsGroup:AddLabel("Previous: --")
+runtime._diagLabels.Log = diagnosticsGroup:AddLabel("Log: " .. (appendFile and logFile or "n/a"))
+runtime._diagValues = {
+	Executor = "checking...",
+	FPS = "--",
+	Perf = "--",
+	Tasks = "0",
+	Remotes = "--",
+	Build = "--",
+	Updated = "--",
+	Errors = "0",
+	Latest = "--",
+	Previous = "--",
+	Log = appendFile and logFile or "n/a",
+}
 
 Core.buildExploitHub(uiSection, {
 	window = uiWindow,
@@ -3517,10 +3529,10 @@ Core.buildExploitHub(uiSection, {
 		Build = VERSION,
 	},
 	statsTick = function(status)
-		if not diagnosticsStatus or not diagnosticsStatus.LastValues then
+		if not runtime._diagValues then
 			return
 		end
-		for key, value in pairs(diagnosticsStatus.LastValues) do
+		for key, value in pairs(runtime._diagValues) do
 			status:Update(key, value)
 		end
 	end,
@@ -4170,7 +4182,6 @@ kickGroup:CreateSlider(
 	"Only matters when scaling is Micro or Nano."
 )
 kickGroup:CreateDivider()
-local predictionStatus
 kickGroup:CreateToggle(
 	"Show what's rolling",
 	state.APredict,
@@ -4178,28 +4189,28 @@ kickGroup:CreateToggle(
 	function(value)
 		state.APredict = value
 		saveSettings()
-		if predictionStatus and predictionStatus.SetVisible then
-			predictionStatus:SetVisible(value)
+		if runtime._predLabels then
+			for _, label in pairs(runtime._predLabels) do
+				label.Visible = value
+			end
 		end
 	end,
 	"APredict"
 )
-predictionStatus = Core.buildStatusDisplay(kickGroup, "Live roll", {
-	Roll       = "--",
-	Rarity     = "--",
-	Mutation   = "--",
-	["Lv1 $/s"] = "--",
-	["vs plot"]  = "--",
-	Result     = "--",
-})
-local sessionStatus = Core.buildStatusDisplay(kickGroup, "This session", {
-	Runtime    = "0:00",
-	Kicks      = "0",
-	["Per min"]  = "0",
-	Keeps      = "0",
-	Resets     = "0",
-	["Best $/s"]= "--",
-})
+runtime._predLabels = {}
+runtime._predLabels.Roll = kickGroup:AddLabel("Roll: --")
+runtime._predLabels.Rarity = kickGroup:AddLabel("Rarity: --")
+runtime._predLabels.Mutation = kickGroup:AddLabel("Mutation: --")
+runtime._predLabels["Lv1 $/s"] = kickGroup:AddLabel("Lv1 $/s: --")
+runtime._predLabels["vs plot"] = kickGroup:AddLabel("vs plot: --")
+runtime._predLabels.Result = kickGroup:AddLabel("Result: --")
+runtime._sessionLabels = {}
+runtime._sessionLabels.Runtime = kickGroup:AddLabel("Runtime: 0:00")
+runtime._sessionLabels.Kicks = kickGroup:AddLabel("Kicks: 0")
+runtime._sessionLabels["Per min"] = kickGroup:AddLabel("Per min: 0")
+runtime._sessionLabels.Keeps = kickGroup:AddLabel("Keeps: 0")
+runtime._sessionLabels.Resets = kickGroup:AddLabel("Resets: 0")
+runtime._sessionLabels["Best $/s"] = kickGroup:AddLabel("Best $/s: --")
 kickGroup:CreateButton(
 	"Reset stats",
 	function()
@@ -4712,7 +4723,6 @@ battleGroup:CreateSlider(
 	"BattleMinPlayers"
 )
 
-local masteryStatus
 local updateMasteryStatus
 
 masteryGroup:CreateToggle(
@@ -4751,20 +4761,25 @@ masteryGroup:CreateDropdown(
 		saveSettings()
 	end
 )
-masteryStatus = Core.buildStatusDisplay(masteryGroup, "Mastery", {
-	Status     = "Off",
-	["Reset"]  = state.MasteryResetMethod,
-	["Last"]   = "--",
-})
+runtime._masteryLabels = {}
+runtime._masteryLabels.Status = masteryGroup:AddLabel("Status: Off")
+runtime._masteryLabels["Reset"] = masteryGroup:AddLabel("Reset: " .. (state.MasteryResetMethod or "Died"))
+runtime._masteryLabels["Last"] = masteryGroup:AddLabel("Last: --")
 updateMasteryStatus = function(status, extra)
-	if not masteryStatus or not masteryStatus.Update then
+	if not runtime._masteryLabels then
 		return
 	end
-	masteryStatus:Update("Status", status or "Off")
-	masteryStatus:Update("Reset", state.MasteryResetMethod or "Died")
+	if runtime._masteryLabels.Status then
+		runtime._masteryLabels.Status:SetText("Status: " .. (status or "Off"))
+	end
+	if runtime._masteryLabels["Reset"] then
+		runtime._masteryLabels["Reset"]:SetText("Reset: " .. (state.MasteryResetMethod or "Died"))
+	end
 	if extra then
 		for key, value in pairs(extra) do
-			masteryStatus:Update(key, value)
+			if runtime._masteryLabels[key] then
+				runtime._masteryLabels[key]:SetText(key .. ": " .. tostring(value))
+			end
 		end
 	end
 end
@@ -5023,17 +5038,16 @@ webhookGroup:CreateButton(
 	"Send the bag update right now."
 )
 
-	if predictionStatus and predictionStatus.SetVisible then
-		predictionStatus:SetVisible(state.APredict)
+	if runtime._predLabels then
+		for _, label in pairs(runtime._predLabels) do
+			label.Visible = state.APredict
+		end
 	end
 
 	return {
 		window = uiWindow,
-		predictionStatus = predictionStatus,
-		sessionStatus = sessionStatus,
 		protectedDropdown = protectedDropdown,
 		upgradeDropdown = upgradeDropdown,
-		diagnosticsStatus = diagnosticsStatus,
 		updateMasteryStatus = updateMasteryStatus,
 	}
 end
@@ -5090,7 +5104,7 @@ task.spawn(function()
 		if runtime.currentFps and runtime.currentFps < 24 then
 			diagnosticsInterval = math.max(diagnosticsInterval, 5)
 		end
-		if ui.diagnosticsStatus and ui.diagnosticsStatus.Update then
+		if runtime._diagLabels then
 			refreshPerformanceMode()
 			local remoteCount = 0
 			for _, remote in pairs(remotes) do
@@ -5102,39 +5116,53 @@ task.spawn(function()
 			for _ in pairs(loops) do
 				loopCount = loopCount + 1
 			end
-			ui.diagnosticsStatus:Update("Executor", Executor.isKnown and Executor.displayName or ("? " .. (Executor.rawName ~= "" and ("(" .. Executor.rawName .. ")") or "unknown")))
-			ui.diagnosticsStatus:Update("FPS", tostring(runtime.currentFps or "--"))
+			local execLabel = Executor.isKnown and Executor.displayName or ("? " .. (Executor.rawName ~= "" and ("(" .. Executor.rawName .. ")") or "unknown"))
+			if runtime._diagLabels.Executor then runtime._diagLabels.Executor:SetText("Executor: " .. execLabel) end
+			runtime._diagValues.Executor = execLabel
+			local fpsText = tostring(runtime.currentFps or "--")
+			if runtime._diagLabels.FPS then runtime._diagLabels.FPS:SetText("FPS: " .. fpsText) end
+			runtime._diagValues.FPS = fpsText
 			local perfLabels = {
 				Balanced = "Normal",
 				Safe = "Saving FPS",
 				Performance = "Light",
 				Aggressive = "Fast",
 			}
-			ui.diagnosticsStatus:Update(
-				"Perf",
-				perfLabels[runtime.performanceMode or "Balanced"] or tostring(runtime.performanceMode or "Normal")
-			)
-			ui.diagnosticsStatus:Update("Tasks", tostring(loopCount))
-			ui.diagnosticsStatus:Update("Remotes", tostring(remoteCount))
+			local perfText = perfLabels[runtime.performanceMode or "Balanced"] or tostring(runtime.performanceMode or "Normal")
+			if runtime._diagLabels.Perf then runtime._diagLabels.Perf:SetText("Perf: " .. perfText) end
+			runtime._diagValues.Perf = perfText
+			local tasksText = tostring(loopCount)
+			if runtime._diagLabels.Tasks then runtime._diagLabels.Tasks:SetText("Tasks: " .. tasksText) end
+			runtime._diagValues.Tasks = tasksText
+			local remoteText = tostring(remoteCount)
+			if runtime._diagLabels.Remotes then runtime._diagLabels.Remotes:SetText("Remotes: " .. remoteText) end
+			runtime._diagValues.Remotes = remoteText
 			local build = runtime.gameBuild
-			ui.diagnosticsStatus:Update(
-				"Build",
-				build and ((build.Changed and "Updated" or "Same") .. " Â· v" .. tostring(build.PlaceVersion or "--")) or "--"
-			)
-			ui.diagnosticsStatus:Update("Updated", build and formatRobloxTimestamp(build.Updated) or "--")
-			ui.diagnosticsStatus:Update("Errors", tostring(totalLoggedErrors()))
-			ui.diagnosticsStatus:Update("Latest", runtime.lastError or runtime.lastLoopError or "none")
-			ui.diagnosticsStatus:Update("Previous", runtime.errorLog[1] or "none")
+			local buildText = build and ((build.Changed and "Updated" or "Same") .. " Â· v" .. tostring(build.PlaceVersion or "--")) or "--"
+			if runtime._diagLabels.Build then runtime._diagLabels.Build:SetText("Build: " .. buildText) end
+			runtime._diagValues.Build = buildText
+			local updatedText = build and formatRobloxTimestamp(build.Updated) or "--"
+			if runtime._diagLabels.Updated then runtime._diagLabels.Updated:SetText("Updated: " .. updatedText) end
+			runtime._diagValues.Updated = updatedText
+			local errorsText = tostring(totalLoggedErrors())
+			if runtime._diagLabels.Errors then runtime._diagLabels.Errors:SetText("Errors: " .. errorsText) end
+			runtime._diagValues.Errors = errorsText
+			local latestText = runtime.lastError or runtime.lastLoopError or "none"
+			if runtime._diagLabels.Latest then runtime._diagLabels.Latest:SetText("Latest: " .. latestText) end
+			runtime._diagValues.Latest = latestText
+			local previousText = runtime.errorLog[1] or "none"
+			if runtime._diagLabels.Previous then runtime._diagLabels.Previous:SetText("Previous: " .. previousText) end
+			runtime._diagValues.Previous = previousText
 
-			if ui.sessionStatus and ui.sessionStatus.Update then
+			if runtime._sessionLabels then
 				local elapsed = math.floor(tick() - (runtime.sessionStart or tick()))
-				ui.sessionStatus:Update("Runtime", string.format("%d:%02d", math.floor(elapsed / 60), elapsed % 60))
-				ui.sessionStatus:Update("Kicks",   tostring(runtime.sessionKicks  or 0))
-				ui.sessionStatus:Update("Per min", tostring(runtime.kicksPerMin or 0))
-				ui.sessionStatus:Update("Keeps", tostring(runtime.sessionMatches or 0))
-				ui.sessionStatus:Update("Resets",  tostring(runtime.sessionResets  or 0))
+				if runtime._sessionLabels.Runtime then runtime._sessionLabels.Runtime:SetText("Runtime: " .. string.format("%d:%02d", math.floor(elapsed / 60), elapsed % 60)) end
+				if runtime._sessionLabels.Kicks then runtime._sessionLabels.Kicks:SetText("Kicks: " .. tostring(runtime.sessionKicks or 0)) end
+				if runtime._sessionLabels["Per min"] then runtime._sessionLabels["Per min"]:SetText("Per min: " .. tostring(runtime.kicksPerMin or 0)) end
+				if runtime._sessionLabels.Keeps then runtime._sessionLabels.Keeps:SetText("Keeps: " .. tostring(runtime.sessionMatches or 0)) end
+				if runtime._sessionLabels.Resets then runtime._sessionLabels.Resets:SetText("Resets: " .. tostring(runtime.sessionResets or 0)) end
 				local bestCps = runtime.sessionBestCps or 0
-				ui.sessionStatus:Update("Best $/s", bestCps > 0 and (formatNumber(bestCps) .. "/s") or "--")
+				if runtime._sessionLabels["Best $/s"] then runtime._sessionLabels["Best $/s"]:SetText("Best $/s: " .. (bestCps > 0 and (formatNumber(bestCps) .. "/s") or "--")) end
 			end
 		end
 		task.wait(diagnosticsInterval)
@@ -5376,18 +5404,18 @@ makeSupervisor("RefreshData", 8, function()
 end)
 
 makeSupervisor("Prediction", 1, function()
-	if not state.APredict or not ui.predictionStatus then
+	if not state.APredict or not runtime._predLabels then
 		return
 	end
 	local inGame = currentRollPayload()
 	if inGame == "" then
 		runtime.lastPredictionKey = ""
-		ui.predictionStatus:Update("Roll",     "--")
-		ui.predictionStatus:Update("Rarity",   "--")
-		ui.predictionStatus:Update("Mutation", "--")
-		ui.predictionStatus:Update("Lv1 $/s",  "--")
-		ui.predictionStatus:Update("vs plot",  "--")
-		ui.predictionStatus:Update("Result",   "--")
+		if runtime._predLabels.Roll then runtime._predLabels.Roll:SetText("Roll: --") end
+		if runtime._predLabels.Rarity then runtime._predLabels.Rarity:SetText("Rarity: --") end
+		if runtime._predLabels.Mutation then runtime._predLabels.Mutation:SetText("Mutation: --") end
+		if runtime._predLabels["Lv1 $/s"] then runtime._predLabels["Lv1 $/s"]:SetText("Lv1 $/s: --") end
+		if runtime._predLabels["vs plot"] then runtime._predLabels["vs plot"]:SetText("vs plot: --") end
+		if runtime._predLabels.Result then runtime._predLabels.Result:SetText("Result: --") end
 		return
 	end
 
@@ -5449,20 +5477,20 @@ makeSupervisor("Prediction", 1, function()
 			notify("Rare!", name .. " Â· " .. rarity .. " Â· " .. mutation, 6)
 		end
 	end
-	if ui.predictionStatus then
-		ui.predictionStatus:Update("Result", matchesFilter and "keep" or "skip")
+	if runtime._predLabels and runtime._predLabels.Result then
+		runtime._predLabels.Result:SetText("Result: " .. (matchesFilter and "keep" or "skip"))
 	end
 	if not shouldRefreshUi then
 		return
 	end
 	runtime.lastPredictionKey = predictionKey
 	runtime.lastPredictionAt = tick()
-	ui.predictionStatus:Update("Roll",     name)
-	ui.predictionStatus:Update("Rarity",   rarity)
-	ui.predictionStatus:Update("Mutation", mutation)
-	ui.predictionStatus:Update("Lv1 $/s",  cps1 and (formatNumber(cps1) .. "/s") or "?")
-	ui.predictionStatus:Update("vs plot",  netGainStr)
-	ui.predictionStatus:Update("Result",   matchesFilter and "keep" or "skip")
+	if runtime._predLabels.Roll then runtime._predLabels.Roll:SetText("Roll: " .. name) end
+	if runtime._predLabels.Rarity then runtime._predLabels.Rarity:SetText("Rarity: " .. rarity) end
+	if runtime._predLabels.Mutation then runtime._predLabels.Mutation:SetText("Mutation: " .. mutation) end
+	if runtime._predLabels["Lv1 $/s"] then runtime._predLabels["Lv1 $/s"]:SetText("Lv1 $/s: " .. (cps1 and (formatNumber(cps1) .. "/s") or "?")) end
+	if runtime._predLabels["vs plot"] then runtime._predLabels["vs plot"]:SetText("vs plot: " .. netGainStr) end
+	if runtime._predLabels.Result then runtime._predLabels.Result:SetText("Result: " .. (matchesFilter and "keep" or "skip")) end
 end)
 
 makeSupervisor("AutoKick", 0.3, function()

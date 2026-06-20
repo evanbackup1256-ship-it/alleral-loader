@@ -13,18 +13,18 @@ function Core.buildStatusDisplay(group, label, fields)
 	local s = { Labels = {}, LastValues = {}, Summary = nil }
 	for k, v in pairs(fields or {}) do
 		s.LastValues[k] = tostring(v)
-		s.Labels[k] = group:CreateLabel(tostring(k) .. ": " .. tostring(v))
+		s.Labels[k] = group:AddLabel(tostring(k) .. ": " .. tostring(v))
 	end
-	s.Summary = group:CreateLabel("")
+	s.Summary = group:AddLabel("")
 	function s:Update(key, value)
 		local rendered = tostring(value)
 		if self.LastValues[key] == rendered then return end
 		self.LastValues[key] = rendered
 		local row = self.Labels[key]
-		if row and row.Set then row:Set({ Name = tostring(key) .. ": " .. rendered }) end
+		if row and row.SetText then pcall(row.SetText, row, tostring(key) .. ": " .. rendered) end
 	end
 	function s:SetSummary(text)
-		if self.Summary and self.Summary.Set then self.Summary:Set({ Name = tostring(text or "") }) end
+		if self.Summary and self.Summary.SetText then pcall(self.Summary.SetText, self.Summary, tostring(text or "")) end
 	end
 	return s
 end

@@ -428,6 +428,10 @@ return function(Core)
 			end, { raw = raw, bindKey = settings.BindKey or settings.StateKey, kind = "dropdown" })
 		end
 
+		function groupbox:AddLabel(text)
+			return safeCall("AddLabel", function() return section:AddLabel(text) end)
+		end
+
 		function groupbox:CreateLabel(settings, id)
 			local text = type(settings) == "table" and (settings.Name or settings.Text) or tostring(settings or "")
 			local raw = safeCall("Label", function() return section:AddLabel(text) end)
@@ -490,6 +494,7 @@ return function(Core)
 			config = type(config) == "table" and config or {}
 			return groupbox:CreateDropdown({ Name = config.Text or config.Name or id, Options = config.Values or config.Options or {}, CurrentOption = config.Default or config.CurrentValue or config.CurrentOption, MultipleOptions = config.Multi or config.MultiSelection, Callback = config.Callback or function() end }, id)
 		end
+		function group:AddLabel(text) return groupbox:AddLabel(text) end
 		function group:CreateLabel(text) return groupbox:CreateLabel({ Name = text }) end
 		function group:CreateDivider() return groupbox:CreateDivider() end
 		return group
