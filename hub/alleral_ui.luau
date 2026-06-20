@@ -216,7 +216,14 @@ return function(Core)
 			if not li then log("ERROR", "Linoria boot failed"); return nil end
 			local title = settings.Title or settings.Name or "Alleral"
 			local liWindow
-			local okW, errW = pcall(function() liWindow = li:CreateWindow({ Title = title, Center = true, AutoShow = true }) end)
+			local winCfg = {
+				Title = title,
+				Center = settings.Center ~= false,
+				AutoShow = settings.AutoShow ~= false,
+				Size = settings.Size or UDim2.fromOffset(720, 520),
+				Position = settings.Position or UDim2.fromOffset(120, 40),
+			}
+			local okW, errW = pcall(function() liWindow = li:CreateWindow(winCfg) end)
 			if not okW or not liWindow then log("ERROR", "CreateWindow failed: " .. tostring(errW or "nil")); return nil end
 			local window = { _liWindow = liWindow, _linoria = li, _library = Library, _tabs = {}, _settings = settings, _title = title }
 			function window:AddTab(name, icon)
@@ -265,7 +272,7 @@ return function(Core)
 			Subtitle = extra.Subtitle or extra.Author or "",
 			Icon = extra.Icon or "sparkles",
 			Theme = extra.Theme or "Default",
-			Size = extra.Size or UDim2.fromOffset(580, 460),
+			Size = extra.Size or UDim2.fromOffset(720, 520),
 			TabWidth = tonumber(extra.TabWidth) or 160,
 			FileSettings = { RootFolder = extra.configFolder or "Alleral_Configs", ConfigFolder = extra.FileName or "Interface" },
 		}
