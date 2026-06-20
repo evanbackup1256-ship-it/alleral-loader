@@ -3897,9 +3897,7 @@ local function main()
 	local expectedVersions = fetchExpectedVersions(true)
 	ENV._Alleral_ExpectedVersions = expectedVersions
 	loadTelemetryConfig(false)
-	if type(PREVIOUS_LOADER_VERSION) == "string" and versionLt(PREVIOUS_LOADER_VERSION, LOADER_VERSION) then
-		purgeAlleralWorkspace({ reason = "boot", label = "stale" })
-	end
+
 	ENV.Alleral_HTTP = ENV.Alleral_HTTP or {}
 	ENV.Alleral_HTTP.get = httpGet
 	refreshExpectedVersionsAsync()

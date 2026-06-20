@@ -127,7 +127,6 @@ return function(Core)
 
 	local function loadLinoriaSource()
 		if type(_linoriaInstance) == "table" and type(_linoriaInstance.CreateWindow) == "function" then
-			log("Linoria already loaded, reusing")
 			return _linoriaInstance
 		end
 
@@ -137,53 +136,56 @@ return function(Core)
 		end
 
 		local body
-		local urls = {
-			"https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua",
-		}
 
-		for attempt = 1, 3 do
-			for _, url in ipairs(urls) do
-				local bust = "?t=" .. tostring(tick()) .. tostring(math.random(10000, 99999))
-				body = safeCall("HttpGet", function() return fetchUrl(url .. bust) end)
-				if body then break end
-			end
-			if type(body) == "string" and #body > 1000 then break end
-			if attempt < 3 then task.wait(0.3) end
+		local repoSrc = tryReadLocal("ui/linoria.luau")
+		if repoSrc and #repoSrc > 1000 then
+			body = repoSrc
 		end
 
-		if not body or #body <= 100 then
+		if not body then
 			local cachePath = ".alleral/cache/linoria.lua"
 			local cached = tryReadLocal(cachePath)
 			if cached and #cached > 1000 then
 				body = cached
-				log("Linoria loaded from local cache")
-			else
-				return nil, "Linoria unavailable after 3 attempts (no cache)"
 			end
-		else
-			tryWriteLocal(".alleral/cache/linoria.lua", body)
+		end
+
+		if not body then
+			local urls = { "https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua" }
+			for attempt = 1, 3 do
+				for _, url in ipairs(urls) do
+					local bust = "?t=" .. tostring(tick()) .. tostring(math.random(10000, 99999))
+					body = safeCall("HttpGet", function() return fetchUrl(url .. bust) end)
+					if body then break end
+				end
+				if type(body) == "string" and #body > 1000 then break end
+				if attempt < 3 then task.wait(0.3) end
+			end
+			if body and #body > 1000 then
+				tryWriteLocal(".alleral/cache/linoria.lua", body)
+			end
+		end
+
+		if not body or #body <= 100 then
+			return nil
 		end
 
 		body = body:gsub("^%s+", ""):gsub("%s+$", "")
 		if body:find("<!DOCTYPE", 1, true) or body:find("<html", 1, true) then
-			return nil, "Linoria source is HTML (rate limited?)"
+			return nil
 		end
-
-		log("Source downloaded (" .. tostring(#body) .. "b)")
 
 		local chunk, compileErr = loadStringFn(body, "@Linoria/source")
 		if type(chunk) ~= "function" then
 			if type(load) == "function" then chunk, compileErr = load(body, "@Linoria/source") end
 		end
-		if type(chunk) ~= "function" then return nil, "Linoria compile: " .. tostring(compileErr) end
-
-		log("Source compiled")
+		if type(chunk) ~= "function" then return nil end
 
 		if setfenv then pcall(setfenv, chunk, ENV) end
 		local ok, pkg = pcall(chunk)
-		if not ok then return nil, "Linoria runtime: " .. tostring(pkg) end
-		if type(pkg) ~= "table" then return nil, "Linoria returned " .. type(pkg) end
-		if type(pkg.CreateWindow) ~= "function" then return nil, "Linoria missing CreateWindow" end
+		if not ok then return nil end
+		if type(pkg) ~= "table" then return nil end
+		if type(pkg.CreateWindow) ~= "function" then return nil end
 		if type(pkg.Notify) == "function" and pkg._AlleralNotifyShim ~= true then
 			local rawNotify = pkg.Notify
 			function pkg:Notify(text, time)
@@ -194,7 +196,6 @@ return function(Core)
 
 		_linoriaInstance = pkg
 		ENV._AlleralUI = pkg
-		log("Linoria booted successfully")
 		return pkg
 	end
 
@@ -220,7 +221,6 @@ return function(Core)
 
 		function Library:CreateWindow(settings)
 			settings = deepClone(type(settings) == "table" and settings or {})
-			log("Creating Window")
 
 			local li = loadLinoriaSource()
 			if not li then
@@ -239,8 +239,6 @@ return function(Core)
 				return nil
 			end
 
-			log("Window created")
-
 			local window = {
 				_liWindow = liWindow,
 				_linoria = li,
@@ -255,7 +253,6 @@ return function(Core)
 				local tabOk, liTab = pcall(function() return liWindow:AddTab(name) end)
 				if tabOk and liTab then
 					table.insert(window._tabs, liTab)
-					log("Tab created: " .. tostring(name))
 				else
 					warn("Tab failed: " .. tostring(name))
 					table.insert(_missingBindings, "Tab:" .. tostring(name))
