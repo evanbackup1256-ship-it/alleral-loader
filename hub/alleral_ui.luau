@@ -462,27 +462,51 @@ return function(Core)
 		local function resolveMethod(names)
 			if _lookup == nil then
 				_lookup = {}
-				local function scan(t)
+				local scanSources = {}
+				local function scanInto(t, sourceLabel)
 					if type(t) ~= "table" then return end
 					for k, v in pairs(t) do
-						if type(v) == "function" then _lookup[k] = v end
+						if type(v) == "function" then
+							_lookup[k] = v
+							if not scanSources[k] then scanSources[k] = {} end
+							scanSources[k][sourceLabel or "obj"] = (scanSources[k][sourceLabel or "obj"] or 0) + 1
+						end
 					end
 					local mt = getrawmetatable and getrawmetatable(t)
 					if type(mt) == "table" then
-						if type(mt.__index) == "table" then scan(mt.__index)
+						if type(mt.__index) == "table" then scanInto(mt.__index, sourceLabel .. ".__index")
 						elseif type(mt.__index) == "function" then
 							local ok, idx = pcall(mt.__index, t, "__alleral_probe__")
-							if ok and type(idx) == "table" then scan(idx) end
+							if ok and type(idx) == "table" then scanInto(idx, sourceLabel .. ".__index()") end
 						end
 					end
 				end
-				if type(section) == "table" then scan(section) end
+				scanInto(section, "tab")
+				local rfMod = ENV._AlleralRayfield
+				if rfMod and rfMod ~= section then scanInto(rfMod, "Rayfield") end
+				local uiWin = ENV.Alleral_UiWindow
+				if uiWin then
+					if uiWin ~= section then scanInto(uiWin, "window") end
+					if uiWin._rfWindow and uiWin._rfWindow ~= section and uiWin._rfWindow ~= uiWin then
+						scanInto(uiWin._rfWindow, "window._rfWindow")
+					end
+				end
 				if not _probed and type(Core.say) == "function" then
 					_probed = true
 					local methodNames = {}
 					for k in pairs(_lookup) do table.insert(methodNames, k) end
 					table.sort(methodNames)
-					Core.say("[UI] Tab provides " .. tostring(#methodNames) .. " methods: " .. table.concat(methodNames, ", "):sub(1, 300))
+					local sourceInfo = {}
+					for k, sources in pairs(scanSources) do
+						local labels = {}
+						for lbl in pairs(sources) do table.insert(labels, lbl) end
+						table.sort(labels)
+						table.insert(sourceInfo, k .. "(" .. table.concat(labels, ",") .. ")")
+					end
+					table.sort(sourceInfo)
+					Core.say("[UI] Found " .. tostring(#methodNames) .. " methods across "
+						.. tostring(#scanSources) .. " method names: " .. table.concat(methodNames, ", "):sub(1, 300))
+					Core.say("[UI] Source detail: " .. table.concat(sourceInfo, "; "):sub(1, 300))
 				end
 			end
 			for _, name in ipairs(names) do

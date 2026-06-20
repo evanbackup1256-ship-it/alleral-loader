@@ -1147,7 +1147,12 @@ function Core.fetchScriptManifest(forceRefresh)
 					end
 				end
 			end
-			local decoded, jsonErr = Core.httpGetJson(fetchUrl)
+			local decoded, jsonErr
+			if type(Core.httpGetJson) == "function" then
+				decoded, jsonErr = Core.httpGetJson(fetchUrl)
+			else
+				jsonErr = "httpGetJson not available"
+			end
 			if type(decoded) == "table" and type(decoded.scripts) == "table" then
 				ENV.Alleral_ScriptManifestCache = { fetchedAt = tick(), data = decoded, source = url }
 				ENV.Alleral_ScriptManifest = decoded

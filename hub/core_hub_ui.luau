@@ -2743,6 +2743,10 @@ function Core.buildCloudConfigStudio(tab, options)
 			return nil, "Enter a share code."
 		end
 		local base = Core.resolveRelayBase()
+		if not base then
+			if type(Core.logWarn) == "function" then Core.logWarn("[CloudConfig] resolveRelayBase returned nil, skipping") end
+			return
+		end
 		local decoded = Core.httpGetJson(base .. "/api/configs/" .. code)
 		if not decoded or decoded.ok ~= true or type(decoded.data) ~= "table" then
 			return nil, decoded and decoded.error or "Config not found."
@@ -2769,6 +2773,10 @@ function Core.buildCloudConfigStudio(tab, options)
 	library:CreateButton("Upload current setup", function()
 		setStatus("Uploading...", nil)
 		local base = Core.resolveRelayBase()
+		if not base then
+			if type(Core.logWarn) == "function" then Core.logWarn("[CloudConfig] resolveRelayBase returned nil, skipping") end
+			return
+		end
 		local payload = {
 			gameId = gameId,
 			name = state.Alleral_CloudConfigName or "My setup",
@@ -2851,6 +2859,10 @@ function Core.buildCloudConfigStudio(tab, options)
 	local browseDropdown
 	local function refreshBrowse()
 		local base = Core.resolveRelayBase()
+		if not base then
+			if type(Core.logWarn) == "function" then Core.logWarn("[CloudConfig] resolveRelayBase returned nil, skipping browse") end
+			return
+		end
 		local decoded = Core.httpGetJson(base .. "/api/configs/browse?game=" .. HttpService:UrlEncode(gameId) .. "&limit=20")
 		browseEntries = {}
 		browseLabels = {}
