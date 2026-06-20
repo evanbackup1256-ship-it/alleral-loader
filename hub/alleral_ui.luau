@@ -541,20 +541,7 @@ return function(Core)
 
 	function Core.wrapUiGroup(groupbox, callbackWrapper)
 		local function wrap(label, callback)
-			if type(callback) ~= "function" then return function() end end
-			if not callbackWrapper then return callback end
-			local guarded = function(...)
-				local ok, result = pcall(callback, ...)
-				if not ok and type(Core.pushErrorLog) == "function" then Core.pushErrorLog(label, result) end
-				return result
-			end
-			return function(...)
-				local ok, wrapped = pcall(callbackWrapper, label, guarded)
-				if ok and type(wrapped) == "function" then
-					return wrapped(...)
-				end
-				return guarded(...)
-			end
+			return callback
 		end
 		local group = {}
 		function group:CreateToggle(name, default, tooltip, callback, bindKey)
