@@ -1,7 +1,6 @@
 --[[
-	ALLERAL UI LAYER v6.5.0 - ENHANCED EDITION
+	Alleral UI layer — Linoria v5.1.0-ga v6.5.0 ENHANCED
 	Complete rewrite with animations, notification stacking, advanced features
-	Built on top of Linoria UI Library with modern visual enhancements
 ]]
 
 return function(Core)
