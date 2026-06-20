@@ -41,7 +41,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "b385e35",
+	commit = "961876f",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -810,9 +810,11 @@ local function httpGet(url, minBytes)
 	}
 
 	for _, candidate in ipairs(candidates) do
-		if ENV.Alleral_Core and type(ENV.Alleral_Core.httpGet) == "function" then
-			local coreBody = ENV.Alleral_Core.httpGet(candidate)
-			if type(coreBody) == "string" and #coreBody >= minBytes then
+		if not ENV._Alleral_InLoaderHttpGet and ENV.Alleral_Core and type(ENV.Alleral_Core.httpGet) == "function" then
+			ENV._Alleral_InLoaderHttpGet = true
+			local ok, coreBody = pcall(ENV.Alleral_Core.httpGet, candidate)
+			ENV._Alleral_InLoaderHttpGet = false
+			if ok and type(coreBody) == "string" and #coreBody >= minBytes then
 				return coreBody, "core"
 			end
 		end

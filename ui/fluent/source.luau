@@ -1,8 +1,6 @@
 local ALLERAL_FLUENT_VERSION = 1
-local FLUENT_SOURCE_URL = "https://github.com/dawid-scripts/Fluent/releases/download/1.1.0/main.lua"
-local FLUENT_FALLBACK_URLS = {
-	"https://raw.githubusercontent.com/dawid-scripts/Fluent/main/Built.lua",
-}
+local FLUENT_SOURCE_URL = "https://github.com/ActualMasterOogway/Fluent-Renewed/releases/download/v1.0.8/Fluent.luau"
+local FLUENT_FALLBACK_URLS = {}
 
 local ENV = (function()
 	local ok, env = pcall(function()

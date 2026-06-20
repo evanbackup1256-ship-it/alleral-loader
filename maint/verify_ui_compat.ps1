@@ -35,7 +35,7 @@ if (Test-Path $fluentSource) {
 $fluentContracts = @(
     @{ Pattern = 'ALLERAL_FLUENT_VERSION\s*=\s*\d+'; Message = 'Fluent version marker present' },
     @{ Pattern = 'bootFluent|boot'; Message = 'Fluent boot function present' },
-    @{ Pattern = 'dawid-scripts/Fluent'; Message = 'Fluent fetches from dawid-scripts/Fluent' }
+    @{ Pattern = 'ActualMasterOogway/Fluent-Renewed/releases/download/v1\.0\.8/Fluent\.luau'; Message = 'Fluent fetches Fluent-Renewed v1.0.8' }
 )
 
 foreach ($contract in $fluentContracts) {

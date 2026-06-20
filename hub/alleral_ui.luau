@@ -76,8 +76,7 @@ return function(Core)
 			body = ENV._AlleralFluentBundle
 		else
 			local urls = {
-				"https://github.com/dawid-scripts/Fluent/releases/download/1.1.0/main.lua",
-				"https://raw.githubusercontent.com/dawid-scripts/Fluent/main/Built.lua",
+				"https://github.com/ActualMasterOogway/Fluent-Renewed/releases/download/v1.0.8/Fluent.luau",
 			}
 			for _, url in ipairs(urls) do
 				if type(game) == "Instance" and type(game.HttpGet) == "function" then
@@ -96,7 +95,7 @@ return function(Core)
 					end)
 					if body then break end
 				end
-				if type(Core.httpGet) == "function" then
+				if not ENV._Alleral_InLoaderHttpGet and type(Core.httpGet) == "function" then
 					body = safeCall("Core.httpGet Fluent", function()
 						return Core.httpGet(url .. "?t=" .. tostring(tick()))
 					end)
