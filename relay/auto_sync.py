@@ -41,6 +41,15 @@ ACTIVE_VERSION_VAR_RE = re.compile(
 VERSION_STRING_CHAR_RE = re.compile(r"local\s+VERSION\s*=\s*string\.char\(([^)]*)\)", re.IGNORECASE)
 SUBTITLE_RE = re.compile(r'Subtitle\s*=\s*"([^"·]+)', re.IGNORECASE)
 FETCH_TIMEOUT = 5
+LOADER_SOURCE_FILES = (
+    "bootstrap.luau",
+    "loader.luau",
+    "hub/core_base.luau",
+    "hub/core_ui.luau",
+    "hub/alleral_ui.luau",
+    "hub/core_hub_ui.luau",
+    "cfg/release.json",
+)
 
 
 def _parse_obfuscated_number(text: str) -> int | None:
@@ -531,6 +540,7 @@ class AutoSyncEngine:
         self.enabled = enabled
         self.notify_fn = notify_fn
         self.data_dir = data_dir
+        self.loader_root = self._resolve_loader_root()
         self.stats = TelemetryStatsStore(data_dir / "telemetry_stats.db")
         self._lock = threading.Lock()
         self._sync_in_progress = threading.Event()
@@ -596,6 +606,7 @@ class AutoSyncEngine:
                 "syncCount": int(sync_count or 0),
                 "autoStatus": True,
                 "syncing": self._sync_in_progress.is_set(),
+                "loaderSourceFiles": persisted.get("loaderSourceFiles") or self._state.get("loaderSourceFiles") or [],
             }
 
     def record_telemetry(self, payload: dict[str, Any]) -> None:
@@ -673,6 +684,42 @@ class AutoSyncEngine:
         except Exception as exc:
             self._note_error(exc)
 
+    def _resolve_loader_root(self) -> Path | None:
+        raw = os.environ.get("LOADER_MODULES_ROOT", "").strip()
+        if not raw:
+            return None
+        return Path(raw)
+
+    def _safe_loader_path(self, rel_path: str) -> Path | None:
+        if self.loader_root is None:
+            return None
+        root = self.loader_root.resolve()
+        clean = rel_path.replace("\\", "/").lstrip("/")
+        if not clean or ".." in clean.split("/"):
+            return None
+        path = (root / clean).resolve()
+        try:
+            path.relative_to(root)
+        except ValueError:
+            return None
+        return path
+
+    def _sync_loader_sources(self) -> list[str]:
+        if self.loader_root is None:
+            return []
+        synced: list[str] = []
+        for rel_path in LOADER_SOURCE_FILES:
+            text = self._fetch_text(rel_path)
+            if text is None:
+                raise RuntimeError(f"loader source missing on GitHub: {rel_path}")
+            path = self._safe_loader_path(rel_path)
+            if path is None:
+                raise RuntimeError(f"invalid loader source path: {rel_path}")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text.lstrip("\ufeff"), encoding="utf-8", newline="\n")
+            synced.append(rel_path)
+        return synced
+
     def sync_if_stale(self, force: bool = False) -> dict[str, Any]:
         if not self.enabled:
             return self.status()
@@ -708,6 +755,7 @@ class AutoSyncEngine:
         release = self._fetch_json("cfg/release.json") or {}
         manifest = self._fetch_json("cfg/scripts_manifest.json") or {}
         site = self._fetch_json("cfg/site.json") or {}
+        loader_source_files = self._sync_loader_sources()
         github_scripts = manifest.get("scripts") if isinstance(manifest.get("scripts"), dict) else {}
 
         discovered = self._discover_games(list(github_scripts.keys()))
@@ -770,6 +818,7 @@ class AutoSyncEngine:
             self._state["lastSyncAt"] = utc_iso()
             self._state["lastError"] = None
             self._state["syncCount"] = int(self._state.get("syncCount") or 0) + 1
+            self._state["loaderSourceFiles"] = loader_source_files
             self._state["notifyInitialized"] = True
             self._save_state()
 
