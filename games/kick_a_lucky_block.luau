@@ -34,6 +34,8 @@ if not getgenv().Alleral_Boot then
 end
 getgenv().Alleral_Boot = nil
 
+print("[Kick] Script executing")
+
 local VERSION = "7.3.2"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
