@@ -18,9 +18,9 @@ RUN npm run build
 
 FROM python:3.12-slim
 WORKDIR /app
-COPY backend/requirements.txt ./requirements.txt
+COPY relay/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-COPY backend/telemetry_relay.py backend/security.py backend/script_registry.py backend/ban_registry.py backend/site_registry.py backend/roblox_api.py backend/weao_api.py backend/auto_sync.py backend/manage_backend.py backend/loader_builder.py ./
+COPY relay/telemetry_relay.py relay/security.py relay/script_registry.py relay/ban_registry.py relay/site_registry.py relay/roblox_api.py relay/weao_api.py relay/auto_sync.py relay/manage_backend.py relay/loader_builder.py ./
 COPY bootstrap.luau loader.luau ./loader_src/
 COPY hub/core_base.luau hub/core_ui.luau hub/alleral_ui.luau hub/core_hub_ui.luau ./loader_src/hub/
 COPY cfg/release.json ./loader_src/cfg/release.json
