@@ -448,27 +448,6 @@ return function(Core)
 			return {}
 		end
 
-		function groupbox:CreateStatus(label, fields)
-			local s = { Labels = {}, LastValues = {} }
-			for k, v in pairs(fields or {}) do
-				s.LastValues[k] = tostring(v)
-				s.Labels[k] = groupbox:CreateLabel({ Name = tostring(k) .. ": " .. tostring(v) })
-			end
-			s.Summary = groupbox:CreateLabel({ Name = "" })
-			s.Update = function(self, key, value)
-				local r = tostring(value)
-				if self.LastValues[key] == r then return end
-				self.LastValues[key] = r
-				if self.Labels[key] and self.Labels[key].Set then
-					self.Labels[key]:Set({ Name = tostring(key) .. ": " .. r })
-				end
-			end
-			s.SetSummary = function(self, text)
-				if self.Summary and self.Summary.Set then self.Summary:Set({ Name = tostring(text or "") }) end
-			end
-			return s
-		end
-
 		return groupbox
 	end
 
@@ -512,16 +491,6 @@ return function(Core)
 			return groupbox:CreateDropdown({ Name = config.Text or config.Name or id, Options = config.Values or config.Options or {}, CurrentOption = config.Default or config.CurrentValue or config.CurrentOption, MultipleOptions = config.Multi or config.MultiSelection, Callback = config.Callback or function() end }, id)
 		end
 		function group:CreateLabel(text) return groupbox:CreateLabel({ Name = text }) end
-		function group:CreateStatus(label, fields)
-			if type(Core.buildStatusDisplay) == "function" then
-				return Core.buildStatusDisplay(group, label, fields)
-			end
-			local s = { Labels = {}, LastValues = {} }
-			for k, v in pairs(fields or {}) do s.LastValues[k] = tostring(v) end
-			s.Update = function() end
-			s.SetSummary = function() end
-			return s
-		end
 		function group:CreateDivider() return groupbox:CreateDivider() end
 		return group
 	end

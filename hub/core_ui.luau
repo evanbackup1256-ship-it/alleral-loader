@@ -232,13 +232,6 @@ return function(Core)
 			CreateDropdown = function() return { Set = function() end } end,
 			CreateLabel = function() return { Set = function() end, SetVisible = function() end } end,
 			CreateDivider = function() return {} end,
-			CreateStatus = function(label, fields)
-				local s = { Labels = {}, LastValues = {} }
-				for k, v in pairs(fields or {}) do s.LastValues[k] = tostring(v) end
-				s.Update = function() end
-				s.SetSummary = function() end
-				return s
-			end,
 		}
 	end
 
@@ -318,4 +311,48 @@ return function(Core)
 	Core.setupHubKeybinds = Core.setupHubKeybinds or function() end
 
 	Core.registerExploitCommandPalette = Core.registerExploitCommandPalette or function() end
+
+	Core._statusRefs = Core._statusRefs or {}
+
+	function Core.AddStatus(box, key, text)
+		if not box then return nil end
+		local label = nil
+		if type(box.AddLabel) == "function" then
+			label = box:AddLabel(text or "Status: Unknown")
+		elseif type(box.CreateLabel) == "function" then
+			label = box:CreateLabel({ Name = text or "Status: Unknown" })
+		end
+		if label then Core._statusRefs[key] = label end
+		return label
+	end
+
+	function Core.SetStatus(key, text)
+		local label = Core._statusRefs[key]
+		if label then
+			if label.SetText then pcall(label.SetText, label, text)
+			elseif label.Set then pcall(label.Set, label, { Name = text }) end
+		end
+	end
+
+	function Core.scanLegacyUI()
+		local hits = {}
+		local patterns = { "CreateStatus", "CreateWidget", "CreateBadge", "CreatePanel", "CreateCard", "CreateFlag", "CreateSection", "MakeTab", "MakeWindow", "AddSection", "NewTab", "NewSection", "CreateIndicator" }
+		for _, name in ipairs(patterns) do
+			if rawget(_G, name) or rawget(getgenv and getgenv() or {}, name) then
+				table.insert(hits, "Global: " .. name)
+			end
+			if Core[name] and type(Core[name]) == "function" and name ~= "CreateSection" then
+				table.insert(hits, "Core." .. name)
+			end
+		end
+		if #hits == 0 then
+			Core.say("[UI] Legacy UI scan: clean")
+			Core.say("[UI] Linoria UI only: true")
+		else
+			for _, h in ipairs(hits) do
+				Core.logWarn("[UI] Legacy UI found: " .. h)
+			end
+		end
+		return hits
+	end
 end
