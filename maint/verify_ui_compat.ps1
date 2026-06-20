@@ -12,7 +12,7 @@ if ($alleralUi -match 'Core\.UI_LIBRARY\s*=\s*"Linoria"') { Pass "alleral_ui dec
 if ($alleralUi -match 'function Core\.buildUiWindow') { Pass "alleral_ui defines buildUiWindow" } else { Fail "alleral_ui missing buildUiWindow" }
 if ($alleralUi -match 'function Core\.buildUiTab') { Pass "alleral_ui defines buildUiTab" } else { Fail "alleral_ui missing buildUiTab" }
 if ($alleralUi -match 'function Core\.buildUiGroup') { Pass "alleral_ui defines buildUiGroup" } else { Fail "alleral_ui missing buildUiGroup" }
-if ($alleralUi -match 'Core\.wrapUiGroup\s*=') { Pass "alleral_ui defines wrapUiGroup" } else { Fail "alleral_ui missing wrapUiGroup" }
+if ($alleralUi -match '(function\s+Core\.wrapUiGroup|Core\.wrapUiGroup\s*=)') { Pass "alleral_ui defines wrapUiGroup" } else { Fail "alleral_ui missing wrapUiGroup" }
 if ($alleralUi -match 'function Core\.buildUiSection') { Pass "alleral_ui defines buildUiSection" } else { Fail "alleral_ui missing buildUiSection" }
 $unclosedInlineFunctions = Select-String -Path (Join-Path $root "hub/alleral_ui.luau") -Pattern 'function .*return ' | Where-Object { $_.Line -notmatch '\bend\s*$' }
 if ($unclosedInlineFunctions) {

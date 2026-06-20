@@ -26,6 +26,37 @@ return function(Core)
 		return result
 	end
 
+	local function textOf(value)
+		if value == nil then return "" end
+		if type(value) == "table" then
+			for _, key in ipairs({ "Text", "Content", "Description", "Message", "Title", "Name" }) do
+				if value[key] ~= nil then
+					return textOf(value[key])
+				end
+			end
+		end
+		return tostring(value)
+	end
+
+	local function notificationDuration(info, fallback)
+		if type(info) == "table" then
+			return tonumber(info.Lifetime or info.Duration or info.Time) or fallback or 4
+		end
+		return tonumber(fallback) or 4
+	end
+
+	local function notificationText(info)
+		if type(info) ~= "table" then
+			return textOf(info)
+		end
+		local title = textOf(info.Title or info.Name)
+		local body = textOf(info.Description or info.Content or info.Text or info.Message)
+		if title ~= "" and body ~= "" then
+			return title .. "\n" .. body
+		end
+		return title ~= "" and title or body
+	end
+
 	local function deepClone(value, seen)
 		if type(value) ~= "table" then return value end
 		seen = seen or {}
@@ -153,6 +184,13 @@ return function(Core)
 		if not ok then return nil, "Linoria runtime: " .. tostring(pkg) end
 		if type(pkg) ~= "table" then return nil, "Linoria returned " .. type(pkg) end
 		if type(pkg.CreateWindow) ~= "function" then return nil, "Linoria missing CreateWindow" end
+		if type(pkg.Notify) == "function" and pkg._AlleralNotifyShim ~= true then
+			local rawNotify = pkg.Notify
+			function pkg:Notify(text, time)
+				return rawNotify(self, notificationText(text), notificationDuration(text, time))
+			end
+			pkg._AlleralNotifyShim = true
+		end
 
 		_linoriaInstance = pkg
 		ENV._AlleralUI = pkg
@@ -169,14 +207,16 @@ return function(Core)
 		function Library:Notification(info)
 			info = type(info) == "table" and info or { Description = tostring(info) }
 			if Linoria and type(Linoria.Notify) == "function" then
-				pcall(Linoria.Notify, Linoria, {
-					Title = info.Title or "Alleral",
-					Content = info.Description or info.Content or info.Text or "",
-					Duration = info.Lifetime or info.Duration or info.Time or 4,
-				})
+				pcall(Linoria.Notify, Linoria, notificationText(info), notificationDuration(info))
 			end
 		end
-		function Library:Notify(info) Library:Notification(info) end
+		function Library:Notify(info, time)
+			if type(info) == "table" then
+				Library:Notification(info)
+			else
+				Library:Notification({ Description = info, Duration = time })
+			end
+		end
 
 		function Library:CreateWindow(settings)
 			settings = deepClone(type(settings) == "table" and settings or {})
@@ -226,13 +266,7 @@ return function(Core)
 			function window:Notify(payload)
 				payload = type(payload) == "table" and payload or {}
 				if li and type(li.Notify) == "function" then
-					pcall(function()
-						li:Notify({
-							Title = payload.Title or "Alleral",
-							Content = payload.Description or payload.Content or "",
-							Duration = payload.Lifetime or payload.Duration or 4,
-						})
-					end)
+					pcall(function() li:Notify(notificationText(payload), notificationDuration(payload)) end)
 				end
 			end
 
@@ -271,7 +305,7 @@ return function(Core)
 			Library = Library,
 			Alleral = Library,
 			CreateWindow = function(_, s) return Library:CreateWindow(s) end,
-			Notify = function(_, i) Library:Notification(i) end,
+			Notify = function(_, i, t) Library:Notify(i, t) end,
 			_linoria = Linoria,
 		}
 		ENV.Alleral_UI = bundle
@@ -322,6 +356,51 @@ return function(Core)
 
 		local groupbox = {}
 		function groupbox:CreateSection(name) return groupbox end
+
+		local function makeStatusDisplay(title, fields)
+			local status = { Labels = {}, LastValues = {}, Summary = nil }
+			if title ~= nil and textOf(title) ~= "" then
+				status.Title = groupbox:AddLabel(textOf(title))
+			end
+			for key, value in pairs(type(fields) == "table" and fields or { Status = fields or "--" }) do
+				local rendered = textOf(value)
+				status.LastValues[key] = rendered
+				status.Labels[key] = groupbox:AddLabel(textOf(key) .. ": " .. rendered)
+			end
+			status.Summary = groupbox:AddLabel("")
+			function status:Update(key, value)
+				local rendered = textOf(value)
+				if self.LastValues[key] == rendered then return end
+				self.LastValues[key] = rendered
+				local row = self.Labels[key]
+				if row and row.SetText then pcall(row.SetText, row, textOf(key) .. ": " .. rendered)
+				elseif row and row.Set then pcall(row.Set, row, { Name = textOf(key) .. ": " .. rendered, Text = textOf(key) .. ": " .. rendered }) end
+			end
+			function status:SetSummary(text)
+				if self.Summary and self.Summary.SetText then pcall(self.Summary.SetText, self.Summary, textOf(text))
+				elseif self.Summary and self.Summary.Set then pcall(self.Summary.Set, self.Summary, { Name = textOf(text), Text = textOf(text) }) end
+			end
+			function status:Set(key, value)
+				if type(key) == "table" then
+					for k, v in pairs(key) do self:Update(k, v) end
+				else
+					self:Update(key, value)
+				end
+			end
+			return status
+		end
+
+		function groupbox:CreateStatus(settings, fields)
+			if type(settings) == "table" then
+				local title = settings.Name or settings.Title or settings.Label or "Status"
+				local fields = settings.Fields or settings.Values or settings.Items or settings.Stats or settings.Data
+				if type(fields) ~= "table" then
+					fields = { Status = settings.Status or settings.Text or settings.Value or "--" }
+				end
+				return makeStatusDisplay(title, fields)
+			end
+			return makeStatusDisplay(settings or "Status", type(fields) == "table" and fields or { Status = fields or "--" })
+		end
 
 		function groupbox:CreateToggle(settings, id)
 			local currentVal = settings.Default or settings.CurrentValue or settings.Value
@@ -429,7 +508,7 @@ return function(Core)
 		end
 
 		function groupbox:AddLabel(text)
-			return safeCall("AddLabel", function() return section:AddLabel(text) end)
+			return safeCall("AddLabel", function() return section:AddLabel(textOf(text)) end)
 		end
 
 		function groupbox:CreateLabel(settings, id)
@@ -441,6 +520,10 @@ return function(Core)
 					local nextText = type(nextSettings) == "table" and (nextSettings.Name or nextSettings.Text) or tostring(nextSettings or "")
 					if not raw then return end
 					if raw.SetText then pcall(raw.SetText, raw, nextText) end
+				end,
+				SetText = function(_, nextText)
+					if not raw then return end
+					if raw.SetText then pcall(raw.SetText, raw, textOf(nextText)) end
 				end,
 				SetVisible = function(_, visible) if raw then pcall(function() raw.Visible = visible == true end) end end,
 			}
@@ -493,6 +576,12 @@ return function(Core)
 		function group:AddDropdown(id, config)
 			config = type(config) == "table" and config or {}
 			return groupbox:CreateDropdown({ Name = config.Text or config.Name or id, Options = config.Values or config.Options or {}, CurrentOption = config.Default or config.CurrentValue or config.CurrentOption, MultipleOptions = config.Multi or config.MultiSelection, Callback = config.Callback or function() end }, id)
+		end
+		function group:CreateStatus(label, fields)
+			if type(label) == "table" then
+				return groupbox:CreateStatus(label)
+			end
+			return groupbox:CreateStatus({ Name = label or "Status", Fields = fields })
 		end
 		function group:AddLabel(text) return groupbox:AddLabel(text) end
 		function group:CreateLabel(text) return groupbox:CreateLabel({ Name = text }) end

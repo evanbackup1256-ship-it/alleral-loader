@@ -97,7 +97,7 @@ if ($hashBumpNeeded) {
 }
 Write-Utf8NoBom $siteSrc $siteRaw
 
-$siteDir = Join-Path $root "relay" "site"
+$siteDir = Join-Path (Join-Path $root "relay") "site"
 Push-Location $siteDir
 try {
     npm run build | Out-Host

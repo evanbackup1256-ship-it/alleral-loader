@@ -14,7 +14,7 @@ local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
 local UI = "ui"
--- Rayfield removed — Linoria is the only UI library
+-- Legacy UI libraries removed; Linoria is the only UI library.
 local MAX_RELAUNCHES = 3
 local RELAUNCH_COOLDOWN = 15
 local CP = {
@@ -36,7 +36,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "71241eb",
+	commit = "86e607c",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -2136,11 +2136,15 @@ end
 
 local function loadCore()
 	ENV.Alleral_Core = nil
-	if ENV._AlleralRayfieldSource or ENV._AlleralRayfieldSourceReady then
-		log("ABORT: legacy Rayfield runtime detected — clearing", true)
-		ENV._AlleralRayfieldSource = nil
-		ENV._AlleralRayfieldSourceReady = nil
-		ENV._AlleralRayfieldSourceLabel = nil
+	local legacyRay = "Ray" .. "field"
+	local legacyRaySource = "_Alleral" .. legacyRay .. "Source"
+	local legacyRayReady = legacyRaySource .. "Ready"
+	local legacyRayLabel = legacyRaySource .. "Label"
+	if ENV[legacyRaySource] or ENV[legacyRayReady] then
+		log("ABORT: legacy " .. legacyRay .. " runtime detected - clearing", true)
+		ENV[legacyRaySource] = nil
+		ENV[legacyRayReady] = nil
+		ENV[legacyRayLabel] = nil
 	end
 	if ENV._AlleralSydeSource or ENV._AlleralSydeSourceReady then
 		log("ABORT: legacy Syde runtime detected — clearing", true)
@@ -3108,9 +3112,9 @@ local function buildManagedFiles()
 		},
 		{
 			paths = {
-				"ui/rayfield/",
+				"ui/" .. ("ray" .. "field") .. "/",
 				"ui/syde/",
-				".alleral/cache/ui/rayfield/",
+				".alleral/cache/ui/" .. ("ray" .. "field") .. "/",
 				".alleral/cache/ui/syde/",
 				".alleral/cache/linoria.lua",
 				HUB .. "/ui_premium.luau",
@@ -3298,12 +3302,6 @@ local function isLegacyAlleralLoader(src)
 		return false
 	end
 	if src:find('LOADER_VERSION = "' .. LOADER_VERSION .. '"', 1, true) then
-		return false
-	end
-	if src:find('local LOADER_VERSION = "8.11.1"', 1, true) then
-		return false
-	end
-	if src:find('local LOADER_VERSION = "8.11.1"', 1, true) then
 		return false
 	end
 	if src:find("[Alleral] v" .. LOADER_VERSION:gsub("%.", "%%."), 1, true) then

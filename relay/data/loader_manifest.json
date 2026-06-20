@@ -1,13 +1,13 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-19T23:36:22Z",
+  "generatedAt": "2026-06-20T21:19:41Z",
   "release": {
     "loader": "8.12.0",
     "core": "2.9.10",
     "weao": "1.1",
-"ui": "Linoria",
-"commit": "40249c2",
-    "updatedAt": "2026-06-19T23:24:58Z",
+    "ui": "Linoria",
+    "commit": "86e607c",
+    "updatedAt": "2026-06-20T21:16:00Z",
     "updatePollSeconds": 120,
     "autoUpdate": true,
     "minLoader": "8.2.0",
@@ -17,55 +17,53 @@
     "helpers": "1.8",
     "security": "1.3",
     "access": "1.1",
-"uiVersion": "5.0.0",
-"linoriaVersion": 1
+    "uiVersion": "5.1.0"
   },
-  "loader": "8.11.1",
+  "loader": "8.12.0",
   "ui": "Linoria",
-  "uiVersion": "5.0.0",
-  "linoriaVersion": 1,
-  "commit": "40249c2",
+  "uiVersion": "5.1.0",
+  "commit": "86e607c",
   "modules": [
     {
       "path": "bootstrap.luau",
-      "bytes": 8529,
-      "sha256": "e7d774e70d9cfe0453c12b12fad57661d160645ef095ab9a7de6df8a50fb0d17",
+      "bytes": 8625,
+      "sha256": "2138238700ba70b8ecf1f3f7f1334047b00af4cb984ad318de97d77b77111022",
       "versionMarker": null
     },
     {
       "path": "loader.luau",
-      "bytes": 124895,
-      "sha256": "090c7d35f7c2e788ca27d5829cc2fa68e07e54048c7b8824316ffe862903b54a",
-      "versionMarker": 1
+      "bytes": 124540,
+      "sha256": "9e7a57a8c9799999116a3c193d182ae3c6ca129362fb4b2611756d8a949a40bb",
+      "versionMarker": null
     },
     {
       "path": "hub/core_base.luau",
-      "bytes": 37278,
-      "sha256": "4da6d1aaffd1e165d582aec069b2a6784fbb82e0bb9954818f3b25f9214a2799",
+      "bytes": 39291,
+      "sha256": "7837d9b440a533c22d3bc3d848300d324b507457c908d47648af7806bbeadeb1",
       "versionMarker": null
     },
     {
       "path": "hub/core_ui.luau",
-      "bytes": 9221,
-      "sha256": "f5460d7edb87661f7cedce09e24799e1e418ff4db668aeff60cadc453621d7aa",
+      "bytes": 10888,
+      "sha256": "5c24c5f2a4a32eadfad826adecd488bc613cec95dce27941fca1ef81ca0ff514",
       "versionMarker": null
     },
     {
       "path": "hub/alleral_ui.luau",
-      "bytes": 28834,
-      "sha256": "ca9ef8aac055c46728e61a9be7c6a5c7b2b8596d1345353cd1d91f512332fc77",
+      "bytes": 29484,
+      "sha256": "d16d7f10dc41eedf010f5987dc095e1247881bd00838d1deed6e82cec4ea03a7",
       "versionMarker": null
     },
     {
       "path": "hub/core_hub_ui.luau",
-      "bytes": 101681,
-      "sha256": "cf960b3b66549c21fae9c88021bd27c83836cf4e0775f37e0dd360a8ca929399",
+      "bytes": 107402,
+      "sha256": "55a91fd01ec71965131bd49c34e26a7a41b3ec78a0d1fb459524d3345166584b",
       "versionMarker": null
     },
     {
       "path": "cfg/release.json",
-      "bytes": 395,
-      "sha256": "77e22de9f862cc9384f90e34c088c3e03c43bda7d3c295467de6daefe4fc1d78",
+      "bytes": 432,
+      "sha256": "5c63d54e8e1a45ae3d244718be2881cf47397362d9183984dd2fd729bee956c2",
       "versionMarker": null
     }
   ]

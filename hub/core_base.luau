@@ -305,16 +305,38 @@ function Core.getUiRuntime()
 	return ui.Library or ui.Alleral
 end
 
+local function notificationValue(value)
+	if value == nil then return "" end
+	if type(value) == "table" then
+		for _, key in ipairs({ "Text", "Content", "Description", "Message", "Title", "Name" }) do
+			if value[key] ~= nil then
+				return notificationValue(value[key])
+			end
+		end
+	end
+	return tostring(value)
+end
+
+function Core.normalizeNotificationPayload(payload)
+	local source = type(payload) == "table" and payload or { Description = payload }
+	local title = notificationValue(source.Title or source.Name)
+	local description = notificationValue(source.Description or source.Content or source.Text or source.Message)
+	if title == "" then title = "Alleral" end
+	return {
+		Title = title,
+		Description = description,
+		Content = description,
+		Text = description,
+		Lifetime = tonumber(source.Lifetime or source.Duration or source.Time) or 4,
+		Duration = tonumber(source.Duration or source.Lifetime or source.Time) or 4,
+		Type = notificationValue(source.Type or source.NotificationType or "info"),
+	}
+end
+
 function Core.notifyUi(payload)
 	local uiRuntime = Core.getUiRuntime()
 	if not uiRuntime then return false end
-	local notifyPayload = type(payload) == "table" and payload or { Description = tostring(payload) }
-	if notifyPayload.Content and not notifyPayload.Description then
-		notifyPayload.Description = notifyPayload.Content
-	end
-	if notifyPayload.Duration and not notifyPayload.Lifetime then
-		notifyPayload.Lifetime = notifyPayload.Duration
-	end
+	local notifyPayload = Core.normalizeNotificationPayload(payload)
 	if type(uiRuntime.Notification) == "function" then
 		return pcall(uiRuntime.Notification, uiRuntime, notifyPayload)
 	end
@@ -369,10 +391,12 @@ function Core.notifyBootReady(settings)
 end
 
 function Core.notify(title, text, duration, notifyType)
-	title = title or "Alleral"
-	text = text or ""
-	duration = duration or 4
-	notifyType = notifyType or "info"
+	title = notificationValue(title)
+	if title == "" then title = "Alleral" end
+	text = notificationValue(text)
+	duration = tonumber(duration) or 4
+	notifyType = notificationValue(notifyType)
+	if notifyType == "" then notifyType = "info" end
 
 	local payload = {
 		Title = title,

@@ -224,13 +224,24 @@ return function(Core)
 	end
 
 	function Core.createStubUiGroup(name)
+		local function labelStub()
+			return { Set = function() end, SetText = function() end, SetVisible = function() end }
+		end
 		return {
 			CreateToggle = function() return { Set = function() end } end,
 			CreateSlider = function() return { Set = function() end } end,
 			CreateButton = function() return { Set = function() end } end,
 			CreateInput = function() return { Set = function() end } end,
 			CreateDropdown = function() return { Set = function() end } end,
-			CreateLabel = function() return { Set = function() end, SetVisible = function() end } end,
+			AddLabel = labelStub,
+			CreateLabel = labelStub,
+			CreateStatus = function()
+				return {
+					Update = function() end,
+					Set = function() end,
+					SetSummary = function() end,
+				}
+			end,
 			CreateDivider = function() return {} end,
 		}
 	end

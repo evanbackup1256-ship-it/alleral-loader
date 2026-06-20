@@ -9,22 +9,59 @@ return function(Core)
 	end
 	local ENV = genv()
 
+local function uiText(value)
+	if value == nil then return "" end
+	if type(value) == "table" then
+		for _, key in ipairs({ "Text", "Content", "Description", "Message", "Title", "Name" }) do
+			if value[key] ~= nil then
+				return uiText(value[key])
+			end
+		end
+	end
+	return tostring(value)
+end
+
+local function setLabelText(label, text)
+	local rendered = uiText(text)
+	if not label then return end
+	if type(label.SetText) == "function" then
+		pcall(label.SetText, label, rendered)
+	elseif type(label.Set) == "function" then
+		pcall(label.Set, label, { Name = rendered, Text = rendered })
+	end
+end
+
+local function addStatusLabel(group, text)
+	if type(group) ~= "table" then
+		return { SetText = function() end, Set = function() end }
+	end
+	if type(group.AddLabel) == "function" then
+		local ok, label = pcall(group.AddLabel, group, uiText(text))
+		if ok and label then return label end
+	end
+	if type(group.CreateLabel) == "function" then
+		local ok, label = pcall(group.CreateLabel, group, uiText(text))
+		if ok and label then return label end
+	end
+	return { SetText = function() end, Set = function() end }
+end
+
 function Core.buildStatusDisplay(group, label, fields)
 	local s = { Labels = {}, LastValues = {}, Summary = nil }
 	for k, v in pairs(fields or {}) do
-		s.LastValues[k] = tostring(v)
-		s.Labels[k] = group:AddLabel(tostring(k) .. ": " .. tostring(v))
+		s.LastValues[k] = uiText(v)
+		s.Labels[k] = addStatusLabel(group, uiText(k) .. ": " .. uiText(v))
 	end
-	s.Summary = group:AddLabel("")
+	s.Summary = addStatusLabel(group, "")
 	function s:Update(key, value)
-		local rendered = tostring(value)
+		local rendered = uiText(value)
 		if self.LastValues[key] == rendered then return end
 		self.LastValues[key] = rendered
 		local row = self.Labels[key]
-		if row and row.SetText then pcall(row.SetText, row, tostring(key) .. ": " .. rendered) end
+		setLabelText(row, uiText(key) .. ": " .. rendered)
 	end
 	function s:SetSummary(text)
-		if self.Summary and self.Summary.SetText then pcall(self.Summary.SetText, self.Summary, tostring(text or "")) end
+		setLabelText(self.Summary, text)
 	end
 	return s
 end
