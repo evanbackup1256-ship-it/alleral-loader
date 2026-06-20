@@ -1,13 +1,13 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-20T21:19:41Z",
+  "generatedAt": "2026-06-20T21:22:45Z",
   "release": {
     "loader": "8.12.0",
     "core": "2.9.10",
     "weao": "1.1",
     "ui": "Linoria",
-    "commit": "86e607c",
-    "updatedAt": "2026-06-20T21:16:00Z",
+    "commit": "0f40775",
+    "updatedAt": "2026-06-20T21:21:49Z",
     "updatePollSeconds": 120,
     "autoUpdate": true,
     "minLoader": "8.2.0",
@@ -22,7 +22,7 @@
   "loader": "8.12.0",
   "ui": "Linoria",
   "uiVersion": "5.1.0",
-  "commit": "86e607c",
+  "commit": "0f40775",
   "modules": [
     {
       "path": "bootstrap.luau",
@@ -33,7 +33,7 @@
     {
       "path": "loader.luau",
       "bytes": 124540,
-      "sha256": "9e7a57a8c9799999116a3c193d182ae3c6ca129362fb4b2611756d8a949a40bb",
+      "sha256": "08e686ab2afa1bdecd444d4d227b45878bd497f4ef620e37da394f81a21e8d8e",
       "versionMarker": null
     },
     {
@@ -63,7 +63,7 @@
     {
       "path": "cfg/release.json",
       "bytes": 432,
-      "sha256": "5c63d54e8e1a45ae3d244718be2881cf47397362d9183984dd2fd729bee956c2",
+      "sha256": "0f037fb4f22376c66e1b722b7f19cd2ece2a6469594f7eb468f8fe9e4958a550",
       "versionMarker": null
     }
   ]
