@@ -69,6 +69,7 @@ local defaults = {
 local saveSettings
 local savedKeys
 saveSettings, savedKeys = Core.initSettings(state, defaults, SETTINGS_FILE, SETTINGS_EXCLUDE)
+state.HubRunning = true
 _G.TweenSpeed = state.TweenSpeed
 
 local function notify(title, text, duration, notifyType)

@@ -94,6 +94,7 @@ local savedKeys
 local saveSettings
 
 saveSettings, savedKeys = Core.initSettings(state, defaults, SETTINGS_FILE, SETTINGS_EXCLUDE)
+state.HubRunning = true
 if state.FPSBoost == true and state.AFPSBoost ~= true then
 	state.AFPSBoost = true
 end

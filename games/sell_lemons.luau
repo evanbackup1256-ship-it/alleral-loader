@@ -78,6 +78,7 @@ local defaults = {
 local savedKeys
 local saveSettings
 saveSettings, savedKeys = Core.initSettings(state, defaults, SETTINGS_FILE, SETTINGS_EXCLUDE)
+state.HubRunning = true
 
 local function notify(title, text, duration, notifyType)
 	Core.notify(title, text, duration, notifyType)

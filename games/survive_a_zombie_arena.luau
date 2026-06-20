@@ -87,6 +87,7 @@ local savedKeys
 local saveSettings
 
 saveSettings, savedKeys = Core.initSettings(state, defaults, SETTINGS_FILE)
+state.HubRunning = true
 state.SafeSpot = Core.normalizeDropdownValue(state.SafeSpot, "Classic")
 
 local function notify(title, text, duration, notifyType)
