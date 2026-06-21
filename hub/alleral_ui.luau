@@ -4,7 +4,7 @@
 ]]
 
 return function(Core)
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "7.2.0"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "7.2.1"
 	Core.UI_VERSION = Core.ALLERAL_UI_VERSION
 	Core.UI_LIBRARY = "Noble"
 
@@ -16,24 +16,24 @@ return function(Core)
 
 	-- 8px design grid. All spacing: 8, 16, 24, 32, 40, 48, 56, 64.
 	local C = {
-		VERSION = "7.2.0",
+		VERSION = "7.2.1",
 		GRID = 8, S = { 8, 16, 24, 32, 40, 48, 56, 64, 72, 80 },
 		WINDOW = { RADIUS = 24, SHADOW = 96 },
-		SIDEBAR = { W = 224, ICON_SIZE = 20, ITEM_H = 48, RADIUS = 14 },
-		GROUP = { PADDING = 18, GAP = 14, RADIUS = 18, TITLE_H = 46 },
-		CONTROL = { ROW_H = 42, GAP = 12, RADIUS = 12 },
+		SIDEBAR = { W = 224, ICON_SIZE = 20, ITEM_H = 46, RADIUS = 14 },
+		GROUP = { PADDING = 18, GAP = 14, RADIUS = 18, TITLE_H = 44 },
+		CONTROL = { ROW_H = 42, GAP = 10, RADIUS = 12 },
 		TOGGLE = { W = 52, H = 28, THUMB = 22, RADIUS = 14 },
 		SLIDER = { TRACK_H = 6, THUMB = 18 },
-		HEADER = { H = 86 }, TABBAR = { H = 54 }, FOOTER = { H = 40 },
+		HEADER = { H = 80 }, TABBAR = { H = 50 }, FOOTER = { H = 38 },
 		NOTIF = { MAX = 5, W = 320, RADIUS = 16 },
 		FONT = Enum.Font.Gotham, FONT_BOLD = Enum.Font.GothamBold,
 		TEXT = 14, TEXT_SM = 12, TEXT_TITLE = 16, TEXT_HEADER = 22,
 		COLOR = {
 			BG0 = Color3.fromRGB(5, 8, 18),          -- deepest navy
-			BG1 = Color3.fromRGB(8, 12, 24),         -- window surface
-			BG2 = Color3.fromRGB(12, 18, 32),        -- card surface
-			BG3 = Color3.fromRGB(18, 25, 44),        -- card hover
-			BG4 = Color3.fromRGB(25, 34, 58),        -- interactive
+			BG1 = Color3.fromRGB(7, 11, 22),         -- window surface
+			BG2 = Color3.fromRGB(13, 19, 36),        -- card surface
+			BG3 = Color3.fromRGB(18, 27, 50),        -- card hover
+			BG4 = Color3.fromRGB(26, 36, 63),        -- interactive
 			ACCENT = Color3.fromRGB(139, 92, 246),     -- purple
 			ACCENT_LIGHT = Color3.fromRGB(192, 132, 252),
 			ACCENT_DARK = Color3.fromRGB(100, 60, 220),
@@ -156,7 +156,7 @@ return function(Core)
 		make("TextLabel",{Size=UDim2.new(1,-C.TOGGLE.W-12,1,0),BackgroundTransparency=1,Text=tostring(name),TextColor3=C.COLOR.TEXT,Font=C.FONT,TextSize=C.TEXT,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Center,TextTruncate=Enum.TextTruncate.AtEnd,Parent=g})
 		local t=make("Frame",{Size=UDim2.new(0,C.TOGGLE.W,0,C.TOGGLE.H),Position=UDim2.new(1,-C.TOGGLE.W,0.5,-C.TOGGLE.H/2),BackgroundColor3=C.COLOR.BG4,BorderSizePixel=0,Parent=g}); corner(t,C.TOGGLE.RADIUS)
 		local th=make("Frame",{Size=UDim2.new(0,C.TOGGLE.THUMB,0,C.TOGGLE.THUMB),Position=UDim2.new(0,3,0.5,-C.TOGGLE.THUMB/2),BackgroundColor3=C.COLOR.WHITE,BorderSizePixel=0,ZIndex=2,Parent=t}); corner(th,9)
-		make("Frame",{Size=UDim2.new(1,2,1,2),Position=UDim2.new(0,-1,0,-1),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=0.65,BorderSizePixel=0,ZIndex=1,Parent=th,Children={make("UICorner",{CornerRadius=UDim.new(0,10),Parent=th})}})
+		make("Frame",{Size=UDim2.new(1,2,1,2),Position=UDim2.new(0,-1,0,-1),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=0.92,BorderSizePixel=0,ZIndex=1,Parent=th,Children={make("UICorner",{CornerRadius=UDim.new(0,10),Parent=th})}})
 		local en=default==true
 		if en then t.BackgroundColor3=C.COLOR.ACCENT; th.Position=UDim2.new(1,-C.TOGGLE.THUMB-3,0.5,-C.TOGGLE.THUMB/2) end
 		local glow=make("Frame",{Size=UDim2.new(1,12,1,12),Position=UDim2.new(0,-6,0,-6),BackgroundColor3=C.COLOR.ACCENT,BackgroundTransparency=1,BorderSizePixel=0,ZIndex=0,Parent=t}); corner(glow,C.TOGGLE.RADIUS+6)
@@ -229,14 +229,14 @@ return function(Core)
 		local function gdt() if multi then if #selected==0 then return"None selected" end; if #selected==1 then return tostring(selected[1]) end; return tostring(#selected).." selected" end; return tostring(selected) end
 		local trig=make("TextButton",{Size=UDim2.new(1,-100,1,0),Position=UDim2.new(0,100,0,0),BackgroundColor3=C.COLOR.BG3,BorderSizePixel=0,Text=gdt(),TextColor3=C.COLOR.TEXT,Font=C.FONT,TextSize=C.TEXT_SM,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,AutoButtonColor=false,Parent=g})
 		corner(trig,C.CONTROL.RADIUS); stroke(trig,C.COLOR.BORDER,nil,0.93); pad(trig,8,24,0,0)
-		make("TextLabel",{Size=UDim2.new(0,16,0,16),Position=UDim2.new(1,-20,0.5,-8),BackgroundTransparency=1,Text="⌄",TextColor3=C.COLOR.TEXT3,Font=C.FONT,TextSize=16,TextXAlignment=Enum.TextXAlignment.Center,TextYAlignment=Enum.TextYAlignment.Center,Parent=trig})
+		make("TextLabel",{Size=UDim2.new(0,16,0,16),Position=UDim2.new(1,-20,0.5,-8),BackgroundTransparency=1,Text="v",TextColor3=C.COLOR.TEXT3,Font=C.FONT,TextSize=16,TextXAlignment=Enum.TextXAlignment.Center,TextYAlignment=Enum.TextYAlignment.Center,Parent=trig})
 		local over=getDropOverlay()
-		local dd=make("Frame",{Size=UDim2.new(0,220,0,0),BackgroundColor3=C.COLOR.BG1,BorderSizePixel=0,Visible=false,ZIndex=1000,ClipsDescendants=false,Parent=over})
+		local dd=make("Frame",{Size=UDim2.new(0,220,0,0),BackgroundColor3=C.COLOR.BG1,BorderSizePixel=0,Visible=false,ZIndex=1000,ClipsDescendants=true,Parent=over})
 		corner(dd,12); stroke(dd,C.COLOR.BORDER,nil,0.9)
 		-- shadow
 		local sc=make("Frame",{Size=UDim2.new(1,8,1,8),Position=UDim2.new(0,-4,0,-4),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=0.6,BorderSizePixel=0,ZIndex=-1,Parent=dd}); make("UICorner",{CornerRadius=UDim.new(0,14),Parent=sc})
 		make("Frame",{Size=UDim2.new(1,0,0,1),BackgroundColor3=C.COLOR.ACCENT,BorderSizePixel=0,ZIndex=1001,Parent=dd})
-		local scr=make("ScrollingFrame",{Size=UDim2.new(1,0,0,0),Position=UDim2.new(0,0,0,4),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,ScrollBarImageColor3=C.COLOR.SCROLLBAR,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,Visible=true,ZIndex=1001,Parent=dd})
+		local scr=make("ScrollingFrame",{Size=UDim2.new(1,0,0,0),Position=UDim2.new(0,0,0,4),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,ScrollBarImageColor3=C.COLOR.SCROLLBAR,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,Active=true,ClipsDescendants=true,Visible=true,ZIndex=1001,Parent=dd})
 		make("UIListLayout",{Padding=UDim.new(0,2),SortOrder=Enum.SortOrder.LayoutOrder,Parent=scr})
 		pad(dd,0,0,4,4)
 
@@ -247,6 +247,7 @@ return function(Core)
 		end
 
 		local ofs={}
+		local open=false
 		local function rebuild(filt)
 			for _,f in ipairs(ofs) do f:Destroy() end; ofs={}
 			filt=filt and filt:lower()
@@ -260,29 +261,37 @@ return function(Core)
 				f.MouseLeave:Connect(function() if not sel then Anim.spring(f,{BackgroundColor3=C.COLOR.BG1}) end end)
 				f.MouseButton1Click:Connect(function()
 					if multi then local fd=false; for j,s in ipairs(selected) do if s==o then table.remove(selected,j); fd=true; break end end; if not fd then table.insert(selected,o) end
-					else selected=(selected==o) and"" or o; dd.Visible=false; trig.Text=gdt() end
+					else selected=(selected==o) and"" or o; open=false; dd.Visible=false; trig.Text=gdt() end
 					trig.Text=gdt(); rebuild(sb and sb.Text or nil); if callback then callback(multi and selected or selected) end
 				end)
 				table.insert(ofs,f)
 			end
 			local ch=#f2*32+4; if sb then ch=ch+34 end
-			scr.Size=UDim2.new(1,0,0,math.min(ch+4,260))
-			dd.Size=UDim2.new(0,220,0,ch+8)
+			local maxListH = 260
+			local menuH = math.min(ch+8, maxListH + (sb and 42 or 12))
+			scr.Size=UDim2.new(1,0,0,math.max(32, menuH - (sb and 42 or 8)))
+			local dw = math.max(220, trig.AbsoluteSize.X)
+			dd.Size=UDim2.fromOffset(dw, menuH)
 		end
 		rebuild()
 
 		local function posDD()
 			local ap=trig.AbsolutePosition; local as=trig.AbsoluteSize
-			local sx,sy=ap.X,ap.Y+as.Y+4; local dh=dd.AbsoluteSize.Y; local sh=1080
-			pcall(function() sh=UIS:GetScreenResolution().Y end)
-			if sy+dh>sh and sy-dh>0 then sy=ap.Y-dh-4 end
+			local sx,sy=ap.X,ap.Y+as.Y+6; local dh=dd.AbsoluteSize.Y; local dw=math.max(220, as.X); local sh=1080; local sw=1920
+			pcall(function() local r=UIS:GetScreenResolution(); sh=r.Y; sw=r.X end)
+			if sy+dh>sh-8 and ap.Y-dh-6>8 then sy=ap.Y-dh-6 end
+			sx=math.clamp(sx,8,math.max(8,sw-dw-8))
+			dd.Size=UDim2.fromOffset(dw, dd.AbsoluteSize.Y > 0 and dd.AbsoluteSize.Y or dh)
 			dd.Position=UDim2.fromOffset(sx,sy)
 		end
 
-		local open=false
 		trig.MouseButton1Click:Connect(function()
 			open=not open
-			if open then rebuild(sb and sb.Text or nil); posDD(); dd.Visible=true; local ddus=Anim.uis(dd); ddus.Scale=0.98; Anim.spring(ddus,{Scale=1}); Anim.spring(dd,{BackgroundTransparency=0}) else dd.Visible=false end
+			if open then
+				rebuild(sb and sb.Text or nil); posDD(); dd.Visible=true; dd.BackgroundTransparency=1; local ddus=Anim.uis(dd); ddus.Scale=0.96; Anim.spring(ddus,{Scale=1}); Anim.spring(dd,{BackgroundTransparency=0})
+			else
+				open=false; local ddus=Anim.uis(dd); Anim.tween(ddus,{Scale=0.98},0.1); local tw=Anim.tween(dd,{BackgroundTransparency=1},0.1); tw.Completed:Connect(function() dd.Visible=false end)
+			end
 		end)
 		trig.MouseEnter:Connect(function() if not open then Anim.spring(trig,{BackgroundColor3=C.COLOR.BG4}) end end)
 		trig.MouseLeave:Connect(function() if not open then Anim.spring(trig,{BackgroundColor3=C.COLOR.BG3}) end end)
@@ -296,8 +305,8 @@ return function(Core)
 	local function createGroup(parent, title, column, columnWidth)
 		local w=columnWidth or 360
 		local card=make("Frame",{Size=UDim2.new(0,w,0,0),BackgroundColor3=C.COLOR.BG2,BackgroundTransparency=0.03,BorderSizePixel=0,AutomaticSize=Enum.AutomaticSize.Y,Parent=parent,ClipsDescendants=false})
-		corner(card,C.GROUP.RADIUS); stroke(card,Color3.fromRGB(80,92,120),1,0.78)
-		gradient(card,Color3.fromRGB(15,22,40),Color3.fromRGB(8,13,26),90)
+		corner(card,C.GROUP.RADIUS); stroke(card,Color3.fromRGB(70,86,120),1,0.82)
+		gradient(card,Color3.fromRGB(16,24,44),Color3.fromRGB(8,13,26),90)
 		local cardScale=Anim.uis(card)
 		local glow=make("Frame",{Size=UDim2.new(1,10,1,10),Position=UDim2.new(0,-5,0,-5),BackgroundColor3=C.COLOR.GLOW,BackgroundTransparency=0.93,BorderSizePixel=0,ZIndex=0,Parent=card}); corner(glow,C.GROUP.RADIUS+6)
 		local shine=make("Frame",{Size=UDim2.new(1,0,0,2),Position=UDim2.new(0,0,0,0),BackgroundColor3=C.COLOR.ACCENT,BackgroundTransparency=0.1,BorderSizePixel=0,ZIndex=3,Parent=card}); gradient(shine,C.COLOR.ACCENT_LIGHT,C.COLOR.ACCENT,0); corner(shine,2)
@@ -358,7 +367,7 @@ return function(Core)
 	-- ========== WINDOW ==========
 	local function createWindow(settings)
 		settings=settings or{}; STATE.windowCount=STATE.windowCount+1; local uid=STATE.windowCount
-		local ws=settings.Size or UDim2.new(0,1180,0,720)
+		local ws=settings.Size or UDim2.new(0,1240,0,720)
 		local screen=make("ScreenGui",{Name="AlleralUI_"..uid,ResetOnSpawn=false,ZIndexBehavior=Enum.ZIndexBehavior.Sibling,DisplayOrder=100,Parent=(CoreGui:FindFirstChild("RobloxGui") or CoreGui)})
 
 		local dim=make("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=0.42,BorderSizePixel=0,ZIndex=1,Parent=screen})
@@ -392,7 +401,7 @@ return function(Core)
 		local sidebarList=make("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder,Parent=sidebar}); pad(sidebar,12,12,12,12)
 
 		-- CONTENT AREA
-		local ca=make("Frame",{Size=UDim2.new(1,-C.SIDEBAR.W-48,1,-sideY-C.FOOTER.H-12),Position=UDim2.new(0,C.SIDEBAR.W+32,0,sideY),BackgroundColor3=C.COLOR.BG1,BackgroundTransparency=0.04,BorderSizePixel=0,ZIndex=3,Parent=main}); corner(ca,16); stroke(ca,C.COLOR.BORDER,1,0.96)
+		local ca=make("Frame",{Size=UDim2.new(1,-C.SIDEBAR.W-48,1,-sideY-C.FOOTER.H-12),Position=UDim2.new(0,C.SIDEBAR.W+32,0,sideY),BackgroundColor3=C.COLOR.BG1,BackgroundTransparency=0,BorderSizePixel=0,ZIndex=3,Parent=main}); corner(ca,16); stroke(ca,C.COLOR.BORDER,1,0.96); gradient(ca,Color3.fromRGB(9,14,28),Color3.fromRGB(6,10,20),90)
 
 		-- FOOTER
 		local footer=make("Frame",{Size=UDim2.new(1,-32,0,C.FOOTER.H),Position=UDim2.new(0,16,1,-C.FOOTER.H-10),BackgroundColor3=C.COLOR.BG2,BackgroundTransparency=0.16,BorderSizePixel=0,ZIndex=6,Parent=main}); corner(footer,12); stroke(footer,C.COLOR.BORDER,1,0.94)
@@ -418,7 +427,7 @@ return function(Core)
 		closeBtn.MouseButton1Click:Connect(function() wc:Hide() end); mini.MouseButton1Click:Connect(function() wc:Hide() end)
 		local w=setmetatable({_main=main,_header=header,_sidebar=sidebar,_tabbar=tabbar,_contentArea=ca,_screen=screen,_tabs=tabs,_footer=footer,Hide=wc.Hide,Show=wc.Show,Toggle=wc.Toggle,selectTab=selectTab},{__index=wc})
 		function w:AddTab(name,iconId)
-			local to=createTab(self,name,iconId,3)
+			local to=createTab(self,name,iconId,2)
 			local top=make("TextButton",{Size=UDim2.new(0,104,0,34),BackgroundColor3=C.COLOR.BG2,BackgroundTransparency=0.55,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=6,Parent=tabbar}); corner(top,10); stroke(top,C.COLOR.BORDER,1,0.92)
 			local tl=make("TextLabel",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text=tostring(name),TextColor3=C.COLOR.TEXT2,Font=C.FONT_BOLD,TextSize=C.TEXT,TextXAlignment=Enum.TextXAlignment.Center,TextYAlignment=Enum.TextYAlignment.Center,ZIndex=7,Parent=top})
 			local sb=make("TextButton",{Size=UDim2.new(1,0,0,C.SIDEBAR.ITEM_H),BackgroundColor3=C.COLOR.BG2,BackgroundTransparency=0.75,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=5,Parent=sidebar}); corner(sb,C.SIDEBAR.RADIUS)
@@ -509,7 +518,7 @@ return function(Core)
 	end
 	function Core.preloadUi() return Core.loadUi() end
 	function Core.uiLibrary(b) if type(b)~="table" then return nil end; return b.Alleral or b.Library end
-	function Core.uiWindowSettings(extra) extra=type(extra)=="table" and extra or{}; return{Title=extra.Title or extra.Name or"Alleral",Name=extra.Title or extra.Name or"Alleral",Subtitle=extra.Subtitle or extra.Author or"",Icon=extra.Icon or"sparkles",Theme=extra.Theme or"Noble",Size=extra.Size or UDim2.new(0,1180,0,720),TabWidth=tonumber(extra.TabWidth) or C.SIDEBAR.W,FileSettings={RootFolder=extra.configFolder or"Alleral_Configs",ConfigFolder=extra.FileName or"Interface"}} end
+	function Core.uiWindowSettings(extra) extra=type(extra)=="table" and extra or{}; return{Title=extra.Title or extra.Name or"Alleral",Name=extra.Title or extra.Name or"Alleral",Subtitle=extra.Subtitle or extra.Author or"",Icon=extra.Icon or"sparkles",Theme=extra.Theme or"Noble",Size=extra.Size or UDim2.new(0,1240,0,720),TabWidth=tonumber(extra.TabWidth) or C.SIDEBAR.W,FileSettings={RootFolder=extra.configFolder or"Alleral_Configs",ConfigFolder=extra.FileName or"Interface"}} end
 
 	-- ========== GROUPBOX WRAPPER ==========
 	local function createGroupbox(section,uiBundle)
