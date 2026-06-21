@@ -1829,7 +1829,8 @@ return function(Core)
 				elseif rawTab.AddLeftGroupbox then
 					return rawTab:AddLeftGroupbox(name)
 				else
-					return rawTab:AddGroupbox and rawTab:AddGroupbox(name) or nil
+					if rawTab.AddGroupbox then return rawTab:AddGroupbox(name) end
+				return nil
 				end
 			end)
 			if not h then table.insert(STATE.missingBindings, "Groupbox:" .. name .. "(failed)"); return {} end
