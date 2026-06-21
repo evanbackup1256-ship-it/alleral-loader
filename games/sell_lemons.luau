@@ -84,11 +84,34 @@ local function notify(title, text, duration, notifyType)
 	Core.notify(title, text, duration, notifyType)
 end
 
-local function waitChild(parent, name, timeout)
-	if G.waitChild then
-		return G.waitChild(parent, name, timeout)
+local function waitChild(parent, childName, timeout)
+	if typeof(parent) ~= "Instance" then
+		warn("[Sell Lemons] waitChild invalid parent:", parent, childName)
+		return nil
 	end
-	return Core.waitChild(parent, name, timeout)
+
+	if type(childName) ~= "string" or childName == "" then
+		warn("[Sell Lemons] waitChild invalid childName:", childName)
+		return nil
+	end
+
+	timeout = tonumber(timeout) or 5
+
+	if type(G.waitChild) == "function" then
+		local ok, result = pcall(G.waitChild, parent, childName, timeout)
+		if ok and result then
+			return result
+		end
+	end
+
+	local ok, result = pcall(function()
+		return parent:WaitForChild(childName, timeout)
+	end)
+	if ok and result then
+		return result
+	end
+
+	return parent:FindFirstChild(childName)
 end
 
 local function characterParts()
