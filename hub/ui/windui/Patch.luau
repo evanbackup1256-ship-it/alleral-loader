@@ -1,7 +1,21 @@
--- Alleral V11.3 — WindUI runtime patches (no native open/close/tooltip recursion)
+-- Alleral V11.3.1 — WindUI runtime patches (block native open/close lag)
 return function(WindUI)
 	local Patch = {}
 	local patchedWindows = {}
+
+	local function hideMain(windWindow)
+		pcall(function()
+			windWindow.Closed = true
+			local main = windWindow.UIElements and windWindow.UIElements.Main
+			if main then
+				main.Visible = false
+				local inner = main:FindFirstChild("Main", true)
+				if inner and inner:IsA("GuiObject") then
+					inner.Visible = false
+				end
+			end
+		end)
+	end
 
 	function Patch.applyWindow(windWindow, handlers)
 		if not windWindow or patchedWindows[windWindow] then
@@ -14,10 +28,8 @@ return function(WindUI)
 		windWindow._AlleralNativeClose = windWindow.Close
 		windWindow._AlleralNativeToggle = windWindow.Toggle
 
+		-- WindUI auto-spawns Open() on create — must stay noop (never animate)
 		function windWindow.Open(_)
-			if handlers.onShow then
-				handlers.onShow()
-			end
 		end
 
 		function windWindow.Close(_)
@@ -38,17 +50,7 @@ return function(WindUI)
 			end)
 		end
 
-		pcall(function()
-			windWindow.Closed = true
-			local main = windWindow.UIElements and windWindow.UIElements.Main
-			if main then
-				main.Visible = false
-				local inner = main:FindFirstChild("Main")
-				if inner and inner:IsA("GuiObject") then
-					inner.Visible = false
-				end
-			end
-		end)
+		hideMain(windWindow)
 	end
 
 	function Patch.applyLibrary(WindUIRef)
@@ -62,6 +64,23 @@ return function(WindUI)
 				WindUIRef.TooltipGui.Enabled = false
 			end
 		end)
+
+		local nativeCreate = WindUIRef.CreateWindow
+		if type(nativeCreate) ~= "function" then
+			return
+		end
+
+		function WindUIRef.CreateWindow(config)
+			local win = nativeCreate(config)
+			if type(win) == "table" then
+				win.Open = function() end
+				win.Close = function() end
+				win.Toggle = function() end
+				win.Closed = true
+				hideMain(win)
+			end
+			return win
+		end
 	end
 
 	Patch.applyLibrary(WindUI)

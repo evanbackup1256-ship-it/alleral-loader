@@ -1,34 +1,36 @@
--- Alleral V11.3 — premium dynamic tooltips (guarded, readable, positioned)
+-- Alleral V11.3.1 — tooltips via hover registry + mouse polling (WindUI-safe)
 return function(Bootstrap, Motion, Text)
 	local TooltipManager = {}
 	local UserInputService = game:GetService("UserInputService")
 	local TextService = game:GetService("TextService")
+	local RunService = game:GetService("RunService")
 	local Players = game:GetService("Players")
 
 	local HOVER_DELAY = 0.25
-	local FADE_IN = 0.1
-	local FADE_OUT = 0.08
+	local POLL_INTERVAL = 1 / 30
 	local MIN_WIDTH = 180
 	local MAX_WIDTH = 300
 
 	local gui
 	local overlay
 	local frame
-	local accentBar
 	local titleLabel
 	local descLabel
 	local metaLabel
 	local uiScale
 
 	local visible = false
-	local isShowingTooltip = false
 	local isHiding = false
-	local activeTooltipId = nil
-	local registeredTooltips = {}
-	local connectedControls = {}
+	local activeTarget = nil
+	local registryList = {}
+	local registryMap = {}
+	local pollConn = nil
+	local lastPoll = 0
+	local pendingTarget = nil
+	local pendingSince = 0
 	local showThread = nil
 	local hideThread = nil
-	local stats = { attached = 0, shown = 0, connections = 0 }
+	local stats = { attached = 0, shown = 0, connections = 0, failed = 0 }
 
 	local COLORS = {
 		bg = Color3.fromHex("#0B1020"),
@@ -62,12 +64,7 @@ return function(Bootstrap, Motion, Text)
 
 	local function textHeight(text, width, fontSize)
 		local ok, size = pcall(function()
-			return TextService:GetTextSize(
-				text,
-				fontSize,
-				Enum.Font.Gotham,
-				Vector2.new(width, 1000)
-			)
+			return TextService:GetTextSize(text, fontSize, Enum.Font.Gotham, Vector2.new(width, 1000))
 		end)
 		if ok and size then
 			return size.Y
@@ -91,7 +88,7 @@ return function(Bootstrap, Motion, Text)
 		gui = Instance.new("ScreenGui")
 		gui.Name = "AlleralTooltipOverlay"
 		gui.ResetOnSpawn = false
-		gui.DisplayOrder = 500
+		gui.DisplayOrder = 10000
 		gui.IgnoreGuiInset = true
 		gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 		gui.Parent = pg
@@ -101,7 +98,8 @@ return function(Bootstrap, Motion, Text)
 		overlay.BackgroundTransparency = 1
 		overlay.BorderSizePixel = 0
 		overlay.Size = UDim2.fromScale(1, 1)
-		overlay.ZIndex = 500
+		overlay.Active = false
+		overlay.ZIndex = 1
 		overlay.Parent = gui
 
 		frame = Instance.new("Frame")
@@ -110,7 +108,7 @@ return function(Bootstrap, Motion, Text)
 		frame.BackgroundTransparency = 0.04
 		frame.BorderSizePixel = 0
 		frame.Visible = false
-		frame.ZIndex = 501
+		frame.ZIndex = 2
 		frame.Parent = overlay
 
 		local corner = Instance.new("UICorner")
@@ -123,12 +121,12 @@ return function(Bootstrap, Motion, Text)
 		stroke.Thickness = 1
 		stroke.Parent = frame
 
-		accentBar = Instance.new("Frame")
+		local accentBar = Instance.new("Frame")
 		accentBar.Name = "AccentBar"
 		accentBar.BackgroundColor3 = COLORS.accent
 		accentBar.BorderSizePixel = 0
 		accentBar.Size = UDim2.new(1, 0, 0, 2)
-		accentBar.ZIndex = 502
+		accentBar.ZIndex = 3
 		accentBar.Parent = frame
 
 		local pad = Instance.new("UIPadding")
@@ -146,12 +144,10 @@ return function(Bootstrap, Motion, Text)
 		titleLabel.TextColor3 = COLORS.text
 		titleLabel.TextTransparency = 0
 		titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-		titleLabel.TextYAlignment = Enum.TextYAlignment.Top
 		titleLabel.TextWrapped = true
 		titleLabel.AutomaticSize = Enum.AutomaticSize.Y
 		titleLabel.Size = UDim2.new(1, 0, 0, 0)
-		titleLabel.Position = UDim2.fromOffset(0, 4)
-		titleLabel.ZIndex = 503
+		titleLabel.ZIndex = 4
 		titleLabel.Parent = frame
 
 		descLabel = Instance.new("TextLabel")
@@ -162,12 +158,10 @@ return function(Bootstrap, Motion, Text)
 		descLabel.TextColor3 = COLORS.muted
 		descLabel.TextTransparency = 0
 		descLabel.TextXAlignment = Enum.TextXAlignment.Left
-		descLabel.TextYAlignment = Enum.TextYAlignment.Top
 		descLabel.TextWrapped = true
 		descLabel.AutomaticSize = Enum.AutomaticSize.Y
 		descLabel.Size = UDim2.new(1, 0, 0, 0)
-		descLabel.Position = UDim2.fromOffset(0, 24)
-		descLabel.ZIndex = 503
+		descLabel.ZIndex = 4
 		descLabel.Parent = frame
 
 		metaLabel = Instance.new("TextLabel")
@@ -176,18 +170,16 @@ return function(Bootstrap, Motion, Text)
 		metaLabel.Font = Enum.Font.Gotham
 		metaLabel.TextSize = 11
 		metaLabel.TextColor3 = COLORS.muted
-		metaLabel.TextTransparency = 0.15
+		metaLabel.TextTransparency = 0.1
 		metaLabel.TextXAlignment = Enum.TextXAlignment.Left
-		metaLabel.TextYAlignment = Enum.TextYAlignment.Top
 		metaLabel.TextWrapped = true
 		metaLabel.AutomaticSize = Enum.AutomaticSize.Y
 		metaLabel.Size = UDim2.new(1, 0, 0, 0)
-		metaLabel.Position = UDim2.fromOffset(0, 44)
-		metaLabel.ZIndex = 503
+		metaLabel.ZIndex = 4
 		metaLabel.Parent = frame
 
 		uiScale = Instance.new("UIScale")
-		uiScale.Scale = 0.96
+		uiScale.Scale = 1
 		uiScale.Parent = frame
 
 		return true
@@ -225,9 +217,6 @@ return function(Bootstrap, Motion, Text)
 		if meta.warning and tostring(meta.warning) ~= "" then
 			table.insert(metaLines, "Warning: " .. sanitizeLine(meta.warning, 120, ""))
 		end
-		if meta.state and tostring(meta.state) ~= "" then
-			table.insert(metaLines, "State: " .. sanitizeLine(meta.state, 40, ""))
-		end
 
 		return title, desc, table.concat(metaLines, "\n")
 	end
@@ -250,18 +239,13 @@ return function(Bootstrap, Motion, Text)
 		descLabel.Position = UDim2.fromOffset(0, titleH + 8)
 		metaLabel.Position = UDim2.fromOffset(0, titleH + descH + 14)
 
-		local contentW = math.max(
-			MIN_WIDTH,
-			math.min(MAX_WIDTH, math.max(textHeight(title, 9999, 14) > 0 and #title * 6 or MIN_WIDTH, innerWidth))
-		)
-		local width = math.clamp(contentW, MIN_WIDTH, MAX_WIDTH)
 		local totalH = 28 + titleH + descH + (metaH > 0 and (metaH + 8) or 0)
-		frame.Size = UDim2.fromOffset(width, totalH)
+		frame.Size = UDim2.fromOffset(MAX_WIDTH, totalH)
 	end
 
 	local function placeNear(guiObj, opts)
 		opts = opts or {}
-		if not frame or not guiObj then
+		if not frame or not guiObj or not guiObj.Parent then
 			return
 		end
 		local cam = workspace.CurrentCamera
@@ -271,20 +255,12 @@ return function(Bootstrap, Motion, Text)
 		local vp = cam.ViewportSize
 		local abs = guiObj.AbsolutePosition
 		local size = guiObj.AbsoluteSize
-		local fw = frame.AbsoluteSize.X > 0 and frame.AbsoluteSize.X or frame.Size.X.Offset
-		if fw < MIN_WIDTH then
-			fw = MIN_WIDTH
-		end
-		local fh = frame.AbsoluteSize.Y > 0 and frame.AbsoluteSize.Y or frame.Size.Y.Offset
-		if fh < 48 then
-			fh = 72
-		end
+		local fw = frame.AbsoluteSize.X > 0 and frame.AbsoluteSize.X or MAX_WIDTH
+		local fh = frame.AbsoluteSize.Y > 0 and frame.AbsoluteSize.Y or 72
 
 		local pos
-		if opts.placement == "sidebar" or abs.X < vp.X * 0.28 then
+		if opts.placement == "sidebar" or abs.X < vp.X * 0.3 then
 			pos = Vector2.new(abs.X + size.X + 14, abs.Y + math.max(0, (size.Y - fh) * 0.5))
-		elseif opts.followMouse then
-			pos = UserInputService:GetMouseLocation() + Vector2.new(16, 16)
 		else
 			pos = Vector2.new(abs.X + size.X + 12, abs.Y + math.max(0, (size.Y - fh) * 0.5))
 		end
@@ -295,105 +271,74 @@ return function(Bootstrap, Motion, Text)
 		if pos.Y + fh > vp.Y - 10 then
 			pos = Vector2.new(pos.X, math.max(10, vp.Y - fh - 10))
 		end
-		if pos.X < 10 then
-			pos = Vector2.new(10, pos.Y)
-		end
-		if pos.Y < 10 then
-			pos = Vector2.new(pos.X, 10)
-		end
-
+		pos = Vector2.new(math.clamp(pos.X, 10, vp.X - fw - 10), math.clamp(pos.Y, 10, vp.Y - fh - 10))
 		frame.Position = UDim2.fromOffset(pos.X, pos.Y)
 	end
 
 	function TooltipManager.hide()
-		if isHiding or not visible then
+		if not visible and not activeTarget then
+			isHiding = false
+			return
+		end
+		if isHiding then
 			return
 		end
 		isHiding = true
 		cancelShowThread()
+		pendingTarget = nil
+		pendingSince = 0
 
-		if frame and uiScale then
-			if Motion then
-				pcall(function()
-					Motion.tween(uiScale, { Scale = 0.96 }, FADE_OUT)
-					Motion.tween(frame, { BackgroundTransparency = 1 }, FADE_OUT)
-				end)
+		cancelHideThread()
+		hideThread = task.delay(0.05, function()
+			if frame then
+				frame.Visible = false
 			end
-			cancelHideThread()
-			hideThread = task.delay(FADE_OUT + 0.02, function()
-				if frame then
-					frame.Visible = false
-					frame.BackgroundTransparency = 0.04
-				end
-				visible = false
-				activeTooltipId = nil
-				isHiding = false
-			end)
-		else
 			visible = false
-			activeTooltipId = nil
+			activeTarget = nil
 			isHiding = false
-		end
+		end)
 	end
 
 	function TooltipManager.show(guiObj, title, desc, metaText, opts)
-		if isShowingTooltip or isHiding then
-			return
-		end
 		if not guiObj or not guiObj.Parent then
 			return
 		end
-
-		local targetId = tostring(guiObj)
-		if visible and activeTooltipId == targetId then
+		if isHiding then
+			return
+		end
+		if visible and activeTarget == guiObj then
 			placeNear(guiObj, opts)
 			return
 		end
 
-		isShowingTooltip = true
 		cancelShowThread()
 		cancelHideThread()
-
-		if visible and activeTooltipId ~= targetId then
-			frame.Visible = false
-			visible = false
-		end
+		isHiding = false
 
 		if not ensureGui() then
-			isShowingTooltip = false
 			return
 		end
 
 		layoutFrame(title, desc, metaText)
 		frame.Visible = true
-		task.defer(function()
-			if not guiObj.Parent then
-				isShowingTooltip = false
-				return
-			end
-			placeNear(guiObj, opts)
-		end)
+		frame.BackgroundTransparency = 0.04
+		titleLabel.TextTransparency = 0
+		descLabel.TextTransparency = 0
+		uiScale.Scale = 1
 		placeNear(guiObj, opts)
+		task.defer(function()
+			if guiObj.Parent and activeTarget == guiObj then
+				placeNear(guiObj, opts)
+			end
+		end)
 
 		visible = true
-		activeTooltipId = targetId
+		activeTarget = guiObj
 		stats.shown = stats.shown + 1
-
-		if uiScale and Motion then
-			uiScale.Scale = 0.96
-			titleLabel.TextTransparency = 0
-			descLabel.TextTransparency = 0
-			frame.BackgroundTransparency = 1
-			pcall(function()
-				Motion.tween(uiScale, { Scale = 1 }, FADE_IN)
-				Motion.tween(frame, { BackgroundTransparency = 0.04 }, FADE_IN)
-			end)
-		end
-
-		isShowingTooltip = false
 	end
 
 	local FRAME_KEYS = {
+		"ElementFrame",
 		"ToggleFrame",
 		"ButtonFrame",
 		"SliderFrame",
@@ -405,93 +350,171 @@ return function(Bootstrap, Motion, Text)
 
 	local function findHoverTarget(el)
 		if typeof(el) == "Instance" and el:IsA("GuiObject") then
-			if el:IsA("GuiButton") then
-				return el
-			end
-			if el:IsA("TextButton") or el:IsA("ImageButton") then
-				return el
-			end
-			for _, child in ipairs(el:GetChildren()) do
-				local found = findHoverTarget(child)
-				if found then
-					return found
-				end
-			end
-			if el.AbsoluteSize.X >= 24 and el.AbsoluteSize.Y >= 16 then
-				return el
-			end
 			return el
 		end
-		if type(el) == "table" then
-			if el.UIElements and typeof(el.UIElements.Main) == "Instance" then
-				return findHoverTarget(el.UIElements.Main)
+		if type(el) ~= "table" then
+			return nil
+		end
+
+		if typeof(el.ElementFrame) == "Instance" then
+			return el.ElementFrame
+		end
+		if el.UIElements and typeof(el.UIElements.Main) == "Instance" then
+			return el.UIElements.Main
+		end
+		for _, key in ipairs(FRAME_KEYS) do
+			local frameObj = el[key]
+			if typeof(frameObj) == "Instance" then
+				return frameObj
 			end
-			for _, key in ipairs(FRAME_KEYS) do
-				local frameObj = el[key]
-				if type(frameObj) == "table" and frameObj.UIElements and typeof(frameObj.UIElements.Main) == "Instance" then
-					return findHoverTarget(frameObj.UIElements.Main)
-				end
+			if type(frameObj) == "table" and frameObj.UIElements and typeof(frameObj.UIElements.Main) == "Instance" then
+				return frameObj.UIElements.Main
 			end
-			for _, key in ipairs({ "Button", "Frame", "Holder", "Root", "Object", "Instance", "Main" }) do
-				local v = el[key]
-				if typeof(v) == "Instance" then
-					local found = findHoverTarget(v)
-					if found then
-						return found
-					end
-				end
+		end
+		for _, key in ipairs({ "Main", "Frame", "Button", "Holder", "Root" }) do
+			if typeof(el[key]) == "Instance" then
+				return el[key]
 			end
 		end
 		return nil
 	end
 
-	function TooltipManager.attach(el, meta, controlType, sectionName, label)
-		local guiObj = findHoverTarget(el)
-		if not guiObj then
+	local function prepareTarget(guiObj)
+		if not guiObj or not guiObj:IsA("GuiObject") then
 			return
 		end
-		local key = tostring(guiObj)
-		if registeredTooltips[key] or connectedControls[key] then
+		pcall(function()
+			guiObj.Active = true
+		end)
+	end
+
+	local function pointInside(guiObj, mousePos)
+		if not guiObj or not guiObj.Parent or not guiObj.Visible then
+			return false
+		end
+		local ap = guiObj.AbsolutePosition
+		local as = guiObj.AbsoluteSize
+		if as.X < 2 or as.Y < 2 then
+			return false
+		end
+		return mousePos.X >= ap.X and mousePos.X <= ap.X + as.X
+			and mousePos.Y >= ap.Y and mousePos.Y <= ap.Y + as.Y
+	end
+
+	local function startPolling()
+		if pollConn then
 			return
 		end
-		registeredTooltips[key] = true
-		connectedControls[key] = true
-		guiObj:SetAttribute("AlleralTooltipBound", true)
-		stats.attached = stats.attached + 1
-
-		local opts = type(meta) == "table" and meta or {}
-		if controlType == "tab" or opts.placement == "sidebar" then
-			opts.placement = "sidebar"
-		end
-
-		local enterConn = guiObj.MouseEnter:Connect(function()
-			if isShowingTooltip or isHiding then
+		pollConn = RunService.Heartbeat:Connect(function()
+			local now = tick()
+			if now - lastPoll < POLL_INTERVAL then
 				return
 			end
-			cancelShowThread()
-			showThread = task.delay(HOVER_DELAY, function()
-				if not guiObj.Parent then
-					return
-				end
-				if isShowingTooltip or isHiding then
-					return
-				end
-				local title, desc, metaText = TooltipManager.resolve(opts, controlType, sectionName, label)
-				TooltipManager.show(guiObj, title, desc, metaText, opts)
-			end)
-		end)
-		stats.connections = stats.connections + 1
+			lastPoll = now
 
-		local leaveConn = guiObj.MouseLeave:Connect(function()
-			cancelShowThread()
-			if activeTooltipId == key then
-				TooltipManager.hide()
+			if #registryList < 1 then
+				return
+			end
+
+			local mousePos = UserInputService:GetMouseLocation()
+			local hit = nil
+			local hitDepth = -1
+
+			for i = #registryList, 1, -1 do
+				local entry = registryList[i]
+				local obj = entry.target
+				if obj and obj.Parent and pointInside(obj, mousePos) then
+					local depth = 0
+					pcall(function()
+						local n = obj
+						while n and n.Parent do
+							depth = depth + 1
+							n = n.Parent
+						end
+					end)
+					if depth > hitDepth then
+						hitDepth = depth
+						hit = entry
+					end
+				end
+			end
+
+			if not hit then
+				pendingTarget = nil
+				pendingSince = 0
+				if visible then
+					TooltipManager.hide()
+				end
+				return
+			end
+
+			if pendingTarget ~= hit.target then
+				pendingTarget = hit.target
+				pendingSince = now
+				cancelShowThread()
+				return
+			end
+
+			if not visible and (now - pendingSince) >= HOVER_DELAY then
+				local title, desc, metaText = TooltipManager.resolve(hit.meta, hit.kind, hit.section, hit.label)
+				TooltipManager.show(hit.target, title, desc, metaText, hit.opts)
+			elseif visible and activeTarget == hit.target then
+				placeNear(hit.target, hit.opts)
 			end
 		end)
 		stats.connections = stats.connections + 1
+	end
 
-		connectedControls[key .. ":enter"] = enterConn
-		connectedControls[key .. ":leave"] = leaveConn
+	function TooltipManager.attach(el, meta, controlType, sectionName, label)
+		local function tryRegister()
+			local guiObj = findHoverTarget(el)
+			if not guiObj or not guiObj.Parent then
+				return false
+			end
+			if registryMap[guiObj] then
+				return true
+			end
+
+			prepareTarget(guiObj)
+			local opts = {}
+			if type(meta) == "table" then
+				for k, v in pairs(meta) do
+					opts[k] = v
+				end
+			end
+			if controlType == "tab" or opts.placement == "sidebar" then
+				opts.placement = "sidebar"
+			end
+
+			local entry = {
+				target = guiObj,
+				meta = meta,
+				opts = opts,
+				kind = controlType,
+				section = sectionName,
+				label = label,
+			}
+			registryMap[guiObj] = entry
+			table.insert(registryList, entry)
+			stats.attached = stats.attached + 1
+			guiObj:SetAttribute("AlleralTooltipBound", true)
+			startPolling()
+			return true
+		end
+
+		if tryRegister() then
+			return
+		end
+
+		task.spawn(function()
+			for _ = 1, 30 do
+				if tryRegister() then
+					return
+				end
+				task.wait(0.1)
+			end
+			stats.failed = stats.failed + 1
+		end)
 	end
 
 	function TooltipManager.attachTab(windTab, name)
@@ -499,11 +522,7 @@ return function(Bootstrap, Motion, Text)
 			return
 		end
 		task.defer(function()
-			local target = windTab
-			if windTab.UIElements and windTab.UIElements.Main then
-				target = windTab.UIElements.Main
-			end
-			TooltipManager.attach(target, {
+			TooltipManager.attach(windTab, {
 				title = name,
 				description = "Switch to the " .. Bootstrap.sanitize(name, 48) .. " tab.",
 				placement = "sidebar",
@@ -513,7 +532,8 @@ return function(Bootstrap, Motion, Text)
 
 	function TooltipManager.init()
 		ensureGui()
-		warn("[WindUI] TooltipManager ready")
+		startPolling()
+		warn("[WindUI] TooltipManager ready (mouse polling)")
 		warn("[WindUI] Tooltip recursion guard active")
 	end
 
@@ -523,13 +543,15 @@ return function(Bootstrap, Motion, Text)
 			shown = stats.shown,
 			visible = visible,
 			connections = stats.connections,
-			activeId = activeTooltipId,
+			failed = stats.failed,
 			registered = stats.attached,
+			activeId = activeTarget and tostring(activeTarget) or nil,
 		}
 	end
 
 	function TooltipManager.suppressDuringDrag()
 		cancelShowThread()
+		pendingTarget = nil
 		TooltipManager.hide()
 	end
 

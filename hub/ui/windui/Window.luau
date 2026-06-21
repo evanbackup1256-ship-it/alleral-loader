@@ -55,11 +55,6 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 		local function bindWindPatches()
 			if Patch and Patch.applyWindow then
 				pcall(Patch.applyWindow, windWindow, {
-					onShow = function()
-						if self then
-							self:Show()
-						end
-					end,
 					onHide = function()
 						if self then
 							self:Hide()
@@ -134,22 +129,8 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			if TooltipManager and TooltipManager.suppressDuringDrag then
 				pcall(TooltipManager.suppressDuringDrag)
 			end
-			if Motion and Motion.animateWindowHide then
-				pcall(function()
-					Motion.animateWindowHide(WindUI, windWindow, function()
-						setRootVisible(false)
-						pcall(function()
-							if windWindow then
-								windWindow.Closed = true
-							end
-						end)
-						self._windowState = STATES.Hidden
-					end)
-				end)
-			else
-				setRootVisible(false)
-				self._windowState = STATES.Hidden
-			end
+			setRootVisible(false)
+			self._windowState = STATES.Hidden
 		end
 
 		function self:Show()
@@ -162,20 +143,7 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			self._windowState = STATES.Showing
 			self._lastOpen = tick()
 			setRootVisible(true)
-			if Motion and Motion.animateWindowShow then
-				pcall(function()
-					Motion.animateWindowShow(WindUI, windWindow, function()
-						pcall(function()
-							if windWindow then
-								windWindow.Closed = false
-							end
-						end)
-						self._windowState = STATES.Visible
-					end)
-				end)
-			else
-				self._windowState = STATES.Visible
-			end
+			self._windowState = STATES.Visible
 		end
 
 		function self:Toggle()
