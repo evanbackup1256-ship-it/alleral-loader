@@ -1,8 +1,8 @@
--- Alleral UI layer — v7.1.0 Noble
+-- Alleral UI layer — v7.1.0 Noble (Linoria-compatible bootstrap)
 --[[
 	STANDALONE GUI RENDERING ENGINE
 	UIScale-based animations. ScreenGui dropdown overlay.
-	UIListLayout everywhere. Zero legacy dependencies.
+	UIListLayout everywhere. Zero legacy dependencies. Linoria-free.
 ]]
 
 return function(Core)
