@@ -394,6 +394,10 @@ function Core.syncUiState(state, options)
 	if type(state) ~= "table" then
 		return 0
 	end
+	if Core._syncUiBusy then
+		return 0
+	end
+	Core._syncUiBusy = true
 	options = type(options) == "table" and options or {}
 	local synced = 0
 	for key, entry in pairs(Core._UiStateBindings or {}) do
@@ -405,13 +409,10 @@ function Core.syncUiState(state, options)
 			end
 			if entry.kind == "toggle" and raw then
 				pcall(function()
-					if type(raw.UpdateState) == "function" then
+					if type(raw.SetValueSilent) == "function" then
+						raw:SetValueSilent(nil, value == true)
+					elseif type(raw.UpdateState) == "function" then
 						raw:UpdateState(value == true)
-					elseif type(raw.Set) == "function" then
-						local prev = raw.Callback
-						raw.Callback = function() end
-						raw:Set(value == true, nil, false)
-						raw.Callback = prev
 					elseif entry.widget and entry.widget.Set then
 						entry.widget:Set({ CurrentValue = value == true })
 					end
@@ -420,13 +421,10 @@ function Core.syncUiState(state, options)
 			elseif entry.kind == "slider" and raw then
 				pcall(function()
 					local num = tonumber(value) or 0
-					if type(raw.UpdateValue) == "function" then
+					if type(raw.SetValueSilent) == "function" then
+						raw:SetValueSilent(nil, num)
+					elseif type(raw.UpdateValue) == "function" then
 						raw:UpdateValue(num)
-					elseif type(raw.Set) == "function" then
-						local prev = raw.Callback
-						raw.Callback = function() end
-						raw:Set(num)
-						raw.Callback = prev
 					elseif entry.widget and entry.widget.Set then
 						entry.widget:Set({ CurrentValue = num })
 					end
@@ -468,6 +466,7 @@ function Core.syncUiState(state, options)
 			end
 		end
 	end
+	Core._syncUiBusy = false
 	if options.notify == true and synced > 0 then
 		Core.notify("UI", "Synced " .. tostring(synced) .. " controls.", 2, "info")
 	end
@@ -1995,7 +1994,11 @@ function Core.buildExecutorIntelGroup(tab, column)
 		group:CreateLabel("UI Layout • " .. layout)
 	end
 	group:CreateLabel("PlaceId • " .. tostring(game.PlaceId))
-	group:CreateLabel("JobId • " .. tostring(game.JobId):sub(1, 20) .. "...")
+	local jobId = tostring(game.JobId or "")
+	if #jobId > 18 then
+		jobId = jobId:sub(1, 18) .. "..."
+	end
+	group:CreateLabel("JobId • " .. jobId)
 	group:CreateLabel("UserId • " .. tostring(game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.UserId or "?"))
 	local caps = {}
 	for key, label in pairs({
@@ -2702,6 +2705,20 @@ function Core.buildCloudConfigStudio(tab, options)
 	local browseLabels = { "Refresh community list" }
 	local selectedBrowseCode = shareCode
 	local previewCache = nil
+	local relayAvailable = Core.resolveRelayBase() ~= nil
+	local cloudWarned = false
+
+	local function getRelayBase()
+		local base = Core.resolveRelayBase()
+		if not base then
+			if not cloudWarned and type(Core.logWarn) == "function" then
+				cloudWarned = true
+				Core.logWarn("[CloudConfig] Relay unavailable — cloud features disabled")
+			end
+			return nil
+		end
+		return base
+	end
 
 	local function collectSnapshot()
 		local snapshot = {}
@@ -2769,7 +2786,12 @@ function Core.buildCloudConfigStudio(tab, options)
 		Downloads = "--",
 		Status = "Ready",
 	})
-	cloudStatus:SetSummary("Upload, preview DNA, then import when you're happy.")
+	if not relayAvailable then
+		cloudStatus:SetSummary("Cloud unavailable — relay not configured.")
+		library:CreateLabel("Cloud unavailable. Configure relay to enable upload and browse.")
+	else
+		cloudStatus:SetSummary("Upload, preview DNA, then import when you're happy.")
+	end
 
 	local function setStatus(message, tone)
 		cloudStatus:Update("Status", message or "Ready")
@@ -2809,10 +2831,9 @@ function Core.buildCloudConfigStudio(tab, options)
 		if code == "" then
 			return nil, "Enter a share code."
 		end
-		local base = Core.resolveRelayBase()
+		local base = getRelayBase()
 		if not base then
-			if type(Core.logWarn) == "function" then Core.logWarn("[CloudConfig] resolveRelayBase returned nil, skipping") end
-			return
+			return nil, "Cloud unavailable."
 		end
 		local decoded = Core.httpGetJson(base .. "/api/configs/" .. code)
 		if not decoded or decoded.ok ~= true or type(decoded.data) ~= "table" then
@@ -2838,10 +2859,14 @@ function Core.buildCloudConfigStudio(tab, options)
 		end
 	)
 	library:CreateButton("Upload current setup", function()
+		if not relayAvailable then
+			setStatus("Cloud unavailable.", "warn")
+			return
+		end
 		setStatus("Uploading...", nil)
-		local base = Core.resolveRelayBase()
+		local base = getRelayBase()
 		if not base then
-			if type(Core.logWarn) == "function" then Core.logWarn("[CloudConfig] resolveRelayBase returned nil, skipping") end
+			setStatus("Cloud unavailable.", "warn")
 			return
 		end
 		local payload = {
@@ -2925,9 +2950,12 @@ function Core.buildCloudConfigStudio(tab, options)
 
 	local browseDropdown
 	local function refreshBrowse()
-		local base = Core.resolveRelayBase()
+		if not relayAvailable then
+			communityStatus:SetSummary("Cloud unavailable — browse disabled.")
+			return
+		end
+		local base = getRelayBase()
 		if not base then
-			if type(Core.logWarn) == "function" then Core.logWarn("[CloudConfig] resolveRelayBase returned nil, skipping browse") end
 			return
 		end
 		local decoded = Core.httpGetJson(base .. "/api/configs/browse?game=" .. HttpService:UrlEncode(gameId) .. "&limit=20")
@@ -3025,7 +3053,9 @@ function Core.buildCloudConfigStudio(tab, options)
 		end
 	end, "Imports the highlighted community setup immediately.")
 
-	task.defer(refreshBrowse)
+	if relayAvailable then
+		task.defer(refreshBrowse)
+	end
 
 	return library, community, cloudStatus, communityStatus
 end

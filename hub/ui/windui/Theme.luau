@@ -1,14 +1,15 @@
--- Alleral V11 — premium EXE-6 / Raycast-style WindUI theme
+-- Alleral V11.1 — premium EXE-6 / Raycast-style WindUI theme
 return function(WindUI, Bootstrap)
 	local Theme = {}
 	Theme.NAME = "Alleral"
+	Theme._registered = false
 
 	local C = {
-		Background = "#070B16",
-		Panel = "#0D1222",
-		Card = "#121827",
-		CardHover = "#182033",
-		Border = "#26324A",
+		Background = "#060914",
+		Panel = "#0B1020",
+		Card = "#101624",
+		Card2 = "#151C2E",
+		Border = "#25304A",
 		Accent = "#8B5CF6",
 		Accent2 = "#A855F7",
 		Text = "#F8FAFC",
@@ -23,6 +24,14 @@ return function(WindUI, Bootstrap)
 	end
 
 	function Theme.register()
+		if Theme._registered then
+			pcall(function()
+				if WindUI and WindUI.SetTheme then
+					WindUI:SetTheme(Theme.NAME)
+				end
+			end)
+			return true
+		end
 		if not WindUI or type(WindUI.AddTheme) ~= "function" then
 			return false
 		end
@@ -42,86 +51,55 @@ return function(WindUI, Bootstrap)
 			Checkbox = hex(C.Accent),
 			SliderIcon = hex(C.Muted),
 			PanelBackground = hex(C.Panel),
-			PanelBackgroundTransparency = 0.1,
+			PanelBackgroundTransparency = 0.08,
 			WindowBackground = hex(C.Background),
 			ElementBackground = hex(C.Card),
-			ElementBackgroundTransparency = 0.03,
+			ElementBackgroundTransparency = 0.02,
 			TabBackground = hex(C.Card),
-			TabBackgroundHover = hex(C.CardHover),
-			TabBackgroundHoverTransparency = 0.06,
-			TabBackgroundActive = hex(C.CardHover),
-			TabBackgroundActiveTransparency = 0.02,
+			TabBackgroundHover = hex(C.Card2),
+			TabBackgroundHoverTransparency = 0.04,
+			TabBackgroundActive = hex(C.Card2),
+			TabBackgroundActiveTransparency = 0.01,
 			TabText = hex(C.Text),
-			TabTextTransparency = 0.2,
+			TabTextTransparency = 0.18,
 			TabTextTransparencyActive = 0,
 			TabIcon = hex(C.Accent),
-			TabIconTransparency = 0.3,
-			TabIconTransparencyActive = 0.04,
-			TabBorderTransparency = 0.82,
+			TabIconTransparency = 0.28,
+			TabIconTransparencyActive = 0.03,
+			TabBorderTransparency = 0.78,
 			TabBorder = hex(C.Border),
-			DropdownTabBackground = hex(C.CardHover),
+			DropdownTabBackground = hex(C.Card2),
 			DropdownBackground = hex(C.Panel),
 			LabelBackground = hex(C.Card),
-			LabelBackgroundTransparency = 0.32,
+			LabelBackgroundTransparency = 0.28,
 			SectionBox = hex(C.Card),
-			SectionBoxTransparency = 0.04,
+			SectionBoxTransparency = 0.02,
 			SectionBoxBorder = hex(C.Border),
-			SectionBoxBorderTransparency = 0.5,
-			SectionBoxBackground = hex(C.Card),
-			SectionBoxBackgroundTransparency = 0.06,
+			SectionBoxBorderTransparency = 0.42,
+			SectionBoxBackground = hex(C.Card2),
+			SectionBoxBackgroundTransparency = 0.04,
 			Notification = hex(C.Panel),
 			NotificationTitle = hex(C.Text),
 			NotificationContent = hex(C.Muted),
 			NotificationBorder = hex(C.Border),
-			NotificationBorderTransparency = 0.45,
+			NotificationBorderTransparency = 0.38,
 		}
 		pcall(function() WindUI:AddTheme(palette) end)
 		pcall(function() WindUI:SetTheme(Theme.NAME) end)
+		Theme._registered = true
 		return true
 	end
 
-	local function polishFrame(frame)
-		if typeof(frame) ~= "Instance" or not frame:IsA("GuiObject") then return end
-		if frame:GetAttribute("AlleralPolished") then return end
-		frame:SetAttribute("AlleralPolished", true)
-		frame:SetAttribute("AlleralBaseTrans", frame.BackgroundTransparency)
-
-		if not frame:FindFirstChildOfClass("UICorner") then
-			local corner = Instance.new("UICorner")
-			corner.CornerRadius = UDim.new(0, 12)
-			corner.Parent = frame
-		end
-
-		local stroke = frame:FindFirstChildOfClass("UIStroke")
-		if not stroke then
-			stroke = Instance.new("UIStroke")
-			stroke.Parent = frame
-		end
-		stroke.Color = hex(C.Border)
-		stroke.Transparency = 0.55
-		stroke.Thickness = 1
-	end
-
 	function Theme.applyToWindow(windWindow)
-		if not windWindow then return end
+		if not windWindow then
+			return
+		end
 		pcall(function()
 			if windWindow.SetPanelBackground then
 				windWindow:SetPanelBackground(true)
 			end
 			if windWindow.HidePanelBackground ~= nil then
 				windWindow.HidePanelBackground = false
-			end
-		end)
-
-		pcall(function()
-			local root = windWindow.UIElements and windWindow.UIElements.Main
-				or windWindow.Main
-				or windWindow.Frame
-			if typeof(root) ~= "Instance" then return end
-			for _, desc in ipairs(root:GetDescendants()) do
-				if desc:IsA("Frame") and (desc.Name:lower():find("section") or desc.Name:lower():find("group") or desc.Name:lower():find("card")) then
-					polishFrame(desc)
-				end
 			end
 		end)
 	end

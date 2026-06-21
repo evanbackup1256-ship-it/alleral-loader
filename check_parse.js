@@ -17,6 +17,8 @@ const files = [
     'hub/ui/windui/Text.luau',
     'hub/ui/windui/Theme.luau',
     'hub/ui/windui/Motion.luau',
+    'hub/ui/windui/Guards.luau',
+    'hub/ui/windui/Validate.luau',
 ];
 
 function getLineCol(src, pos) {

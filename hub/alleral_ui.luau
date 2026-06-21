@@ -1,4 +1,4 @@
--- Alleral UI layer — v11.0.1 WindUI (sole framework)
+-- Alleral UI layer — v11.1.0 WindUI (sole framework)
 --[[
 	WindUI bootstrap — https://github.com/Footagesus/WindUI
 	No Noble, Fusion, Spr, Linoria, or legacy renderers.
@@ -10,8 +10,8 @@
 	  GITHUB_RAW remote fallback via Core.httpGet
 ]]
 return function(Core)
-	Core.ALLERAL_UI_VERSION = "11.0.1"
-	Core.UI_VERSION = "11.0.1"
+	Core.ALLERAL_UI_VERSION = "11.1.0"
+	Core.UI_VERSION = "11.1.0"
 	Core.UI_LIBRARY = "WindUI"
 
 	local GITHUB_RAW = "https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main"
@@ -25,7 +25,7 @@ return function(Core)
 	end)()
 
 	local getGenv = getgenv or function() return ENV end
-	local WINDUI_CACHE_VERSION = "11.0.1"
+	local WINDUI_CACHE_VERSION = "11.1.0"
 	getGenv()._NobleV8Modules = nil
 	getGenv()._NobleV8CacheVersion = nil
 	getGenv()._NobleV10Modules = nil
@@ -268,15 +268,36 @@ return function(Core)
 			return base .. "_" .. s
 		end
 
-		local function wc(as, m)
+		local function wc(_as, m)
 			m = type(m) == "table" and m or {}
-			local w = {}
+			local w = { _busy = false }
 			function w:Set(v)
-				if type(v) == "table" then
-					as(v)
-				else
-					as({ CurrentValue = v })
+				if w._busy then
+					return
 				end
+				w._busy = true
+				local raw = m.raw
+				if raw then
+					local val = v
+					if type(v) == "table" then
+						val = v.CurrentValue or v.Value or v.CurrentOption or v
+					end
+					if m.kind == "toggle" then
+						val = val == true
+					elseif m.kind == "slider" then
+						val = tonumber(val) or 0
+					elseif m.kind == "input" then
+						val = tostring(val or "")
+					end
+					if raw.SetValueSilent then
+						raw:SetValueSilent(nil, val)
+					elseif raw.SetValue then
+						raw:SetValue(nil, val)
+					elseif raw.Set then
+						raw:Set(nil, val)
+					end
+				end
+				w._busy = false
 			end
 			if m.bindKey and Core and type(Core.bindUiState) == "function" then
 				Core.bindUiState(m.bindKey, w, m.kind or "toggle", m.raw)
@@ -803,8 +824,6 @@ return function(Core)
 				local raw = type(window) == "table" and (window._rawWindow or window) or nil
 				if raw and type(raw.Validate) == "function" then
 					raw:Validate()
-				elseif Bootstrap and type(Bootstrap.runValidation) == "function" then
-					Bootstrap.runValidation(STATE.gameId, STATE.tabCount)
 				end
 			end)
 		end)
@@ -944,5 +963,5 @@ return function(Core)
 	Core._NobleV10 = nil
 	Core._NobleV8 = nil
 
-	log("INFO", "Alleral WindUI v11.0.1 — sole UI framework loaded")
+	log("INFO", "Alleral WindUI v11.1.0 — sole UI framework loaded")
 end

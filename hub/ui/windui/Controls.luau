@@ -1,13 +1,11 @@
--- Alleral V11 — WindUI control builders (premium spacing + sanitized text)
-return function(Bootstrap, Motion, Text)
+-- Alleral V11.1 — WindUI control builders (compact, guarded, no empty rows)
+return function(Bootstrap, Motion, Text, Guards)
 	local Controls = {}
 	Text = Text or Bootstrap
+	Guards = Guards or { wrap = function(fn) return fn or function() end end }
 
 	local LAYOUT = {
-		SECTION_GAP = 18,
-		CONTROL_GAP = 12,
-		SLIDER_WIDTH = 240,
-		ROW_HEIGHT = 48,
+		SLIDER_WIDTH = 220,
 	}
 
 	local function stub()
@@ -16,56 +14,101 @@ return function(Bootstrap, Motion, Text)
 			SetText = function() end,
 			SetVisible = function() end,
 			SetValue = function() end,
+			SetValueSilent = function() end,
 			Refresh = function() end,
 		}
 	end
 
-	local function wrapElement(el, kind)
-		if not el then return stub() end
-		if Motion then
-			if kind == "button" then
-				pcall(function() Motion.bindHover(el, { hoverScale = 1.02, pressScale = 0.97, brighten = true }) end)
-			elseif kind == "toggle" or kind == "dropdown" then
-				pcall(function() Motion.bindHover(el, { hoverScale = 1.01, pressScale = 0.98, brighten = false }) end)
+	local function shouldSkipText(text)
+		text = Bootstrap.sanitize(text, 200)
+		return text == "" or text == "--" or text == "—"
+	end
+
+	local function wrapElement(el, kind, flag)
+		if not el then
+			return stub()
+		end
+		if Motion and kind == "button" then
+			pcall(function()
+				Motion.bindHover(el, { hoverScale = 1.02, pressScale = 0.97 })
+			end)
+		end
+
+		local api = { _raw = el, _kind = kind, _setting = false }
+
+		function api:SetValueSilent(_, v)
+			if api._setting then
+				return
 			end
+			api._setting = true
+			Guards.silentSet(el, v, kind)
+			pcall(function()
+				if el.SetValue then
+					el:SetValue(v)
+				elseif el.Set then
+					local prev = el.Callback
+					el.Callback = function() end
+					el:Set(v)
+					el.Callback = prev
+				end
+			end)
+			api._setting = false
 		end
-		local api = {}
+
 		function api:SetValue(_, v)
+			if api._setting or Guards.isSilent(flag or kind) then
+				return api:SetValueSilent(nil, v)
+			end
+			api._setting = true
 			pcall(function()
-				if el.Set then el:Set(v)
-				elseif el.SetValue then el:SetValue(v) end
+				if el.Set then
+					el:Set(v)
+				elseif el.SetValue then
+					el:SetValue(v)
+				end
 			end)
+			api._setting = false
 		end
-		function api:Set(_, v) api:SetValue(nil, v) end
+
+		function api:Set(_, v)
+			api:SetValue(nil, v)
+		end
+
 		function api:SetText(_, t)
+			local clean = Bootstrap.sanitize(t, 200)
+			if shouldSkipText(clean) then
+				return
+			end
 			pcall(function()
-				local clean = Bootstrap.sanitize(t, 200)
-				if el.Set then el:Set(clean)
-				elseif el.SetTitle then el:SetTitle(clean) end
+				if el.Set then
+					el:Set(clean)
+				elseif el.SetTitle then
+					el:SetTitle(clean)
+				end
 			end)
 		end
+
 		function api:SetVisible() end
+
 		function api:Refresh(_, values)
 			pcall(function()
-				if el.Refresh then el:Refresh(Text.sanitizeList and Text.sanitizeList(values) or values) end
+				if el.Refresh then
+					el:Refresh(Text.sanitizeList and Text.sanitizeList(values) or values)
+				end
 			end)
 		end
-		api._raw = el
-		api._kind = kind
+
 		return api
 	end
 
-	local function addSpace(box)
-		pcall(function()
-			if type(box.Space) == "function" then
-				box:Space({ Columns = 1 })
-			end
-		end)
-	end
-
 	function Controls.createGroup(section, groupName)
-		if not section then return nil end
+		if not section then
+			return nil
+		end
 		groupName = Bootstrap.sanitize(groupName, 64)
+		if groupName == "" then
+			return nil
+		end
 
 		local box = section
 		if type(section.Section) == "function" then
@@ -76,7 +119,6 @@ return function(Bootstrap, Motion, Text)
 					Box = true,
 					BoxBorder = true,
 					Opened = true,
-					FontWeight = "SemiBold",
 				})
 			end)
 			if ok and created then
@@ -84,10 +126,20 @@ return function(Bootstrap, Motion, Text)
 			end
 		end
 
-		local group = {}
+		local group = { _controlCount = 0 }
+
+		local function track(el, kind, flag)
+			if el then
+				group._controlCount = group._controlCount + 1
+			end
+			return wrapElement(el, kind, flag)
+		end
 
 		function group:AddLabel(text)
 			text = Bootstrap.sanitize(text, 200)
+			if shouldSkipText(text) then
+				return stub()
+			end
 			local el
 			pcall(function()
 				if type(box.Paragraph) == "function" then
@@ -95,67 +147,69 @@ return function(Bootstrap, Motion, Text)
 						Title = text,
 						Desc = "",
 					})
-				elseif type(box.Section) == "function" then
-					el = box:Section({
-						Title = text,
-						TextSize = 13,
-						TextTransparency = 0.2,
-					})
 				end
 			end)
-			addSpace(box)
-			return wrapElement(el, "label")
+			return track(el, "label", text)
 		end
 
 		function group:AddDivider()
-			addSpace(box)
 			return {}
 		end
 
 		function group:AddToggle(flag, props)
 			props = type(props) == "table" and props or {}
 			local title = Bootstrap.sanitize(props.Text or flag or "Toggle", 80)
+			if shouldSkipText(title) then
+				return stub()
+			end
+			local flagKey = Bootstrap.sanitize(flag or title, 48)
 			local el
 			pcall(function()
 				el = box:Toggle({
-					Flag = Bootstrap.sanitize(flag or title, 48),
+					Flag = flagKey,
 					Title = title,
-					Desc = Bootstrap.sanitize(props.Tooltip or props.Description or "", 120),
+					Desc = Bootstrap.sanitize(props.Tooltip or props.Description or "", 100),
 					Value = props.Default == true,
-					Callback = props.Callback or function() end,
+					Callback = Guards.wrap(props.Callback or function() end, "toggle:" .. flagKey),
 				})
 			end)
-			addSpace(box)
-			return wrapElement(el, "toggle")
+			return track(el, "toggle", flagKey)
 		end
 
 		function group:AddButton(props)
 			props = type(props) == "table" and props or {}
+			local title = Bootstrap.sanitize(props.Text or "Button", 80)
+			if shouldSkipText(title) then
+				return stub()
+			end
 			local el
 			pcall(function()
 				el = box:Button({
-					Title = Bootstrap.sanitize(props.Text or "Button", 80),
-					Desc = Bootstrap.sanitize(props.Tooltip or "", 120),
+					Title = title,
+					Desc = Bootstrap.sanitize(props.Tooltip or "", 100),
 					Color = Color3.fromHex("#8B5CF6"),
 					Justify = "Center",
-					Callback = props.Func or props.Callback or function() end,
+					Callback = Guards.wrap(props.Func or props.Callback or function() end, "button:" .. title),
 				})
 			end)
-			addSpace(box)
-			return wrapElement(el, "button")
+			return track(el, "button", title)
 		end
 
 		function group:AddSlider(flag, props)
 			props = type(props) == "table" and props or {}
+			local title = Bootstrap.sanitize(props.Text or flag or "Slider", 80)
+			if shouldSkipText(title) then
+				return stub()
+			end
 			local minV = tonumber(props.Min) or 0
 			local maxV = tonumber(props.Max) or 100
 			local defV = tonumber(props.Default) or minV
-			local suffix = Bootstrap.sanitize(props.Suffix or "", 16)
+			local flagKey = Bootstrap.sanitize(flag or title, 48)
 			local el
 			pcall(function()
 				el = box:Slider({
-					Flag = Bootstrap.sanitize(flag or props.Text or "slider", 48),
-					Title = Bootstrap.sanitize(props.Text or flag or "Slider", 80),
+					Flag = flagKey,
+					Title = title,
 					Desc = Bootstrap.sanitize(props.Tooltip or "", 100),
 					Step = tonumber(props.Rounding) or 1,
 					Width = LAYOUT.SLIDER_WIDTH,
@@ -168,41 +222,43 @@ return function(Bootstrap, Motion, Text)
 						Default = defV,
 						DisplayMethod = "Value",
 					},
-					Callback = props.Callback or function() end,
+					Callback = Guards.wrap(props.Callback or function() end, "slider:" .. flagKey),
 				})
 			end)
-			if suffix ~= "" and el and type(box.Section) == "function" then
-				pcall(function()
-					box:Section({
-						Title = "",
-						TextSize = 11,
-					})
-				end)
-			end
-			addSpace(box)
-			return wrapElement(el, "slider")
+			return track(el, "slider", flagKey)
 		end
 
 		function group:AddInput(flag, props)
 			props = type(props) == "table" and props or {}
+			local title = Bootstrap.sanitize(props.Text or flag or "Input", 80)
+			if shouldSkipText(title) then
+				return stub()
+			end
+			local flagKey = Bootstrap.sanitize(flag or title, 48)
 			local el
 			pcall(function()
 				el = box:Input({
-					Flag = Bootstrap.sanitize(flag or props.Text or "input", 48),
-					Title = Bootstrap.sanitize(props.Text or flag or "Input", 80),
+					Flag = flagKey,
+					Title = title,
 					Desc = Bootstrap.sanitize(props.Tooltip or "", 100),
 					Value = Bootstrap.sanitize(props.Default or "", 120),
 					Placeholder = Bootstrap.sanitize(props.Placeholder or "Enter...", 80),
-					Callback = props.Callback or function() end,
+					Callback = Guards.wrap(props.Callback or function() end, "input:" .. flagKey),
 				})
 			end)
-			addSpace(box)
-			return wrapElement(el, "input")
+			return track(el, "input", flagKey)
 		end
 
 		function group:AddDropdown(flag, props)
 			props = type(props) == "table" and props or {}
 			local values = Text.sanitizeList and Text.sanitizeList(props.Values or props.Options or {}) or (props.Values or props.Options or {})
+			if #values < 1 then
+				return stub()
+			end
+			local title = Bootstrap.sanitize(props.Text or flag or "Dropdown", 80)
+			if shouldSkipText(title) then
+				return stub()
+			end
 			local defaultVal = props.Default
 			if type(defaultVal) == "string" then
 				defaultVal = Bootstrap.sanitize(defaultVal, 80)
@@ -211,29 +267,33 @@ return function(Bootstrap, Motion, Text)
 			else
 				defaultVal = Bootstrap.sanitize(values[1] or "", 80)
 			end
+			local flagKey = Bootstrap.sanitize(flag or title, 48)
 			local el
 			pcall(function()
 				el = box:Dropdown({
-					Flag = Bootstrap.sanitize(flag or props.Text or "dropdown", 48),
-					Title = Bootstrap.sanitize(props.Text or flag or "Dropdown", 80),
+					Flag = flagKey,
+					Title = title,
 					Desc = Bootstrap.sanitize(props.Tooltip or "", 100),
 					Values = values,
 					Value = defaultVal,
 					Multi = props.Multi == true,
-					Callback = props.Callback or function() end,
+					Callback = Guards.wrap(props.Callback or function() end, "dropdown:" .. flagKey),
 				})
 			end)
 			if #values > 8 and el then
 				pcall(function()
-					if el.SetSearchable then el:SetSearchable(true) end
+					if el.SetSearchable then
+						el:SetSearchable(true)
+					end
 				end)
 			end
-			addSpace(box)
-			local w = wrapElement(el, "dropdown")
+			local w = track(el, "dropdown", flagKey)
 			function w:Refresh(_, newValues)
 				pcall(function()
 					local clean = Text.sanitizeList and Text.sanitizeList(newValues) or newValues
-					if el and el.Refresh then el:Refresh(clean or values) end
+					if el and el.Refresh and type(clean) == "table" and #clean > 0 then
+						el:Refresh(clean)
+					end
 				end)
 			end
 			return w

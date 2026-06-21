@@ -1,5 +1,5 @@
--- Alleral V11 — WindUI window shell (premium layout)
-return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion)
+-- Alleral V11.1 — WindUI window shell (guarded, validated)
+return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate)
 	local WindowMod = {}
 
 	function WindowMod.create(settings, state)
@@ -25,13 +25,13 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion)
 				HideSearchBar = false,
 				Transparent = true,
 				Acrylic = true,
-				Size = settings.Size or UDim2.fromOffset(1200, 740),
+				Size = settings.Size or UDim2.fromOffset(1180, 700),
 				OpenButton = { Enabled = false },
 				Topbar = {
-					Height = 48,
+					Height = 44,
 					ButtonsType = "Mac",
 				},
-				SideBarWidth = 244,
+				SideBarWidth = 232,
 			})
 		end)
 		if not ok or not windWindow then
@@ -51,7 +51,9 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion)
 			pcall(function() Motion.openWindow(WindUI) end)
 		end
 		pcall(function()
-			if WindUI.ToggleAcrylic then WindUI:ToggleAcrylic(true) end
+			if WindUI.ToggleAcrylic then
+				WindUI:ToggleAcrylic(true)
+			end
 		end)
 
 		local self = {
@@ -63,6 +65,7 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion)
 			_keybind = keybind,
 			_settings = settings,
 			_gameId = Bootstrap.resolveGameId(),
+			_validated = false,
 		}
 
 		function self:SetTheme(name)
@@ -103,11 +106,17 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion)
 		end
 
 		function self:Toggle()
-			if self._hidden then self:Show() else self:Hide() end
+			if self._hidden then
+				self:Show()
+			else
+				self:Hide()
+			end
 		end
 
 		function self:selectTab(tab)
-			if self._activeTab == tab then return end
+			if self._activeTab == tab then
+				return
+			end
 			self._activeTab = tab
 			pcall(function()
 				if tab and tab._windTab and tab._windTab.Select then
@@ -118,6 +127,9 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion)
 
 		function self:AddTab(name, iconId, _columns)
 			name = Bootstrap.sanitize(name, 48)
+			if name == "" then
+				return nil
+			end
 			local icon = Bootstrap.mapIcon(iconId)
 
 			local windTab
@@ -128,7 +140,6 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion)
 					IconColor = Color3.fromHex("#8B5CF6"),
 					Border = true,
 					Desc = "",
-					FontWeight = "Medium",
 				})
 			end)
 			if not windTab then
@@ -145,6 +156,7 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion)
 			}
 
 			function tab:AddLeftGroupbox(groupName)
+				state.groupCount = (state.groupCount or 0) + 1
 				return Controls.createGroup(windTab, groupName)
 			end
 			tab.AddRightGroupbox = tab.AddLeftGroupbox
@@ -154,7 +166,9 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion)
 			state.tabCount = (state.tabCount or 0) + 1
 
 			if #self._tabs == 1 then
-				task.defer(function() self:selectTab(tab) end)
+				task.defer(function()
+					self:selectTab(tab)
+				end)
 			end
 
 			return tab
@@ -172,6 +186,9 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion)
 		end
 
 		function self:Unload()
+			if Motion and Motion.cleanup then
+				pcall(Motion.cleanup)
+			end
 			pcall(function()
 				if self._wind.Destroy then
 					self._wind:Destroy()
@@ -184,8 +201,20 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion)
 		end
 
 		function self:Validate()
-			Bootstrap.runValidation(self._gameId, #self._tabs)
-			return #self._tabs > 0
+			if self._validated then
+				return true
+			end
+			local passed = true
+			if Validate and Validate.run then
+				passed = select(1, Validate.run(self, state))
+			elseif #self._tabs < 1 or (state.controls or 0) < 1 then
+				passed = false
+			end
+			if passed then
+				Bootstrap.runValidation()
+				self._validated = true
+			end
+			return passed
 		end
 
 		pcall(function()

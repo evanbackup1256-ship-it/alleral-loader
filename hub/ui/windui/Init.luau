@@ -1,17 +1,20 @@
--- Alleral V11 — WindUI framework entry (sole UI stack)
+-- Alleral V11.1 — WindUI framework entry (sole UI stack)
 return function(loadModule, Core)
 	local Text = loadModule("Text")()
+	local Guards = loadModule("Guards")()
 	local Bootstrap = loadModule("Bootstrap")(Core, Text)
 	local WindUI = Bootstrap.loadWindUI()
 	local Theme = loadModule("Theme")(WindUI, Bootstrap)
 	local Motion = loadModule("Motion")()
+	local Validate = loadModule("Validate")(Bootstrap)
 	local Notifications = loadModule("Notifications")(WindUI, Bootstrap)
-	local Controls = loadModule("Controls")(Bootstrap, Motion, Text)
-	local WindowMod = loadModule("Window")(WindUI, Bootstrap, Controls, Notifications, Theme, Motion)
+	local Controls = loadModule("Controls")(Bootstrap, Motion, Text, Guards)
+	local WindowMod = loadModule("Window")(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate)
 	local Configs = loadModule("Configs")(Bootstrap)
 	local Tabs = loadModule("Tabs")()
 
 	pcall(function() Theme.register() end)
+	pcall(function() Motion.logPerformance() end)
 
 	local STATE = {
 		tabCount = 0,
@@ -64,7 +67,9 @@ return function(loadModule, Core)
 	end
 
 	function Library:Notify(text, dur)
-		if type(text) == "table" then return Library:Notification(text) end
+		if type(text) == "table" then
+			return Library:Notification(text)
+		end
 		return Notifications.push(WindUI, "Alleral", text, "info", dur or 4)
 	end
 
@@ -74,13 +79,15 @@ return function(loadModule, Core)
 
 	function Library:SetTheme(name)
 		pcall(function()
-			if WindUI.SetTheme then WindUI:SetTheme(Bootstrap.sanitize(name, 32)) end
+			if WindUI.SetTheme then
+				WindUI:SetTheme(Bootstrap.sanitize(name, 32))
+			end
 		end)
 	end
 
 	function Library:GetLayoutInfo()
 		return {
-			profile = "windui-v11-premium",
+			profile = "windui-v11.1-premium",
 			engine = Bootstrap.ENGINE,
 			version = Bootstrap.VERSION,
 			stack = "WindUI",
@@ -103,6 +110,8 @@ return function(loadModule, Core)
 		Text = Text,
 		Theme = Theme,
 		Motion = Motion,
+		Guards = Guards,
+		Validate = Validate,
 		Configs = Configs,
 		Tabs = Tabs,
 		WindUI = WindUI,
