@@ -23,6 +23,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY relay/telemetry_relay.py relay/security.py relay/script_registry.py relay/ban_registry.py relay/site_registry.py relay/roblox_api.py relay/weao_api.py relay/auto_sync.py relay/manage_backend.py relay/loader_builder.py ./
 COPY bootstrap.luau loader.luau ./loader_src/
 COPY hub/core_base.luau hub/core_ui.luau hub/alleral_ui.luau hub/core_hub_ui.luau ./loader_src/hub/
+COPY hub/ui/noble ./loader_src/hub/ui/noble/
 COPY cfg/release.json ./loader_src/cfg/release.json
 COPY --from=site-build /site/out ./site
 RUN if [ -f /app/site/index.html ]; then mv /app/site/index.html /app/site/app.html; fi

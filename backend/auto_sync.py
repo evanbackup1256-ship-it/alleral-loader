@@ -48,6 +48,17 @@ LOADER_SOURCE_FILES = (
     "hub/core_ui.luau",
     "hub/alleral_ui.luau",
     "hub/core_hub_ui.luau",
+    "hub/ui/noble/init.luau",
+    "hub/ui/noble/Theme.luau",
+    "hub/ui/noble/Util.luau",
+    "hub/ui/noble/Fusion.luau",
+    "hub/ui/noble/Components.luau",
+    "hub/ui/noble/Vendor/Spr.luau",
+    "hub/ui/noble/Vendor/Janitor.luau",
+    "hub/ui/noble/Vendor/Signal.luau",
+    "hub/ui/noble/Systems/Window.luau",
+    "hub/ui/noble/Systems/Search.luau",
+    "hub/ui/noble/Systems/NotificationManager.luau",
     "cfg/release.json",
 )
 

@@ -1,0 +1,55 @@
+const fs = require('fs');
+const path = require('path');
+const luaparse = require(process.cwd() + '/node_modules/luaparse/luaparse.js');
+
+const files = [
+    'hub/alleral_ui.luau',
+    'hub/core_ui.luau',
+    'hub/core_hub_ui.luau',
+    'hub/core_base.luau',
+    'hub/ui/noble/init.luau',
+    'hub/ui/noble/Theme.luau',
+    'hub/ui/noble/Util.luau',
+    'hub/ui/noble/Fusion.luau',
+    'hub/ui/noble/Components.luau',
+    'hub/ui/noble/Vendor/Spr.luau',
+    'hub/ui/noble/Vendor/Janitor.luau',
+    'hub/ui/noble/Vendor/Signal.luau',
+    'hub/ui/noble/Systems/Window.luau',
+    'hub/ui/noble/Systems/Search.luau',
+    'hub/ui/noble/Systems/NotificationManager.luau',
+];
+
+function getLineCol(src, pos) {
+    const before = src.substring(0, pos);
+    const line = (before.match(/\n/g) || []).length + 1;
+    const lastNL = before.lastIndexOf('\n');
+    return { line, col: pos - lastNL };
+}
+
+let ok = true;
+for (const relPath of files) {
+    const filepath = path.resolve(process.cwd(), relPath);
+    try {
+        const src = fs.readFileSync(filepath, 'utf8');
+        try {
+            luaparse.parse(src, { luaVersion: '5.1', comments: false, scope: false });
+            console.log('[PASS] ' + relPath);
+        } catch (err) {
+            ok = false;
+            const loc = getLineCol(src, err.index || 0);
+            const lines = src.split('\n');
+            const l = loc.line - 1;
+            console.log('[FAIL] ' + relPath + ' line ' + loc.line + ': ' + err.message);
+            for (let j = Math.max(0, l-2); j <= Math.min(lines.length-1, l+2); j++) {
+                const marker = j === l ? '>>>' : '   ';
+                let text = lines[j];
+                if (text.length > 150) text = text.substring(0, 150) + '...';
+                console.log('  ' + marker + ' ' + (j+1) + ': ' + text);
+            }
+        }
+    } catch (e) {
+        console.log('[SKIP] ' + relPath + ' - ' + e.message);
+    }
+}
+console.log(ok ? '\nAll files pass' : '\nFAILED');
