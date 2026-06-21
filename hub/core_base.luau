@@ -305,6 +305,21 @@ function Core.getUiRuntime()
 	return ui.Library or ui.Alleral
 end
 
+local NOTIFY_DEBOUNCE = {}
+
+local function safeNotifyText(value, maxLen)
+	if value == nil then return "" end
+	local text = tostring(value)
+	text = text:gsub("[%c]", " ")
+	text = text:gsub("(stack overflow%s*)+", "stack overflow ")
+	text = text:gsub("(%s%s+)", " ")
+	maxLen = tonumber(maxLen) or 240
+	if #text > maxLen then
+		text = string.sub(text, 1, maxLen - 3) .. "..."
+	end
+	return text
+end
+
 local function notificationValue(value)
 	if value == nil then return "" end
 	if type(value) == "table" then
@@ -314,7 +329,7 @@ local function notificationValue(value)
 			end
 		end
 	end
-	return tostring(value)
+	return safeNotifyText(value, 2000)
 end
 
 function Core.normalizeNotificationPayload(payload)
@@ -391,12 +406,19 @@ function Core.notifyBootReady(settings)
 end
 
 function Core.notify(title, text, duration, notifyType)
-	title = notificationValue(title)
+	title = safeNotifyText(notificationValue(title), 80)
 	if title == "" then title = "Alleral" end
-	text = notificationValue(text)
+	text = safeNotifyText(notificationValue(text), 240)
 	duration = tonumber(duration) or 4
-	notifyType = notificationValue(notifyType)
+	notifyType = safeNotifyText(notificationValue(notifyType), 32)
 	if notifyType == "" then notifyType = "info" end
+
+	local debounceKey = title .. "|" .. text
+	local now = tick()
+	if NOTIFY_DEBOUNCE[debounceKey] and now - NOTIFY_DEBOUNCE[debounceKey] < 5 then
+		return
+	end
+	NOTIFY_DEBOUNCE[debounceKey] = now
 
 	local payload = {
 		Title = title,

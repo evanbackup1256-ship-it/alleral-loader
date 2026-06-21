@@ -263,10 +263,14 @@ return function(Core)
 
 	Core.notifyBootReady = Core.notifyBootReady or function(info)
 		info = type(info) == "table" and info or {}
+		local title = tostring(info.Name or "Alleral")
+		if #title > 80 then title = title:sub(1, 77) .. "..." end
+		local body = info.Subtitle and tostring(info.Subtitle) or "Ready"
+		if #body > 240 then body = body:sub(1, 237) .. "..." end
 		pcall(function()
 			StarterGui:SetCore("SendNotification", {
-				Title = info.Name or "Alleral",
-				Text = (info.Subtitle and ("v" .. tostring(info.Subtitle)) or "Ready"),
+				Title = title,
+				Text = body,
 				Duration = 2,
 			})
 		end)

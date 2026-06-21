@@ -90,10 +90,20 @@ return function(deps)
 		for id in pairs(self._entries) do self:dismiss(id) end
 	end
 
+	local function safeText(text, maxLen)
+		text = Util.textOf(text)
+		text = text:gsub("[%c]", " ")
+		maxLen = tonumber(maxLen) or 240
+		if #text > maxLen then
+			text = string.sub(text, 1, maxLen - 3) .. "..."
+		end
+		return text
+	end
+
 	function NotificationManager:push(title, body, ntype, duration)
-		title = Util.textOf(title)
+		title = safeText(title, 80)
 		if title == "" then title = "Notification" end
-		body = Util.textOf(body)
+		body = safeText(body, 240)
 		duration = math.max(1, num(duration, 4, "duration"))
 
 		local meta = NOTIF_TYPES[type(ntype) == "string" and ntype:lower() or "info"] or NOTIF_TYPES.info

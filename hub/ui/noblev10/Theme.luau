@@ -1,6 +1,6 @@
 -- Alleral Noble V10 — design tokens (EXE-6 desktop-first)
 local Theme = {
-	VERSION = "10.0.1",
+	VERSION = "10.0.2",
 	ENGINE = "Alleral Noble V10",
 
 	GRID = 8,

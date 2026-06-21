@@ -286,8 +286,9 @@ return function(deps)
 		local groupPath = (ctx.tabName or "Tab") .. " / " .. tostring(title or "Group")
 
 		local function registerControl(label, action)
-			if ctx.search and type(ctx.search.register) == "function" then
-				ctx.search:register({
+			if ctx.search and type(ctx.search.registerEntry) == "function" then
+				pcall(ctx.search.registerEntry, ctx.search, {
+					id = groupPath .. "::" .. Util.textOf(label),
 					label = label,
 					path = groupPath,
 					keywords = groupPath .. " " .. Util.textOf(label),
@@ -683,25 +684,26 @@ return function(deps)
 			Parent = topBar,
 		})
 
-		local closeBtn = Util.make("TextButton", {
-			Size = UDim2.fromOffset(28, 28),
-			Position = UDim2.new(1, -winPad - 4, 0.5, -14),
-			BackgroundColor3 = Theme.COLOR.Surface2,
-			BorderSizePixel = 0,
-			Text = "✕",
-			TextColor3 = Theme.COLOR.TextMuted,
-			Font = Theme.FONT_BOLD,
-			TextSize = 14,
-			AutoButtonColor = false,
+		local controlsWrap = Util.make("Frame", {
+			Name = "WindowControls",
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -12, 0.5, 0),
+			Size = UDim2.fromOffset(84, 40),
+			BackgroundTransparency = 1,
 			ZIndex = 12,
 			Parent = topBar,
 		})
-		Util.corner(closeBtn, Theme.RADIUS.Button)
-		local closeScale = Util.scale(closeBtn)
+		Util.make("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Right,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			Padding = UDim.new(0, 8),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Parent = controlsWrap,
+		})
 
 		local miniBtn = Util.make("TextButton", {
-			Size = UDim2.fromOffset(28, 28),
-			Position = UDim2.new(1, -winPad - 36, 0.5, -14),
+			Size = UDim2.fromOffset(36, 36),
 			BackgroundColor3 = Theme.COLOR.Surface1,
 			BorderSizePixel = 0,
 			Text = "–",
@@ -709,11 +711,28 @@ return function(deps)
 			Font = Theme.FONT_BOLD,
 			TextSize = 16,
 			AutoButtonColor = false,
+			LayoutOrder = 1,
 			ZIndex = 12,
-			Parent = topBar,
+			Parent = controlsWrap,
 		})
 		Util.corner(miniBtn, Theme.RADIUS.Button)
 		local miniScale = Util.scale(miniBtn)
+
+		local closeBtn = Util.make("TextButton", {
+			Size = UDim2.fromOffset(36, 36),
+			BackgroundColor3 = Theme.COLOR.Surface2,
+			BorderSizePixel = 0,
+			Text = "✕",
+			TextColor3 = Theme.COLOR.TextMuted,
+			Font = Theme.FONT_BOLD,
+			TextSize = 14,
+			AutoButtonColor = false,
+			LayoutOrder = 2,
+			ZIndex = 12,
+			Parent = controlsWrap,
+		})
+		Util.corner(closeBtn, Theme.RADIUS.Button)
+		local closeScale = Util.scale(closeBtn)
 
 		closeBtn.MouseEnter:Connect(function()
 			Util.safeSprTarget(closeScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 1.04 })
@@ -739,15 +758,15 @@ return function(deps)
 
 		local tabStrip = Util.make("ScrollingFrame", {
 			Name = "TabStrip",
-			Size = UDim2.new(1, -(sideW + winPad * 3), 0, tabH + 4),
+			Size = UDim2.new(1, -(sideW + winPad * 3 + 100), 0, tabH + 4),
 			Position = UDim2.new(0, sideW + winPad * 2, 0, topH + 6),
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			ScrollBarThickness = 0,
+			ScrollBarThickness = 4,
 			CanvasSize = UDim2.new(0, 0, 0, 0),
 			AutomaticCanvasSize = Enum.AutomaticSize.X,
 			ScrollingDirection = Enum.ScrollingDirection.X,
-			ClipsDescendants = true,
+			ClipsDescendants = false,
 			ZIndex = 8,
 			Parent = main,
 		})
@@ -839,7 +858,7 @@ return function(deps)
 			Size = UDim2.new(0.22, 0, 1, 0),
 			Position = UDim2.new(0, 14, 0, 0),
 			BackgroundTransparency = 1,
-			Text = "● UI Ready",
+			Text = "● Building UI…",
 			TextColor3 = Theme.COLOR.GREEN,
 			Font = Theme.FONT_BOLD,
 			TextSize = Theme.TEXT_SM,
@@ -889,22 +908,35 @@ return function(deps)
 		self._dropLayer = dropLayer
 		self._dropdownManager = dropdownManager
 		self._statusBar = statusBar
+		self._statusLeft = statusLeft
 		self._keybindLabel = keybindLabel
 
 		sidebar.CanvasPosition = Vector2.new(0, 0)
 		tabStrip.CanvasPosition = Vector2.new(0, 0)
 
-		-- Search overlay (optional dep passed via settings.Search factory)
+		-- Search overlay (optional — must not break UI if init fails)
+		self._searchFailed = false
 		if settings.Search and type(settings.Search.new) == "function" then
-			self._search = settings.Search.new({
-				parent = screen,
-				keybind = settings.SearchKeybind or Theme.SEARCH_KEY or Enum.KeyCode.K,
-				modifiers = settings.SearchModifiers or { Ctrl = true },
-			})
-			if settings.Search.setInstance then
-				settings.Search.setInstance(self._search)
+			local searchOk, searchInst = pcall(function()
+				return settings.Search.new({
+					parent = screen,
+					keybind = settings.SearchKeybind or Theme.SEARCH_KEY or Enum.KeyCode.K,
+					modifiers = settings.SearchModifiers or { Ctrl = true },
+				})
+			end)
+			if searchOk and searchInst then
+				self._search = searchInst
+				if settings.Search.setInstance then
+					pcall(settings.Search.setInstance, searchInst)
+				end
+				self._janitor:Add(self._search, "Destroy")
+			else
+				self._searchFailed = true
+				if not self._searchWarned then
+					self._searchWarned = true
+					warn("[Alleral V10] Search disabled — init failed")
+				end
 			end
-			self._janitor:Add(self._search, "Destroy")
 		end
 
 		local function styleTab(tab, active)
@@ -966,6 +998,84 @@ return function(deps)
 			styleTab(tab, true)
 			self._activeTab = tab
 			self.TabSelected:Fire(tab)
+			if self._tabStrip and tab._topBtn then
+				task.defer(function()
+					pcall(function()
+						local strip = self._tabStrip
+						local btn = tab._topBtn
+						if strip and btn and btn.Parent == strip then
+							local cx = btn.AbsolutePosition.X - strip.AbsolutePosition.X
+							local cw = strip.AbsoluteSize.X
+							local bw = btn.AbsoluteSize.X
+							if cx < strip.CanvasPosition.X then
+								strip.CanvasPosition = Vector2.new(math.max(0, cx - 8), 0)
+							elseif cx + bw > strip.CanvasPosition.X + cw then
+								strip.CanvasPosition = Vector2.new(cx + bw - cw + 8, 0)
+							end
+						end
+					end)
+				end)
+			end
+		end
+
+		function self:selectFirstTabWithContent()
+			local firstWithContent, firstAny
+			for _, tab in ipairs(self._tabs) do
+				if not firstAny then firstAny = tab end
+				if Validation and Validation.tabHasContent(tab) then
+					firstWithContent = tab
+					break
+				end
+			end
+			local pick = firstWithContent or firstAny
+			if pick then
+				self:selectTab(pick)
+			end
+		end
+
+		function self:showBuildError(message)
+			if self._buildErrorCard and self._buildErrorCard.Parent then
+				return
+			end
+			message = Validation and Validation.safeText(message, 240) or tostring(message or "UI build failed")
+			local card = Util.make("Frame", {
+				Name = "BuildErrorCard",
+				Size = UDim2.new(1, -32, 0, 120),
+				Position = UDim2.new(0, 16, 0, 16),
+				BackgroundColor3 = Theme.COLOR.Surface1,
+				BackgroundTransparency = 0.04,
+				BorderSizePixel = 0,
+				ZIndex = 30,
+				Parent = self._contentArea,
+			})
+			Util.corner(card, Theme.RADIUS.Card)
+			Util.make("TextLabel", {
+				Size = UDim2.new(1, -24, 0, 24),
+				Position = UDim2.new(0, 12, 0, 12),
+				BackgroundTransparency = 1,
+				Text = "UI failed to mount",
+				TextColor3 = Theme.COLOR.Red,
+				Font = Theme.FONT_BOLD,
+				TextSize = Theme.TEXT_TITLE,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				ZIndex = 31,
+				Parent = card,
+			})
+			Util.make("TextLabel", {
+				Size = UDim2.new(1, -24, 1, -44),
+				Position = UDim2.new(0, 12, 0, 40),
+				BackgroundTransparency = 1,
+				Text = message,
+				TextColor3 = Theme.COLOR.TextMuted,
+				Font = Theme.FONT,
+				TextSize = Theme.TEXT_SM,
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Top,
+				ZIndex = 31,
+				Parent = card,
+			})
+			self._buildErrorCard = card
 		end
 
 		function self:Hide()
@@ -1011,8 +1121,10 @@ return function(deps)
 			local tab = createTab(self, name, iconId, columns)
 			local iconText = iconId or SIDEBAR_ICONS[tostring(name)] or "•"
 
+			local tabLabel = Validation and Validation.sanitizeText(name, 32) or tostring(name)
 			local topBtn = Util.make("TextButton", {
-				Size = UDim2.fromOffset(92, tabH),
+				Size = UDim2.fromOffset(0, tabH),
+				AutomaticSize = Enum.AutomaticSize.X,
 				BackgroundColor3 = Theme.COLOR.Surface1,
 				BackgroundTransparency = 0.7,
 				BorderSizePixel = 0,
@@ -1022,6 +1134,7 @@ return function(deps)
 				ZIndex = 9,
 				Parent = tabStrip,
 			})
+			Util.padding(topBtn, 14, 14, 0, 0)
 			Util.corner(topBtn, Theme.RADIUS.Tab)
 
 			local topGlow = Util.make("Frame", {
@@ -1036,9 +1149,10 @@ return function(deps)
 			})
 
 			local topLabel = Util.make("TextLabel", {
-				Size = UDim2.new(1, 0, 1, 0),
+				Size = UDim2.new(0, 0, 1, 0),
+				AutomaticSize = Enum.AutomaticSize.X,
 				BackgroundTransparency = 1,
-				Text = Validation and Validation.sanitizeText(name, 32) or tostring(name),
+				Text = tabLabel,
 				TextColor3 = Theme.COLOR.TEXT2,
 				Font = Theme.FONT_BOLD,
 				TextSize = Theme.TEXT,
@@ -1146,8 +1260,9 @@ return function(deps)
 			end)
 			topBtn.MouseButton1Click:Connect(function() self:selectTab(tab) end)
 
-			if self._search then
-				self._search:register({
+			if self._search and type(self._search.registerEntry) == "function" then
+				pcall(self._search.registerEntry, self._search, {
+					id = "tab::" .. tostring(name),
 					label = "Open tab: " .. tostring(name),
 					path = "Navigation / " .. tostring(name),
 					action = function() self:selectTab(tab) end,

@@ -53,7 +53,6 @@ return function(loadModule)
 		Motion = Motion,
 		DropdownManager = DropdownManager,
 		NotificationManager = NotificationManager,
-		SearchManager = SearchManager,
 	})
 
 	local function log(lvl, msg, core)
@@ -97,12 +96,6 @@ return function(loadModule)
 		State.search = win._search
 		State.dropdownManager = win._dropdownManager
 
-		if win._screen and Validation.isScreenGui(win._screen) then
-			Validation.bootPrint("ScreenGui parent validated")
-		end
-		if win._search then
-			Validation.bootPrint("Search initialized")
-		end
 		Validation.runLayoutChecks(win)
 
 		local notifParent = win._screen
@@ -152,8 +145,9 @@ return function(loadModule)
 		window.Show = function() if win then win:Show() end end
 		window.Toggle = function() if win then win:Toggle() end end
 
-		Validation.bootPrint("Window created successfully")
-		Validation.runRuntimeChecks()
+		function window:Validate()
+			return Validation.runRuntimeChecks(win, window._tabs)
+		end
 
 		return window
 	end

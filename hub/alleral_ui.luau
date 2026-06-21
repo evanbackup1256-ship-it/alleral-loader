@@ -13,8 +13,8 @@
 	  https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/
 ]]
 return function(Core)
-	Core.ALLERAL_UI_VERSION = "10.0.1"
-	Core.UI_VERSION = "10.0.1"
+	Core.ALLERAL_UI_VERSION = "10.0.2"
+	Core.UI_VERSION = "10.0.2"
 	Core.UI_LIBRARY = "Linoria"
 
 	local GITHUB_RAW = "https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main"
@@ -29,7 +29,7 @@ return function(Core)
 	end)()
 
 	local getGenv = getgenv or function() return ENV end
-	local NOBLE_CACHE_VERSION = "10.0.1"
+	local NOBLE_CACHE_VERSION = "10.0.2"
 	getGenv()._NobleV8Modules = nil
 	getGenv()._NobleV8CacheVersion = nil
 	if getGenv()._NobleV10CacheVersion ~= NOBLE_CACHE_VERSION then
@@ -161,6 +161,7 @@ return function(Core)
 	local Util = noble.Util
 	local Spr = noble.Spr
 	local Theme = noble.Theme
+	local Validation = noble.Validation
 
 	local function log(lvl, msg)
 		if type(noble.log) == "function" then
@@ -747,6 +748,12 @@ return function(Core)
 		w.Toggle = function()
 			if rw and rw.Toggle then rw:Toggle() end
 		end
+		function w:Validate()
+			if rw and type(rw.Validate) == "function" then
+				return rw:Validate()
+			end
+			return false
+		end
 		ENV.Alleral_UiWindow = w
 		if type(Core.registerUiWindow) == "function" then
 			Core.registerUiWindow(w)
@@ -798,6 +805,18 @@ return function(Core)
 				end)
 			end)
 		end
+		task.defer(function()
+			pcall(function()
+				local raw = type(window) == "table" and (window._rawWindow or window) or nil
+				if raw and type(raw.Validate) == "function" then
+					raw:Validate()
+				elseif Validation and type(Validation.validateWindowMount) == "function" then
+					local win = raw and raw._win
+					local tabs = raw and raw._tabs
+					Validation.validateWindowMount(win, tabs)
+				end
+			end)
+		end)
 		if type(Core.setupHubKeybinds) == "function" then
 			pcall(Core.setupHubKeybinds, { window = window, ui = ui or window._ui or ENV.Alleral_UI })
 		end
@@ -941,5 +960,5 @@ return function(Core)
 	ENV._NobleV8Bundle = nil
 	Core._NobleV8 = nil
 
-	log("INFO", "Alleral Noble v10.0.0 — premium desktop UI ready")
+	log("INFO", "Alleral Noble v10.0.2 — premium desktop UI framework loaded")
 end

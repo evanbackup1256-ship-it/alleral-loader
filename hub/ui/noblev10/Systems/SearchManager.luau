@@ -57,6 +57,7 @@ return function(deps)
 		self._janitor = Janitor.new()
 		self._parent = options.parent
 		self._registry = {}
+		self._registered = {}
 		self._results = {}
 		self._selected = 1
 		self._open = false
@@ -426,20 +427,34 @@ return function(deps)
 		return self
 	end
 
-	function Search:register(entry)
-		if type(entry) ~= "table" then return end
-		entry.id = entry.id or ("entry_" .. tostring(#self._registry + 1))
-		entry.label = Util.textOf(entry.label or entry.name or "Untitled")
-		entry.path = Util.textOf(entry.path or "")
-		entry.keywords = Util.textOf(entry.keywords or "")
+	function Search:registerEntry(entry)
+		if type(entry) ~= "table" then return nil end
+		self._registered = self._registered or {}
+		local key = entry.id or entry.Id or entry.Instance or entry.label or entry.name or entry.Name
+		if key == nil then
+			key = "entry_" .. tostring(#self._registry + 1)
+		else
+			key = tostring(key)
+		end
+		if self._registered[key] then
+			return key
+		end
+		self._registered[key] = true
+		entry.id = key
+		entry.label = Util.textOf(entry.label or entry.name or entry.Name or "Untitled")
+		entry.path = Util.textOf(entry.path or entry.Path or "")
+		entry.keywords = Util.textOf(entry.keywords or entry.Keywords or "")
 		table.insert(self._registry, entry)
 		if self._open and self._rebuildResults then
-			self._rebuildResults()
+			pcall(self._rebuildResults)
 		end
 		return entry.id
 	end
 
 	function Search:unregister(id)
+		if self._registered and id then
+			self._registered[tostring(id)] = nil
+		end
 		for i, entry in ipairs(self._registry) do
 			if entry.id == id then
 				table.remove(self._registry, i)
@@ -455,6 +470,7 @@ return function(deps)
 		for i = #self._registry, 1, -1 do
 			self._registry[i] = nil
 		end
+		self._registered = {}
 		if self._open and self._rebuildResults then
 			self._rebuildResults()
 		end
@@ -551,13 +567,16 @@ return function(deps)
 
 	function Search.register(entry)
 		if not Search._instance or type(entry) ~= "table" then return nil end
-		return Search._instance:register({
+		return Search._instance:registerEntry({
+			id = entry.Id or entry.id or ("cmd_" .. tostring(entry.Name or entry.label or "Command")),
 			label = entry.Name or entry.label or "Command",
 			path = entry.Path or entry.path or "Commands",
 			keywords = entry.Keywords or entry.keywords or "",
 			action = entry.Callback or entry.action,
 		})
 	end
+
+	Search.safe = true
 
 	return Search
 end
