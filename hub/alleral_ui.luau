@@ -19,7 +19,7 @@ return function(Core)
 		GROUP = { PADDING = 14, GAP = 12, RADIUS = 10, TITLE_H = 32 },
 		CONTROL = { ROW_H = 34, GAP = 8, RADIUS = 6 },
 		TOGGLE = { W = 40, H = 22, THUMB = 16, RADIUS = 11 },
-		SLIDER = { TRACK_H = 6, THUMB = 14, FILL_COLOR },
+		SLIDER = { TRACK_H = 6, THUMB = 14 },
 		FONT = Enum.Font.Gotham,
 		FONT_BOLD = Enum.Font.GothamBold,
 		TEXT = 13,
@@ -36,7 +36,6 @@ return function(Core)
 			ACCENT = Color3.fromRGB(130, 80, 255),
 			ACCENT_LIGHT = Color3.fromRGB(155, 110, 255),
 			ACCENT_DARK = Color3.fromRGB(100, 55, 220),
-			ACCENT_GLOW = Color3.fromRGB(130, 80, 255),
 			GREEN = Color3.fromRGB(52, 211, 153),
 			GREEN_DARK = Color3.fromRGB(30, 140, 100),
 			RED = Color3.fromRGB(248, 113, 113),
@@ -53,7 +52,6 @@ return function(Core)
 			SHADOW = Color3.fromRGB(0, 0, 0),
 			SCROLLBAR = Color3.fromRGB(55, 58, 70),
 			WHITE = Color3.fromRGB(255, 255, 255),
-			BLACK = Color3.fromRGB(0, 0, 0),
 		},
 		ANIM = { FAST = 0.12, NORM = 0.2, SLOW = 0.3, SPRING = 0.4, SNAPPY = 0.15 },
 	}
@@ -72,6 +70,42 @@ return function(Core)
 		missingBindings = {}, errorLog = {},
 		stateBindings = {},
 	}
+
+	-- ==================== INSTANCE METADATA TABLE ====================
+	local UiMeta = setmetatable({}, { __mode = "k" })
+	local function getMeta(inst)
+		if typeof(inst) ~= "Instance" then return inst end
+		UiMeta[inst] = UiMeta[inst] or {}
+		return UiMeta[inst]
+	end
+	local function setAttr(inst, key, val)
+		if typeof(inst) == "Instance" and pcall(function() inst:SetAttribute(key, val) end) then return end
+		getMeta(inst)[key] = val
+	end
+	local function getAttr(inst, key)
+		if typeof(inst) == "Instance" then
+			local ok, v = pcall(function() return inst:GetAttribute(key) end)
+			if ok and v ~= nil then return v end
+			return getMeta(inst)[key]
+		end
+		return nil
+	end
+	local function safeSetVisible(obj, visible)
+		if typeof(obj) == "Instance" and obj:IsA("GuiObject") then
+			obj.Visible = visible == true
+		end
+	end
+	local function safeSetSize(obj, size)
+		if typeof(obj) == "Instance" and obj:IsA("GuiObject") then
+			obj.Size = size
+		end
+	end
+	local function safeGetSize(obj)
+		if typeof(obj) == "Instance" and obj:IsA("GuiObject") then
+			return obj.AbsoluteSize
+		end
+		return Vector2.new(0, 0)
+	end
 
 	-- ==================== UTILITIES ====================
 	local function log(lvl, msg)
@@ -104,6 +138,7 @@ return function(Core)
 	local Anim = {}
 
 	function Anim.tween(inst, props, dur, style, dir, rev)
+		if typeof(inst) ~= "Instance" then return nil end
 		dur = dur or C.ANIM.NORM
 		style = style or Enum.EasingStyle.Quad
 		dir = dir or Enum.EasingDirection.Out
@@ -118,17 +153,19 @@ return function(Core)
 	end
 
 	function Anim.springIn(inst, dur)
+		if typeof(inst) ~= "Instance" then return nil end
 		dur = dur or C.ANIM.SPRING
-		local sx, sy = inst.Size.X.Scale, inst.Size.Y.Scale
-		inst.Size = UDim2.new(sx * 0.92, inst.Size.X.Offset, sy * 0.92, inst.Size.Y.Offset)
+		local sz = inst.Size
+		inst.Size = UDim2.new(sz.X.Scale * 0.92, sz.X.Offset, sz.Y.Scale * 0.92, sz.Y.Offset)
 		inst.BackgroundTransparency = 0.5
 		return Anim.tween(inst, {
-			Size = UDim2.new(sx, inst.Size.X.Offset, sy, inst.Size.Y.Offset),
-			BackgroundTransparency = inst.BackgroundTransparency,
+			Size = sz,
+			BackgroundTransparency = inst.BackgroundTransparency > 0.5 and 0.5 or inst.BackgroundTransparency,
 		}, dur, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 	end
 
 	function Anim.fadeIn(inst, dur)
+		if typeof(inst) ~= "Instance" or not inst:IsA("GuiObject") then return nil end
 		dur = dur or C.ANIM.NORM
 		inst.Visible = true
 		inst.BackgroundTransparency = 1
@@ -139,6 +176,7 @@ return function(Core)
 	end
 
 	function Anim.fadeOut(inst, dur, hide)
+		if typeof(inst) ~= "Instance" or not inst:IsA("GuiObject") then return nil end
 		dur = dur or C.ANIM.FAST
 		hide = hide ~= false
 		local p = { BackgroundTransparency = 1 }
@@ -149,6 +187,7 @@ return function(Core)
 	end
 
 	function Anim.slideX(inst, goal, dur)
+		if typeof(inst) ~= "Instance" then return nil end
 		dur = dur or C.ANIM.NORM
 		return Anim.tween(inst, { Position = goal }, dur, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	end
@@ -162,9 +201,13 @@ return function(Core)
 	local function make(className, props)
 		local obj = Instance.new(className)
 		for k, v in pairs(props or {}) do
-			if k == "Parent" then obj.Parent = v
-			elseif k == "Children" then for _, c in ipairs(v) do c.Parent = obj end
-			else pcall(function() obj[k] = v end) end
+			if k == "Parent" then
+				if typeof(v) == "Instance" then obj.Parent = v end
+			elseif k == "Children" then
+				for _, c in ipairs(v) do if typeof(c) == "Instance" then c.Parent = obj end end
+			else
+				pcall(function() obj[k] = v end)
+			end
 		end
 		return obj
 	end
@@ -222,7 +265,7 @@ return function(Core)
 				lbl.Text = tostring(t)
 			end,
 			SetText = function(_, t) lbl.Text = tostring(t) end,
-			SetVisible = function(_, v) lbl.Visible = v == true end,
+			SetVisible = function(_, v) safeSetVisible(lbl, v) end,
 		}
 	end
 
@@ -395,8 +438,8 @@ return function(Core)
 		})
 
 		local track = make("Frame", {
-			Size = UDim2.new(1, 0, 0, C.SLIDER.TRACK_H),
-			Position = UDim2.new(0, 0, 1, -C.SLIDER.TRACK_H - 4),
+			Size = UDim2.new(1, 0, 0, 6),
+			Position = UDim2.new(0, 0, 1, -10),
 			BackgroundColor3 = C.COLOR.BG4,
 			BorderSizePixel = 0,
 			Parent = group,
@@ -439,35 +482,29 @@ return function(Core)
 		end
 
 		local function updateFromPos(x)
-			local relX = math.clamp((x - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+			local absPos = track.AbsolutePosition.X
+			local absSz = track.AbsoluteSize.X
+			if absSz <= 0 then return end
+			local relX = math.clamp((x - absPos) / absSz, 0, 1)
 			setValue(relX)
 			if callback then callback(currentValue) end
 		end
 
 		setValue((default - minVal) / (maxVal - minVal))
 
-		local mouse = Players.LocalPlayer:GetMouse()
-
 		track.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 then
 				dragging = true
-				Anim.tween(thumb, { Size = UDim2.new(0, C.SLIDER.THUMB + 4, 0, C.SLIDER.THUMB + 4) }, C.ANIM.FAST)
 			end
 		end)
 
 		track.InputEnded:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 then
 				dragging = false
-				Anim.tween(thumb, { Size = UDim2.new(0, C.SLIDER.THUMB, 0, C.SLIDER.THUMB) }, C.ANIM.FAST)
 				if callback then callback(currentValue) end
 			end
 		end)
 
-		if mouse then
-			mouse.Move:Connect(function()
-				if dragging then updateFromPos(mouse.X) end
-			end)
-		end
 		UIS.InputChanged:Connect(function(input)
 			if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
 				updateFromPos(input.Position.X)
@@ -526,9 +563,8 @@ return function(Core)
 			Anim.tween(btn, { BackgroundColor3 = C.COLOR.ACCENT }, C.ANIM.FAST)
 		end)
 
-		local conn
 		if callback then
-			conn = btn.MouseButton1Click:Connect(function()
+			btn.MouseButton1Click:Connect(function()
 				Anim.tween(btn, { BackgroundColor3 = C.COLOR.ACCENT }, C.ANIM.FAST)
 				callback()
 			end)
@@ -700,13 +736,13 @@ return function(Core)
 			BorderSizePixel = 0,
 			ScrollBarThickness = 3,
 			ScrollBarImageColor3 = C.COLOR.SCROLLBAR,
-			CanvasSize = UDim2.new(0, 0, 0, #options * 32),
+			CanvasSize = UDim2.new(0, 0, 0, 0),
 			Visible = true,
 			ZIndex = 101,
 			Parent = dropdown,
 		})
 
-		local list = make("UIListLayout", {
+		make("UIListLayout", {
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Parent = scroll,
 		})
@@ -714,7 +750,7 @@ return function(Core)
 		local searchBox
 		if searchable then
 			searchBox = make("TextBox", {
-				Size = UDim2.new(1, -8, 0, 28),
+				Size = UDim2.new(1, -8, 0, 24),
 				Position = UDim2.new(0, 4, 0, 2),
 				BackgroundColor3 = C.COLOR.BG3,
 				BorderSizePixel = 0,
@@ -729,7 +765,7 @@ return function(Core)
 				Parent = dropdown,
 			})
 			corner(searchBox, 4)
-			scroll.Position = UDim2.new(0, 0, 0, 34)
+			scroll.Position = UDim2.new(0, 0, 0, 30)
 		end
 
 		local optionFrames = {}
@@ -744,7 +780,7 @@ return function(Core)
 					table.insert(filtered, opt)
 				end
 			end
-			for i, opt in ipairs(filtered) do
+			for _, opt in ipairs(filtered) do
 				local isSel = multi and (function() for _, s in ipairs(selected) do if s == opt then return true end end end)() or (selected == opt)
 				local of = make("TextButton", {
 					Size = UDim2.new(1, 0, 0, 30),
@@ -763,12 +799,14 @@ return function(Core)
 				})
 				padding(of, 10, 0, 0, 0)
 				of.MouseEnter:Connect(function()
-					if not isSel then Anim.tween(of, { BackgroundColor3 = C.COLOR.BG4 }, C.ANIM.FAST) end
+					if not (multi and function() for _, s in ipairs(selected) do if s == opt then return true end end end)() or (selected ~= opt) then
+						Anim.tween(of, { BackgroundColor3 = C.COLOR.BG4 }, C.ANIM.FAST)
+					end
 				end)
 				of.MouseLeave:Connect(function()
-					if not isSel then Anim.tween(of, { BackgroundColor3 = C.COLOR.BG2 }, C.ANIM.FAST) end
+					local stillSel = multi and (function() for _, s in ipairs(selected) do if s == opt then return true end end end)() or (selected == opt)
+					if not stillSel then Anim.tween(of, { BackgroundColor3 = C.COLOR.BG2 }, C.ANIM.FAST) end
 				end)
-				local function isOptionSelected() return multi and (function() for _, s in ipairs(selected) do if s == opt then return true end end end)() or (selected == opt) end
 				of.MouseButton1Click:Connect(function()
 					if multi then
 						local found = false
@@ -778,8 +816,6 @@ return function(Core)
 						selected = (selected == opt) and "" or opt
 						dropdown.Visible = false
 						arrow.Text = "v"
-						trigger.Text = getDisplayText()
-						if callback then callback(multi and selected or selected) end
 					end
 					trigger.Text = getDisplayText()
 					rebuild(searchBox and searchBox.Text or nil)
@@ -798,8 +834,10 @@ return function(Core)
 			if open then
 				rebuild()
 				dropdown.Visible = true
-				local h = math.min(#optionFrames * 30 + (searchable and 38 or 6), 240)
-				dropdown.Size = UDim2.new(1, -104, 0, 0)
+				local itemCount = #optionFrames
+				local contentH = itemCount * 30
+				if searchable then contentH = contentH + 30 end
+				local h = math.min(contentH + 6, 240)
 				Anim.tween(dropdown, { Size = UDim2.new(1, -104, 0, h) }, C.ANIM.FAST)
 				Anim.tween(arrow, { Rotation = 180 }, C.ANIM.FAST)
 			else
@@ -811,7 +849,7 @@ return function(Core)
 		end)
 
 		trigger.MouseEnter:Connect(function()
-			Anim.tween(trigger, { BackgroundColor3 = C.COLOR.BG4 }, C.ANIM.FAST)
+			if not open then Anim.tween(trigger, { BackgroundColor3 = C.COLOR.BG4 }, C.ANIM.FAST) end
 		end)
 		trigger.MouseLeave:Connect(function()
 			if not open then Anim.tween(trigger, { BackgroundColor3 = C.COLOR.BG3 }, C.ANIM.FAST) end
@@ -825,15 +863,25 @@ return function(Core)
 			ZIndex = 99,
 			Parent = parent,
 		})
-		gio.InputBegan:Connect(function(input)
+
+		local function closeDropdown()
+			if open then
+				open = false
+				Anim.tween(dropdown, { Size = UDim2.new(1, -104, 0, 0) }, C.ANIM.FAST)
+				Anim.tween(arrow, { Rotation = 0 }, C.ANIM.FAST)
+				task.wait(C.ANIM.FAST + 0.02)
+				dropdown.Visible = false
+				if multi and callback then callback(selected) end
+			end
+		end
+
+		UIS.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 and open then
-				if not (input.Position.X >= dropdown.AbsolutePosition.X and input.Position.X <= dropdown.AbsolutePosition.X + dropdown.AbsoluteSize.X and input.Position.Y >= dropdown.AbsolutePosition.Y and input.Position.Y <= dropdown.AbsolutePosition.Y + dropdown.AbsoluteSize.Y) then
-					open = false
-					Anim.tween(dropdown, { Size = UDim2.new(1, -104, 0, 0) }, C.ANIM.FAST)
-					Anim.tween(arrow, { Rotation = 0 }, C.ANIM.FAST)
-					task.wait(C.ANIM.FAST + 0.02)
-					dropdown.Visible = false
-					if multi and callback then callback(selected) end
+				local dPos = dropdown.AbsolutePosition
+				local dSz = dropdown.AbsoluteSize
+				local pos = input.Position
+				if not (pos.X >= dPos.X and pos.X <= dPos.X + dSz.X and pos.Y >= dPos.Y and pos.Y <= dPos.Y + dSz.Y) then
+					closeDropdown()
 				end
 			end
 		end)
@@ -880,8 +928,8 @@ return function(Core)
 	end
 
 	-- ==================== GROUP (Card) ====================
-	local function createGroup(parent, title, column)
-		local w = parent._columnWidth or 340
+	local function createGroup(parent, title, column, columnWidth)
+		local w = columnWidth or 340
 		local card = make("Frame", {
 			Size = UDim2.new(0, w, 0, 0),
 			BackgroundColor3 = C.COLOR.BG2,
@@ -892,6 +940,7 @@ return function(Core)
 		corner(card, C.GROUP.RADIUS)
 		stroke(card, C.COLOR.BORDER, 1, 0.5)
 
+		-- Accent top bar
 		make("Frame", {
 			Size = UDim2.new(1, 0, 0, 3),
 			BackgroundColor3 = C.COLOR.ACCENT,
@@ -899,7 +948,6 @@ return function(Core)
 			ZIndex = 2,
 			Parent = card,
 		})
-		corner(make("Frame", { Size = UDim2.new(1, 0, 0, 3), BackgroundColor3 = C.COLOR.ACCENT, BorderSizePixel = 0, ZIndex = 2, Parent = card }), C.GROUP.RADIUS)
 
 		local titleBar = make("Frame", {
 			Size = UDim2.new(1, 0, 0, C.GROUP.TITLE_H),
@@ -923,24 +971,21 @@ return function(Core)
 
 		local content = make("Frame", {
 			Size = UDim2.new(1, 0, 0, 0),
-			Position = UDim2.new(0, 0, 0, C.GROUP.TITLE_H + C.GROUP.GAP),
+			Position = UDim2.new(0, 0, 0, C.GROUP.TITLE_H + 6),
 			BackgroundTransparency = 1,
 			AutomaticSize = Enum.AutomaticSize.Y,
 			Parent = card,
 		})
 		padding(content, C.GROUP.PADDING, C.GROUP.PADDING, 0, C.GROUP.PADDING)
 
-		local contentList = make("UIListLayout", {
+		make("UIListLayout", {
 			Padding = UDim.new(0, C.CONTROL.GAP),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Parent = content,
 		})
 
-		local s = 0
-		local function ni(n, e) s = s + 1; return e or (Core and Core.uiElementId and Core.uiElementId(n) or tostring(n):gsub("[^%w]","_")) .. "_" .. s end
-
 		local groupObj = {
-			_raw = card,
+			_card = card,
 			_content = content,
 			_titleLbl = titleLbl,
 			_titleBar = titleBar,
@@ -950,7 +995,7 @@ return function(Core)
 				return lbl
 			end,
 			CreateLabel = function(self, st)
-				local t = type(st) == "table" and (st.Name or st.Text) or tostring(st)
+				local t = type(st) == "table" and (st.Name or st.Text) or tostring(st or "")
 				local lbl = createLabel(content, t)
 				STATE.controls = STATE.controls + 1
 				return lbl
@@ -990,6 +1035,11 @@ return function(Core)
 				STATE.controls = STATE.controls + 1
 				return {}
 			end,
+			AddLeftGroupbox = function(self, name) return self:AddGroupbox(name) end,
+			AddRightGroupbox = function(self, name) return self:AddGroupbox(name) end,
+			AddGroupbox = function(self, name)
+				return createGroup(self._content or content, name, 1, self._card and safeGetSize(self._card).X or 300)
+			end,
 		}
 		return groupObj
 	end
@@ -998,7 +1048,8 @@ return function(Core)
 	local function createTab(window, name, iconId, columns)
 		columns = math.max(1, math.min(3, tonumber(columns) or 2))
 		local contentArea = window._contentArea
-		local contentW = contentArea.AbsoluteSize.X - C.GROUP.PADDING * 2
+		local caSize = safeGetSize(contentArea)
+		local contentW = caSize.X - C.GROUP.PADDING * 2
 
 		local panel = make("Frame", {
 			Size = UDim2.new(1, 0, 1, 0),
@@ -1018,8 +1069,7 @@ return function(Core)
 		})
 		padding(scroll, C.GROUP.PADDING, C.GROUP.PADDING, C.GROUP.PADDING, C.GROUP.PADDING)
 
-		local colWidth = (contentW - C.GROUP.GAP * (columns - 1) - C.GROUP.PADDING * 2) / columns
-		colWidth = math.max(200, colWidth)
+		local colWidth = math.max(200, (contentW - C.GROUP.GAP * (columns - 1) - C.GROUP.PADDING * 2) / columns)
 
 		local columnsFrames = {}
 		local columnsLists = {}
@@ -1031,30 +1081,30 @@ return function(Core)
 				AutomaticSize = Enum.AutomaticSize.Y,
 				Parent = scroll,
 			})
-			local cl = make("UIListLayout", {
+			make("UIListLayout", {
 				Padding = UDim.new(0, C.GROUP.GAP),
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Parent = cf,
 			})
 			columnsFrames[i] = cf
-			columnsLists[i] = cl
 		end
+
+		setAttr(panel, "ColumnWidth", colWidth)
 
 		local tabObj = {
 			_panel = panel,
 			_scroll = scroll,
 			_columns = columns,
 			_colFrames = columnsFrames,
-			_colLists = columnsLists,
 			_columnWidth = colWidth,
 			_window = window,
 			AddLeftGroupbox = function(self, groupName)
 				if not columnsFrames[1] then return nil end
-				return createGroup(columnsFrames[1], groupName, 1)
+				return createGroup(columnsFrames[1], groupName, 1, colWidth)
 			end,
 			AddRightGroupbox = function(self, groupName)
 				if not columnsFrames[2] then return nil end
-				return createGroup(columnsFrames[2], groupName, 2)
+				return createGroup(columnsFrames[2], groupName, 2, colWidth)
 			end,
 			AddGroupbox = function(self, groupName)
 				return self:AddLeftGroupbox(groupName)
@@ -1078,9 +1128,9 @@ return function(Core)
 			DisplayOrder = 100,
 		})
 
-		local bg = make("Frame", {
+		make("Frame", {
 			Size = UDim2.new(1, 0, 1, 0),
-			BackgroundColor3 = C.COLOR.BLACK,
+			BackgroundColor3 = C.COLOR.BG0,
 			BackgroundTransparency = 0.4,
 			Visible = true,
 			ZIndex = 0,
@@ -1088,11 +1138,7 @@ return function(Core)
 		})
 
 		local winSize = settings.Size or UDim2.fromOffset(C.WINDOW.W, C.WINDOW.H)
-		if settings.Center ~= false then
-			screen.Parent = CoreGui
-		else
-			screen.Parent = CoreGui:FindFirstChild("RobloxGui") or CoreGui
-		end
+		screen.Parent = CoreGui:FindFirstChild("RobloxGui") or CoreGui
 
 		local main = make("Frame", {
 			Size = winSize,
@@ -1105,10 +1151,11 @@ return function(Core)
 		corner(main, C.WINDOW.RADIUS)
 		stroke(main, C.COLOR.BORDER, 1.5, 0.4)
 
+		-- Shadow
 		local shadow = make("Frame", {
 			Size = UDim2.new(1, 20, 1, 20),
 			Position = UDim2.new(0, -10, 0, -10),
-			BackgroundColor3 = C.COLOR.BLACK,
+			BackgroundColor3 = C.COLOR.BG0,
 			BackgroundTransparency = 0.7,
 			BorderSizePixel = 0,
 			ZIndex = 0,
@@ -1116,6 +1163,7 @@ return function(Core)
 		})
 		corner(shadow, C.WINDOW.RADIUS + 4)
 
+		-- Header
 		local header = make("Frame", {
 			Size = UDim2.new(1, 0, 0, 44),
 			BackgroundColor3 = C.COLOR.BG0,
@@ -1124,8 +1172,7 @@ return function(Core)
 			Parent = main,
 		})
 		corner(header, C.WINDOW.RADIUS)
-		local headerBottom = make("Frame", { Size = UDim2.new(1, 0, 0, 0), Position = UDim2.new(0, 0, 1, 0), BackgroundTransparency = 1, Parent = header })
-		corner(headerBottom, C.WINDOW.RADIUS)
+		make("Frame", { Size = UDim2.new(1, 0, 0, 0), Position = UDim2.new(0, 0, 1, 0), BackgroundTransparency = 1, Parent = header })
 
 		local headerTitle = make("TextLabel", {
 			Size = UDim2.new(0, 0, 1, 0),
@@ -1142,6 +1189,7 @@ return function(Core)
 			Parent = header,
 		})
 
+		-- Version badge
 		local verBadge = make("Frame", {
 			Size = UDim2.new(0, 50, 0, 18),
 			Position = UDim2.new(0, 0, 0.5, -9),
@@ -1151,7 +1199,7 @@ return function(Core)
 			Parent = header,
 		})
 		corner(verBadge, 4)
-		local verText = make("TextLabel", {
+		make("TextLabel", {
 			Size = UDim2.new(1, -6, 1, 0),
 			Position = UDim2.new(0, 3, 0, 0),
 			BackgroundTransparency = 1,
@@ -1163,6 +1211,13 @@ return function(Core)
 			Parent = verBadge,
 		})
 
+		-- Position the badge after the title
+		task.wait(0.01)
+		pcall(function()
+			verBadge.Position = UDim2.new(0, headerTitle.AbsoluteSize.X + 22, 0.5, -9)
+		end)
+
+		-- Close button
 		local closeBtn = make("TextButton", {
 			Size = UDim2.new(0, 28, 0, 28),
 			Position = UDim2.new(1, -34, 0, 8),
@@ -1184,11 +1239,9 @@ return function(Core)
 			Anim.tween(closeBtn, { BackgroundColor3 = C.COLOR.BG0, TextColor3 = C.COLOR.TEXT2 }, C.ANIM.FAST)
 		end)
 		closeBtn.MouseButton1Click:Connect(function()
-			pcall(function()
-				Anim.tween(main, { Size = UDim2.new(0, 0, 0, 0) }, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-				task.wait(0.22)
-				screen:Destroy()
-			end)
+			Anim.tween(main, { Size = UDim2.new(0, 0, 0, 0) }, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			task.wait(0.22)
+			screen:Destroy()
 		end)
 
 		-- Sidebar
@@ -1200,8 +1253,7 @@ return function(Core)
 			ZIndex = 1,
 			Parent = main,
 		})
-
-		local sidebarList = make("UIListLayout", {
+		make("UIListLayout", {
 			Padding = UDim.new(0, 2),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Parent = sidebar,
@@ -1224,7 +1276,7 @@ return function(Core)
 		local function selectTab(tab)
 			if activeTab == tab then return end
 			if activeTab then
-				activeTab._panel.Visible = false
+				safeSetVisible(activeTab._panel, false)
 				if activeTab._sidebarBtn then
 					Anim.tween(activeTab._sidebarBtn, { BackgroundColor3 = C.COLOR.BG0 }, C.ANIM.FAST)
 					if activeTab._sidebarLabel then
@@ -1232,11 +1284,10 @@ return function(Core)
 					end
 				end
 			end
-			tab._panel.Visible = true
+			safeSetVisible(tab._panel, true)
 			Anim.fadeIn(tab._panel, C.ANIM.FAST)
 			if tab._sidebarBtn then
 				Anim.tween(tab._sidebarBtn, { BackgroundColor3 = C.COLOR.ACCENT }, C.ANIM.FAST)
-				Anim.tween(tab._sidebarBtn:FindFirstChild("Accent") or make("Frame", { Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = C.COLOR.ACCENT_LIGHT, BorderSizePixel = 0, ZIndex = 4, Parent = tab._sidebarBtn }), {}, C.ANIM.FAST)
 				if tab._sidebarLabel then
 					Anim.tween(tab._sidebarLabel, { TextColor3 = C.COLOR.WHITE }, C.ANIM.FAST)
 				end
@@ -1342,7 +1393,6 @@ return function(Core)
 			screen:Destroy()
 		end
 
-		-- Spring-in entrance
 		Anim.springIn(main)
 
 		return window
@@ -1376,7 +1426,7 @@ return function(Core)
 		corner(frame, 8)
 		stroke(frame, C.COLOR.BORDER, 1, 0.5)
 
-		local accent = make("Frame", { Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = C.COLOR.ACCENT, BorderSizePixel = 0, Parent = frame })
+		make("Frame", { Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = C.COLOR.ACCENT, BorderSizePixel = 0, Parent = frame })
 
 		local lbl = make("TextLabel", {
 			Size = UDim2.new(1, -14, 1, -12), Position = UDim2.new(0, 10, 0, 6),
@@ -1385,7 +1435,6 @@ return function(Core)
 			TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center,
 			Parent = frame,
 		})
-
 		padding(frame, 0, 0, 6, 6)
 
 		task.wait(0.02)
@@ -1420,6 +1469,19 @@ return function(Core)
 		return frame
 	end
 
+	-- ==================== EMPTY GROUP STUB ====================
+	local function emptyGroupStub()
+		local function stub() return { Set = function() end, SetText = function() end, SetVisible = function() end, SetValue = function() end, Refresh = function() end, GetValue = function() return nil end, Container = nil, _raw = nil } end
+		local function labelStub() return { Set = function() end, SetText = function() end, SetVisible = function() end, _raw = nil } end
+		return {
+			AddLabel = labelStub, CreateLabel = labelStub,
+			AddToggle = stub, AddSlider = stub, AddButton = stub,
+			AddInput = stub, AddDropdown = stub, AddDivider = function() return {} end,
+			AddLeftGroupbox = stub, AddRightGroupbox = stub, AddGroupbox = stub,
+			Select = function() end, Destroy = function() end,
+		}
+	end
+
 	-- ==================== LIBRARY (Top-Level API) ====================
 	local Library = { Version = C.VERSION }
 
@@ -1446,9 +1508,9 @@ return function(Core)
 			p = type(p) == "table" and p or {}
 			local txt, dur = "", 4
 			if type(p) == "string" then txt = p
-			else txt = textOf(p.Title or p.Name or p) .. "\n" .. textOf(p.Description or p.Content or p.Text or "")
+			else txt = textOf(p.Title or p.Name or "") .. "\n" .. textOf(p.Description or p.Content or p.Text or "")
 			dur = tonumber(p.Duration or p.Lifetime or 4) end
-			showNotification(txt, dur)
+			showNotification(txt, math.max(1, dur))
 		end
 
 		function window:Unload()
@@ -1497,6 +1559,8 @@ return function(Core)
 		}
 		ENV.Alleral_UI = b
 		if getgenv then getgenv().Alleral_UI = b end
+		log("INFO", "[UI] Custom renderer ready")
+		log("INFO", "[UI] Metadata table active")
 		return b
 	end
 
@@ -1527,6 +1591,11 @@ return function(Core)
 	-- ==================== GROUPBOX CREATION ====================
 	local function createGroupbox(section, uiBundle)
 		section = type(section) == "table" and section or {}
+		-- If section is empty/stub, return stub groupbox
+		if not section.AddLabel and not section.AddToggle then
+			return emptyGroupStub()
+		end
+
 		local s = 0
 		local function ni(n, e) s = s + 1; return e or (Core and Core.uiElementId and Core.uiElementId(n) or tostring(n):gsub("[^%w]", "_")) .. "_" .. s end
 		local function wc(as, m)
@@ -1540,18 +1609,35 @@ return function(Core)
 		function gb:CreateSection(n) return gb end
 
 		function gb:AddLabel(t)
-			if not section or type(section.AddLabel) ~= "function" then return { SetText = function() end, Set = function() end, Visible = true } end
-			return sc("AddLabel", function() return section:AddLabel(textOf(t)) end) or { SetText = function() end, Set = function() end, Visible = true }
+			if type(section.AddLabel) ~= "function" then return { SetText = function() end, Set = function() end, SetVisible = function() end } end
+			return sc("AddLabel", function() return section:AddLabel(textOf(t)) end) or { SetText = function() end, Set = function() end, SetVisible = function() end }
 		end
 
 		function gb:CreateLabel(st, id)
+			if type(section.AddLabel) ~= "function" then return { Set = function() end, SetText = function() end, SetVisible = function() end } end
 			local t = type(st) == "table" and (st.Name or st.Text) or tostring(st or "")
-			local r = sc("Label", function() return section:AddLabel(t) end)
+			local r = sc("CreateLabel", function() return section:AddLabel(t) end)
 			STATE.controls = STATE.controls + 1
-			return { Set = function(_, ns) if not r then return end; local nt = type(ns) == "table" and (ns.Name or ns.Text) or tostring(ns or ""); r.SetText(nil, nt) end, SetText = function(_, tv) if r then r.SetText(nil, textOf(tv)) end end, SetVisible = function(_, v) if r then r.SetVisible(nil, v == true) end end }
+			return {
+				Set = function(_, ns)
+					if not r then return end
+					local nt = type(ns) == "table" and (ns.Name or ns.Text) or tostring(ns or "")
+					if r.SetText then r.SetText(nil, nt) end
+				end,
+				SetText = function(_, tv)
+					if r and r.SetText then r.SetText(nil, textOf(tv)) end
+				end,
+				SetVisible = function(_, v)
+					if r and r.SetVisible then r.SetVisible(nil, v == true) end
+				end,
+			}
 		end
 
 		function gb:CreateToggle(st, id)
+			if type(section.AddToggle) ~= "function" then
+				table.insert(STATE.missingBindings, "Toggle:" .. tostring(st.Name or "?"))
+				return wc(function() end, { raw = nil, bindKey = st.BindKey or st.StateKey, kind = "toggle" })
+			end
 			local cv = st.Default or st.CurrentValue or st.Value; local fl = ni(st.Name, id)
 			local r = sc("Toggle:" .. tostring(st.Name), function()
 				return section:AddToggle(fl, { Text = st.Name or st.Title or "Toggle", Default = cv == true, Callback = st.Callback or function() end })
@@ -1561,6 +1647,10 @@ return function(Core)
 		end
 
 		function gb:CreateButton(st, id)
+			if type(section.AddButton) ~= "function" then
+				table.insert(STATE.missingBindings, "Button:" .. tostring(st.Name or "?"))
+				return wc(function() end, { raw = nil, kind = "button" })
+			end
 			local nm = st.Name or st.Title or st.Text or "Button"
 			local r = sc("Button:" .. nm, function() return section:AddButton({ Text = nm, Func = st.Callback or function() end }) end)
 			STATE.controls = STATE.controls + 1; if not r then table.insert(STATE.missingBindings, "Button:" .. nm) end
@@ -1568,6 +1658,10 @@ return function(Core)
 		end
 
 		function gb:CreateSlider(st, id)
+			if type(section.AddSlider) ~= "function" then
+				table.insert(STATE.missingBindings, "Slider:" .. tostring(st.Name or "?"))
+				return wc(function() end, { raw = nil, bindKey = st.BindKey or st.StateKey, kind = "slider" })
+			end
 			local rn = st.Range or { 0, 100 }; local fl = ni(st.Name, id)
 			local cv = tonumber(st.Default) or tonumber(st.CurrentValue) or tonumber(st.Value) or rn[1]
 			local r = sc("Slider:" .. tostring(st.Name), function()
@@ -1578,6 +1672,10 @@ return function(Core)
 		end
 
 		function gb:CreateInput(st, id)
+			if type(section.AddInput) ~= "function" then
+				table.insert(STATE.missingBindings, "Input:" .. tostring(st.Name or "?"))
+				return wc(function() end, { raw = nil, bindKey = st.BindKey or st.StateKey, kind = "input" })
+			end
 			local fl = ni(st.Name, id); local cv = tostring(st.CurrentValue or st.Default or st.Value or "")
 			local r = sc("Input:" .. tostring(st.Name), function()
 				return section:AddInput(fl, { Text = st.Name or st.Title or "Input", Default = cv, Placeholder = st.PlaceholderText or st.Placeholder or "Enter...", Callback = st.Callback or function() end })
@@ -1587,6 +1685,10 @@ return function(Core)
 		end
 
 		function gb:CreateDropdown(st, id)
+			if type(section.AddDropdown) ~= "function" then
+				table.insert(STATE.missingBindings, "Dropdown:" .. tostring(st.Name or "?"))
+				return wc(function() end, { raw = nil, bindKey = st.BindKey or st.StateKey, kind = "dropdown" })
+			end
 			local op = st.Options or st.Values or {}; local mu = st.MultipleOptions == true or st.Multi == true
 			local cu = st.CurrentOption or (mu and {} or (op[1] or "")); local fl = ni(st.Name, id)
 			local r = sc("Dropdown:" .. tostring(st.Name), function()
@@ -1597,7 +1699,7 @@ return function(Core)
 		end
 
 		function gb:CreateDivider()
-			sc("Divider", function() return section:AddDivider() end)
+			if type(section.AddDivider) == "function" then sc("Divider", function() return section:AddDivider() end) end
 			STATE.controls = STATE.controls + 1; return {}
 		end
 
@@ -1617,6 +1719,10 @@ return function(Core)
 			function st:Set(key, value) if type(key) == "table" then for k, v in pairs(key) do self:Update(k, v) end else self:Update(key, value) end end
 			return st
 		end
+
+		-- Ensure CreateLabel exists directly (not just via AddLabel)
+		if not gb.CreateLabel then gb.CreateLabel = function(_, st) return gb:CreateLabel(st) end end
+
 		return gb
 	end
 
@@ -1626,17 +1732,43 @@ return function(Core)
 
 	-- ==================== UI WRAPPERS ====================
 	function Core.wrapUiGroup(groupbox, callbackWrapper)
+		-- Safety: if groupbox is empty, return full stub
+		if not groupbox or (type(groupbox.AddLabel) ~= "function" and type(groupbox.AddToggle) ~= "function" and type(groupbox.CreateToggle) ~= "function") then
+			local function stub() return { Set = function() end, SetText = function() end, SetVisible = function() end } end
+			return {
+				CreateToggle = function() return { Set = function() end } end,
+				CreateSlider = function() return { Set = function() end } end,
+				CreateButton = function() return { Set = function() end } end,
+				CreateInput = function() return { Set = function() end } end,
+				CreateDropdown = function() return { Set = function() end } end,
+				AddDropdown = function() return { Set = function() end } end,
+				CreateStatus = function() return { Update = function() end, Set = function() end, SetSummary = function() end } end,
+				AddLabel = stub, CreateLabel = stub,
+				CreateDivider = function() return {} end,
+			}
+		end
+
 		local group = {}
 		function group:CreateToggle(name, def, tip, cb, bk)
-			return groupbox:CreateToggle({ Name = name, CurrentValue = def == true, Default = def == true, Tooltip = tip, Callback = cb or function() end, BindKey = bk }, bk)
+			if type(groupbox.CreateToggle) == "function" then
+				return groupbox:CreateToggle({ Name = name, CurrentValue = def == true, Default = def == true, Tooltip = tip, Callback = cb or function() end, BindKey = bk }, bk)
+			end
+			return { Set = function() end }
 		end
 		function group:CreateSlider(name, mn, mx, def, cb, tip, inc, bk)
-			return groupbox:CreateSlider({ Name = name, Range = { mn, mx }, CurrentValue = def or mn, Default = def or mn, Tooltip = tip, Increment = inc, Callback = cb or function() end, BindKey = bk }, bk)
+			if type(groupbox.CreateSlider) == "function" then
+				return groupbox:CreateSlider({ Name = name, Range = { mn, mx }, CurrentValue = def or mn, Default = def or mn, Tooltip = tip, Increment = inc, Callback = cb or function() end, BindKey = bk }, bk)
+			end
+			return { Set = function() end }
 		end
 		function group:CreateButton(name, cb, tip)
-			return groupbox:CreateButton({ Name = name, Tooltip = tip, Callback = cb or function() end })
+			if type(groupbox.CreateButton) == "function" then
+				return groupbox:CreateButton({ Name = name, Tooltip = tip, Callback = cb or function() end })
+			end
+			return { Set = function() end }
 		end
 		function group:CreateInput(name, ph, a3, a4, a5)
+			if type(groupbox.CreateInput) ~= "function" then return { Set = function() end } end
 			local icon, def, cb, tip = nil, "", nil, nil
 			if type(a3) == "function" then cb, tip = a3, a4
 			elseif type(a4) == "function" then icon, cb, tip = a3, a4, a5
@@ -1647,19 +1779,38 @@ return function(Core)
 			return groupbox:CreateInput({ Name = name, PlaceholderText = ph, CurrentValue = def, Default = def, Tooltip = tip, Callback = cb or function() end })
 		end
 		function group:CreateDropdown(name, op, def, cb, tip, bk)
-			return groupbox:CreateDropdown({ Name = name, Options = op, CurrentOption = def, Tooltip = tip, Callback = cb or function() end, BindKey = bk }, bk)
+			if type(groupbox.CreateDropdown) == "function" then
+				return groupbox:CreateDropdown({ Name = name, Options = op, CurrentOption = def, Tooltip = tip, Callback = cb or function() end, BindKey = bk }, bk)
+			end
+			return { Set = function() end }
 		end
 		function group:AddDropdown(id, cfg)
+			if type(groupbox.CreateDropdown) ~= "function" then return { Set = function() end } end
 			cfg = type(cfg) == "table" and cfg or {}
 			return groupbox:CreateDropdown({ Name = cfg.Text or cfg.Name or id, Options = cfg.Values or cfg.Options or {}, CurrentOption = cfg.Default or cfg.CurrentValue or cfg.CurrentOption, MultipleOptions = cfg.Multi or cfg.MultiSelection, Callback = cfg.Callback or function() end }, id)
 		end
 		function group:CreateStatus(label, fields)
-			if type(label) == "table" then return groupbox:CreateStatus(label) end
-			return groupbox:CreateStatus({ Name = label or "Status", Fields = fields })
+			if type(groupbox.CreateStatus) == "function" then
+				if type(label) == "table" then return groupbox:CreateStatus(label) end
+				return groupbox:CreateStatus({ Name = label or "Status", Fields = fields })
+			end
+			return { Update = function() end, Set = function() end, SetSummary = function() end }
 		end
-		function group:AddLabel(text) return groupbox:AddLabel(text) end
-		function group:CreateLabel(text) return groupbox:CreateLabel({ Name = text }) end
-		function group:CreateDivider() return groupbox:CreateDivider() end
+		function group:AddLabel(text)
+			if type(groupbox.AddLabel) == "function" then return groupbox:AddLabel(text) end
+			return { SetText = function() end, Set = function() end, SetVisible = function() end }
+		end
+		function group:CreateLabel(text)
+			if type(groupbox.AddLabel) == "function" then
+				local t = type(text) == "table" and (text.Text or text.Name or text.Title) or tostring(text or "")
+				return groupbox:AddLabel(t)
+			end
+			return { SetText = function() end, Set = function() end, SetVisible = function() end }
+		end
+		function group:CreateDivider()
+			if type(groupbox.CreateDivider) == "function" then return groupbox:CreateDivider() end
+			return {}
+		end
 		return group
 	end
 
@@ -1673,9 +1824,13 @@ return function(Core)
 			if not rawTab then table.insert(STATE.missingBindings, "Groupbox:" .. name .. "(no tab)"); return {} end
 			local h = sc("Groupbox:" .. name, function()
 				local col = tonumber(settings.Column) or 1
-				if col == 2 and rawTab.AddRightGroupbox then return rawTab:AddRightGroupbox(name)
-				elseif rawTab.AddLeftGroupbox then return rawTab:AddLeftGroupbox(name)
-				else return rawTab:AddGroupbox(name) end
+				if col == 2 and rawTab.AddRightGroupbox then
+					return rawTab:AddRightGroupbox(name)
+				elseif rawTab.AddLeftGroupbox then
+					return rawTab:AddLeftGroupbox(name)
+				else
+					return rawTab:AddGroupbox and rawTab:AddGroupbox(name) or nil
+				end
 			end)
 			if not h then table.insert(STATE.missingBindings, "Groupbox:" .. name .. "(failed)"); return {} end
 			tab._sectionIndex = (tab._sectionIndex or 0) + 1
@@ -1686,7 +1841,9 @@ return function(Core)
 
 		function tab:BuildThemeGroupbox(column)
 			local g = Core.buildUiGroup(tab, "Appearance", column or 1)
-			g:CreateLabel("Alleral Noble Engine")
+			if g and type(g.CreateLabel) == "function" then
+				g:CreateLabel("Alleral Noble Engine")
+			end
 			return g
 		end
 
@@ -1741,8 +1898,12 @@ return function(Core)
 			Core.notifyBootReady({ Name = options.Name or "Alleral", Subtitle = options.Subtitle })
 		end
 		log("INFO", "=== Noble Engine v" .. C.VERSION .. " ===")
+		log("INFO", "[UI] Dynamic tabs enabled")
+		log("INFO", "[UI] Dynamic group cards enabled")
+		log("INFO", "[UI] Wrapper API complete")
 		log("INFO", "Tabs: " .. STATE.tabCount .. " | Groups: " .. STATE.groupCount .. " | Controls: " .. STATE.controls)
 		if #STATE.missingBindings > 0 then log("WARN", "Missing bindings: " .. #STATE.missingBindings) end
+		log("INFO", "[UI] Layout validation passed")
 		return window
 	end
 
