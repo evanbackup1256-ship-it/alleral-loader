@@ -1,15 +1,30 @@
--- Alleral V11.4 — search bar focus glow
-return function()
+-- Alleral V11.5 — search bar aurora glow (dual stroke + idle shimmer)
+return function(Theme)
 	local SearchGlow = {}
 	local TweenService = game:GetService("TweenService")
 
 	local ACCENT = Color3.fromHex("#8B5CF6")
-	local ACCENT_BRIGHT = Color3.fromHex("#A855F7")
-	local IDLE_TRANSPARENCY = 0.88
-	local FOCUS_TRANSPARENCY = 0.12
-	local TWEEN_TIME = 0.22
+	local ACCENT_BRIGHT = Color3.fromHex("#A78BFA")
+	local CYAN = Color3.fromHex("#22D3EE")
+	local IDLE_TRANSPARENCY = 0.9
+	local FOCUS_TRANSPARENCY = 0.08
+	local TWEEN_TIME = 0.26
 
 	local bound = {}
+
+	if Theme then
+		pcall(function()
+			if Theme.accent then
+				ACCENT = Theme.accent()
+			end
+			if Theme.accentBright then
+				ACCENT_BRIGHT = Theme.accentBright()
+			end
+			if Theme.cyan then
+				CYAN = Theme.cyan()
+			end
+		end)
+	end
 
 	local function getRoot(windWindow)
 		local root = windWindow and windWindow.UIElements and windWindow.UIElements.Main
@@ -68,20 +83,32 @@ return function()
 		return nil, nil
 	end
 
-	local function ensureStroke(frame)
-		local stroke = frame:FindFirstChild("AlleralSearchGlow")
-		if stroke and stroke:IsA("UIStroke") then
-			return stroke
+	local function ensureStrokes(frame)
+		local outer = frame:FindFirstChild("AlleralSearchGlow")
+		if not outer or not outer:IsA("UIStroke") then
+			outer = Instance.new("UIStroke")
+			outer.Name = "AlleralSearchGlow"
+			outer.Parent = frame
 		end
-		stroke = Instance.new("UIStroke")
-		stroke.Name = "AlleralSearchGlow"
-		stroke.Color = ACCENT
-		stroke.Thickness = 1.6
-		stroke.Transparency = IDLE_TRANSPARENCY
-		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-		stroke.LineJoinMode = Enum.LineJoinMode.Round
-		stroke.Parent = frame
-		return stroke
+		outer.Color = ACCENT
+		outer.Thickness = 1.8
+		outer.Transparency = IDLE_TRANSPARENCY
+		outer.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		outer.LineJoinMode = Enum.LineJoinMode.Round
+
+		local inner = frame:FindFirstChild("AlleralSearchGlowInner")
+		if not inner or not inner:IsA("UIStroke") then
+			inner = Instance.new("UIStroke")
+			inner.Name = "AlleralSearchGlowInner"
+			inner.Parent = frame
+		end
+		inner.Color = CYAN
+		inner.Thickness = 3.6
+		inner.Transparency = 0.96
+		inner.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		inner.LineJoinMode = Enum.LineJoinMode.Round
+
+		return outer, inner
 	end
 
 	local function bindTarget(textBox, frame)
@@ -90,39 +117,78 @@ return function()
 		end
 		bound[textBox] = true
 
-		local stroke = ensureStroke(frame)
+		local outer, inner = ensureStrokes(frame)
 		local glowTween
+		local idleTween
+
+		local function stopIdle()
+			if idleTween then
+				pcall(function()
+					idleTween:Cancel()
+				end)
+				idleTween = nil
+			end
+		end
+
+		local function startIdle()
+			stopIdle()
+			idleTween = TweenService:Create(
+				outer,
+				TweenInfo.new(2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+				{
+					Transparency = 0.82,
+					Color = ACCENT_BRIGHT,
+				}
+			)
+			idleTween:Play()
+		end
 
 		local function tweenGlow(focused)
+			stopIdle()
 			if glowTween then
 				pcall(function()
 					glowTween:Cancel()
 				end)
 			end
 			glowTween = TweenService:Create(
-				stroke,
+				outer,
 				TweenInfo.new(TWEEN_TIME, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
 				{
 					Transparency = focused and FOCUS_TRANSPARENCY or IDLE_TRANSPARENCY,
 					Color = focused and ACCENT_BRIGHT or ACCENT,
-					Thickness = focused and 2.2 or 1.6,
+					Thickness = focused and 2.4 or 1.8,
 				}
 			)
 			glowTween:Play()
+
+			local innerTween = TweenService:Create(
+				inner,
+				TweenInfo.new(TWEEN_TIME, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+				{
+					Transparency = focused and 0.78 or 0.96,
+					Thickness = focused and 5 or 3.6,
+				}
+			)
+			innerTween:Play()
+
+			if not focused then
+				task.delay(TWEEN_TIME, startIdle)
+			end
 		end
 
 		textBox.MouseButton1Click:Connect(function()
 			tweenGlow(true)
 		end)
 		textBox.FocusLost:Connect(function()
-			tweenGlow(false)
-		end)
-		textBox:GetPropertyChangedSignal("Text"):Connect(function()
-			if #textBox.Text > 0 then
-				tweenGlow(true)
+			if #textBox.Text == 0 then
+				tweenGlow(false)
 			end
 		end)
+		textBox:GetPropertyChangedSignal("Text"):Connect(function()
+			tweenGlow(#textBox.Text > 0)
+		end)
 
+		startIdle()
 		return true
 	end
 
@@ -139,7 +205,7 @@ return function()
 					pcall(function()
 						local Log = getgenv and getgenv().Alleral_Log
 						if Log and Log.info then
-							Log.info("Search bar glow active")
+							Log.info("Search bar aurora glow active")
 						end
 					end)
 					return

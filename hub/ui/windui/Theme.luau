@@ -1,22 +1,28 @@
--- Alleral V11.1 — premium EXE-6 / Raycast-style WindUI theme
+-- Alleral V11.5 — Aurora glass theme (violet + cyan accent system)
 return function(WindUI, Bootstrap)
 	local Theme = {}
 	Theme.NAME = "Alleral"
 	Theme._registered = false
 
 	local C = {
-		Background = "#060914",
-		Panel = "#0B1020",
-		Card = "#101624",
-		Card2 = "#151C2E",
-		Border = "#25304A",
+		Background = "#030508",
+		Panel = "#080D18",
+		Card = "#0C1220",
+		Card2 = "#111827",
+		CardHover = "#151F33",
+		Border = "#1E293B",
+		BorderGlow = "#334155",
 		Accent = "#8B5CF6",
-		Accent2 = "#A855F7",
-		Text = "#F8FAFC",
-		Muted = "#94A3B8",
-		Success = "#22C55E",
-		Warning = "#F59E0B",
-		Error = "#EF4444",
+		Accent2 = "#A78BFA",
+		AccentDeep = "#6D28D9",
+		Cyan = "#22D3EE",
+		CyanDeep = "#0891B2",
+		Glow = "#6366F1",
+		Text = "#F1F5F9",
+		Muted = "#64748B",
+		Success = "#34D399",
+		Warning = "#FBBF24",
+		Error = "#F87171",
 	}
 
 	local function hex(h)
@@ -45,44 +51,44 @@ return function(WindUI, Bootstrap)
 			Placeholder = hex(C.Muted),
 			Background = hex(C.Background),
 			Button = hex(C.Accent2),
-			Icon = hex(C.Accent),
+			Icon = hex(C.Cyan),
 			Toggle = hex(C.Accent),
-			Slider = hex(C.Accent),
+			Slider = hex(C.Cyan),
 			Checkbox = hex(C.Accent),
 			SliderIcon = hex(C.Muted),
 			PanelBackground = hex(C.Panel),
-			PanelBackgroundTransparency = 0.08,
+			PanelBackgroundTransparency = 0.14,
 			WindowBackground = hex(C.Background),
 			ElementBackground = hex(C.Card),
-			ElementBackgroundTransparency = 0.02,
+			ElementBackgroundTransparency = 0.06,
 			TabBackground = hex(C.Card),
-			TabBackgroundHover = hex(C.Card2),
-			TabBackgroundHoverTransparency = 0.04,
+			TabBackgroundHover = hex(C.CardHover),
+			TabBackgroundHoverTransparency = 0.08,
 			TabBackgroundActive = hex(C.Card2),
-			TabBackgroundActiveTransparency = 0.01,
+			TabBackgroundActiveTransparency = 0.03,
 			TabText = hex(C.Text),
-			TabTextTransparency = 0.18,
+			TabTextTransparency = 0.14,
 			TabTextTransparencyActive = 0,
-			TabIcon = hex(C.Accent),
-			TabIconTransparency = 0.28,
-			TabIconTransparencyActive = 0.03,
-			TabBorderTransparency = 0.78,
-			TabBorder = hex(C.Border),
+			TabIcon = hex(C.Cyan),
+			TabIconTransparency = 0.22,
+			TabIconTransparencyActive = 0,
+			TabBorderTransparency = 0.72,
+			TabBorder = hex(C.BorderGlow),
 			DropdownTabBackground = hex(C.Card2),
 			DropdownBackground = hex(C.Panel),
 			LabelBackground = hex(C.Card),
-			LabelBackgroundTransparency = 0.28,
+			LabelBackgroundTransparency = 0.32,
 			SectionBox = hex(C.Card),
-			SectionBoxTransparency = 0.02,
-			SectionBoxBorder = hex(C.Border),
-			SectionBoxBorderTransparency = 0.42,
+			SectionBoxTransparency = 0.05,
+			SectionBoxBorder = hex(C.BorderGlow),
+			SectionBoxBorderTransparency = 0.34,
 			SectionBoxBackground = hex(C.Card2),
-			SectionBoxBackgroundTransparency = 0.04,
-			Notification = hex(C.Panel),
+			SectionBoxBackgroundTransparency = 0.08,
+			Notification = hex(C.Card2),
 			NotificationTitle = hex(C.Text),
 			NotificationContent = hex(C.Muted),
-			NotificationBorder = hex(C.Border),
-			NotificationBorderTransparency = 0.38,
+			NotificationBorder = hex(C.BorderGlow),
+			NotificationBorderTransparency = 0.28,
 		}
 		pcall(function() WindUI:AddTheme(palette) end)
 		pcall(function() WindUI:SetTheme(Theme.NAME) end)
@@ -106,6 +112,18 @@ return function(WindUI, Bootstrap)
 
 	function Theme.colors()
 		return C
+	end
+
+	function Theme.accent()
+		return hex(C.Accent)
+	end
+
+	function Theme.accentBright()
+		return hex(C.Accent2)
+	end
+
+	function Theme.cyan()
+		return hex(C.Cyan)
 	end
 
 	return Theme

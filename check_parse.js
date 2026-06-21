@@ -26,6 +26,7 @@ const files = [
     'hub/ui/windui/Patch.luau',
     'hub/ui/windui/Drag.luau',
     'hub/ui/windui/SearchGlow.luau',
+    'hub/ui/windui/VisualPolish.luau',
 ];
 
 function getLineCol(src, pos) {

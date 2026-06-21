@@ -2,7 +2,7 @@ local Core = {}
 Core.VERSION = "2.9.10"
 Core._CORE_ARTIFACT = "base"
 Core.UI_LIBRARY = "WindUI"
-Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "11.4.0"
+Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "11.5.0"
 Core.UI_VERSION = Core.ALLERAL_UI_VERSION
 
 local HttpService = game:GetService("HttpService")

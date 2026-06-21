@@ -1,4 +1,4 @@
--- Alleral V11.1 — WindUI notifications (rate-limited, no recursion)
+-- Alleral V11.5 — type-accented notifications (rate-limited)
 return function(WindUI, Bootstrap)
 	local Notifications = {}
 	local DEBOUNCE = {}
@@ -8,10 +8,10 @@ return function(WindUI, Bootstrap)
 	local COOLDOWN = 5
 
 	local TYPE_META = {
-		info = { icon = "info" },
-		success = { icon = "check" },
-		warning = { icon = "alert-triangle" },
-		error = { icon = "x" },
+		info = { icon = "info", color = "#6366F1" },
+		success = { icon = "check", color = "#34D399" },
+		warning = { icon = "alert-triangle", color = "#FBBF24" },
+		error = { icon = "x", color = "#F87171" },
 	}
 
 	local function stripTrace(text)
@@ -66,6 +66,8 @@ return function(WindUI, Bootstrap)
 				Content = content,
 				Desc = content,
 				Icon = meta.icon,
+				IconColor = Color3.fromHex(meta.color),
+				Color = Color3.fromHex(meta.color),
 				Duration = duration,
 				CanClose = true,
 			})

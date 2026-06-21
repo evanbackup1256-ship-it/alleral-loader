@@ -3,8 +3,8 @@
   "core": "2.9.10",
   "weao": "1.1",
   "ui": "WindUI",
-  "commit": "3b0fa07",
-  "updatedAt": "2026-06-21T23:00:00Z",
+  "commit": "pending",
+  "updatedAt": "2026-06-21T23:30:00Z",
   "updatePollSeconds": 120,
   "autoUpdate": true,
   "minLoader": "8.2.0",
@@ -14,5 +14,5 @@
   "helpers": "1.8",
   "security": "1.3",
   "access": "1.1",
-  "uiVersion": "11.4.0"
+  "uiVersion": "11.5.0"
 }

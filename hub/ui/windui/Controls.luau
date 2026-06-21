@@ -1,12 +1,30 @@
--- Alleral V11.4 — WindUI control builders (compact, guarded, no tooltips)
-return function(Bootstrap, Motion, Text, Guards, _TooltipManager)
+-- Alleral V11.5 — WindUI control builders (aurora accents, no tooltips)
+return function(Bootstrap, Motion, Text, Guards, _TooltipManager, Theme)
 	local Controls = {}
 	Text = Text or Bootstrap
 	Guards = Guards or { wrap = function(fn) return fn or function() end end }
 
 	local LAYOUT = {
-		SLIDER_WIDTH = 220,
+		SLIDER_WIDTH = 240,
 	}
+
+	local ACCENT = Color3.fromHex("#7C3AED")
+	local ACCENT_BRIGHT = Color3.fromHex("#A78BFA")
+	local CYAN = Color3.fromHex("#22D3EE")
+
+	if Theme then
+		pcall(function()
+			if Theme.accent then
+				ACCENT = Theme.accent()
+			end
+			if Theme.accentBright then
+				ACCENT_BRIGHT = Theme.accentBright()
+			end
+			if Theme.cyan then
+				CYAN = Theme.cyan()
+			end
+		end)
+	end
 
 	local function stub()
 		return {
@@ -183,7 +201,9 @@ return function(Bootstrap, Motion, Text, Guards, _TooltipManager)
 				el = box:Button({
 					Title = title,
 					Desc = "",
-					Color = Color3.fromHex("#8B5CF6"),
+					Color = props.Primary and ACCENT_BRIGHT or ACCENT,
+					Icon = props.Icon,
+					IconColor = props.Icon and CYAN or nil,
 					Justify = "Center",
 					Callback = Guards.wrap(props.Func or props.Callback or function() end, "button:" .. title),
 				})

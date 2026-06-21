@@ -1,5 +1,5 @@
--- Alleral V11.4 — WindUI window (animated show/hide, search glow, no tooltips)
-return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, _TooltipManager, Cache, Patch, SearchGlow)
+-- Alleral V11.5 — WindUI window (aurora glass polish, search glow, no tooltips)
+return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, _TooltipManager, Cache, Patch, SearchGlow, VisualPolish)
 	local WindowMod = {}
 
 	local STATES = {
@@ -30,6 +30,8 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			folder = "Alleral"
 		end
 
+		local tabIcon = Theme and Theme.cyan and Theme.cyan() or Color3.fromHex("#22D3EE")
+
 		local windowConfig = {
 			Title = title,
 			Author = Bootstrap.sanitize(settings.Author or "Alleral", 48),
@@ -40,13 +42,13 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			HideSearchBar = false,
 			Transparent = settings.Transparent ~= false,
 			Acrylic = false,
-			Size = settings.Size or UDim2.fromOffset(1180, 700),
+			Size = settings.Size or UDim2.fromOffset(1240, 720),
 			OpenButton = { Enabled = false },
 			Topbar = {
-				Height = 44,
+				Height = 52,
 				ButtonsType = "Mac",
 			},
-			SideBarWidth = settings.SideBarWidth or 232,
+			SideBarWidth = settings.SideBarWidth or 248,
 		}
 		if type(windowConfig) ~= "table" then
 			error("[WindUI] windowConfig missing")
@@ -220,7 +222,7 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 				windTab = self._wind:Tab({
 					Title = name,
 					Icon = icon,
-					IconColor = Color3.fromHex("#8B5CF6"),
+					IconColor = tabIcon,
 					Border = true,
 					Desc = "",
 				})
@@ -333,6 +335,9 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 		end
 		if SearchGlow and SearchGlow.bind then
 			pcall(SearchGlow.bind, windWindow)
+		end
+		if VisualPolish and VisualPolish.bind then
+			pcall(VisualPolish.bind, windWindow)
 		end
 
 		if Cache then
