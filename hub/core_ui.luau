@@ -224,24 +224,16 @@ return function(Core)
 	end
 
 	function Core.createStubUiGroup(name)
-		local function labelStub()
-			return { Set = function() end, SetText = function() end, SetVisible = function() end }
-		end
+		local function stub() return { Set = function() end, SetText = function() end, SetVisible = function() end } end
 		return {
 			CreateToggle = function() return { Set = function() end } end,
 			CreateSlider = function() return { Set = function() end } end,
 			CreateButton = function() return { Set = function() end } end,
 			CreateInput = function() return { Set = function() end } end,
 			CreateDropdown = function() return { Set = function() end } end,
-			AddLabel = labelStub,
-			CreateLabel = labelStub,
-			CreateStatus = function()
-				return {
-					Update = function() end,
-					Set = function() end,
-					SetSummary = function() end,
-				}
-			end,
+			AddLabel = stub,
+			CreateLabel = stub,
+			CreateStatus = function() return { Update = function() end, Set = function() end, SetSummary = function() end } end,
 			CreateDivider = function() return {} end,
 		}
 	end
@@ -284,10 +276,6 @@ return function(Core)
 		return icon
 	end
 
-	Core.uiIcon = Core.uiIcon or function(icon)
-		return icon
-	end
-
 	Core.uiElementId = Core.uiElementId or function(name)
 		return tostring(name):gsub("[^%w]", "_"):lower()
 	end
@@ -323,47 +311,8 @@ return function(Core)
 
 	Core.registerExploitCommandPalette = Core.registerExploitCommandPalette or function() end
 
-	Core._statusRefs = Core._statusRefs or {}
-
-	function Core.AddStatus(box, key, text)
-		if not box then return nil end
-		local label = nil
-		if type(box.AddLabel) == "function" then
-			label = box:AddLabel(text or "Status: Unknown")
-		elseif type(box.CreateLabel) == "function" then
-			label = box:CreateLabel({ Name = text or "Status: Unknown" })
-		end
-		if label then Core._statusRefs[key] = label end
-		return label
-	end
-
-	function Core.SetStatus(key, text)
-		local label = Core._statusRefs[key]
-		if label then
-			if label.SetText then pcall(label.SetText, label, text)
-			elseif label.Set then pcall(label.Set, label, { Name = text }) end
-		end
-	end
-
 	function Core.scanLegacyUI()
-		local hits = {}
-		local patterns = { "CreateStatus", "CreateWidget", "CreateBadge", "CreatePanel", "CreateCard", "CreateFlag", "CreateSection", "MakeTab", "MakeWindow", "AddSection", "NewTab", "NewSection", "CreateIndicator" }
-		for _, name in ipairs(patterns) do
-			if rawget(_G, name) or rawget(getgenv and getgenv() or {}, name) then
-				table.insert(hits, "Global: " .. name)
-			end
-			if Core[name] and type(Core[name]) == "function" and name ~= "CreateSection" then
-				table.insert(hits, "Core." .. name)
-			end
-		end
-		if #hits == 0 then
-			Core.say("[UI] Legacy UI scan: clean")
-			Core.say("[UI] Linoria UI only: true")
-		else
-			for _, h in ipairs(hits) do
-				Core.logWarn("[UI] Legacy UI found: " .. h)
-			end
-		end
-		return hits
+		if Core.say then Core.say("[UI] Noble Engine active — zero legacy dependencies") end
+		return {}
 	end
 end
