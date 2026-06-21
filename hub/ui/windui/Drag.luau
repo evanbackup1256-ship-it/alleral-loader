@@ -111,7 +111,12 @@ return function(Motion, TooltipManager)
 	end
 
 	function Drag.logReady()
-		warn("[WindUI] Drag optimization active")
+		pcall(function()
+			local Log = getgenv and getgenv().Alleral_Log
+			if Log and Log.info then
+				Log.info("Drag optimization active")
+			end
+		end)
 	end
 
 	return Drag

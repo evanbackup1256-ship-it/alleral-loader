@@ -25,8 +25,13 @@ return function(loadModule, Core)
 	pcall(function() Theme.register() end)
 	pcall(function() Motion.logPerformance() end)
 	pcall(function() Drag.logReady() end)
-	warn("[WindUI] UI cached; toggles do not rebuild")
-	warn("[WindUI] Tab cache active")
+	pcall(function()
+		local Log = getgenv and getgenv().Alleral_Log
+		if Log and Log.info then
+			Log.info("UI cached; toggles do not rebuild")
+			Log.info("Tab cache active")
+		end
+	end)
 
 	local STATE = {
 		tabCount = 0,
@@ -183,7 +188,25 @@ return function(loadModule, Core)
 		WindUI = WindUI,
 		sanitize = Bootstrap.sanitize,
 		log = function(lvl, msg)
-			warn("[Alleral] [" .. tostring(lvl) .. "] " .. tostring(msg))
+			if msg == nil then
+				msg = lvl
+				lvl = "INFO"
+			end
+			local Log = nil
+			pcall(function()
+				if getgenv then
+					Log = getgenv().Alleral_Log
+				end
+			end)
+			if Log then
+				if lvl == "WARN" or lvl == "ERROR" then
+					Log.warn(msg)
+				else
+					Log.info(msg)
+				end
+				return
+			end
+			warn("[Alleral] [" .. tostring(lvl) .. "] " .. Bootstrap.sanitize(msg, 500))
 		end,
 	}
 end

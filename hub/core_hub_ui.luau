@@ -18,6 +18,13 @@ local function uiText(value)
 			end
 		end
 	end
+	if type(Core.sanitizeText) == "function" then
+		return Core.sanitizeText(value, 240)
+	end
+	local envLog = ENV.Alleral_Log
+	if type(envLog) == "table" and type(envLog.sanitize) == "function" then
+		return envLog.sanitize(value, 240)
+	end
 	return tostring(value)
 end
 
@@ -1061,7 +1068,9 @@ function Core.buildJoinServerControls(group, options)
 		if not ok then
 			Core.notify("Alleral", "That doesn't look like a valid link or job id.", 3, "warn")
 			if err and err ~= "invalid_join_input" and ENV.Alleral_TelemetryDebug == true then
-				warn("[Alleral] Join hop failed: " .. tostring(err))
+				if type(Core.logWarn) == "function" then
+					Core.logWarn("Join hop failed: " .. tostring(err))
+				end
 			end
 		end
 	end, buttonTooltip)

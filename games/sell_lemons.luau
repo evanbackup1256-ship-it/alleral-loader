@@ -162,20 +162,21 @@ refreshRemotes()
 
 local function fireKey(key, ...)
 	local remote = runtime.remotes[key]
+	local args = { ... }
 	if remote and G.fireRemote then
-		return G.fireRemote(remote, ...)
+		return G.fireRemote(remote, table.unpack(args))
 	end
 	if remote then
 		local ok = pcall(function()
 			if remote:IsA("RemoteEvent") then
-				remote:FireServer(...)
+				remote:FireServer(table.unpack(args))
 			elseif remote:IsA("RemoteFunction") then
-				remote:InvokeServer(...)
+				remote:InvokeServer(table.unpack(args))
 			end
 		end)
 		return ok
 	end
-	return G.probeRemote and G.probeRemote(runtime.remotes, REMOTE_ALIASES[key] or { key }, { ... }) or false
+	return G.probeRemote and G.probeRemote(runtime.remotes, REMOTE_ALIASES[key] or { key }, args) or false
 end
 
 local function tickEvery(key, interval, fn)
@@ -469,7 +470,9 @@ end)
 utilGroup:CreateButton("Scan remotes", function()
 	refreshRemotes()
 	local n = 0
-	for _ in pairs(runtime.remotes) do n += 1 end
+	for _ in pairs(runtime.remotes) do
+		n = n + 1
+	end
 	notify("Alleral", "Indexed " .. n .. " remotes.", 3)
 end)
 

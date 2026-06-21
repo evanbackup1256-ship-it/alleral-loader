@@ -8,8 +8,27 @@ return function(Core, Text, GameRegistry)
 	Text = Text or { sanitize = function(v, m) return tostring(v or "") end }
 	GameRegistry = GameRegistry or {}
 
-	local function log(msg)
-		warn("[Alleral] " .. tostring(msg))
+	local function log(lvl, msg)
+		if msg == nil then
+			msg = lvl
+			lvl = "INFO"
+		end
+		local Log = nil
+		pcall(function()
+			if getgenv then
+				Log = getgenv().Alleral_Log
+			end
+		end)
+		local text = tostring(msg or "")
+		if Log then
+			if lvl == "WARN" or lvl == "ERROR" then
+				Log.warn(text)
+			else
+				Log.info(text)
+			end
+			return
+		end
+		warn("[Alleral] [" .. tostring(lvl or "INFO") .. "] " .. (Bootstrap.sanitize and Bootstrap.sanitize(text, 500) or text))
 	end
 
 	function Bootstrap.sanitize(value, maxLen)

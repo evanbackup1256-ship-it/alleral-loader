@@ -806,7 +806,10 @@ function Telemetry:_send(event, contextExtra, errorInfo, notes)
 		ok, err = self:_sendRelay(payload)
 	end
 	if not ok and ENV.Alleral_TelemetryDebug == true then
-		warn("[Alleral Telemetry] " .. tostring(event) .. " failed: " .. tostring(err))
+		local Log = ENV.Alleral_Log
+		if Log and Log.warn then
+			Log.warn("Telemetry " .. tostring(event) .. " failed: " .. tostring(err))
+		end
 	end
 	return ok, err
 end

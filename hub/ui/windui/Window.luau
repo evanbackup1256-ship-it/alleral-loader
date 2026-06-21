@@ -21,35 +21,55 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 
 		local title = Bootstrap.sanitize(settings.Title or settings.Name or "Alleral", 64)
 		local keybind = settings.Keybind or Enum.KeyCode.RightShift
-		local folder = settings.ConfigFolder or Bootstrap.configFolder()
+		local folder = settings.ConfigFolder or settings.Folder or Bootstrap.configFolder()
+		if type(folder) ~= "string" or folder == "" then
+			folder = "Alleral_" .. gameId:gsub("[^%w_%-]", "_")
+		end
+		folder = folder:gsub("[^%w_%-/]", "_")
+		if folder == "" then
+			folder = "Alleral"
+		end
+
+		local windowConfig = {
+			Title = title,
+			Author = Bootstrap.sanitize(settings.Author or "Alleral", 48),
+			Icon = settings.Icon or "sparkles",
+			Folder = folder,
+			Theme = Theme and Theme.NAME or "Dark",
+			NewElements = true,
+			HideSearchBar = false,
+			Transparent = settings.Transparent ~= false,
+			Acrylic = false,
+			Size = settings.Size or UDim2.fromOffset(1180, 700),
+			OpenButton = { Enabled = false },
+			Topbar = {
+				Height = 44,
+				ButtonsType = "Mac",
+			},
+			SideBarWidth = settings.SideBarWidth or 232,
+		}
+		if type(windowConfig) ~= "table" then
+			error("[WindUI] windowConfig missing")
+		end
+		windowConfig.Folder = windowConfig.Folder or "Alleral"
 
 		if Theme and Theme.register then
 			pcall(Theme.register)
 		end
 
+		local logFn = Bootstrap.log or function(_, msg)
+			warn("[Alleral] " .. tostring(msg))
+		end
+		pcall(logFn, "INFO", "WindUI window config validated")
+
 		local windWindow
 		local ok, err = pcall(function()
-			windWindow = WindUI:CreateWindow({
-				Title = title,
-				Folder = folder,
-				Icon = "sparkles",
-				Theme = Theme and Theme.NAME or "Violet",
-				NewElements = true,
-				HideSearchBar = false,
-				Transparent = true,
-				Acrylic = false,
-				Size = settings.Size or UDim2.fromOffset(1180, 700),
-				OpenButton = { Enabled = false },
-				Topbar = {
-					Height = 44,
-					ButtonsType = "Mac",
-				},
-				SideBarWidth = 232,
-			})
+			windWindow = WindUI:CreateWindow(windowConfig)
 		end)
 		if not ok or not windWindow then
 			error("WindUI CreateWindow failed: " .. tostring(err))
 		end
+		pcall(logFn, "INFO", "WindUI window created")
 
 		local self
 		local function bindWindPatches()

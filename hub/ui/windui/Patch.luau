@@ -70,8 +70,10 @@ return function(WindUI)
 			return
 		end
 
-		function WindUIRef.CreateWindow(config)
-			local win = nativeCreate(config)
+		function WindUIRef.CreateWindow(self, config)
+			config = type(config) == "table" and config or {}
+			config.Folder = config.Folder or config.Title or "Alleral"
+			local win = nativeCreate(self, config)
 			if type(win) == "table" then
 				win.Open = function() end
 				win.Close = function() end

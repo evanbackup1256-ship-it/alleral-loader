@@ -7,6 +7,7 @@ const files = [
     'hub/core_ui.luau',
     'hub/core_hub_ui.luau',
     'hub/core_base.luau',
+    'hub/log.luau',
     'hub/ui/windui/Init.luau',
     'hub/ui/windui/Bootstrap.luau',
     'hub/ui/windui/Window.luau',

@@ -54,8 +54,13 @@ return function()
 	function Motion.cleanup() end
 
 	function Motion.logPerformance()
-		warn("[WindUI] Window open/close instant (no descendant tweens)")
-		warn("[WindUI] Duplicate connection guard active")
+		pcall(function()
+			local Log = getgenv and getgenv().Alleral_Log
+			if Log and Log.info then
+				Log.info("Window open/close instant (no descendant tweens)")
+				Log.info("Duplicate connection guard active")
+			end
+		end)
 	end
 
 	return Motion

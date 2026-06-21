@@ -130,7 +130,7 @@ end
 local game = resolveGameInstance()
 if not game then
 	error(
-		"[Alleral] game is nil Ã¢â‚¬â€ run the loader inside a Roblox game session (not the executor menu outside a place)."
+		"[Alleral] game is nil — run the loader inside a Roblox game session (not the executor menu outside a place)."
 	)
 end
 
@@ -167,12 +167,13 @@ end
 
 local function notLoadedApi(name)
 	return function()
-		warn(
-			"[Alleral] "
-				.. name
-				.. " Ã¢â‚¬â€ loader is not running. Run the GitHub loadstring first:\n"
-				.. LOADSTRING_HINT
-		)
+		local Log = ENV.Alleral_Log
+		local text = name .. " — loader is not running. Run the GitHub loadstring first:\n" .. LOADSTRING_HINT
+		if Log and Log.warn then
+			Log.warn(text)
+		else
+			warn("[Alleral] " .. text)
+		end
 		return false
 	end
 end
@@ -251,13 +252,74 @@ local function tryGameHttpGet(url)
 	return nil
 end
 
+local function installLogModule()
+	if type(ENV.Alleral_Log) == "table" and type(ENV.Alleral_Log.sanitize) == "function" then
+		return ENV.Alleral_Log
+	end
+	local paths = {
+		HUB .. "/log.luau",
+		"kick/" .. HUB .. "/log.luau",
+		".alleral/cache/" .. HUB .. "/log.luau",
+	}
+	if readFile and isFile then
+		for _, path in ipairs(paths) do
+			if isFile(path) then
+				local ok, body = pcall(readFile, path)
+				if ok and type(body) == "string" and #body > 200 and loadStringFn then
+					local fn = loadStringFn(body, "Alleral/log")
+					if fn then
+						local okRun, Log = pcall(fn)
+						if okRun and type(Log) == "table" and Log.install then
+							Log.install(ENV)
+							return Log
+						end
+					end
+				end
+			end
+		end
+	end
+	if loadStringFn then
+		local url = GITHUB_RAW .. "/" .. HUB .. "/log.luau?t=" .. tostring(tick())
+		local body = select(1, tryGameHttpGet(url))
+		if type(body) == "string" and #body > 200 then
+			local fn = loadStringFn(body, "Alleral/log@remote")
+			if fn then
+				local okRun, Log = pcall(fn)
+				if okRun and type(Log) == "table" and Log.install then
+					Log.install(ENV)
+					return Log
+				end
+			end
+		end
+	end
+	return nil
+end
+
+installLogModule()
+
 local function log(msg, isWarn)
-	local line = "[Alleral v" .. LOADER_VERSION .. "] " .. msg
+	local Log = ENV.Alleral_Log
+	local text = "[v" .. LOADER_VERSION .. "] " .. tostring(msg)
+	if Log then
+		if isWarn then
+			Log.warn(text)
+		else
+			Log.info(text)
+		end
+		return
+	end
+	local line = "[Alleral] " .. text
 	if isWarn then
 		warn(line)
 	else
 		print(line)
 	end
+end
+
+if ENV.Alleral_Log then
+	ENV.Alleral_Log.info("Global text sanitizer active")
+	ENV.Alleral_Log.info("Logging sanitizer active")
+	ENV.Alleral_Log.info("Mojibake cleanup passed")
 end
 
 local function safeSpawn(fn)
@@ -1400,8 +1462,8 @@ local function checkGamePlaceUpdate()
 			.. tostring(previous)
 			.. " -> "
 			.. tostring(placeVersion)
-			.. "). Alleral still loads Ã¢â‚¬â€ report it if something breaks."
-		warn("[Alleral v" .. LOADER_VERSION .. "] " .. msg)
+			.. "). Alleral still loads — report it if something breaks."
+		log(msg, true)
 		ENV._Alleral_GameRecentlyUpdated = true
 		ENV._Alleral_GameUpdateMessage = msg
 		ENV._Alleral_PlaceVersionChange = {
@@ -1436,10 +1498,10 @@ local function verifyBootstrapAttestation()
 	local token = ENV._Alleral_BootstrapToken
 	local at = tonumber(ENV._Alleral_BootstrapTokenAt)
 	if type(token) ~= "string" or #token < 8 or not at then
-		return false, "Missing bootstrap attestation Ã¢â‚¬â€ re-run the bootstrap loadstring."
+		return false, "Missing bootstrap attestation — re-run the bootstrap loadstring."
 	end
 	if (tick() - at) > 120 then
-		return false, "Bootstrap attestation expired Ã¢â‚¬â€ re-run the bootstrap loadstring."
+		return false, "Bootstrap attestation expired — re-run the bootstrap loadstring."
 	end
 	local expected = hashBootstrapAttest(game.PlaceId, game.JobId, at, ENV._Alleral_BootstrapCommit)
 	if token ~= expected then
@@ -2258,6 +2320,8 @@ local function loadCore()
 		return false, formatCoreLoadError("Core base fetch failed", CP.base, baseLabel, baseLabel or "download failed")
 	end
 
+	pcall(loadModule, { HUB .. "/log.luau" }, HUB .. "/log.luau", "Alleral_Log", "Alleral/log")
+
 	local ok, err = compileAndRun(baseSrc, formatCoreChunkName(CP.base, baseLabel))
 	if not ok then
 		ENV.Alleral_Core = nil
@@ -2455,7 +2519,7 @@ local function loadWeaoStack()
 			}, "fallback", 0
 		end,
 	}
-	log("WEAO module unavailable Ã¢â‚¬â€ running in offline compatibility mode", true)
+	log("WEAO module unavailable — running in offline compatibility mode", true)
 	return true
 end
 
@@ -2797,7 +2861,7 @@ local GAMES = {
 			waitForPath(ReplicatedStorage, { "Shared" }, 20)
 			local areas = Workspace:WaitForChild("Areas", 20)
 			if not areas or not areas:WaitForChild("KickReady", 10) then
-				return false, "KickReady pad not found Ã¢â‚¬â€ are you in the main world?"
+				return false, "KickReady pad not found — are you in the main world?"
 			end
 			return true
 		end,
@@ -3682,7 +3746,7 @@ local function applyRemoteUpdate(profile, expected, reason)
 	end
 	ENV._Alleral_UpdateApplying = true
 	stopAutoUpdater()
-	log("Update available (" .. tostring(reason) .. ") Ã¢â‚¬â€ refreshing from GitHub")
+	log("Update available (" .. tostring(reason) .. ") — refreshing from GitHub")
 	local telemetry = ENV.Alleral_Telemetry
 	if type(telemetry) == "table" and type(telemetry.ReportEvent) == "function" then
 		pcall(function()
@@ -3866,7 +3930,7 @@ end
 
 local function main()
 	if ENV.Alleral_LoaderRunning then
-		log("Already running Ã¢â‚¬â€ use getgenv().Alleral_Reload()", true)
+		log("Already running — use getgenv().Alleral_Reload()", true)
 		return
 	end
 	ENV.Alleral_LoaderRunning = true
@@ -3907,7 +3971,7 @@ local function main()
 	ENV.Alleral_StartupFailed = nil
 
 	if type(PREVIOUS_LOADER_VERSION) == "string" and versionLt(PREVIOUS_LOADER_VERSION, LOADER_VERSION) then
-		log("Upgrading from loader v" .. PREVIOUS_LOADER_VERSION .. " Ã¢â‚¬â€ purging stale workspace cache")
+		log("Upgrading from loader v" .. PREVIOUS_LOADER_VERSION .. " — purging stale workspace cache")
 		ENV._Alleral_UpdateFingerprint = nil
 	end
 
@@ -3948,14 +4012,14 @@ local function main()
 				.. tostring(expectedVersions.loader)
 				.. " available (session v"
 				.. LOADER_VERSION
-				.. ") Ã¢â‚¬â€ auto-updating via bootstrap"
+				.. ") — auto-updating via bootstrap"
 		)
 		ENV.Alleral_LoaderRunning = false
 		task.defer(function()
 			local count = tonumber(ENV._Alleral_RelaunchCount) or 0
 			local last = tonumber(ENV._Alleral_LastRelaunch) or 0
 			if count >= MAX_RELAUNCHES or os.time() - last < RELAUNCH_COOLDOWN then
-				warn("[Alleral v" .. LOADER_VERSION .. "] Skipping relaunch (count=" .. count .. ")")
+				log("Skipping relaunch (count=" .. count .. ")", true)
 				return
 			end
 			ENV._Alleral_RelaunchCount = count + 1
@@ -3972,7 +4036,7 @@ local function main()
 				.. LOADER_VERSION
 				.. " is below minimum v"
 				.. tostring(expectedVersions.minLoader)
-				.. " Ã¢â‚¬â€ fetching latest bootstrap"
+				.. " — fetching latest bootstrap"
 		)
 		ENV.Alleral_LoaderRunning = false
 		task.defer(function()
@@ -3993,7 +4057,7 @@ local function main()
 				.. tostring(RELEASE_FALLBACK.commit)
 				.. " != release "
 				.. tostring(expectedVersions.commit)
-				.. " Ã¢â‚¬â€ continuing (bootstrap may refresh on next relaunch)"
+				.. " — continuing (bootstrap may refresh on next relaunch)"
 		)
 	end
 	task.spawn(function()
@@ -4020,7 +4084,7 @@ local function main()
 				reportLegacyScan(remaining, deletedPaths)
 				notify(
 					"Alleral",
-					"Old loader files found Ã¢â‚¬â€ run getgenv().Alleral_ScanLegacy() to list them",
+					"Old loader files found — run getgenv().Alleral_ScanLegacy() to list them",
 					8
 				)
 			end
@@ -4032,7 +4096,7 @@ local function main()
 		log(
 			"Old loader v"
 				.. PREVIOUS_LOADER_VERSION
-				.. " ran before this script Ã¢â‚¬â€ check "
+				.. " ran before this script — check "
 				.. savedScriptsHint
 				.. " and workspace loader files",
 			true
@@ -4059,7 +4123,7 @@ local function main()
 		profile.name,
 		EXECUTOR.name,
 		EXECUTOR.slug,
-		EXECUTOR.weaoVerified and " Ã‚Â· WEAO" or ""
+		EXECUTOR.weaoVerified and " · WEAO" or ""
 	))
 	ENV._Alleral_ActiveProfile = profile
 
@@ -4092,7 +4156,7 @@ local function main()
 			local status = evaluation.status
 			local msg = status.label
 			if status.message ~= "" then
-				msg = msg .. " Ã¢â‚¬â€ " .. status.message
+				msg = msg .. " — " .. status.message
 			end
 			msg = msg .. ". Set getgenv().Alleral_ForceLoad = true and reload to bypass."
 			notify("Alleral", status.icon .. " " .. msg, 12)
@@ -4263,7 +4327,7 @@ publishConsoleApi("Alleral_Bootstrap", function(reason)
 	end
 	local ok, err = relaunch(reason or "manual-bootstrap")
 	if not ok then
-		warn("[Alleral v" .. LOADER_VERSION .. "] Bootstrap failed: " .. tostring(err))
+		log("Bootstrap failed: " .. tostring(err), true)
 		return false, err
 	end
 	return true, err
@@ -4272,12 +4336,12 @@ end)
 publishConsoleApi("Alleral_Load", function()
 	local relaunch = ENV._Alleral_RelaunchViaBootstrap
 	if type(relaunch) ~= "function" then
-		warn("[Alleral v" .. LOADER_VERSION .. "] Load failed: bootstrap relaunch unavailable")
+		log("Load failed: bootstrap relaunch unavailable", true)
 		return false
 	end
 	local ok, err = relaunch("manual-load")
 	if not ok then
-		warn("[Alleral v" .. LOADER_VERSION .. "] Load failed: " .. tostring(err))
+		log("Load failed: " .. tostring(err), true)
 		return false
 	end
 	return true
@@ -4309,12 +4373,12 @@ end)
 
 publishConsoleApi("Alleral_ScanLegacy", function()
 	local hits = scanLegacyLoaders()
-	print("[Alleral v" .. LOADER_VERSION .. "] Legacy scan (" .. tostring(#hits) .. " hit(s)):")
+	log("Legacy scan (" .. tostring(#hits) .. " hit(s)):")
 	for _, hit in ipairs(hits) do
-		print("  - " .. hit.path .. " (v" .. hit.version .. ")")
+		log("  - " .. hit.path .. " (v" .. hit.version .. ")")
 	end
 	if #hits == 0 then
-		print("  (none Ã¢â‚¬â€ if you still see v3.x logs, it is a Saved Script or old one-liner, not a workspace file)")
+		log("  (none — if you still see v3.x logs, it is a Saved Script or old one-liner, not a workspace file)")
 	end
 	return hits
 end)
@@ -4322,9 +4386,9 @@ end)
 publishConsoleApi("Alleral_PurgeCache", function()
 	local ok = pcall(purgeAlleralWorkspace, { reason = "manual" })
 	if ok then
-		print("[Alleral v" .. LOADER_VERSION .. "] Workspace cache purge complete")
+		log("Workspace cache purge complete")
 	else
-		warn("[Alleral v" .. LOADER_VERSION .. "] Purge skipped — filesystem not available")
+		log("Purge skipped — filesystem not available", true)
 	end
 	return true
 end)
@@ -4332,10 +4396,10 @@ end)
 publishConsoleApi("Alleral_CheckUpdate", function()
 	local profile = ENV._Alleral_ActiveProfile
 	if checkForRemoteUpdate(profile, false) then
-		print("[Alleral v" .. LOADER_VERSION .. "] Update found Ã¢â‚¬â€ reloading")
+		log("Update found — reloading")
 		return true
 	end
-	print("[Alleral v" .. LOADER_VERSION .. "] Already up to date")
+	log("Already up to date")
 	return false
 end)
 

@@ -533,8 +533,13 @@ return function(Bootstrap, Motion, Text)
 	function TooltipManager.init()
 		ensureGui()
 		startPolling()
-		warn("[WindUI] TooltipManager ready (mouse polling)")
-		warn("[WindUI] Tooltip recursion guard active")
+		pcall(function()
+			local Log = getgenv and getgenv().Alleral_Log
+			if Log and Log.info then
+				Log.info("TooltipManager ready (mouse polling)")
+				Log.info("Tooltip recursion guard active")
+			end
+		end)
 	end
 
 	function TooltipManager.getStats()

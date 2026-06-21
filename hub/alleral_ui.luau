@@ -170,6 +170,12 @@ return function(Core)
 		if Util and type(Util.textOf) == "function" then
 			return Util.textOf(v, maxLen)
 		end
+		if type(Core.sanitizeText) == "function" then
+			return Core.sanitizeText(v, maxLen or 240)
+		end
+		if sanitizeFn then
+			return sanitizeFn(v, maxLen or 240)
+		end
 		if v == nil then return "" end
 		return tostring(v)
 	end

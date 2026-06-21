@@ -107,12 +107,49 @@ end
 local ENV = genv()
 local LOG_TAG = "[Alleral]"
 
+local function getLog()
+	return ENV.Alleral_Log
+end
+
+function Core.sanitizeText(value, maxLen)
+	local Log = getLog()
+	if Log and type(Log.sanitize) == "function" then
+		return Log.sanitize(value, maxLen)
+	end
+	if type(ENV.Alleral_Text) == "table" and type(ENV.Alleral_Text.sanitize) == "function" then
+		return ENV.Alleral_Text.sanitize(value, maxLen)
+	end
+	if value == nil then
+		return ""
+	end
+	return tostring(value)
+end
+
 function Core.say(msg)
-	print(LOG_TAG .. " " .. tostring(msg))
+	local Log = getLog()
+	if Log and Log.info then
+		Log.info(msg)
+		return
+	end
+	print(LOG_TAG .. " " .. Core.sanitizeText(msg, 2000))
 end
 
 function Core.logWarn(msg)
-	warn(LOG_TAG .. " " .. tostring(msg))
+	local Log = getLog()
+	if Log and Log.warn then
+		Log.warn(msg)
+		return
+	end
+	warn(LOG_TAG .. " " .. Core.sanitizeText(msg, 2000))
+end
+
+function Core.logError(msg)
+	local Log = getLog()
+	if Log and Log.error then
+		Log.error(msg)
+		return
+	end
+	warn(LOG_TAG .. " ERROR " .. Core.sanitizeText(msg, 2000))
 end
 
 function Core.assertLoader()
@@ -321,8 +358,7 @@ local NOTIFY_DEBOUNCE = {}
 
 local function safeNotifyText(value, maxLen)
 	if value == nil then return "" end
-	local text = tostring(value)
-	text = text:gsub("[%c]", " ")
+	local text = Core.sanitizeText(value, maxLen or 240)
 	text = text:gsub("(stack overflow%s*)+", "stack overflow ")
 	text = text:gsub("(%s%s+)", " ")
 	maxLen = tonumber(maxLen) or 240

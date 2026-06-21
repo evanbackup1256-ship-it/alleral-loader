@@ -3418,7 +3418,7 @@ local function loggedCallback(label, callback)
 end
 
 local uiWindow = Core.buildUiWindow(ui, Core.uiWindowSettings({
-	Subtitle = "Kick a Lucky Block Â· v" .. VERSION,
+	Subtitle = "Kick a Lucky Block  ·  v" .. VERSION,
 	Icon = "zap",
 	Theme = "Default",
 	Size = UDim2.fromOffset(960, 660),
@@ -5159,7 +5159,7 @@ task.spawn(function()
 			if runtime._diagLabels.Remotes then runtime._diagLabels.Remotes:SetText("Remotes: " .. remoteText) end
 			runtime._diagValues.Remotes = remoteText
 			local build = runtime.gameBuild
-			local buildText = build and ((build.Changed and "Updated" or "Same") .. " Â· v" .. tostring(build.PlaceVersion or "--")) or "--"
+			local buildText = build and ((build.Changed and "Updated" or "Same") .. "  ·  v" .. tostring(build.PlaceVersion or "--")) or "--"
 			if runtime._diagLabels.Build then runtime._diagLabels.Build:SetText("Build: " .. buildText) end
 			runtime._diagValues.Build = buildText
 			local updatedText = build and formatRobloxTimestamp(build.Updated) or "--"
@@ -5475,7 +5475,7 @@ makeSupervisor("Prediction", 1, function()
 		if weakestCps < math.huge then
 			local diff = cps1 - weakestCps
 			if hasEmpty then
-				netGainStr = "+" .. formatNumber(cps1) .. " Â· open slot"
+				netGainStr = "+" .. formatNumber(cps1) .. "  ·  open slot"
 			else
 				netGainStr = (diff >= 0 and "+" or "") .. formatNumber(diff) .. "/s"
 			end
@@ -5495,7 +5495,7 @@ makeSupervisor("Prediction", 1, function()
 		local signature = name .. "\0" .. mutation .. "\0" .. rarity
 		if runtime.lastRareNotify ~= signature then
 			runtime.lastRareNotify = signature
-			notify("Rare!", name .. " Â· " .. rarity .. " Â· " .. mutation, 6)
+			notify("Rare!", name .. "  ·  " .. rarity .. "  ·  " .. mutation, 6)
 		end
 	end
 	if runtime._predLabels and runtime._predLabels.Result then
@@ -5559,7 +5559,7 @@ makeSupervisor("AutoKick", 0.3, function()
 			local signature = notifyName .. "\0" .. notifyMutation .. "\0" .. notifyRarity
 			if runtime.lastRareNotify ~= signature then
 				runtime.lastRareNotify = signature
-				notify("Rare!", notifyName .. " Â· " .. notifyRarity .. " Â· " .. notifyMutation, 6)
+				notify("Rare!", notifyName .. "  ·  " .. notifyRarity .. "  ·  " .. notifyMutation, 6)
 			end
 		end
 	end
@@ -6281,7 +6281,7 @@ task.defer(function()
 end)
 
 Core.finalizeGameUi(uiHandles.window, ui, {
-	Subtitle = "Kick a Lucky Block Â· v" .. VERSION,
+	Subtitle = "Kick a Lucky Block  ·  v" .. VERSION,
 })
 end
 

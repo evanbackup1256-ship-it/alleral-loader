@@ -21,7 +21,10 @@ return function()
 			local results = { pcall(fn, ...) }
 			BUSY[key] = false
 			if not results[1] then
-				warn("[Alleral] callback error (" .. key .. "): " .. tostring(results[2]))
+				local Log = getgenv and getgenv().Alleral_Log
+				if Log and Log.warn then
+					Log.warn("callback error (" .. key .. "): " .. tostring(results[2]))
+				end
 				return
 			end
 			return table.unpack(results, 2)
