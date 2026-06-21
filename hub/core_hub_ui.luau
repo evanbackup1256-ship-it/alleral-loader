@@ -416,7 +416,7 @@ function Core.syncUiState(state, options)
 						entry.widget:Set({ CurrentValue = value == true })
 					end
 				end)
-				synced += 1
+				synced = synced + 1
 			elseif entry.kind == "slider" and raw then
 				pcall(function()
 					local num = tonumber(value) or 0
@@ -431,7 +431,7 @@ function Core.syncUiState(state, options)
 						entry.widget:Set({ CurrentValue = num })
 					end
 				end)
-				synced += 1
+				synced = synced + 1
 			elseif entry.kind == "input" and raw then
 				pcall(function()
 					if type(raw.UpdateText) == "function" then
@@ -440,7 +440,7 @@ function Core.syncUiState(state, options)
 						entry.widget:Set({ CurrentValue = tostring(value) })
 					end
 				end)
-				synced += 1
+				synced = synced + 1
 			elseif entry.kind == "dropdown" and raw then
 				pcall(function()
 					if type(raw.UpdateSelection) == "function" then
@@ -453,7 +453,7 @@ function Core.syncUiState(state, options)
 						entry.widget:Set({ CurrentOption = value })
 					end
 				end)
-				synced += 1
+				synced = synced + 1
 			elseif entry.widget and type(entry.widget.Set) == "function" then
 				pcall(function()
 					if entry.kind == "toggle" then
@@ -464,7 +464,7 @@ function Core.syncUiState(state, options)
 						entry.widget:Set({ CurrentOption = value })
 					end
 				end)
-				synced += 1
+				synced = synced + 1
 			end
 		end
 	end
@@ -1161,7 +1161,7 @@ function Core.buildSessionStatsGroup(tab, column)
 	local startedAt = tick()
 	local frameCount = 0
 	local frameConn = RunService.RenderStepped:Connect(function()
-		frameCount += 1
+		frameCount = frameCount + 1
 	end)
 	local group = Core.buildUiGroup(tab, "Session stats", column or 1, nil, nil, "SessionStats")
 	local status = Core.buildStatusDisplay(group, "Live", {
@@ -1497,7 +1497,7 @@ function Core.buildAutomationStatusGroup(tab, options)
 		for _, entry in ipairs(flags) do
 			local on = state[entry.key] == true
 			if on then
-				active += 1
+				active = active + 1
 			end
 			local loopState = loops[entry.key] or loops[entry.label]
 			local pulse = on and (loopState and loopState.enabled ~= false and "â—" or "â—‹") or "Â·"
@@ -2142,7 +2142,7 @@ function Core.buildRemoteToolsGroup(tab, column, options)
 	end
 
 	local function scanRemotesAsync(done)
-		scanToken += 1
+		scanToken = scanToken + 1
 		local token = scanToken
 		status:Update("LastScan", "scanning")
 		task.spawn(function()
@@ -2153,7 +2153,7 @@ function Core.buildRemoteToolsGroup(tab, column, options)
 					return
 				end
 				if isRemote(inst) then
-					count += 1
+					count = count + 1
 				end
 				if i % 2500 == 0 then
 					status:Update("Indexed", tostring(count))
@@ -2188,7 +2188,7 @@ function Core.buildRemoteToolsGroup(tab, column, options)
 
 	group:CreateButton("Copy remote list", function()
 		scanRemotesAsync(function()
-			scanToken += 1
+			scanToken = scanToken + 1
 			local token = scanToken
 			task.spawn(function()
 				local lines = {}
@@ -2734,7 +2734,7 @@ function Core.buildCloudConfigStudio(tab, options)
 			local localValue = state[key]
 			local remoteValue = remote[key]
 			if remoteValue ~= nil and HttpService:JSONEncode(localValue) ~= HttpService:JSONEncode(remoteValue) then
-				changed += 1
+				changed = changed + 1
 			end
 		end
 		return changed
