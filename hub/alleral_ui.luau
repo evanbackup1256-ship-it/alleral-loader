@@ -131,16 +131,15 @@ return function(Core)
 	end
 	local function createDivider(p) return make("Frame",{Size=UDim2.new(1,0,0,1),BackgroundColor3=C.COLOR.BORDER,BackgroundTransparency=0.93,BorderSizePixel=0,Parent=p}) end
 
-	-- ========== TOGGLE (iOS-style) ==========
+	-- ========== TOGGLE ==========
 	local function createToggle(parent, name, default, callback)
 		local g=make("Frame",{Size=UDim2.new(1,0,0,C.CONTROL.ROW_H),BackgroundTransparency=1,Parent=parent})
 		make("TextLabel",{Size=UDim2.new(1,-C.TOGGLE.W-12,1,0),BackgroundTransparency=1,Text=tostring(name),TextColor3=C.COLOR.TEXT,Font=C.FONT,TextSize=C.TEXT,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Center,TextTruncate=Enum.TextTruncate.AtEnd,Parent=g})
 		local t=make("Frame",{Size=UDim2.new(0,C.TOGGLE.W,0,C.TOGGLE.H),Position=UDim2.new(1,-C.TOGGLE.W,0.5,-C.TOGGLE.H/2),BackgroundColor3=C.COLOR.BG4,BorderSizePixel=0,Parent=g}); corner(t,C.TOGGLE.RADIUS)
-		local th=make("Frame",{Size=UDim2.new(0,C.TOGGLE.THUMB,0,C.TOGGLE.THUMB),Position=UDim2.new(0,3,0.5,-C.TOGGLE.THUMB/2),BackgroundColor3=C.COLOR.TEXT2,BorderSizePixel=0,ZIndex=2,Parent=t}); corner(th,9)
-		-- shadow
-		make("Frame",{Size=UDim2.new(1,0,1,0),Position=UDim2.new(0,0,0,0),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=0.6,BorderSizePixel=0,ZIndex=1,Parent=th}); corner(th:FindFirstChildOfClass("UICorner") or make("UICorner",{CornerRadius=UDim.new(0,9),Parent=th}))
+		local th=make("Frame",{Size=UDim2.new(0,C.TOGGLE.THUMB,0,C.TOGGLE.THUMB),Position=UDim2.new(0,3,0.5,-C.TOGGLE.THUMB/2),BackgroundColor3=C.COLOR.WHITE,BorderSizePixel=0,ZIndex=2,Parent=t}); corner(th,9)
+		make("Frame",{Size=UDim2.new(1,2,1,2),Position=UDim2.new(0,-1,0,-1),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=0.65,BorderSizePixel=0,ZIndex=1,Parent=th,Children={make("UICorner",{CornerRadius=UDim.new(0,10),Parent=th})}})
 		local en=default==true
-		if en then t.BackgroundColor3=C.COLOR.ACCENT; th.Position=UDim2.new(1,-C.TOGGLE.THUMB-3,0.5,-C.TOGGLE.THUMB/2); th.BackgroundColor3=C.COLOR.WHITE end
+		if en then t.BackgroundColor3=C.COLOR.ACCENT; th.Position=UDim2.new(1,-C.TOGGLE.THUMB-3,0.5,-C.TOGGLE.THUMB/2) end
 		local function tog() en=not en; Anim.spring(t,{BackgroundColor3=en and C.COLOR.ACCENT or C.COLOR.BG4}); Anim.spring(th,{Position=en and UDim2.new(1,-C.TOGGLE.THUMB-3,0.5,-C.TOGGLE.THUMB/2) or UDim2.new(0,3,0.5,-C.TOGGLE.THUMB/2)}); if callback then callback(en) end end
 		t.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then tog() end end)
 		return {Set=function(_,v) local val; if type(v)=="table" then val=v.CurrentValue or v.Value else val=v end; if val~=nil and val~=en then tog() end end,SetValue=function(_,v) if v~=nil and v~=en then tog() end end,Container=g}
@@ -171,15 +170,16 @@ return function(Core)
 		local g=make("Frame",{Size=UDim2.new(1,0,0,40),BackgroundTransparency=1,Parent=parent})
 		local b=make("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundColor3=C.COLOR.BG3,BorderSizePixel=0,Text=tostring(name),TextColor3=C.COLOR.TEXT,Font=C.FONT_BOLD,TextSize=C.TEXT,AutoButtonColor=false,Parent=g})
 		corner(b,C.CONTROL.RADIUS); stroke(b,C.COLOR.BORDER,nil,0.93)
-		b.MouseEnter:Connect(function() Anim.spring(b,{BackgroundColor3=C.COLOR.ACCENT,TextColor3=C.COLOR.WHITE}) end)
-		b.MouseLeave:Connect(function() Anim.spring(b,{BackgroundColor3=C.COLOR.BG3,TextColor3=C.COLOR.TEXT}) end)
-		b.MouseButton1Down:Connect(function() Anim.spring(b,{BackgroundColor3=C.COLOR.ACCENT_DARK}) end)
-		b.MouseButton1Up:Connect(function() Anim.spring(b,{BackgroundColor3=C.COLOR.ACCENT}) end)
+		local bus=Anim.uis(b)
+		b.MouseEnter:Connect(function() Anim.spring(bus,{Scale=1.02}); Anim.spring(b,{BackgroundColor3=C.COLOR.ACCENT,TextColor3=C.COLOR.WHITE}) end)
+		b.MouseLeave:Connect(function() Anim.spring(bus,{Scale=1}); Anim.spring(b,{BackgroundColor3=C.COLOR.BG3,TextColor3=C.COLOR.TEXT}) end)
+		b.MouseButton1Down:Connect(function() Anim.spring(bus,{Scale=0.97}); Anim.spring(b,{BackgroundColor3=C.COLOR.ACCENT_DARK}) end)
+		b.MouseButton1Up:Connect(function() Anim.spring(bus,{Scale=1}); Anim.spring(b,{BackgroundColor3=C.COLOR.ACCENT}) end)
 		if callback then b.MouseButton1Click:Connect(function() callback() end) end
-		-- lift+glow
-		make("Frame",{Size=UDim2.new(1,0,1,0),Position=UDim2.new(0,0,0,0),BackgroundColor3=C.COLOR.ACCENT,BackgroundTransparency=1,BorderSizePixel=0,ZIndex=-1,Parent=b,Children={make("UICorner",{CornerRadius=UDim.new(0,C.CONTROL.RADIUS),Parent=b})}})
-		b.MouseEnter:Connect(function() local g2=b:FindFirstChildWhichIsA("Frame"); if g2 then Anim.tween(g2,{BackgroundTransparency=0.8},0.12) end end)
-		b.MouseLeave:Connect(function() local g2=b:FindFirstChildWhichIsA("Frame"); if g2 then Anim.tween(g2,{BackgroundTransparency=1},0.12) end end)
+		-- glow layer
+		local glow=make("Frame",{Size=UDim2.new(1,0,1,0),Position=UDim2.new(0,0,0,0),BackgroundColor3=C.COLOR.ACCENT,BackgroundTransparency=1,BorderSizePixel=0,ZIndex=-1,Parent=b,Children={make("UICorner",{CornerRadius=UDim.new(0,C.CONTROL.RADIUS),Parent=b})}})
+		b.MouseEnter:Connect(function() Anim.tween(glow,{BackgroundTransparency=0.8},0.12) end)
+		b.MouseLeave:Connect(function() Anim.tween(glow,{BackgroundTransparency=1},0.12) end)
 		return {Set=function() end,Container=g}
 	end
 
