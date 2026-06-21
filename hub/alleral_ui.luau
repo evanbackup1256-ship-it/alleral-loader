@@ -594,6 +594,7 @@ return function(Core)
 
 		-- Toggle/hide system
 		local uiHidden = false
+		local window = {}
 		function window:Hide()
 			if uiHidden then return end; uiHidden = true; Anim.stopAll()
 			Anim.centerFadeOut(main, 0.15)
