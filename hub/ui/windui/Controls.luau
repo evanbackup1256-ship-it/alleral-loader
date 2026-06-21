@@ -70,14 +70,16 @@ return function(Bootstrap, Motion, Text, Guards, TooltipManager)
 
 		function api:SetText(_, t)
 			local clean = Bootstrap.sanitize(t, 200)
-			if shouldSkipText(clean) then
+			if clean == "" then
 				return
 			end
 			pcall(function()
-				if el.Set then
-					el:Set(clean)
-				elseif el.SetTitle then
+				if el.SetTitle then
 					el:SetTitle(clean)
+				elseif el.Set then
+					el:Set(clean)
+				elseif el.Title ~= nil then
+					el.Title = clean
 				end
 			end)
 		end

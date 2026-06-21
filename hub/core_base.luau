@@ -1,8 +1,8 @@
 local Core = {}
 Core.VERSION = "2.9.10"
 Core._CORE_ARTIFACT = "base"
-Core.UI_LIBRARY = "Linoria"
-Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "5.0.0"
+Core.UI_LIBRARY = "WindUI"
+Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "11.3.1"
 Core.UI_VERSION = Core.ALLERAL_UI_VERSION
 
 local HttpService = game:GetService("HttpService")
@@ -799,11 +799,35 @@ function Core.detectExecutor()
 		display = "Bunni"
 	end
 
+	local envSlugs = {}
+	local sharedEnv = ENV.shared or (typeof(shared) == "table" and shared) or nil
+	local function addEnvSlug(envSlug, ok)
+		if ok then
+			table.insert(envSlugs, envSlug)
+		end
+	end
+	addEnvSlug("volt", type(ENV.Volt) == "table" and type(ENV.Volt.request) == "function")
+	addEnvSlug("synapse", type(ENV.syn) == "table" and type(ENV.syn.request) == "function")
+	addEnvSlug("krnl", ENV.KRNL_LOADED == true)
+	addEnvSlug("fluxus", type(ENV.fluxus) == "table")
+	addEnvSlug("xeno", type(ENV.Xeno) == "table")
+	addEnvSlug("wave", type(ENV.Wave) == "table")
+	addEnvSlug("electron", type(ENV.Electron) == "table")
+	addEnvSlug("solara", type(ENV.Solara) == "table" or (sharedEnv and type(sharedEnv.solara) == "table"))
+	addEnvSlug("potassium", type(ENV.Potassium) == "table")
+	addEnvSlug("velocity", type(ENV.Velocity) == "table")
+	addEnvSlug("codex", type(ENV.Codex) == "table")
+	addEnvSlug("hydrogen", type(ENV.Hydrogen) == "table")
+	addEnvSlug("delta", type(ENV.delta) == "table")
+	addEnvSlug("celery", type(ENV.celery) == "table")
+	addEnvSlug("jjsploit", ENV.IS_JJSLOIT == true or type(ENV.jjsploit) == "table")
+
 	return {
 		slug = slug,
 		name = display,
 		rawName = rawName,
 		isKnown = slug ~= "unknown",
+		envSlugs = envSlugs,
 	}
 end
 
@@ -980,6 +1004,7 @@ function Core.executorProfile()
 			isKnown = detected.isKnown,
 			envSlugs = detected.envSlugs,
 			weao = Core.formatWeaoEntry(Core.matchWeaoExploit(detected, ENV.Alleral_WeaoCache and ENV.Alleral_WeaoCache.data)),
+			weaoVerified = false,
 		})
 	end
 	local slug = detected.slug
@@ -1057,7 +1082,7 @@ function Core.refreshLoaderCapabilities()
 	local profile = Core.executorProfile()
 	local caps = {
 		executor = profile.displayName,
-		executorSlug = profile.name,
+		executorSlug = profile.slug or profile.name,
 		http = profile.hasHttp,
 		loadstring = type(ENV.loadstring or loadstring) == "function",
 		readfile = profile.hasFilesystem,
@@ -1375,6 +1400,95 @@ function Core.httpGetJson(url)
 		return nil, "json parse failed"
 	end
 	return decoded, nil
+end
+
+local _liveStats = {
+	fps = nil,
+	pingMs = nil,
+	memoryMb = nil,
+	players = nil,
+	uptimeSec = 0,
+	startedAt = tick(),
+}
+local _liveStatsConn = nil
+local _liveStatsRunning = false
+
+function Core.hubSessionActive()
+	local env = genv()
+	local hubState = env.Alleral_State
+	if type(hubState) == "table" and hubState.HubRunning == false then
+		return false
+	end
+	return true
+end
+
+function Core.startLiveStatsSampler()
+	if _liveStatsRunning then
+		return
+	end
+	_liveStatsRunning = true
+	_liveStats.startedAt = tick()
+	local RunService = game:GetService("RunService")
+	local Stats = game:GetService("Stats")
+	local Players = game:GetService("Players")
+	local frameCount = 0
+	if _liveStatsConn then
+		_liveStatsConn:Disconnect()
+		_liveStatsConn = nil
+	end
+	_liveStatsConn = RunService.RenderStepped:Connect(function()
+		frameCount = frameCount + 1
+	end)
+	task.spawn(function()
+		local lastTick = tick()
+		while _liveStatsRunning do
+			local now = tick()
+			local elapsed = math.max(now - lastTick, 0.001)
+			local fps = math.floor(frameCount / elapsed)
+			frameCount = 0
+			lastTick = now
+			pcall(function()
+				local item = Stats.PerformanceStats.FrameRate
+				if item and item.GetValue then
+					local perfFps = math.floor(item:GetValue())
+					if perfFps > 0 then
+						fps = perfFps
+					end
+				end
+			end)
+			local pingMs = nil
+			pcall(function()
+				local item = Stats.Network.ServerStatsItem["Data Ping"]
+				if item and item.GetValue then
+					pingMs = math.floor(item:GetValue())
+				elseif item and item.GetValueString then
+					pingMs = tonumber(tostring(item:GetValueString()):match("%d+"))
+				end
+			end)
+			local memoryMb = nil
+			pcall(function()
+				memoryMb = Stats:GetTotalMemoryUsageMb()
+			end)
+			_liveStats.fps = fps
+			_liveStats.pingMs = pingMs
+			_liveStats.memoryMb = memoryMb
+			_liveStats.players = #Players:GetPlayers()
+			_liveStats.uptimeSec = math.floor(now - _liveStats.startedAt)
+			task.wait(1)
+		end
+		if _liveStatsConn then
+			_liveStatsConn:Disconnect()
+			_liveStatsConn = nil
+		end
+	end)
+end
+
+function Core.getLiveStats()
+	return _liveStats
+end
+
+function Core.stopLiveStatsSampler()
+	_liveStatsRunning = false
 end
 
 Core.installResilience()

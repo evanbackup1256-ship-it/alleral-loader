@@ -29,14 +29,14 @@ local RELEASE_FALLBACK = {
 	loader = "8.12.2",
 	core = "2.9.10",
 	ui = "WindUI",
-	uiVersion = "11.0.0",
+	uiVersion = "11.3.1",
 	analytics = "1.2",
 	telemetry = "3.5",
 	helpers = "1.8",
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "5463b31",
+	commit = "361fc74",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -633,18 +633,27 @@ local function bootExecutorRuntime()
 	return false
 end
 
-task.defer(bootExecutorRuntime)
-
-local EXECUTOR = resolveExecutorProfile()
-if type(ENV.Alleral_ExecutorRuntime) == "table" and type(ENV.Alleral_ExecutorRuntime.enrichProfile) == "function" then
-	local enriched = ENV.Alleral_ExecutorRuntime.enrichProfile(EXECUTOR)
-	if type(enriched) == "table" then
-		EXECUTOR = enriched
-		EXECUTOR.slug = enriched.slug or EXECUTOR.slug
-		EXECUTOR.name = enriched.displayName or enriched.name or EXECUTOR.name
+local function applyExecutorProfile(profile)
+	profile = profile or resolveExecutorProfile()
+	if type(ENV.Alleral_ExecutorRuntime) == "table" and type(ENV.Alleral_ExecutorRuntime.enrichProfile) == "function" then
+		local enriched = ENV.Alleral_ExecutorRuntime.enrichProfile(profile)
+		if type(enriched) == "table" then
+			profile = enriched
+			profile.slug = enriched.slug or profile.slug
+			profile.name = enriched.displayName or enriched.name or profile.name
+		end
 	end
+	EXECUTOR = profile
+	ENV.Alleral_Executor = profile
+	if ENV.Alleral_Core and type(ENV.Alleral_Core.refreshLoaderCapabilities) == "function" then
+		pcall(ENV.Alleral_Core.refreshLoaderCapabilities)
+	end
+	return profile
 end
-log("Executor: " .. EXECUTOR.name .. " (" .. EXECUTOR.slug .. ")")
+
+bootExecutorRuntime()
+local EXECUTOR = applyExecutorProfile(resolveExecutorProfile())
+log("Executor: " .. tostring(EXECUTOR.name or "?") .. " (" .. tostring(EXECUTOR.slug or "unknown") .. ")")
 
 -- Per-executor HTTP transport order (first = preferred for that injector)
 local HTTP_STRATEGIES = {
@@ -3029,15 +3038,10 @@ fetchExpectedVersions = function(forceRefresh)
 		expected.weao = release.weao or expected.weao
 		expected.uiVersion = release.uiVersion or expected.uiVersion
 		expected.ui = release.ui or expected.ui
-		expected.commit = release.commit or expected.commit
-		expected.updatedAt = release.updatedAt or expected.updatedAt
-		if type(release.commit) == "string" and release.commit ~= "" and type(RELEASE_FALLBACK.commit) == "string" then
-			if release.commit ~= RELEASE_FALLBACK.commit then
-				expected.commit = RELEASE_FALLBACK.commit
-			else
-				expected.commit = release.commit
-			end
+		if type(release.commit) == "string" and release.commit ~= "" then
+			expected.commit = release.commit
 		end
+		expected.updatedAt = release.updatedAt or expected.updatedAt
 		expected.minLoader = release.minLoader or expected.minLoader
 		expected.minCore = release.minCore or expected.minCore
 		if type(release.updatePollSeconds) == "number" then
@@ -4135,8 +4139,13 @@ local function main()
 	ensureTelemetryLoaded()
 
 	grantPublicAccess()
+	pcall(loadModule, { HUB .. "/executor_runtime.luau" }, HUB .. "/executor_runtime.luau", "Alleral_ExecutorRuntime", "Alleral/executor_runtime")
+	applyExecutorProfile(EXECUTOR)
+	pcall(refreshWeaoProfile, EXECUTOR)
+	if ENV.Alleral_Core and type(ENV.Alleral_Core.notifyExecutorCompat) == "function" then
+		pcall(ENV.Alleral_Core.notifyExecutorCompat)
+	end
 	task.spawn(function()
-		pcall(loadModule, { HUB .. "/executor_runtime.luau" }, HUB .. "/executor_runtime.luau", "Alleral_ExecutorRuntime", "Alleral/executor_runtime")
 		pcall(loadModule, { HUB .. "/analytics.luau" }, HUB .. "/analytics.luau", "Alleral_Analytics", "Alleral/analytics")
 		pcall(loadModule, { HUB .. "/helpers.luau", "core/game_helpers.luau" }, HUB .. "/helpers.luau", "GameHelpers", "Alleral/helpers")
 	end)

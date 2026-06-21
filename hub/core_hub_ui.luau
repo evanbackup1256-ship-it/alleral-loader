@@ -25,9 +25,20 @@ local function setLabelText(label, text)
 	local rendered = uiText(text)
 	if not label then return end
 	if type(label.SetText) == "function" then
-		pcall(label.SetText, label, rendered)
-	elseif type(label.Set) == "function" then
-		pcall(label.Set, label, { Name = rendered, Text = rendered })
+		pcall(function()
+			label:SetText(rendered)
+		end)
+	end
+	if type(label.Set) == "function" then
+		pcall(function()
+			label:Set({ Name = rendered, Text = rendered, Title = rendered })
+		end)
+	end
+	local raw = type(label) == "table" and (label._raw or label._rawElement)
+	if raw and type(raw.SetTitle) == "function" then
+		pcall(function()
+			raw:SetTitle(rendered)
+		end)
 	end
 end
 
@@ -1157,14 +1168,9 @@ function Core.settingsFilePath(options)
 end
 
 function Core.buildSessionStatsGroup(tab, column)
-	local RunService = game:GetService("RunService")
-	local Stats = game:GetService("Stats")
-	local Players = game:GetService("Players")
-	local startedAt = tick()
-	local frameCount = 0
-	local frameConn = RunService.RenderStepped:Connect(function()
-		frameCount = frameCount + 1
-	end)
+	if type(Core.startLiveStatsSampler) == "function" then
+		pcall(Core.startLiveStatsSampler)
+	end
 	local group = Core.buildUiGroup(tab, "Session stats", column or 1, nil, nil, "SessionStats")
 	local status = Core.buildStatusDisplay(group, "Live", {
 		FPS = "--",
@@ -1174,34 +1180,27 @@ function Core.buildSessionStatsGroup(tab, column)
 		Memory = "--",
 	})
 	task.spawn(function()
-		local lastTick = tick()
-		while ENV.Alleral_State and ENV.Alleral_State.HubRunning ~= false do
-			local now = tick()
-			local elapsed = math.max(now - lastTick, 0.001)
-			local fps = math.floor(frameCount / elapsed)
-			frameCount = 0
-			lastTick = now
-			local ping = "--"
-			pcall(function()
-				local item = Stats.Network.ServerStatsItem["Data Ping"]
-				if item then
-					ping = item:GetValueString()
-				end
-			end)
-			local memory = "--"
-			pcall(function()
-				memory = string.format("%.0f MB", Stats:GetTotalMemoryUsageMb())
-			end)
-			local uptime = math.floor(tick() - startedAt)
-			status:Update("FPS", tostring(fps))
-			status:Update("Ping", ping)
-			status:Update("Players", tostring(#Players:GetPlayers()))
-			status:Update("Uptime", uptime .. "s")
-			status:Update("Memory", memory)
-			task.wait(2)
+		while true do
+			local env = genv()
+			local hubState = env.Alleral_State
+			if type(hubState) == "table" and hubState.HubRunning == false then
+				break
+			end
+			if type(Core.hubSessionActive) == "function" and Core.hubSessionActive() == false then
+				break
+			end
+			local live = type(Core.getLiveStats) == "function" and Core.getLiveStats() or nil
+			if type(live) == "table" then
+				status:Update("FPS", live.fps and tostring(live.fps) or "--")
+				status:Update("Ping", live.pingMs and (tostring(live.pingMs) .. " ms") or "--")
+				status:Update("Players", live.players and tostring(live.players) or "--")
+				status:Update("Uptime", (live.uptimeSec and (tostring(live.uptimeSec) .. "s")) or "0s")
+				status:Update("Memory", live.memoryMb and string.format("%.0f MB", live.memoryMb) or "--")
+			end
+			task.wait(1)
 		end
-		if frameConn then
-			frameConn:Disconnect()
+		if type(Core.stopLiveStatsSampler) == "function" then
+			pcall(Core.stopLiveStatsSampler)
 		end
 	end)
 	return group, status
@@ -1979,48 +1978,73 @@ end
 
 function Core.buildExecutorIntelGroup(tab, column)
 	local group = Core.buildUiGroup(tab, "Executor intel", column or 1, nil, nil, "ExecutorIntel")
-	local profile = type(Core.executorProfile) == "function" and Core.executorProfile() or {}
-	local execName = profile.displayName or Core.getExecutorDisplayName()
-	group:CreateLabel("Executor • " .. execName)
-	if profile.tier then
+	local status = Core.buildStatusDisplay(group, "Runtime", {
+		Executor = "detecting...",
+		Tier = "--",
+		Layout = "--",
+		PlaceId = tostring(game.PlaceId),
+		JobId = "--",
+		UserId = "--",
+		Caps = "--",
+	})
+	local function refreshExecutorIntel()
+		local profile = type(Core.executorProfile) == "function" and Core.executorProfile() or {}
+		local execName = profile.displayName or Core.getExecutorDisplayName() or "Unknown"
+		status:Update("Executor", execName)
 		local tier = tostring(profile.tier or "")
 		if tier ~= "" then
 			tier = tier:sub(1, 1):upper() .. tier:sub(2):lower()
 		end
-		group:CreateLabel("Tier • " .. tier)
-	end
-	if profile.layoutMode then
+		status:Update("Tier", tier ~= "" and tier or "--")
 		local layout = tostring(profile.layoutMode or "")
 		if layout ~= "" then
 			layout = layout:sub(1, 1):upper() .. layout:sub(2):lower()
 		end
-		group:CreateLabel("UI Layout • " .. layout)
-	end
-	group:CreateLabel("PlaceId • " .. tostring(game.PlaceId))
-	local jobId = tostring(game.JobId or "")
-	if #jobId > 18 then
-		jobId = jobId:sub(1, 18) .. "..."
-	end
-	group:CreateLabel("JobId • " .. jobId)
-	group:CreateLabel("UserId • " .. tostring(game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.UserId or "?"))
-	local caps = {}
-	for key, label in pairs({
-		hasClipboard = "clipboard",
-		hasFilesystem = "filesystem",
-		hasHttp = "http",
-		hasHook = "hook",
-		hasDrawing = "drawing",
-		hasGetConn = "signals",
-		hasFireTouch = "touch",
-	}) do
-		if profile[key] then
-			table.insert(caps, label)
+		status:Update("Layout", layout ~= "" and layout or "--")
+		status:Update("PlaceId", tostring(game.PlaceId))
+		local jobId = tostring(game.JobId or "")
+		if #jobId > 18 then
+			jobId = jobId:sub(1, 18) .. "..."
 		end
+		status:Update("JobId", jobId)
+		local lp = game:GetService("Players").LocalPlayer
+		status:Update("UserId", lp and tostring(lp.UserId) or "?")
+		local caps = {}
+		for key, label in pairs({
+			hasClipboard = "clipboard",
+			hasFilesystem = "filesystem",
+			hasHttp = "http",
+			hasHook = "hook",
+			hasDrawing = "drawing",
+			hasGetConn = "signals",
+			hasFireTouch = "touch",
+		}) do
+			if profile[key] then
+				table.insert(caps, label)
+			end
+		end
+		table.sort(caps)
+		status:Update("Caps", #caps > 0 and table.concat(caps, ", ") or "sandboxed")
 	end
-	group:CreateLabel("Caps • " .. (#caps > 0 and table.concat(caps, ", ") or "sandboxed"))
+	refreshExecutorIntel()
+	task.spawn(function()
+		while true do
+			local env = genv()
+			local hubState = env.Alleral_State
+			if type(hubState) == "table" and hubState.HubRunning == false then
+				break
+			end
+			if type(Core.hubSessionActive) == "function" and Core.hubSessionActive() == false then
+				break
+			end
+			refreshExecutorIntel()
+			task.wait(3)
+		end
+	end)
+	group:CreateButton("Refresh executor", refreshExecutorIntel, "Re-detect executor and capabilities.")
 	group:CreateButton("Copy JobId", Core.copyJobId, "Copy this server's JobId.")
 	group:CreateButton("Copy join link", Core.copyPlaceJoinLink, "Roblox app join link.")
-	return group
+	return group, status
 end
 
 function Core.buildPlayerOpsGroup(tab, column)

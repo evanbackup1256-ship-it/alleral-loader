@@ -441,13 +441,21 @@ local function notify(title, text, duration, notifyType)
 	end)
 end
 
-local Executor = Core.executorProfile()
+local function currentExecutor()
+	return Core.executorProfile()
+end
+
+local function executorEnv()
+	local profile = currentExecutor()
+	return (type(profile) == "table" and profile.env) or getgenv()
+end
 
 local function execFunc(name, noFs)
-	if noFs and not Executor.fsOk then
+	local executor = currentExecutor()
+	if noFs and not executor.fsOk then
 		return nil
 	end
-	local v = Executor.env[name]
+	local v = executor.env[name]
 	return type(v) == "function" and v or nil
 end
 
@@ -482,8 +490,11 @@ local listFiles   = execFunc("listfiles",  true)
 local appendFile  = execFunc("appendfile", true)
 local setClipboard = execFunc("setclipboard")
 	or execFunc("toclipboard")
-	or (type(Executor.env.Wave) == "table" and type(Executor.env.Wave.setclipboard) == "function" and Executor.env.Wave.setclipboard)
-	or (type(Executor.env.Electron) == "table" and type(Executor.env.Electron.setclipboard) == "function" and Executor.env.Electron.setclipboard)
+	or (function()
+		local env = executorEnv()
+		return (type(env.Wave) == "table" and type(env.Wave.setclipboard) == "function" and env.Wave.setclipboard)
+			or (type(env.Electron) == "table" and type(env.Electron.setclipboard) == "function" and env.Electron.setclipboard)
+	end)()
 local settingsFolder = "Alleral_Configs"
 local settingsFile = string.format("%s/KickBlox_v4_%s.json", settingsFolder, tostring(LocalPlayer.UserId))
 local logFile = string.format("%s/KickBlox_v4_%s.log", settingsFolder, tostring(LocalPlayer.UserId))
@@ -646,7 +657,7 @@ local function requestFunction()
 			return shared
 		end
 	end
-	local e = Executor.env
+	local e = executorEnv()
 	local candidates = {
 		type(e.syn)         == "table" and type(e.syn.request)          == "function" and e.syn.request          or nil,
 		type(e.fluxus)      == "table" and type(e.fluxus.request)       == "function" and e.fluxus.request       or nil,
@@ -717,7 +728,7 @@ local function fetchUrl(url)
 end
 
 local function getConnectionFetcher()
-	local e = Executor.env
+	local e = executorEnv()
 	local candidates = {
 		e.getconnections,
 		e.get_signal_cons,
@@ -5125,7 +5136,8 @@ task.spawn(function()
 			for _ in pairs(loops) do
 				loopCount = loopCount + 1
 			end
-			local execLabel = Executor.isKnown and Executor.displayName or ("? " .. (Executor.rawName ~= "" and ("(" .. Executor.rawName .. ")") or "unknown"))
+			local executor = currentExecutor()
+			local execLabel = executor.isKnown and executor.displayName or ("? " .. (executor.rawName ~= "" and ("(" .. executor.rawName .. ")") or "unknown"))
 			if runtime._diagLabels.Executor then runtime._diagLabels.Executor:SetText("Executor: " .. execLabel) end
 			runtime._diagValues.Executor = execLabel
 			local fpsText = tostring(runtime.currentFps or "--")

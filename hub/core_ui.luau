@@ -51,6 +51,9 @@ return function(Core)
 			end
 		end
 		state.HubRunning = true
+		if type(core.startLiveStatsSampler) == "function" then
+			pcall(core.startLiveStatsSampler)
+		end
 		if type(core.initAnalytics) == "function" then
 			core.initAnalytics()
 		end
