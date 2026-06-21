@@ -1289,17 +1289,19 @@ function Core.applyUiLayer(source, label)
 	if not loadFn then
 		return false, "loadstring unavailable"
 	end
-	local chunk, compileErr = loadFn(source, label or "@Alleral/core_ui")
+	local chunkName = label or "@Alleral/core_ui"
+	local chunk, compileErr = loadFn(source, chunkName)
 	if not chunk then
-		return false, tostring(compileErr)
+		return false, "[" .. tostring(chunkName) .. "] " .. tostring(compileErr)
 	end
 	local ok, layer = pcall(chunk)
 	if not ok or type(layer) ~= "function" then
-		return false, ok and "ui layer must return function(Core)" or tostring(layer)
+		return false, "[" .. tostring(chunkName) .. "] "
+			.. (ok and "ui layer must return function(Core)" or tostring(layer))
 	end
 	local applied, applyErr = pcall(layer, Core)
 	if not applied then
-		return false, tostring(applyErr)
+		return false, "[" .. tostring(chunkName) .. "] " .. tostring(applyErr)
 	end
 	Core._UiLayerCount = (Core._UiLayerCount or 0) + 1
 	if type(Core.loadUi) == "function"

@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.12.0"
+local LOADER_VERSION = "8.12.1"
 local BOOTSTRAP_VERSION = "2.1.0"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
@@ -26,7 +26,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.12.0",
+	loader = "8.12.1",
 	core = "2.9.10",
 	ui = "Linoria",
 	uiVersion = "5.1.0",
@@ -1304,6 +1304,47 @@ local function formatRuntimeError(runErr, chunkName)
 	return trace
 end
 
+local function normalizeCoreSourcePath(fallbackPath, label)
+	fallbackPath = tostring(fallbackPath or "unknown")
+	if type(label) ~= "string" or label == "" then
+		return fallbackPath
+	end
+	local trimmed = label:match("^local:(.+)$") or label:match("^cache:(.+)$")
+	if trimmed then
+		return trimmed
+	end
+	trimmed = label:match("^([^:]+%.luau):")
+	if trimmed then
+		return trimmed
+	end
+	trimmed = label:match("githubusercontent%.com/[^/]+/[^/]+/[^/]+/([^%s]+)")
+		or label:match("cdn%.jsdelivr%.net/gh/[^/]+/[^@]+@[^/]+/([^%s]+)")
+	if trimmed then
+		return trimmed
+	end
+	if label:find("%.luau", 1, true) then
+		trimmed = label:match("([%w%._/-]+%.luau)")
+		if trimmed then
+			return trimmed
+		end
+	end
+	return fallbackPath
+end
+
+local function formatCoreChunkName(fallbackPath, label)
+	local path = normalizeCoreSourcePath(fallbackPath, label)
+	return "@" .. path:gsub("^/+", "")
+end
+
+local function formatCoreLoadError(stage, fallbackPath, label, err)
+	local path = normalizeCoreSourcePath(fallbackPath, label)
+	local msg = tostring(err or "unknown error")
+	if msg:find(path, 1, true) then
+		return tostring(stage) .. ": " .. msg
+	end
+	return tostring(stage) .. " (" .. path .. "): " .. msg
+end
+
 local function hashBootstrapAttest(placeId, jobId, at, commit)
 	local text = "AlleralBootstrapGate-v5"
 		.. "|"
@@ -2208,13 +2249,13 @@ local function loadCore()
 	local alleralUiSrc, alleralUiLabel = resolved[3][2], resolved[3][3]
 	local hubUiSrc, hubUiLabel = resolved[4][2], resolved[4][3]
 	if not baseSrc then
-		return false, baseLabel or "core_base download failed"
+		return false, formatCoreLoadError("Core base fetch failed", CP.base, baseLabel, baseLabel or "download failed")
 	end
 
-	local ok, err = compileAndRun(baseSrc, "Alleral/core")
+	local ok, err = compileAndRun(baseSrc, formatCoreChunkName(CP.base, baseLabel))
 	if not ok then
 		ENV.Alleral_Core = nil
-		return false, err
+		return false, formatCoreLoadError("Core base", CP.base, baseLabel, err)
 	end
 	if not ENV.Alleral_Core then
 		return false, "Core did not initialize"
@@ -2236,37 +2277,37 @@ local function loadCore()
 
 	if not uiSrc then
 		ENV.Alleral_Core = nil
-		return false, uiLabel or "Core UI download failed"
+		return false, formatCoreLoadError("Core UI fetch failed", CP.ui, uiLabel, uiLabel or "download failed")
 	end
 
 	if not alleralUiSrc then
 		ENV.Alleral_Core = nil
-		return false, alleralUiLabel or "Alleral UI layer download failed"
+		return false, formatCoreLoadError("Alleral UI fetch failed", CP.alleral, alleralUiLabel, alleralUiLabel or "download failed")
 	end
 
 	if not hubUiSrc then
 		ENV.Alleral_Core = nil
-		return false, hubUiLabel or "Core hub UI download failed"
+		return false, formatCoreLoadError("Core hub UI fetch failed", CP.hub, hubUiLabel, hubUiLabel or "download failed")
 	end
 
-	local applied, applyErr = ENV.Alleral_Core.applyUiLayer(uiSrc, uiLabel or "@Alleral/core_ui")
+	local applied, applyErr = ENV.Alleral_Core.applyUiLayer(uiSrc, formatCoreChunkName(CP.ui, uiLabel))
 	if not applied then
 		ENV.Alleral_Core = nil
-		return false, applyErr or "Core UI layer failed"
-	end
-	RunService.Heartbeat:Wait()
-
-	applied, applyErr = ENV.Alleral_Core.applyUiLayer(alleralUiSrc, alleralUiLabel or "@Alleral/alleral_ui")
-	if not applied then
-		ENV.Alleral_Core = nil
-		return false, applyErr or "Alleral UI layer failed"
+		return false, formatCoreLoadError("Core UI layer", CP.ui, uiLabel, applyErr or "compile failed")
 	end
 	RunService.Heartbeat:Wait()
 
-	applied, applyErr = ENV.Alleral_Core.applyUiLayer(hubUiSrc, hubUiLabel or "@Alleral/core_hub_ui")
+	applied, applyErr = ENV.Alleral_Core.applyUiLayer(alleralUiSrc, formatCoreChunkName(CP.alleral, alleralUiLabel))
 	if not applied then
 		ENV.Alleral_Core = nil
-		return false, applyErr or "Core hub UI layer failed"
+		return false, formatCoreLoadError("Alleral UI layer", CP.alleral, alleralUiLabel, applyErr or "compile failed")
+	end
+	RunService.Heartbeat:Wait()
+
+	applied, applyErr = ENV.Alleral_Core.applyUiLayer(hubUiSrc, formatCoreChunkName(CP.hub, hubUiLabel))
+	if not applied then
+		ENV.Alleral_Core = nil
+		return false, formatCoreLoadError("Core hub UI layer", CP.hub, hubUiLabel, applyErr or "compile failed")
 	end
 
 	if not ENV.Alleral_Core._UiLayerReady or type(ENV.Alleral_Core.loadUi) ~= "function" then
