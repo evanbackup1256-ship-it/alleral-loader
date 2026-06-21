@@ -3,7 +3,7 @@
     "core":  "2.9.10",
     "weao":  "1.1",
     "ui":  "Linoria",
-    "commit":  "902fdbf",
+    "commit":  "b92080e",
     "updatedAt":  "2026-06-21T12:00:00Z",
     "updatePollSeconds":  120,
     "autoUpdate":  true,
