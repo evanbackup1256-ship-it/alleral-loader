@@ -259,7 +259,7 @@ return function(Core)
 		local open=false
 		trig.MouseButton1Click:Connect(function()
 			open=not open
-			if open then rebuild(sb and sb.Text or nil); posDD(); dd.Visible=true; dd.Scale=UDim2.new(0.98,0,0.98,0); Anim.spring(dd,{Scale=UDim2.new(1,0,1,0)}); Anim.spring(dd,{BackgroundTransparency=0}) else dd.Visible=false end
+			if open then rebuild(sb and sb.Text or nil); posDD(); dd.Visible=true; local ddus=Anim.uis(dd); ddus.Scale=0.98; Anim.spring(ddus,{Scale=1}); Anim.spring(dd,{BackgroundTransparency=0}) else dd.Visible=false end
 		end)
 		trig.MouseEnter:Connect(function() if not open then Anim.spring(trig,{BackgroundColor3=C.COLOR.BG4}) end end)
 		trig.MouseLeave:Connect(function() if not open then Anim.spring(trig,{BackgroundColor3=C.COLOR.BG3}) end end)
