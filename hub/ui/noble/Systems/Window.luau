@@ -207,12 +207,12 @@ return function(deps)
 		Util.corner(shine, 2)
 
 		card.MouseEnter:Connect(function()
-			Spr.target(glow, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.88 })
-			Spr.target(card, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.02 })
+			Util.safeSprTarget(glow, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.88 })
+			Util.safeSprTarget(card, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.02 })
 		end)
 		card.MouseLeave:Connect(function()
-			Spr.target(glow, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.94 })
-			Spr.target(card, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.04 })
+			Util.safeSprTarget(glow, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.94 })
+			Util.safeSprTarget(card, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.04 })
 		end)
 
 		local titleBar = Util.make("Frame", {
@@ -489,6 +489,10 @@ return function(deps)
 			Parent = settings.Parent or game:GetService("CoreGui"),
 		})
 
+		if typeof(screen) ~= "Instance" or not screen:IsA("ScreenGui") or not screen.Parent then
+			warn("[NobleV8] ScreenGui must be parented before building window UI")
+		end
+
 		local dim = Util.make("Frame", {
 			Name = "Dim",
 			Size = UDim2.new(1, 0, 1, 0),
@@ -713,18 +717,18 @@ return function(deps)
 		local miniScale = Util.scale(miniBtn)
 
 		closeBtn.MouseEnter:Connect(function()
-			Spr.target(closeScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 1.08 })
+			Util.safeSprTarget(closeScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 1.08 })
 		end)
 		closeBtn.MouseLeave:Connect(function()
-			Spr.target(closeScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 1 })
+			Util.safeSprTarget(closeScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 1 })
 		end)
 		miniBtn.MouseEnter:Connect(function()
-			Spr.target(miniScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 1.06 })
-			Spr.target(miniBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundColor3 = Theme.COLOR.BG4 })
+			Util.safeSprTarget(miniScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 1.06 })
+			Util.safeSprTarget(miniBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundColor3 = Theme.COLOR.BG4 })
 		end)
 		miniBtn.MouseLeave:Connect(function()
-			Spr.target(miniScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 1 })
-			Spr.target(miniBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundColor3 = Theme.COLOR.BG3 })
+			Util.safeSprTarget(miniScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 1 })
+			Util.safeSprTarget(miniBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundColor3 = Theme.COLOR.BG3 })
 		end)
 
 		-- Tab strip
@@ -884,45 +888,45 @@ return function(deps)
 
 		local function styleTab(tab, active)
 			if tab._sidebarBtn then
-				Spr.target(tab._sidebarBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+				Util.safeSprTarget(tab._sidebarBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 					BackgroundColor3 = active and Theme.COLOR.BG4 or Theme.COLOR.BG3,
 					BackgroundTransparency = active and 0.06 or 0.2,
 				})
 			end
 			if tab._sidebarBar then
-				Spr.target(tab._sidebarBar, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
+				Util.safeSprTarget(tab._sidebarBar, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
 					BackgroundTransparency = active and 0.02 or 1,
 					Size = active and UDim2.new(0, 4, 1, -16) or UDim2.new(0, 3, 1, -24),
 				})
 			end
 			if tab._sidebarGlow then
-				Spr.target(tab._sidebarGlow, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+				Util.safeSprTarget(tab._sidebarGlow, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 					BackgroundTransparency = active and 0.86 or 1,
 				})
 			end
 			if tab._sidebarLabel then
-				Spr.target(tab._sidebarLabel, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+				Util.safeSprTarget(tab._sidebarLabel, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 					TextColor3 = active and Theme.COLOR.TEXT or Theme.COLOR.TEXT2,
 				})
 			end
 			if tab._sidebarIcon then
-				Spr.target(tab._sidebarIcon, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+				Util.safeSprTarget(tab._sidebarIcon, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 					TextColor3 = active and Theme.COLOR.ACCENT_LIGHT or Theme.COLOR.TEXT3,
 				})
 			end
 			if tab._topBtn then
-				Spr.target(tab._topBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+				Util.safeSprTarget(tab._topBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 					BackgroundTransparency = active and 0.04 or 0.45,
 					BackgroundColor3 = active and Theme.COLOR.BG4 or Theme.COLOR.BG3,
 				})
 			end
 			if tab._topLabel then
-				Spr.target(tab._topLabel, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+				Util.safeSprTarget(tab._topLabel, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 					TextColor3 = active and Theme.COLOR.TEXT or Theme.COLOR.TEXT2,
 				})
 			end
 			if tab._topGlow then
-				Spr.target(tab._topGlow, Theme.SPRING.BOUNCY[1], Theme.SPRING.BOUNCY[2], {
+				Util.safeSprTarget(tab._topGlow, Theme.SPRING.BOUNCY[1], Theme.SPRING.BOUNCY[2], {
 					BackgroundTransparency = active and 0.35 or 1,
 					Size = active and UDim2.new(0.82, 0, 0, 3) or UDim2.new(0.35, 0, 0, 2),
 				})
@@ -944,9 +948,9 @@ return function(deps)
 		function self:Hide()
 			if self._hidden then return end
 			self._hidden = true
-			Spr.target(self._mainScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 0.9 })
-			Spr.target(main, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.2 })
-			Spr.target(dim, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 1 })
+			Util.safeSprTarget(self._mainScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 0.9 })
+			Util.safeSprTarget(main, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.2 })
+			Util.safeSprTarget(dim, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 1 })
 			self.VisibilityChanged:Fire(false)
 		end
 
@@ -954,9 +958,9 @@ return function(deps)
 			if not self._hidden then return end
 			self._hidden = false
 			dim.Visible = true
-			Spr.target(self._mainScale, Theme.SPRING.BOUNCY[1], Theme.SPRING.BOUNCY[2], { Scale = 1 })
-			Spr.target(main, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], { BackgroundTransparency = 0 })
-			Spr.target(dim, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], { BackgroundTransparency = 0.38 })
+			Util.safeSprTarget(self._mainScale, Theme.SPRING.BOUNCY[1], Theme.SPRING.BOUNCY[2], { Scale = 1 })
+			Util.safeSprTarget(main, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], { BackgroundTransparency = 0 })
+			Util.safeSprTarget(dim, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], { BackgroundTransparency = 0.38 })
 			self.VisibilityChanged:Fire(true)
 		end
 
@@ -1092,10 +1096,10 @@ return function(deps)
 
 			local function hoverSidebar(on)
 				if self._activeTab ~= tab then
-					Spr.target(sidebarBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+					Util.safeSprTarget(sidebarBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 						BackgroundTransparency = on and 0.1 or 0.2,
 					})
-					Spr.target(sidebarGlow, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+					Util.safeSprTarget(sidebarGlow, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 						BackgroundTransparency = on and 0.92 or 1,
 					})
 				end
@@ -1107,12 +1111,12 @@ return function(deps)
 
 			topBtn.MouseEnter:Connect(function()
 				if self._activeTab ~= tab then
-					Spr.target(topBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.2 })
+					Util.safeSprTarget(topBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.2 })
 				end
 			end)
 			topBtn.MouseLeave:Connect(function()
 				if self._activeTab ~= tab then
-					Spr.target(topBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.45 })
+					Util.safeSprTarget(topBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.45 })
 				end
 			end)
 			topBtn.MouseButton1Click:Connect(function() self:selectTab(tab) end)
@@ -1176,13 +1180,13 @@ return function(deps)
 				self:Toggle()
 			end
 		end)
-		self._janitor:Connect(keyConn)
+		self._janitor:Add(keyConn, "Disconnect")
 
 		-- Responsive root scale
 		local function applyResponsive()
 			local vpX, vpY = getViewport()
 			local scale = computeResponsiveScale(vpX, vpY)
-			Spr.target(rootScale, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { Scale = scale })
+			Util.safeSprTarget(rootScale, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { Scale = scale })
 
 			local minW = Theme.WINDOW.MIN_W * scale
 			local minH = Theme.WINDOW.MIN_H * scale
@@ -1241,16 +1245,16 @@ return function(deps)
 				connected
 			)
 		end)
-		self._janitor:Connect(heartbeat)
+		self._janitor:Add(heartbeat, "Disconnect")
 
 		task.spawn(function()
 			while screen.Parent do
 				if pulseUp then
-					Spr.target(playerDot, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.15 })
-					Spr.target(playerPill, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.02 })
+					Util.safeSprTarget(playerDot, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.15 })
+					Util.safeSprTarget(playerPill, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.02 })
 				else
-					Spr.target(playerDot, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.45 })
-					Spr.target(playerPill, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.1 })
+					Util.safeSprTarget(playerDot, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.45 })
+					Util.safeSprTarget(playerPill, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.1 })
 				end
 				pulseUp = not pulseUp
 				task.wait(1)
@@ -1260,11 +1264,11 @@ return function(deps)
 		task.spawn(function()
 			while screen.Parent do
 				if glowUp then
-					Spr.target(verGlow, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.68 })
-					Spr.target(readyGlow, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.55 })
+					Util.safeSprTarget(verGlow, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.68 })
+					Util.safeSprTarget(readyGlow, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.55 })
 				else
-					Spr.target(verGlow, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.88 })
-					Spr.target(readyGlow, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.9 })
+					Util.safeSprTarget(verGlow, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.88 })
+					Util.safeSprTarget(readyGlow, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.9 })
 				end
 				glowUp = not glowUp
 				task.wait(1.2)
@@ -1276,7 +1280,7 @@ return function(deps)
 			dim.BackgroundTransparency = 1
 			mainScale.Scale = 0.9
 		else
-			Spr.target(mainScale, Theme.SPRING.BOUNCY[1], Theme.SPRING.BOUNCY[2], { Scale = 1 })
+			Util.safeSprTarget(mainScale, Theme.SPRING.BOUNCY[1], Theme.SPRING.BOUNCY[2], { Scale = 1 })
 		end
 
 		self._janitor:Add(screen, "Destroy")

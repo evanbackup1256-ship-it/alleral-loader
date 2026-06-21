@@ -1,4 +1,4 @@
--- Alleral UI layer — v8.0.1 Noble V8 (Fusion + Spr + Janitor + Signal)
+-- Alleral UI layer — v8.0.2 Noble V8 (Fusion + Spr + Janitor + Signal)
 --[[
 	Noble V8 bootstrap — Linoria-compatible bootstrap for loader/verify scripts.
 	Fusion reactive state, Spr spring motion, Janitor lifecycle, Signal events.
@@ -14,8 +14,8 @@
 	  https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/
 ]]
 return function(Core)
-	Core.ALLERAL_UI_VERSION = "8.0.1"
-	Core.UI_VERSION = "8.0.1"
+	Core.ALLERAL_UI_VERSION = "8.0.2"
+	Core.UI_VERSION = "8.0.2"
 	Core.UI_LIBRARY = "Linoria"
 
 	local GITHUB_RAW = "https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main"
@@ -30,6 +30,11 @@ return function(Core)
 	end)()
 
 	local getGenv = getgenv or function() return ENV end
+	local NOBLE_CACHE_VERSION = "8.0.2"
+	if getGenv()._NobleV8CacheVersion ~= NOBLE_CACHE_VERSION then
+		getGenv()._NobleV8Modules = nil
+		getGenv()._NobleV8CacheVersion = NOBLE_CACHE_VERSION
+	end
 	local moduleCache = getGenv()._NobleV8Modules
 	if type(moduleCache) ~= "table" then
 		moduleCache = {}
@@ -933,5 +938,5 @@ return function(Core)
 	ENV._NobleV8Bundle = noble
 	Core._NobleV8 = noble
 
-	log("INFO", "Alleral Noble v8.0.1 — Fusion+Spr framework ready")
+	log("INFO", "Alleral Noble v8.0.2 — Fusion+Spr framework ready")
 end

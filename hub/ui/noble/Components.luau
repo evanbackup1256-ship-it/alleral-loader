@@ -15,7 +15,7 @@ return function(deps)
 
 	local function spring(obj, props, preset)
 		preset = preset or Theme.SPRING.SNAPPY
-		Spr.target(obj, preset[1], preset[2], props)
+		Util.safeSprTarget(obj, preset[1], preset[2], props)
 	end
 
 	local function pointInGui(pos, gui)

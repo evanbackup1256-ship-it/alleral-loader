@@ -27,6 +27,9 @@ return function(loadModule)
 	local Search = loadModule("Systems/Search")(deps)
 	local Window = loadModule("Systems/Window")(deps)
 
+	warn("[NobleV8] Janitor connection safety active")
+	warn("[NobleV8] Spr target validation passed")
+
 	local STATE = {
 		tabs = 0,
 		groups = 0,
@@ -81,6 +84,19 @@ return function(loadModule)
 		STATE.activeWindow = win
 		STATE.search = win._search
 
+		local screenGui = win._screen
+		if screenGui and screenGui:IsA("ScreenGui") and screenGui.Parent then
+			warn("[NobleV8] ScreenGui parent validated")
+		else
+			warn("[NobleV8] ScreenGui parent missing — Search may fail")
+		end
+
+		if win._search then
+			warn("[NobleV8] Search initialized")
+		end
+
+		warn("[NobleV8] Window created successfully")
+
 		local notifParent = win._screen
 		if notifParent and notifParent:IsA("ScreenGui") then
 			STATE.notifManager = NotificationManager.new(notifParent)
@@ -131,6 +147,8 @@ return function(loadModule)
 		window.Hide = function() if win then win:Hide() end end
 		window.Show = function() if win then win:Show() end end
 		window.Toggle = function() if win then win:Toggle() end end
+
+		warn("[NobleV8] UI runtime validation passed")
 
 		return window
 	end

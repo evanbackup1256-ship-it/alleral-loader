@@ -28,10 +28,20 @@ function Janitor:GiveTask(task)
 	return self:Add(task)
 end
 
-function Janitor:Connect(signal, fn)
-	if signal and signal.Connect then
-		return self:Add(signal:Connect(fn), "Disconnect")
+function Janitor:Connect(signalOrConnection, callback)
+	if typeof(signalOrConnection) == "RBXScriptSignal" then
+		if type(callback) ~= "function" then
+			warn("[Janitor] Connect expected function callback for RBXScriptSignal")
+			return nil
+		end
+		return self:Add(signalOrConnection:Connect(callback), "Disconnect")
 	end
+
+	if typeof(signalOrConnection) == "RBXScriptConnection" then
+		return self:Add(signalOrConnection, "Disconnect")
+	end
+
+	warn("[Janitor] Connect expected RBXScriptSignal or RBXScriptConnection, got:", typeof(signalOrConnection))
 	return nil
 end
 

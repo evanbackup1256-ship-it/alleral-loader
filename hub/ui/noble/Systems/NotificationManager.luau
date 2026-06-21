@@ -85,7 +85,7 @@ return function(deps)
 	function NotificationManager:_reflow()
 		for _, entry in pairs(self._entries) do
 			if entry.frame and entry.frame.Parent then
-				Spr.target(entry.frame, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
+				Util.safeSprTarget(entry.frame, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
 					Position = UDim2.new(0, 0, 0, 0),
 				})
 			end
@@ -109,8 +109,8 @@ return function(deps)
 		end
 
 		local scale = Util.scale(frame)
-		Spr.target(scale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 0.92 })
-		Spr.target(frame, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+		Util.safeSprTarget(scale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 0.92 })
+		Util.safeSprTarget(frame, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 			Position = UDim2.new(0, 56, 0, 0),
 			BackgroundTransparency = 1,
 		})
@@ -128,7 +128,7 @@ return function(deps)
 					props.Transparency = 1
 				end
 				if next(props) then
-					Spr.target(child, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], props)
+					Util.safeSprTarget(child, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], props)
 				end
 			end
 		end
@@ -315,12 +315,12 @@ return function(deps)
 			if not frame.Parent then return end
 			local finalH = computeHeight()
 			bodyLabel.Size = UDim2.new(1, -92, 0, finalH - 52)
-			Spr.target(frame, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
+			Util.safeSprTarget(frame, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
 				Size = UDim2.fromOffset(Theme.NOTIF.W, finalH),
 				Position = UDim2.new(0, 0, 0, 0),
 				BackgroundTransparency = 0.08,
 			})
-			Spr.target(scale, Theme.SPRING.BOUNCY[1], Theme.SPRING.BOUNCY[2], { Scale = 1 })
+			Util.safeSprTarget(scale, Theme.SPRING.BOUNCY[1], Theme.SPRING.BOUNCY[2], { Scale = 1 })
 			self:_reflow()
 		end)
 
@@ -330,11 +330,11 @@ return function(deps)
 
 		frame.MouseEnter:Connect(function()
 			entry.paused = true
-			Spr.target(glass, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.06 })
+			Util.safeSprTarget(glass, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.06 })
 		end)
 		frame.MouseLeave:Connect(function()
 			entry.paused = false
-			Spr.target(glass, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.14 })
+			Util.safeSprTarget(glass, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.14 })
 		end)
 
 		entry.tickConn = RunService.RenderStepped:Connect(function(dt)

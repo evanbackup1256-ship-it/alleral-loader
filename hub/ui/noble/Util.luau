@@ -75,9 +75,24 @@ return function(Theme, Spr)
 		return obj
 	end
 
+	function Util.safeSprTarget(target, damping, frequency, props)
+		if typeof(target) ~= "Instance" then
+			warn("[NobleV8] Spr.target skipped, Instance expected:", tostring(target))
+			return false
+		end
+		local ok, err = pcall(function()
+			Spr.target(target, damping, frequency, props)
+		end)
+		if not ok then
+			warn("[NobleV8] Spr.target failed:", tostring(err))
+			return false
+		end
+		return true
+	end
+
 	function Util.spring(obj, props, preset)
 		preset = preset or Theme.SPRING.SNAPPY
-		Spr.target(obj, preset[1], preset[2], props)
+		return Util.safeSprTarget(obj, preset[1], preset[2], props)
 	end
 
 	function Util.styleScroll(sf)
@@ -90,10 +105,10 @@ return function(Theme, Spr)
 		sf.Active = true
 		sf.BorderSizePixel = 0
 		sf.MouseEnter:Connect(function()
-			Spr.target(sf, 0.9, 6, { ScrollBarImageColor3 = Theme.COLOR.SCROLL_HOVER, ScrollBarImageTransparency = 0.15 })
+			Util.safeSprTarget(sf, 0.9, 6, { ScrollBarImageColor3 = Theme.COLOR.SCROLL_HOVER, ScrollBarImageTransparency = 0.15 })
 		end)
 		sf.MouseLeave:Connect(function()
-			Spr.target(sf, 0.9, 6, { ScrollBarImageColor3 = Theme.COLOR.SCROLL, ScrollBarImageTransparency = 0.4 })
+			Util.safeSprTarget(sf, 0.9, 6, { ScrollBarImageColor3 = Theme.COLOR.SCROLL, ScrollBarImageTransparency = 0.4 })
 		end)
 	end
 

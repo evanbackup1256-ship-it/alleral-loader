@@ -216,13 +216,13 @@ return function(deps)
 			self._selected = Util.clamp(idx, 1, math.max(1, #self._results))
 			for i, row in ipairs(self._rowFrames) do
 				local active = i == self._selected
-				Spr.target(row, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+				Util.safeSprTarget(row, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 					BackgroundColor3 = active and Theme.COLOR.BG4 or Theme.COLOR.BG3,
 					BackgroundTransparency = active and 0.04 or 0.18,
 				})
 				local bar = row:FindFirstChild("AccentBar")
 				if bar then
-					Spr.target(bar, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+					Util.safeSprTarget(bar, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 						BackgroundTransparency = active and 0.05 or 0.85,
 					})
 				end
@@ -347,27 +347,27 @@ return function(deps)
 		searchBox:GetPropertyChangedSignal("Text"):Connect(rebuildResults)
 
 		searchBox.Focused:Connect(function()
-			Spr.target(searchStroke, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+			Util.safeSprTarget(searchStroke, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 				Color = Theme.COLOR.ACCENT,
 				Transparency = 0.08,
 			})
-			Spr.target(searchBox, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+			Util.safeSprTarget(searchBox, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 				BackgroundColor3 = Color3.fromRGB(18, 30, 58),
 			})
-			Spr.target(glow, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
+			Util.safeSprTarget(glow, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
 				BackgroundTransparency = 0.78,
 			})
 		end)
 
 		searchBox.FocusLost:Connect(function(enter)
-			Spr.target(searchStroke, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+			Util.safeSprTarget(searchStroke, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 				Color = Theme.COLOR.SEARCH_BORDER,
 				Transparency = 0.32,
 			})
-			Spr.target(searchBox, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+			Util.safeSprTarget(searchBox, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 				BackgroundColor3 = Theme.COLOR.SEARCH_BG,
 			})
-			Spr.target(glow, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
+			Util.safeSprTarget(glow, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
 				BackgroundTransparency = 0.92,
 			})
 			if enter and self._results[self._selected] then
@@ -420,7 +420,7 @@ return function(deps)
 				end
 			end
 		end)
-		self._janitor:Connect(inputConn)
+		self._janitor:Add(inputConn, "Disconnect")
 
 		self._janitor:Add(overlay, "Destroy")
 		return self
@@ -468,13 +468,13 @@ return function(deps)
 		self._selected = 1
 		self._rebuildResults()
 
-		Spr.target(self._overlay, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
+		Util.safeSprTarget(self._overlay, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
 			BackgroundTransparency = 0.42,
 		})
-		Spr.target(self._panelScale, Theme.SPRING.BOUNCY[1], Theme.SPRING.BOUNCY[2], {
+		Util.safeSprTarget(self._panelScale, Theme.SPRING.BOUNCY[1], Theme.SPRING.BOUNCY[2], {
 			Scale = 1,
 		})
-		Spr.target(self._panel, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
+		Util.safeSprTarget(self._panel, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
 			BackgroundTransparency = 0.02,
 		})
 
@@ -494,13 +494,13 @@ return function(deps)
 			self._searchBox:ReleaseFocus()
 		end
 
-		Spr.target(self._overlay, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+		Util.safeSprTarget(self._overlay, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 			BackgroundTransparency = 1,
 		})
-		Spr.target(self._panelScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+		Util.safeSprTarget(self._panelScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 			Scale = 0.94,
 		})
-		Spr.target(self._panel, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
+		Util.safeSprTarget(self._panel, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
 			BackgroundTransparency = 0.2,
 		})
 

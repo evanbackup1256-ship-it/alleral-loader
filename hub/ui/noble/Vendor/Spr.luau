@@ -273,7 +273,7 @@ end)
 local Spr = {}
 
 function Spr.target(instance, dampingRatio, frequency, properties)
-	if type(instance) ~= "Instance" then
+	if typeof(instance) ~= "Instance" then
 		error("bad argument #1 to Spr.target (Instance expected)", 2)
 	end
 	if type(dampingRatio) ~= "number" then
@@ -327,7 +327,7 @@ function Spr.target(instance, dampingRatio, frequency, properties)
 end
 
 function Spr.stop(instance, property)
-	if type(instance) ~= "Instance" then
+	if typeof(instance) ~= "Instance" then
 		error("bad argument #1 to Spr.stop (Instance expected)", 2)
 	end
 
@@ -345,7 +345,7 @@ function Spr.stop(instance, property)
 end
 
 function Spr.completed(instance, callback)
-	if type(instance) ~= "Instance" then
+	if typeof(instance) ~= "Instance" then
 		error("bad argument #1 to Spr.completed (Instance expected)", 2)
 	end
 	if type(callback) ~= "function" then
