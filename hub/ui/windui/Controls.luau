@@ -1,4 +1,4 @@
--- Alleral V11.2 — WindUI control builders (compact, guarded, tooltips)
+-- Alleral V11.3 — WindUI control builders (compact, guarded, tooltips)
 return function(Bootstrap, Motion, Text, Guards, TooltipManager)
 	local Controls = {}
 	Text = Text or Bootstrap
@@ -28,12 +28,6 @@ return function(Bootstrap, Motion, Text, Guards, TooltipManager)
 		if not el then
 			return stub()
 		end
-		if Motion and kind == "button" then
-			pcall(function()
-				Motion.bindHover(el, { hoverScale = 1.02, pressScale = 0.97 })
-			end)
-		end
-
 		local api = { _raw = el, _kind = kind, _setting = false }
 
 		function api:SetValueSilent(_, v)
@@ -132,14 +126,20 @@ return function(Bootstrap, Motion, Text, Guards, TooltipManager)
 			if not TooltipManager or not el then
 				return
 			end
+			local desc = props.Tooltip or props.Description or props.Desc or ""
+			if desc == "" and title ~= "" then
+				desc = "Toggle, adjust, or interact with " .. title .. "."
+			end
 			local meta = type(props.TooltipMeta) == "table" and props.TooltipMeta or {
 				title = title,
-				description = props.Tooltip or props.Description or props.Desc or "",
+				description = desc,
 				configKey = flagKey,
 				value = props.Default,
 			}
-			pcall(function()
-				TooltipManager.attach(el, meta, kind, groupName, title)
+			task.defer(function()
+				pcall(function()
+					TooltipManager.attach(el, meta, kind, groupName, title)
+				end)
 			end)
 		end
 
@@ -184,7 +184,7 @@ return function(Bootstrap, Motion, Text, Guards, TooltipManager)
 				el = box:Toggle({
 					Flag = flagKey,
 					Title = title,
-					Desc = Bootstrap.sanitize(props.Tooltip or props.Description or "", 100),
+					Desc = "",
 					Value = props.Default == true,
 					Callback = Guards.wrap(props.Callback or function() end, "toggle:" .. flagKey),
 				})
@@ -202,7 +202,7 @@ return function(Bootstrap, Motion, Text, Guards, TooltipManager)
 			pcall(function()
 				el = box:Button({
 					Title = title,
-					Desc = Bootstrap.sanitize(props.Tooltip or "", 100),
+					Desc = "",
 					Color = Color3.fromHex("#8B5CF6"),
 					Justify = "Center",
 					Callback = Guards.wrap(props.Func or props.Callback or function() end, "button:" .. title),
@@ -226,12 +226,12 @@ return function(Bootstrap, Motion, Text, Guards, TooltipManager)
 				el = box:Slider({
 					Flag = flagKey,
 					Title = title,
-					Desc = Bootstrap.sanitize(props.Tooltip or "", 100),
+					Desc = "",
 					Step = tonumber(props.Rounding) or 1,
 					Width = LAYOUT.SLIDER_WIDTH,
-					IsTooltip = true,
+					IsTooltip = false,
 					IsTextbox = true,
-					DisplayInTooltip = true,
+					DisplayInTooltip = false,
 					Value = {
 						Min = minV,
 						Max = maxV,
@@ -256,7 +256,7 @@ return function(Bootstrap, Motion, Text, Guards, TooltipManager)
 				el = box:Input({
 					Flag = flagKey,
 					Title = title,
-					Desc = Bootstrap.sanitize(props.Tooltip or "", 100),
+					Desc = "",
 					Value = Bootstrap.sanitize(props.Default or "", 120),
 					Placeholder = Bootstrap.sanitize(props.Placeholder or "Enter...", 80),
 					Callback = Guards.wrap(props.Callback or function() end, "input:" .. flagKey),
@@ -289,7 +289,7 @@ return function(Bootstrap, Motion, Text, Guards, TooltipManager)
 				el = box:Dropdown({
 					Flag = flagKey,
 					Title = title,
-					Desc = Bootstrap.sanitize(props.Tooltip or "", 100),
+					Desc = "",
 					Values = values,
 					Value = defaultVal,
 					Multi = props.Multi == true,

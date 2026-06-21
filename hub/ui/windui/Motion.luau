@@ -1,25 +1,10 @@
--- Alleral V11.1 — lightweight TweenService motion (performance pass)
+-- Alleral V11.3 — lightweight motion (window-only animations, guarded)
 return function()
 	local TweenService = game:GetService("TweenService")
 	local Motion = {}
 	local ACTIVE = {}
-	local BOUND = {}
 	local DRAG_MODE = false
-
-	local function findGui(el)
-		if typeof(el) == "Instance" and el:IsA("GuiObject") then
-			return el
-		end
-		if type(el) == "table" then
-			for _, key in ipairs({ "Frame", "UIElements", "Object", "Instance", "Button", "Root" }) do
-				local v = el[key]
-				if typeof(v) == "Instance" and v:IsA("GuiObject") then
-					return v
-				end
-			end
-		end
-		return nil
-	end
+	local isAnimatingWindow = false
 
 	function Motion.cancel(inst)
 		local tw = ACTIVE[inst]
@@ -52,53 +37,94 @@ return function()
 		DRAG_MODE = enabled == true
 	end
 
-	function Motion.bindHover(el, opts)
-		if DRAG_MODE then
-			return
-		end
-		opts = opts or {}
-		local gui = findGui(el)
-		if not gui or not gui:IsA("GuiButton") then
-			return
-		end
-		if BOUND[gui] then
-			return
-		end
-		BOUND[gui] = true
-		gui:SetAttribute("AlleralMotionBound", true)
-
-		local scale = gui:FindFirstChildOfClass("UIScale")
-		if not scale then
-			scale = Instance.new("UIScale")
-			scale.Parent = gui
-		end
-
-		local hover = opts.hoverScale or 1.02
-		local press = opts.pressScale or 0.97
-
-		gui.MouseEnter:Connect(function()
-			Motion.tween(scale, { Scale = hover }, 0.14)
-		end)
-		gui.MouseLeave:Connect(function()
-			Motion.tween(scale, { Scale = 1 }, 0.14)
-		end)
-		gui.MouseButton1Down:Connect(function()
-			Motion.tween(scale, { Scale = press }, 0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-		end)
-		gui.MouseButton1Up:Connect(function()
-			Motion.tween(scale, { Scale = 1 }, 0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-		end)
+	function Motion.isAnimatingWindow()
+		return isAnimatingWindow
 	end
 
-	function Motion.openWindow(WindUI, force)
-		if DRAG_MODE and not force then
+	function Motion.getActiveTweenCount()
+		local n = 0
+		for _ in pairs(ACTIVE) do
+			n = n + 1
+		end
+		return n
+	end
+
+	local function findWindowDim(windWindow)
+		if not windWindow then
+			return nil
+		end
+		local main = windWindow.UIElements and windWindow.UIElements.Main
+		if typeof(main) == "Instance" then
+			if main:IsA("CanvasGroup") then
+				return main
+			end
+			local cg = main:FindFirstChildWhichIsA("CanvasGroup", true)
+			if cg then
+				return cg
+			end
+			local bg = main:FindFirstChild("Background", true)
+			if typeof(bg) == "Instance" and bg:IsA("GuiObject") then
+				return bg
+			end
+		end
+		return nil
+	end
+
+	function Motion.animateWindowShow(WindUI, windWindow, onDone)
+		if isAnimatingWindow or DRAG_MODE then
+			if onDone then onDone() end
 			return
 		end
+		isAnimatingWindow = true
 		pcall(function()
 			local scaleObj = WindUI and WindUI.UIScaleObj
 			if scaleObj then
-				scaleObj.Scale = 0.98
-				Motion.tween(scaleObj, { Scale = 1 }, 0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+				scaleObj.Scale = 0.97
+				Motion.tween(scaleObj, { Scale = 1 }, 0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+			end
+			local dim = findWindowDim(windWindow)
+			if dim then
+				if dim:IsA("CanvasGroup") then
+					dim.GroupTransparency = 1
+					Motion.tween(dim, { GroupTransparency = 0 }, 0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+				elseif dim:IsA("GuiObject") then
+					dim.BackgroundTransparency = 1
+					Motion.tween(dim, { BackgroundTransparency = dim:GetAttribute("AlleralBaseTransparency") or 0 }, 0.18)
+				end
+			end
+		end)
+		task.delay(0.22, function()
+			isAnimatingWindow = false
+			if onDone then
+				onDone()
+			end
+		end)
+	end
+
+	function Motion.animateWindowHide(WindUI, windWindow, onDone)
+		if isAnimatingWindow or DRAG_MODE then
+			if onDone then onDone() end
+			return
+		end
+		isAnimatingWindow = true
+		pcall(function()
+			local scaleObj = WindUI and WindUI.UIScaleObj
+			if scaleObj then
+				Motion.tween(scaleObj, { Scale = 0.97 }, 0.16, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+			end
+			local dim = findWindowDim(windWindow)
+			if dim then
+				if dim:IsA("CanvasGroup") then
+					Motion.tween(dim, { GroupTransparency = 1 }, 0.14, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+				elseif dim:IsA("GuiObject") then
+					Motion.tween(dim, { BackgroundTransparency = 1 }, 0.14)
+				end
+			end
+		end)
+		task.delay(0.18, function()
+			isAnimatingWindow = false
+			if onDone then
+				onDone()
 			end
 		end)
 	end
@@ -108,16 +134,14 @@ return function()
 			pcall(function() tw:Cancel() end)
 			ACTIVE[inst] = nil
 		end
-		for key in pairs(BOUND) do
-			BOUND[key] = nil
-		end
+		isAnimatingWindow = false
 	end
 
 	function Motion.logPerformance()
 		warn("[WindUI] Animation connections cleaned")
 		warn("[WindUI] Duplicate connection guard active")
+		warn("[WindUI] Window animation optimized")
 		warn("[WindUI] Animation cleanup active")
-		warn("[WindUI] Animation performance pass complete")
 	end
 
 	return Motion

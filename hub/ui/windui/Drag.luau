@@ -1,5 +1,5 @@
--- Alleral V11.2 — lightweight window drag (no rebuild during drag)
-return function(Motion)
+-- Alleral V11.3 — lightweight window drag
+return function(Motion, TooltipManager)
 	local UserInputService = game:GetService("UserInputService")
 	local Drag = {}
 	local state = {
@@ -9,6 +9,7 @@ return function(Motion)
 		root = nil,
 		start = nil,
 		origin = nil,
+		bound = false,
 	}
 
 	local function findRoot(windWindow)
@@ -23,8 +24,6 @@ return function(Motion)
 				windWindow.UIElements and windWindow.UIElements.Main,
 				windWindow.Main,
 				windWindow.Frame,
-				windWindow.Drag,
-				windWindow.Topbar,
 			}
 			for _, c in ipairs(candidates) do
 				if typeof(c) == "Instance" and c:IsA("GuiObject") then
@@ -45,7 +44,9 @@ return function(Motion)
 			state.endConn = nil
 		end
 		state.active = false
-		state.root = nil
+		if Motion and Motion.setDragMode then
+			pcall(Motion.setDragMode, false)
+		end
 	end
 
 	function Drag.isDragging()
@@ -53,7 +54,9 @@ return function(Motion)
 	end
 
 	function Drag.bind(windWindow, handle)
-		Drag.cleanup()
+		if state.bound then
+			return true
+		end
 		local root = findRoot(windWindow)
 		if not root then
 			return false
@@ -78,6 +81,9 @@ return function(Motion)
 			state.active = true
 			state.start = input.Position
 			state.origin = root.Position
+			if TooltipManager and TooltipManager.suppressDuringDrag then
+				pcall(TooltipManager.suppressDuringDrag)
+			end
 			if Motion and Motion.setDragMode then
 				pcall(Motion.setDragMode, true)
 			end
@@ -96,12 +102,11 @@ return function(Motion)
 			state.endConn = input.Changed:Connect(function()
 				if input.UserInputState == Enum.UserInputState.End then
 					Drag.cleanup()
-					if Motion and Motion.setDragMode then
-						pcall(Motion.setDragMode, false)
-					end
 				end
 			end)
 		end)
+
+		state.bound = true
 		return true
 	end
 

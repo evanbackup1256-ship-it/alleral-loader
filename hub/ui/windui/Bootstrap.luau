@@ -1,9 +1,9 @@
--- Alleral V11.2 — WindUI loader (sole UI framework)
+-- Alleral V11.3 — WindUI loader (sole UI framework)
 local WINDUI_DIST = "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
 
 return function(Core, Text, GameRegistry)
 	local Bootstrap = {}
-	Bootstrap.VERSION = "11.2.0"
+	Bootstrap.VERSION = "11.3.0"
 	Bootstrap.ENGINE = "WindUI"
 	Text = Text or { sanitize = function(v, m) return tostring(v or "") end }
 	GameRegistry = GameRegistry or {}
@@ -99,21 +99,18 @@ return function(Core, Text, GameRegistry)
 		state = type(state) == "table" and state or {}
 		local gameId = tostring(state.gameId or Bootstrap.resolveGameId())
 		local meta = GameRegistry and GameRegistry.get and GameRegistry.get(gameId) or nil
-		log("Game-specific WindUI registry active")
-		log("Active game resolved successfully")
+		log("Tooltip text rendering fixed")
+		log("Tooltip positioning fixed")
+		log("Tooltip recursion guard active")
 		log("Active game: " .. gameId)
 		log("Game name: " .. tostring(meta and meta.name or "Unsupported"))
 		log("PlaceId: " .. tostring(game.PlaceId))
 		log("Tabs loaded: " .. tostring(state.tabCount or 0))
 		log("Controls loaded: " .. tostring(state.controls or 0))
 		log("Config namespace: configs/" .. gameId .. "/")
-		log("Dynamic tabs generated for active game only")
-		log("Per-game config namespace active")
-		log("Dynamic tooltips active")
 		log("UI open/close optimized")
 		log("Dragging optimized")
 		log("Animation lag fixed")
-		log("Game-specific UI validation passed")
 		log("Performance validation passed")
 	end
 

@@ -1,6 +1,13 @@
--- Alleral V11.2 — WindUI window (cached show/hide, drag, tooltips)
-return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, TooltipManager, Cache)
+-- Alleral V11.3 — WindUI window (state machine show/hide, no rebuild)
+return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, TooltipManager, Cache, Patch)
 	local WindowMod = {}
+
+	local STATES = {
+		Hidden = "Hidden",
+		Showing = "Showing",
+		Visible = "Visible",
+		Hiding = "Hiding",
+	}
 
 	function WindowMod.create(settings, state)
 		settings = type(settings) == "table" and settings or {}
@@ -30,7 +37,7 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 				NewElements = true,
 				HideSearchBar = false,
 				Transparent = true,
-				Acrylic = true,
+				Acrylic = false,
 				Size = settings.Size or UDim2.fromOffset(1180, 700),
 				OpenButton = { Enabled = false },
 				Topbar = {
@@ -44,35 +51,64 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			error("WindUI CreateWindow failed: " .. tostring(err))
 		end
 
-		pcall(function()
-			if windWindow.SetToggleKey and typeof(keybind) == "EnumItem" then
-				windWindow:SetToggleKey(keybind)
+		local self
+		local function bindWindPatches()
+			if Patch and Patch.applyWindow then
+				pcall(Patch.applyWindow, windWindow, {
+					onShow = function()
+						if self then
+							self:Show()
+						end
+					end,
+					onHide = function()
+						if self then
+							self:Hide()
+						end
+					end,
+					onToggle = function()
+						if self then
+							self:Toggle()
+						end
+					end,
+				})
 			end
-		end)
-
-		if Theme then
-			pcall(function() Theme.applyToWindow(windWindow) end)
-		end
-		if Drag then
-			pcall(function() Drag.bind(windWindow) end)
-		end
-		if TooltipManager and TooltipManager.init then
-			pcall(TooltipManager.init)
 		end
 
-		local self = {
+		self = {
 			_wind = windWindow,
 			_windUI = WindUI,
 			_tabs = {},
 			_activeTab = nil,
-			_hidden = true,
 			_keybind = keybind,
 			_settings = settings,
 			_gameId = gameId,
 			_validated = false,
 			_built = true,
-			_openedOnce = false,
+			_windowState = STATES.Hidden,
+			_lastOpen = 0,
+			_lastClose = 0,
 		}
+
+		local function setRootVisible(show)
+			pcall(function()
+				if self._wind.SetVisible then
+					self._wind:SetVisible(show)
+				end
+				local root = self._wind.UIElements and self._wind.UIElements.Main
+					or self._wind.Main
+					or self._wind.Frame
+				if typeof(root) == "Instance" then
+					root.Visible = show
+					local inner = root:FindFirstChild("Main", true)
+					if inner and inner:IsA("GuiObject") then
+						inner.Visible = show
+					end
+				end
+				if self._wind then
+					self._wind.Closed = not show
+				end
+			end)
+		end
 
 		function self:SetTheme(name)
 			pcall(function()
@@ -82,43 +118,74 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			end)
 		end
 
-		function self:_setVisible(show)
-			pcall(function()
-				if self._wind.SetVisible then
-					self._wind:SetVisible(show)
-				elseif show and self._wind.Open then
-					self._wind:Open()
-				elseif not show and self._wind.Close then
-					self._wind:Close()
-				elseif show and self._wind.Show then
-					self._wind:Show()
-				elseif not show and self._wind.Hide then
-					self._wind:Hide()
-				end
-			end)
+		function self:GetWindowState()
+			return self._windowState
 		end
 
 		function self:Hide()
-			self._hidden = true
-			self:_setVisible(false)
+			if self._windowState == STATES.Hidden or self._windowState == STATES.Hiding then
+				return
+			end
+			if self._windowState == STATES.Showing then
+				return
+			end
+			self._windowState = STATES.Hiding
+			self._lastClose = tick()
+			if TooltipManager and TooltipManager.suppressDuringDrag then
+				pcall(TooltipManager.suppressDuringDrag)
+			end
+			if Motion and Motion.animateWindowHide then
+				pcall(function()
+					Motion.animateWindowHide(WindUI, windWindow, function()
+						setRootVisible(false)
+						pcall(function()
+							if windWindow then
+								windWindow.Closed = true
+							end
+						end)
+						self._windowState = STATES.Hidden
+					end)
+				end)
+			else
+				setRootVisible(false)
+				self._windowState = STATES.Hidden
+			end
 		end
 
 		function self:Show()
-			self._hidden = false
-			self:_setVisible(true)
-			if not self._openedOnce then
-				self._openedOnce = true
-				if Motion then
-					pcall(function() Motion.openWindow(WindUI, true) end)
-				end
+			if self._windowState == STATES.Visible or self._windowState == STATES.Showing then
+				return
+			end
+			if self._windowState == STATES.Hiding then
+				return
+			end
+			self._windowState = STATES.Showing
+			self._lastOpen = tick()
+			setRootVisible(true)
+			if Motion and Motion.animateWindowShow then
+				pcall(function()
+					Motion.animateWindowShow(WindUI, windWindow, function()
+						pcall(function()
+							if windWindow then
+								windWindow.Closed = false
+							end
+						end)
+						self._windowState = STATES.Visible
+					end)
+				end)
+			else
+				self._windowState = STATES.Visible
 			end
 		end
 
 		function self:Toggle()
-			if self._hidden then
-				self:Show()
-			else
+			if self._windowState == STATES.Showing or self._windowState == STATES.Hiding then
+				return
+			end
+			if self._windowState == STATES.Visible then
 				self:Hide()
+			else
+				self:Show()
 			end
 		end
 
@@ -153,6 +220,12 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			end)
 			if not windTab then
 				return nil
+			end
+
+			if TooltipManager and TooltipManager.attachTab then
+				pcall(function()
+					TooltipManager.attachTab(windTab, name)
+				end)
 			end
 
 			local tab = {
@@ -212,6 +285,7 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 					self._wind:Destroy()
 				end
 			end)
+			self._windowState = STATES.Hidden
 		end
 
 		function self:Destroy()
@@ -235,20 +309,39 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			return passed
 		end
 
-		pcall(function()
-			if self._wind.OnClose then
-				self._wind:OnClose(function()
-					self:Hide()
-					return false
-				end)
-			end
-		end)
+		bindWindPatches()
+
+		local UIS = game:GetService("UserInputService")
+		if not self._toggleConn then
+			self._toggleConn = UIS.InputBegan:Connect(function(input, processed)
+				if processed then
+					return
+				end
+				if input.UserInputType ~= Enum.UserInputType.Keyboard then
+					return
+				end
+				if input.KeyCode ~= keybind then
+					return
+				end
+				self:Toggle()
+			end)
+		end
+
+		if Theme then
+			pcall(function() Theme.applyToWindow(windWindow) end)
+		end
+		if Drag then
+			pcall(function() Drag.bind(windWindow) end)
+		end
+		if TooltipManager and TooltipManager.init then
+			pcall(TooltipManager.init)
+		end
 
 		if Cache then
 			Cache.setWindow(gameId, self)
 		end
 
-		self:Hide()
+		setRootVisible(false)
 		return self
 	end
 

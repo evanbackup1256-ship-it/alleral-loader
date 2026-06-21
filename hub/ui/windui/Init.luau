@@ -1,4 +1,4 @@
--- Alleral V11.2 — WindUI framework entry (sole UI stack)
+-- Alleral V11.3 — WindUI framework entry (sole UI stack)
 return function(loadModule, Core)
 	local Text = loadModule("Text")()
 	local Guards = loadModule("Guards")()
@@ -6,14 +6,15 @@ return function(loadModule, Core)
 	local Cache = loadModule("Cache")()
 	local Bootstrap = loadModule("Bootstrap")(Core, Text, GameRegistry)
 	local WindUI = Bootstrap.loadWindUI()
+	local Patch = loadModule("Patch")(WindUI)
 	local Theme = loadModule("Theme")(WindUI, Bootstrap)
 	local Motion = loadModule("Motion")()
-	local Drag = loadModule("Drag")(Motion)
 	local TooltipManager = loadModule("TooltipManager")(Bootstrap, Motion, Text)
+	local Drag = loadModule("Drag")(Motion, TooltipManager)
 	local Validate = loadModule("Validate")(Bootstrap, GameRegistry)
 	local Notifications = loadModule("Notifications")(WindUI, Bootstrap)
 	local Controls = loadModule("Controls")(Bootstrap, Motion, Text, Guards, TooltipManager)
-	local WindowMod = loadModule("Window")(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, TooltipManager, Cache)
+	local WindowMod = loadModule("Window")(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, TooltipManager, Cache, Patch)
 	local Configs = loadModule("Configs")(Bootstrap, GameRegistry)
 	local Tabs = loadModule("Tabs")(GameRegistry, Cache)
 
@@ -24,7 +25,7 @@ return function(loadModule, Core)
 	pcall(function() Theme.register() end)
 	pcall(function() Motion.logPerformance() end)
 	pcall(function() Drag.logReady() end)
-	warn("[WindUI] UI cached; toggles will not rebuild")
+	warn("[WindUI] UI cached; toggles do not rebuild")
 	warn("[WindUI] Tab cache active")
 
 	local STATE = {
@@ -128,7 +129,7 @@ return function(loadModule, Core)
 
 	function Library:GetLayoutInfo()
 		return {
-			profile = "windui-v11.2-premium",
+			profile = "windui-v11.3-premium",
 			engine = Bootstrap.ENGINE,
 			version = Bootstrap.VERSION,
 			stack = "WindUI",
@@ -147,10 +148,19 @@ return function(loadModule, Core)
 	end
 
 	function Library:GetPerfStats()
+		local win = STATE.activeWindow
 		return {
 			cache = Cache.stats(),
 			tooltips = TooltipManager.getStats and TooltipManager.getStats() or {},
 			dragging = Drag.isDragging and Drag.isDragging() or false,
+			windowState = win and win.GetWindowState and win:GetWindowState() or "Unknown",
+			tweens = Motion.getActiveTweenCount and Motion.getActiveTweenCount() or 0,
+			animatingWindow = Motion.isAnimatingWindow and Motion.isAnimatingWindow() or false,
+			gameId = STATE.gameId,
+			tabId = win and win._activeTab and win._activeTab._name or nil,
+			lastOpen = win and win._lastOpen or 0,
+			lastClose = win and win._lastClose or 0,
+			connections = (TooltipManager.getStats and TooltipManager.getStats().connections) or 0,
 		}
 	end
 
@@ -169,6 +179,7 @@ return function(loadModule, Core)
 		Tabs = Tabs,
 		Cache = Cache,
 		GameRegistry = GameRegistry,
+		Patch = Patch,
 		WindUI = WindUI,
 		sanitize = Bootstrap.sanitize,
 		log = function(lvl, msg)
