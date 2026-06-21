@@ -1,24 +1,20 @@
--- Alleral UI layer — v10.0.0 Noble V10 (Fusion + Spr + Janitor + Signal)
+-- Alleral UI layer — v11.0.0 WindUI (sole framework)
 --[[
-	Noble V10 bootstrap — Linoria-compatible bootstrap for loader/verify scripts.
-	Premium EXE-6 inspired desktop UI. Single framework — no legacy renderers.
+	WindUI bootstrap — https://github.com/Footagesus/WindUI
+	No Noble, Fusion, Spr, Linoria, or legacy renderers.
 
-	Module roots (resolved in order):
-	  hub/ui/noblev10/{path}.luau
-	  kick/hub/ui/noblev10/{path}.luau
-	  .alleral/cache/hub/ui/noblev10/{path}.luau
+	Module roots:
+	  hub/ui/windui/{path}.luau
+	  kick/hub/ui/windui/{path}.luau
+	  .alleral/cache/hub/ui/windui/{path}.luau
 	  GITHUB_RAW remote fallback via Core.httpGet
-
-	Linoria CDN shim (compat only — Noble V10 is the active renderer):
-	  https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/
 ]]
 return function(Core)
-	Core.ALLERAL_UI_VERSION = "10.0.2"
-	Core.UI_VERSION = "10.0.2"
-	Core.UI_LIBRARY = "Linoria"
+	Core.ALLERAL_UI_VERSION = "11.0.0"
+	Core.UI_VERSION = "11.0.0"
+	Core.UI_LIBRARY = "WindUI"
 
 	local GITHUB_RAW = "https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main"
-	local LINORIA_RAW = "https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/"
 
 	local ENV = (function()
 		local ok, e = pcall(function()
@@ -29,37 +25,26 @@ return function(Core)
 	end)()
 
 	local getGenv = getgenv or function() return ENV end
-	local NOBLE_CACHE_VERSION = "10.0.2"
+	local WINDUI_CACHE_VERSION = "11.0.0"
 	getGenv()._NobleV8Modules = nil
 	getGenv()._NobleV8CacheVersion = nil
-	if getGenv()._NobleV10CacheVersion ~= NOBLE_CACHE_VERSION then
-		getGenv()._NobleV10Modules = nil
-		getGenv()._NobleV10CacheVersion = NOBLE_CACHE_VERSION
+	getGenv()._NobleV10Modules = nil
+	getGenv()._NobleV10CacheVersion = nil
+	if getGenv()._WindUIModulesCacheVersion ~= WINDUI_CACHE_VERSION then
+		getGenv()._WindUIModules = nil
+		getGenv()._WindUIModulesCacheVersion = WINDUI_CACHE_VERSION
 	end
-	local moduleCache = getGenv()._NobleV10Modules
+	local moduleCache = getGenv()._WindUIModules
 	if type(moduleCache) ~= "table" then
 		moduleCache = {}
-		getGenv()._NobleV10Modules = moduleCache
+		getGenv()._WindUIModules = moduleCache
 	end
 
-	-- ========== LINORIA COMPAT SHIM ==========
-	-- Linoria-compatible bootstrap: loader/verify expect loadLinoriaSource + CDN reference.
-	local function loadLinoriaSource(asset)
-		asset = tostring(asset or "Library.lua")
-		local url = LINORIA_RAW .. asset
-		if Core and type(Core.httpGet) == "function" then
-			local ok, body = pcall(Core.httpGet, url)
-			if ok and type(body) == "string" and body ~= "" then
-				return body, url
-			end
-			return nil, tostring(body)
-		end
-		return nil, "httpGet unavailable for Linoria asset: " .. url
+	Core.loadLinoriaSource = Core.loadLinoriaSource or function()
+		return nil, "Linoria removed — WindUI is the sole UI framework"
 	end
 
-	Core.loadLinoriaSource = Core.loadLinoriaSource or loadLinoriaSource
-
-	-- ========== NOBLE V10 MODULE LOADER ==========
+	-- ========== WINDUI MODULE LOADER ==========
 	local function resolveReadfile()
 		if Core and type(Core.execFunction) == "function" then
 			local rf = Core.execFunction("readfile")
@@ -79,7 +64,7 @@ return function(Core)
 	end
 
 	local function modulePaths(path)
-		local rel = "hub/ui/noblev10/" .. path .. ".luau"
+		local rel = "hub/ui/windui/" .. path .. ".luau"
 		return {
 			rel,
 			"kick/" .. rel,
@@ -105,7 +90,7 @@ return function(Core)
 			end
 		end
 
-		local remote = GITHUB_RAW .. "/hub/ui/noblev10/" .. path .. ".luau"
+		local remote = GITHUB_RAW .. "/hub/ui/windui/" .. path .. ".luau"
 		if Core and type(Core.httpGet) == "function" then
 			local ok, src = pcall(Core.httpGet, remote)
 			if ok and type(src) == "string" and #src > 32 then
@@ -121,7 +106,7 @@ return function(Core)
 		end
 		local src, via = readModuleSource(path)
 		if not src then
-			error(via or ("failed to load Noble module: " .. tostring(path)))
+			error(via or ("failed to load WindUI module: " .. tostring(path)))
 		end
 		local loadFn = Core and Core.loadStringFn and Core.loadStringFn()
 		if type(loadFn) ~= "function" and type(ENV.loadstring) == "function" then
@@ -131,9 +116,9 @@ return function(Core)
 			loadFn = loadstring
 		end
 		if type(loadFn) ~= "function" then
-			error("loadstring unavailable for Noble module: " .. tostring(path))
+			error("loadstring unavailable for WindUI module: " .. tostring(path))
 		end
-		local chunkName = "@NobleV10/" .. tostring(path)
+		local chunkName = "@WindUI/" .. tostring(path)
 		local chunk, compileErr = loadFn(src, chunkName)
 		if not chunk then
 			error("[" .. chunkName .. "] " .. tostring(compileErr))
@@ -146,26 +131,24 @@ return function(Core)
 		return result
 	end
 
-	-- Bootstrap Noble V10 framework (Init.luau returns factory(loadModule))
-	local nobleFactory = loadModule("Init")
-	if type(nobleFactory) ~= "function" then
-		error("Noble Init.luau must return function(loadModule)")
+	-- Bootstrap WindUI framework (Init.luau returns factory(loadModule, Core))
+	local winduiFactory = loadModule("Init")
+	if type(winduiFactory) ~= "function" then
+		error("WindUI Init.luau must return function(loadModule, Core)")
 	end
-	local noble = nobleFactory(loadModule)
-	if type(noble) ~= "table" then
-		error("Noble init factory must return bundle table")
+	local windui = winduiFactory(loadModule, Core)
+	if type(windui) ~= "table" then
+		error("WindUI init factory must return bundle table")
 	end
 
-	local Library = noble.Library
-	local STATE = noble.STATE
-	local Util = noble.Util
-	local Spr = noble.Spr
-	local Theme = noble.Theme
-	local Validation = noble.Validation
+	local Library = windui.Library
+	local STATE = windui.STATE
+	local Bootstrap = windui.Bootstrap
+	local Util = { textOf = function(v) return v == nil and "" or tostring(v) end }
 
 	local function log(lvl, msg)
-		if type(noble.log) == "function" then
-			noble.log(lvl, msg, Core)
+		if type(windui.log) == "function" then
+			windui.log(lvl, msg)
 		elseif Core and type(Core.say) == "function" then
 			Core.say("[" .. lvl .. "] " .. msg)
 		end
@@ -190,15 +173,6 @@ return function(Core)
 	end
 
 	local keybindConn = nil
-
-	local function stopSpringsOnTree(root)
-		if not Spr or type(Spr.stop) ~= "function" then return end
-		if typeof(root) ~= "Instance" then return end
-		pcall(function() Spr.stop(root) end)
-		for _, desc in ipairs(root:GetDescendants()) do
-			pcall(function() Spr.stop(desc) end)
-		end
-	end
 
 	local function showNotification(info, duration, ntype)
 		if not Library or type(Library.Notification) ~= "function" then return nil end
@@ -705,7 +679,7 @@ return function(Core)
 		function tab:BuildThemeGroupbox(col)
 			local g2 = Core.buildUiGroup(tab, "Appearance", col or 1)
 			if g2 and type(g2.CreateLabel) == "function" then
-				g2:CreateLabel("Alleral Noble Engine v10")
+				g2:CreateLabel("Alleral WindUI v11")
 			end
 			return g2
 		end
@@ -810,10 +784,8 @@ return function(Core)
 				local raw = type(window) == "table" and (window._rawWindow or window) or nil
 				if raw and type(raw.Validate) == "function" then
 					raw:Validate()
-				elseif Validation and type(Validation.validateWindowMount) == "function" then
-					local win = raw and raw._win
-					local tabs = raw and raw._tabs
-					Validation.validateWindowMount(win, tabs)
+				elseif Bootstrap and type(Bootstrap.runValidation) == "function" then
+					Bootstrap.runValidation(STATE.gameId, STATE.tabCount)
 				end
 			end)
 		end)
@@ -823,7 +795,7 @@ return function(Core)
 		if options.notify ~= false and type(Core.notifyBootReady) == "function" then
 			Core.notifyBootReady({ Name = options.Name or "Alleral", Subtitle = options.Subtitle })
 		end
-		log("INFO", "=== Alleral Noble v" .. (Theme and Theme.VERSION or "10.0.0") .. " ===")
+		log("INFO", "=== Alleral WindUI v" .. (Library and Library.Version or "11.0.0") .. " ===")
 		log("INFO", "Tabs: " .. tostring(STATE.tabCount or 0) .. " | Groups: " .. tostring(STATE.groupCount or 0) .. " | Controls: " .. tostring(STATE.controls or 0))
 		if type(STATE.missingBindings) == "table" and #STATE.missingBindings > 0 then
 			log("WARN", "Missing bindings: " .. #STATE.missingBindings)
@@ -860,8 +832,6 @@ return function(Core)
 			Alleral = Library,
 			STATE = STATE,
 			Util = Util,
-			Spr = Spr,
-			Theme = Theme,
 			CreateWindow = function(_, s)
 				return Library:CreateWindow(s)
 			end,
@@ -875,8 +845,9 @@ return function(Core)
 		ENV.Alleral_UI = b
 		ENV._AlleralUiLibrary = Library
 		ENV._AlleralUI = b
+		ENV._WindUIBundle = windui
 		if getgenv then getgenv().Alleral_UI = b end
-		log("INFO", "[UI] Noble V8 renderer v" .. (Theme and Theme.VERSION or "8.0.0") .. " ready")
+		log("INFO", "[UI] WindUI renderer v" .. (Library.Version or "11.0.0") .. " ready")
 		return b
 	end
 
@@ -891,20 +862,18 @@ return function(Core)
 
 	function Core.uiWindowSettings(extra)
 		extra = type(extra) == "table" and extra or {}
-		local defaultSize = Theme and Theme.WINDOW and Theme.WINDOW.DEFAULT or UDim2.fromOffset(1180, 700)
-		local sidebarW = Theme and Theme.SIDEBAR and Theme.SIDEBAR.W or 220
+		local gameId = STATE and STATE.gameId or (Bootstrap and Bootstrap.resolveGameId(Core)) or "alleral"
 		return {
 			Title = extra.Title or extra.Name or "Alleral",
 			Name = extra.Title or extra.Name or "Alleral",
 			Subtitle = extra.Subtitle or extra.Author or "",
 			Icon = extra.Icon or "sparkles",
-			Theme = extra.Theme or "Noble_V8",
-			Size = extra.Size or defaultSize,
-			TabWidth = tonumber(extra.TabWidth) or sidebarW,
-			Keybind = extra.Keybind or (Theme and Theme.KEYBIND) or Enum.KeyCode.RightShift,
+			Theme = extra.Theme or "WindUI",
+			Keybind = extra.Keybind or Enum.KeyCode.RightShift,
+			ConfigFolder = extra.ConfigFolder or (Bootstrap and Bootstrap.configFolder(Core)) or ("configs/" .. gameId),
 			FileSettings = {
-				RootFolder = extra.configFolder or "Alleral_Configs",
-				ConfigFolder = extra.FileName or "Interface",
+				RootFolder = extra.configFolder or "configs",
+				ConfigFolder = gameId,
 			},
 		}
 	end
@@ -926,27 +895,23 @@ return function(Core)
 		end
 		local active = STATE and STATE.activeWindow
 		if active then
-			if active._screen then stopSpringsOnTree(active._screen) end
-			if active._win and active._win._screen then stopSpringsOnTree(active._win._screen) end
 			pcall(function()
-				if active.Destroy then active:Destroy() end
+				if active.Unload then active:Unload()
+				elseif active.Destroy then active:Destroy() end
 			end)
 			STATE.activeWindow = nil
 		end
 		local uiWin = ENV.Alleral_UiWindow
 		if type(uiWin) == "table" and uiWin._rawWindow then
-			local raw = uiWin._rawWindow
-			if raw._win and raw._win._screen then stopSpringsOnTree(raw._win._screen) end
 			pcall(function()
-				if raw.Unload then raw:Unload() end
+				if uiWin._rawWindow.Unload then uiWin._rawWindow:Unload() end
 			end)
 		end
 		ENV._AlleralUiLibrary = nil
 		ENV._AlleralUI = nil
+		ENV._WindUIBundle = nil
 		ENV.Alleral_UiWindow = nil
 		if STATE then
-			STATE.notifManager = nil
-			STATE.search = nil
 			STATE.groupRegistry = {}
 			STATE.uiDestroyed = true
 		end
@@ -954,11 +919,11 @@ return function(Core)
 
 	ENV.AnimatedNotification = showNotification
 
-	-- Expose Noble bundle for diagnostics / hot reload
-	ENV._NobleV10Bundle = noble
-	Core._NobleV10 = noble
+	Core._WindUI = windui
+	ENV._NobleV10Bundle = nil
 	ENV._NobleV8Bundle = nil
+	Core._NobleV10 = nil
 	Core._NobleV8 = nil
 
-	log("INFO", "Alleral Noble v10.0.2 — premium desktop UI framework loaded")
+	log("INFO", "Alleral WindUI v11.0.0 — sole UI framework loaded")
 end

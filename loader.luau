@@ -14,7 +14,7 @@ local CORE_MONOLITH_MIN_BYTES = 130000
 local HUB = "hub"
 local CFG = "cfg"
 local UI = "ui"
--- Legacy UI libraries removed; Linoria is the only UI library.
+-- Legacy UI libraries removed; WindUI is the only UI framework.
 local MAX_RELAUNCHES = 3
 local RELAUNCH_COOLDOWN = 15
 local CP = {
@@ -28,8 +28,8 @@ local CP = {
 local RELEASE_FALLBACK = {
 	loader = "8.12.2",
 	core = "2.9.10",
-	ui = "Linoria",
-	uiVersion = "5.1.0",
+	ui = "WindUI",
+	uiVersion = "11.0.0",
 	analytics = "1.2",
 	telemetry = "3.5",
 	helpers = "1.8",
@@ -1693,7 +1693,7 @@ local function coreHubUiValid(src)
 	if not src:find("buildStandardSettingsExtras", 1, true) then
 		return false
 	end
-	if not src:find("Linoria-only builders", 1, true) then
+	if not src:find("WindUI builders", 1, true) then
 		return false
 	end
 	return compileCoreSource(src, "Alleral/core_hub_ui")
@@ -1715,7 +1715,7 @@ local function alleralUiValid(src)
 	if not src:find("Alleral UI layer", 1, true) then
 		return false
 	end
-	if not src:find("Linoria", 1, true) then
+	if not src:find("WindUI", 1, true) then
 		return false
 	end
 	return compileCoreSource(src, "Alleral/alleral_ui")
@@ -1835,8 +1835,8 @@ local function alleralUiRejectReason(src)
 	if not src:find("Alleral UI layer", 1, true) then
 		return "missing Alleral UI layer marker"
 	end
-	if not src:find("Linoria", 1, true) then
-		return "missing Linoria bootstrap"
+	if not src:find("WindUI", 1, true) then
+		return "missing WindUI bootstrap"
 	end
 	if not looksLikeLua(src) then
 		return "invalid lua body"
@@ -4235,7 +4235,7 @@ local function main()
 	end
 
 	local uiRuntime = ENV.Alleral_UI and (ENV.Alleral_UI.Library or ENV.Alleral_UI.Alleral)
-	local uiEngine = (type(uiRuntime) == "table" and uiRuntime.GetLayoutInfo and uiRuntime:GetLayoutInfo().engine) or (Core and Core.UI_LIBRARY) or "Linoria"
+	local uiEngine = (type(uiRuntime) == "table" and uiRuntime.GetLayoutInfo and uiRuntime:GetLayoutInfo().engine) or (Core and Core.UI_LIBRARY) or "WindUI"
 	log("=== Alleral Ready ===")
 	log("  Bootstrap: v" .. tostring(ENV._Alleral_BootstrapVersion or BOOTSTRAP_VERSION))
 	log("  Loader:    v" .. LOADER_VERSION)
