@@ -3,8 +3,8 @@
     "core":  "2.9.10",
     "weao":  "1.1",
     "ui":  "Linoria",
-    "commit":  "5463b31",
-    "updatedAt":  "2026-06-21T00:00:00Z",
+    "commit":  "150fd79",
+    "updatedAt":  "2026-06-21T12:00:00Z",
     "updatePollSeconds":  120,
     "autoUpdate":  true,
     "minLoader":  "8.2.0",
@@ -14,5 +14,5 @@
     "helpers":  "1.8",
     "security":  "1.3",
     "access":  "1.1",
-    "uiVersion":  "5.1.0"
+    "uiVersion":  "7.5.2"
 }
