@@ -1,38 +1,88 @@
--- Alleral V11.6 — WindUI framework entry (sole UI stack)
+-- Alleral V12 — WindUI framework entry (unified manager architecture)
 return function(loadModule, Core)
 	local Text = loadModule("Text")()
 	local Guards = loadModule("Guards")()
-	local GameRegistry = loadModule("GameRegistry")(Core)
+	local GameTabSchemasEarly = loadModule("GameTabSchemas")()
+	local GameRegistry = loadModule("GameRegistry")(Core, GameTabSchemasEarly)
 	local Cache = loadModule("Cache")()
 	local Bootstrap = loadModule("Bootstrap")(Core, Text, GameRegistry)
 	local WindUI = Bootstrap.loadWindUI()
 	local Patch = loadModule("Patch")(WindUI)
 	local Theme = loadModule("Theme")(WindUI, Bootstrap)
-	local Motion = loadModule("Motion")()
+
+	local Runtime = loadModule("Runtime")(loadModule, Core)
+	local EventBus = Runtime.EventBus
+	local ConnectionTracker = Runtime.ConnectionTracker
+	local PerformanceManager = Runtime.PerformanceManager
+	local AnimationManager = Runtime.AnimationManager
+	local LayoutManager = Runtime.LayoutManager
+	local GameTabSchemas = Runtime.GameTabSchemas
+
+	local DragManager = loadModule("managers/DragManager")(EventBus, ConnectionTracker, PerformanceManager)
+	local ResizeManager = loadModule("managers/ResizeManager")(EventBus, ConnectionTracker, PerformanceManager, Theme)
+	local ThemeManager = loadModule("managers/ThemeManager")(EventBus, Theme, Bootstrap)
+	local TabManager = loadModule("managers/TabManager")(EventBus, GameTabSchemas, Bootstrap, GameRegistry)
+	local NotificationManager = loadModule("managers/NotificationManager")(EventBus, Bootstrap)
+	local GameUIBuilder = loadModule("managers/GameUIBuilder")(EventBus, GameTabSchemas, TabManager, Bootstrap)
+	local ConfigUIBuilder = loadModule("managers/ConfigUIBuilder")(EventBus, GameRegistry, Bootstrap)
+	local DashboardBuilder = loadModule("managers/DashboardBuilder")(EventBus, Bootstrap)
+
+	local Motion = AnimationManager
 	local TooltipManager = loadModule("TooltipManager")()
 	local SearchGlow = loadModule("SearchGlow")(Theme)
 	local VisualPolish = loadModule("VisualPolish")(Theme)
 	local ElementPolish = loadModule("ElementPolish")(Theme, Motion)
-	local Drag = loadModule("Drag")(Motion, TooltipManager)
 	local Validate = loadModule("Validate")(Bootstrap, GameRegistry)
-	local Notifications = loadModule("Notifications")(WindUI, Bootstrap)
+	local ValidationManager = loadModule("managers/ValidationManager")(EventBus, Validate, TabManager, PerformanceManager)
+	local Notifications = NotificationManager
 	local Controls = loadModule("Controls")(Bootstrap, Motion, Text, Guards, TooltipManager, Theme)
-	local WindowMod = loadModule("Window")(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, TooltipManager, Cache, Patch, SearchGlow, VisualPolish, ElementPolish)
+
+	local WindowManager = loadModule("managers/WindowManager")(
+		EventBus,
+		ConnectionTracker,
+		PerformanceManager,
+		AnimationManager,
+		DragManager,
+		ResizeManager,
+		LayoutManager,
+		ThemeManager,
+		ElementPolish,
+		VisualPolish,
+		SearchGlow
+	)
+
+	local WindowMod = loadModule("Window")(
+		WindUI,
+		Bootstrap,
+		Controls,
+		Notifications,
+		Theme,
+		WindowManager,
+		ValidationManager,
+		TabManager,
+		TooltipManager,
+		Cache,
+		Patch
+	)
+
 	local Configs = loadModule("Configs")(Bootstrap, GameRegistry)
-	local Tabs = loadModule("Tabs")(GameRegistry, Cache)
+	local Tabs = loadModule("Tabs")(GameRegistry, Cache, GameTabSchemas)
 
 	local gameId, gameMeta = GameRegistry.resolve({})
 	gameId = tostring(gameId or Bootstrap.resolveGameId(Core) or "unsupported")
 	Cache.setGame(gameId)
 
-	pcall(function() Theme.register() end)
-	pcall(function() Motion.logPerformance() end)
-	pcall(function() Drag.logReady() end)
+	pcall(ThemeManager.register)
+	pcall(AnimationManager.logPerformance)
+	pcall(DragManager.logReady)
+	pcall(ResizeManager.logReady)
+	pcall(LayoutManager.logReady)
+	pcall(WindowManager.logReady)
+	pcall(PerformanceManager.logReady)
 	pcall(function()
 		local Log = getgenv and getgenv().Alleral_Log
 		if Log and Log.info then
-			Log.info("UI cached; toggles do not rebuild")
-			Log.info("Tab cache active")
+			Log.info("V12 runtime active; event bus + managers online")
 		end
 	end)
 
@@ -64,6 +114,7 @@ return function(loadModule, Core)
 				pcall(function() STATE.activeWindow:Unload() end)
 			end
 			Cache.clearGame(STATE.gameId)
+			TabManager.clearCache(STATE.gameId)
 			STATE.tabCount = 0
 			STATE.groupCount = 0
 			STATE.controls = 0
@@ -95,7 +146,7 @@ return function(loadModule, Core)
 		STATE.uiDestroyed = false
 
 		settings.GameId = resolvedId
-		settings.ConfigFolder = settings.ConfigFolder or Configs.getNamespace(resolvedId)
+		settings.ConfigFolder = settings.ConfigFolder or ConfigUIBuilder.namespace(resolvedId)
 
 		local win = WindowMod.create(settings, STATE)
 		STATE.activeWindow = win
@@ -137,13 +188,14 @@ return function(loadModule, Core)
 
 	function Library:GetLayoutInfo()
 		return {
-			profile = "windui-v11.6-exe6",
+			profile = "windui-v12-unified",
 			engine = Bootstrap.ENGINE,
 			version = Bootstrap.VERSION,
 			stack = "WindUI",
 			theme = Theme.NAME,
 			gameId = STATE.gameId,
 			gameName = STATE.gameName,
+			navigation = GameUIBuilder.suggestTabOrder(STATE.gameId),
 		}
 	end
 
@@ -160,26 +212,44 @@ return function(loadModule, Core)
 		return {
 			cache = Cache.stats(),
 			tooltips = TooltipManager.getStats and TooltipManager.getStats() or {},
-			dragging = Drag.isDragging and Drag.isDragging() or false,
+			dragging = DragManager.isDragging and DragManager.isDragging(win and win._wind) or false,
 			windowState = win and win.GetWindowState and win:GetWindowState() or "Unknown",
-			tweens = Motion.getActiveTweenCount and Motion.getActiveTweenCount() or 0,
-			animatingWindow = Motion.isAnimatingWindow and Motion.isAnimatingWindow() or false,
+			tweens = AnimationManager.getActiveTweenCount and AnimationManager.getActiveTweenCount() or 0,
+			animatingWindow = WindowManager.isAnimating and WindowManager.isAnimating() or false,
 			gameId = STATE.gameId,
 			tabId = win and win._activeTab and win._activeTab._name or nil,
 			lastOpen = win and win._lastOpen or 0,
 			lastClose = win and win._lastClose or 0,
-			connections = (TooltipManager.getStats and TooltipManager.getStats().connections) or 0,
+			connections = ConnectionTracker.count(),
+			notifications = Notifications.stats and Notifications.stats() or {},
+			performance = PerformanceManager.stats and PerformanceManager.stats() or {},
 		}
 	end
 
 	return {
 		Library = Library,
 		STATE = STATE,
+		Runtime = Runtime,
+		EventBus = EventBus,
+		ConnectionTracker = ConnectionTracker,
+		PerformanceManager = PerformanceManager,
+		WindowManager = WindowManager,
+		DragManager = DragManager,
+		ResizeManager = ResizeManager,
+		AnimationManager = AnimationManager,
+		LayoutManager = LayoutManager,
+		TabManager = TabManager,
+		ThemeManager = ThemeManager,
+		NotificationManager = NotificationManager,
+		ValidationManager = ValidationManager,
+		GameUIBuilder = GameUIBuilder,
+		ConfigUIBuilder = ConfigUIBuilder,
+		DashboardBuilder = DashboardBuilder,
 		Bootstrap = Bootstrap,
 		Text = Text,
 		Theme = Theme,
 		Motion = Motion,
-		Drag = Drag,
+		Drag = DragManager,
 		TooltipManager = TooltipManager,
 		Guards = Guards,
 		Validate = Validate,
@@ -187,6 +257,7 @@ return function(loadModule, Core)
 		Tabs = Tabs,
 		Cache = Cache,
 		GameRegistry = GameRegistry,
+		GameTabSchemas = GameTabSchemas,
 		Patch = Patch,
 		WindUI = WindUI,
 		sanitize = Bootstrap.sanitize,

@@ -423,22 +423,26 @@ Core.buildExploitHub(section, {
 	onRemoteScan = refreshRemotes,
 })
 
-local farmTab = Core.buildUiTab(section, "Farm", 10734923214, 2, "farm")
-local offerTab = Core.buildUiTab(section, "Offers", 10723407389, 1, "offers")
-local progTab = Core.buildUiTab(section, "Progress", 10734952479, 2, "progress")
-local miscTab = Core.buildUiTab(section, "Misc", 10709789407, 1, "misc")
+local farmingTab = Core.buildUiTab(section, "Farming", "sprout", 2, "farming")
+local treesTab = Core.buildUiTab(section, "Trees", "tree-pine", 2, "trees")
+local sellingTab = Core.buildUiTab(section, "Selling", "coins", 2, "selling")
+local upgradesTab = Core.buildUiTab(section, "Upgrades", "trending-up", 2, "upgrades")
+local eventsTab = Core.buildUiTab(section, "Events", "sparkles", 2, "events")
+local statsTab = Core.buildUiTab(section, "Stats", "bar-chart-3", 2, "stats")
 local settingsTab = Core.buildUiTab(section, "Settings", 10734950309, 1, "settings")
 local saveWrap = Core.onUiSave(saveSettings)
 
-local collectGroup = Core.buildUiGroup(farmTab, "Collect", 1, saveWrap, nil, "collect")
-local incomeGroup = Core.buildUiGroup(farmTab, "Income", 2, saveWrap, nil, "income")
-local offerGroup = Core.buildUiGroup(offerTab, "Offers", 1, saveWrap, nil, "offer")
-local shopGroup = Core.buildUiGroup(offerTab, "Shop", 2, saveWrap, nil, "shop")
-local evolveGroup = Core.buildUiGroup(progTab, "Evolution", 1, saveWrap, nil, "evolve")
-local rebirthGroup = Core.buildUiGroup(progTab, "Rebirth", 2, saveWrap, nil, "rebirth")
-local eventGroup = Core.buildUiGroup(progTab, "Events", 1, saveWrap, nil, "events")
-local moveGroup = Core.buildUiGroup(miscTab, "Movement", 1, saveWrap, nil, "move")
-local utilGroup = Core.buildUiGroup(miscTab, "Utilities", 2, saveWrap, nil, "util")
+local collectGroup = Core.buildUiGroup(farmingTab, "Collect", 1, saveWrap, nil, "collect")
+local incomeGroup = Core.buildUiGroup(farmingTab, "Income", 2, saveWrap, nil, "income")
+local evolveGroup = Core.buildUiGroup(treesTab, "Evolution", 1, saveWrap, nil, "evolve")
+local offerGroup = Core.buildUiGroup(sellingTab, "Offers", 1, saveWrap, nil, "offer")
+local shopGroup = Core.buildUiGroup(sellingTab, "Shop", 2, saveWrap, nil, "shop")
+local rebirthGroup = Core.buildUiGroup(upgradesTab, "Rebirth", 1, saveWrap, nil, "rebirth")
+local powerGroup = Core.buildUiGroup(upgradesTab, "Power", 2, saveWrap, nil, "power")
+local eventGroup = Core.buildUiGroup(eventsTab, "Events", 1, saveWrap, nil, "events")
+local moveGroup = Core.buildUiGroup(statsTab, "Movement", 1, saveWrap, nil, "move")
+local utilGroup = Core.buildUiGroup(statsTab, "Utilities", 2, saveWrap, nil, "util")
+local statsGroup = Core.buildUiGroup(statsTab, "Leaderstats", 1, saveWrap, nil, "leaderstats")
 
 collectGroup:CreateToggle("Auto collect lemon", state.AutoCollectLemon, "Collects lemons from your stand area.", function(v) state.AutoCollectLemon = v end)
 collectGroup:CreateToggle("Auto collect cash drops", state.AutoCollectCashDrops, "Grabs cash bags and coins.", function(v) state.AutoCollectCashDrops = v end)
@@ -467,8 +471,9 @@ shopGroup:AddDropdown("Manage selection", {
 
 evolveGroup:CreateToggle("Auto evolve", state.AutoEvolve, "Evolves lemons up to max level.", function(v) state.AutoEvolve = v end)
 evolveGroup:CreateToggle("Auto ascend", state.AutoAscend, "Ascends when available.", function(v) state.AutoAscend = v end)
-evolveGroup:CreateToggle("Auto upgrade power", state.AutoUpgradePower, "Purchases power upgrades.", function(v) state.AutoUpgradePower = v end)
 evolveGroup:CreateSlider("Max evolution level", 1, 50, state.MaxEvolutionLevel, function(v) state.MaxEvolutionLevel = v end, "Cap for auto evolve.")
+
+powerGroup:CreateToggle("Auto upgrade power", state.AutoUpgradePower, "Purchases power upgrades.", function(v) state.AutoUpgradePower = v end)
 
 rebirthGroup:CreateToggle("Auto rebirth", state.AutoRebirth, "Rebirths when affordable.", function(v) state.AutoRebirth = v end)
 rebirthGroup:CreateSlider("Rebirth delay (minutes)", 1, 60, state.RebirthDelayMinutes, function(v)
@@ -485,6 +490,10 @@ eventGroup:CreateButton("Talk to alien", function() fireKey("TalkAlien") end, "F
 moveGroup:CreateToggle("Custom walk speed", state.WalkSpeedEnabled, "Overrides local walkspeed.", function(v) state.WalkSpeedEnabled = v end)
 moveGroup:CreateSlider("Walk speed", 16, 120, state.WalkSpeed, function(v) state.WalkSpeed = v end, "Local movement speed.")
 moveGroup:CreateToggle("Infinite jump", state.InfiniteJump, "Jump again while airborne.", function(v) state.InfiniteJump = v end)
+
+statsGroup:AddLabel("Cash: " .. (leaderstat("Cash") or leaderstat("Money") or "?"))
+statsGroup:AddLabel("Lemons: " .. (leaderstat("Lemons") or leaderstat("Lemon") or "?"))
+statsGroup:AddLabel("Rebirths: " .. (leaderstat("Rebirths") or leaderstat("Prestige") or "?"))
 
 utilGroup:CreateToggle("Anti AFK", state.AntiAFK ~= false, "Prevents idle kicks.", function(v)
 	state.AntiAFK = v

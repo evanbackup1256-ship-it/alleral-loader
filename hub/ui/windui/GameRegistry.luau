@@ -1,5 +1,5 @@
--- Alleral V11.2 — game-specific registry (PlaceId resolution, no cross-game bleed)
-return function(Core)
+-- Alleral V12 — game-specific registry (PlaceId + tab schemas)
+return function(Core, GameTabSchemas)
 	local GameRegistry = {}
 
 	local ENTRIES = {
@@ -81,7 +81,11 @@ return function(Core)
 		if not gameId then
 			return nil
 		end
-		return ENTRIES[tostring(gameId)]
+		local meta = ENTRIES[tostring(gameId)]
+		if meta and GameTabSchemas and GameTabSchemas.get and not meta.uiTabs then
+			meta.uiTabs = GameTabSchemas.get(gameId)
+		end
+		return meta
 	end
 
 	function GameRegistry.resolve(options)

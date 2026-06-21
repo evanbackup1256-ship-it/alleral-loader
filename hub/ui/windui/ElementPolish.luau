@@ -1,4 +1,4 @@
--- Alleral V11.6 — runtime element polish (cards, tabs, toggles, scrollbars, layout)
+-- Alleral V12 — one-shot element polish (no DescendantAdded recursion)
 return function(Theme, Motion)
 	local ElementPolish = {}
 	local TweenService = game:GetService("TweenService")
@@ -141,6 +141,9 @@ return function(Theme, Motion)
 			pad.Parent = sf
 		end
 
+		if not mark(sf, "scroll-fade") then
+			return
+		end
 		local lastScroll = 0
 		local fadeTween
 		sf:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
@@ -464,29 +467,21 @@ return function(Theme, Motion)
 		end
 		bound[windWindow] = true
 
-		task.spawn(function()
-			for _ = 1, 80 do
-				if applyAll(windWindow) then
-					break
-				end
-				task.wait(0.1)
+		local passes = 0
+		local function runPass()
+			passes = passes + 1
+			pcall(applyAll, windWindow)
+			if passes < 4 then
+				task.defer(runPass)
 			end
+		end
+		task.defer(runPass)
 
-			local root = getRoot(windWindow)
-			if root then
-				root.DescendantAdded:Connect(function(desc)
-					task.defer(function()
-						pcall(walk, desc)
-					end)
-				end)
+		pcall(function()
+			local Log = getgenv and getgenv().Alleral_Log
+			if Log and Log.info then
+				Log.info("Element polish active (one-shot, no recursion)")
 			end
-
-			pcall(function()
-				local Log = getgenv and getgenv().Alleral_Log
-				if Log and Log.info then
-					Log.info("Element polish active (cards, tabs, toggles, scrollbars)")
-				end
-			end)
 		end)
 	end
 

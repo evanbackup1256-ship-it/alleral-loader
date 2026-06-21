@@ -1,5 +1,5 @@
--- Alleral V11.6 — WindUI window (EXE-6 polish, 1080p fit, no tooltips)
-return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, _TooltipManager, Cache, Patch, SearchGlow, VisualPolish, ElementPolish)
+-- Alleral V12 — WindUI window (manager-driven lifecycle)
+return function(WindUI, Bootstrap, Controls, Notifications, Theme, WindowManager, ValidationManager, TabManager, _TooltipManager, Cache, Patch)
 	local WindowMod = {}
 
 	local STATES = {
@@ -55,15 +55,6 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 		end
 		windowConfig.Folder = windowConfig.Folder or "Alleral"
 
-		if Theme and Theme.register then
-			pcall(Theme.register)
-		end
-
-		local logFn = Bootstrap.log or function(_, msg)
-			warn("[Alleral] " .. tostring(msg))
-		end
-		pcall(logFn, "INFO", "WindUI window config validated")
-
 		local windWindow
 		local ok, err = pcall(function()
 			windWindow = WindUI:CreateWindow(windowConfig)
@@ -71,7 +62,6 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 		if not ok or not windWindow then
 			error("WindUI CreateWindow failed: " .. tostring(err))
 		end
-		pcall(logFn, "INFO", "WindUI window created")
 
 		local self
 		local function bindWindPatches()
@@ -112,14 +102,8 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 					self._wind:SetVisible(show)
 				end
 				local root = self._wind.UIElements and self._wind.UIElements.Main
-					or self._wind.Main
-					or self._wind.Frame
 				if typeof(root) == "Instance" then
 					root.Visible = show
-					local inner = root:FindFirstChild("Main", true)
-					if inner and inner:IsA("GuiObject") then
-						inner.Visible = show
-					end
 				end
 				if self._wind then
 					self._wind.Closed = not show
@@ -148,8 +132,8 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			end
 			self._windowState = STATES.Hiding
 			self._lastClose = tick()
-			if Motion and Motion.animateWindowHide then
-				Motion.animateWindowHide(self._windUI, self._wind, function()
+			if WindowManager and WindowManager.hide then
+				WindowManager.hide(self._windUI, self._wind, function()
 					pcall(function()
 						if self._wind then
 							self._wind.Closed = true
@@ -177,8 +161,8 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 					self._wind.Closed = false
 				end
 			end)
-			if Motion and Motion.animateWindowShow then
-				Motion.animateWindowShow(self._windUI, self._wind, function()
+			if WindowManager and WindowManager.show then
+				WindowManager.show(self._windUI, self._wind, function()
 					self._windowState = STATES.Visible
 				end)
 			else
@@ -252,6 +236,9 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			if Cache then
 				Cache.trackTab(self._gameId, tab)
 			end
+			if TabManager and TabManager.onTabAdded then
+				pcall(TabManager.onTabAdded, self, tab)
+			end
 
 			if #self._tabs == 1 then
 				task.defer(function()
@@ -274,11 +261,12 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 		end
 
 		function self:Unload()
-			if Drag and Drag.cleanup then
-				pcall(Drag.cleanup)
+			if WindowManager and WindowManager.teardown then
+				pcall(WindowManager.teardown, self._wind)
 			end
-			if Motion and Motion.cleanup then
-				pcall(Motion.cleanup)
+			if self._toggleConn then
+				pcall(function() self._toggleConn:Disconnect() end)
+				self._toggleConn = nil
 			end
 			pcall(function()
 				if self._wind.Destroy then
@@ -297,8 +285,8 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 				return true
 			end
 			local passed = true
-			if Validate and Validate.run then
-				passed = select(1, Validate.run(self, state))
+			if ValidationManager and ValidationManager.run then
+				passed = select(1, ValidationManager.run(self, state))
 			elseif #self._tabs < 1 or (state.controls or 0) < 1 then
 				passed = false
 			end
@@ -327,20 +315,8 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			end)
 		end
 
-		if Theme then
-			pcall(function() Theme.applyToWindow(windWindow) end)
-		end
-		if Drag then
-			pcall(function() Drag.bind(windWindow) end)
-		end
-		if SearchGlow and SearchGlow.bind then
-			pcall(SearchGlow.bind, windWindow)
-		end
-		if VisualPolish and VisualPolish.bind then
-			pcall(VisualPolish.bind, windWindow)
-		end
-		if ElementPolish and ElementPolish.bind then
-			pcall(ElementPolish.bind, windWindow)
+		if WindowManager and WindowManager.setup then
+			pcall(WindowManager.setup, windWindow, { gameId = gameId })
 		end
 
 		if Cache then

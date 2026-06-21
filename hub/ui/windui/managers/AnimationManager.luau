@@ -1,6 +1,6 @@
--- Alleral V12 — root-only UIScale animation (delegates to AnimationManager pattern)
-return function()
-	local Motion = {}
+-- Alleral V12 — root-only UIScale animation (60fps, no reparent)
+return function(EventBus)
+	local AnimationManager = {}
 	local TweenService = game:GetService("TweenService")
 
 	local OPEN_DURATION = 0.18
@@ -33,7 +33,7 @@ return function()
 		return scale
 	end
 
-	function Motion.cancel(windWindow)
+	function AnimationManager.cancel(windWindow)
 		local tween = activeTweens[windWindow]
 		if tween then
 			pcall(function() tween:Cancel() end)
@@ -42,11 +42,11 @@ return function()
 		windowAnimating = false
 	end
 
-	function Motion.isAnimatingWindow()
+	function AnimationManager.isAnimatingWindow()
 		return windowAnimating
 	end
 
-	function Motion.getActiveTweenCount()
+	function AnimationManager.getActiveTweenCount()
 		local n = 0
 		for _ in pairs(activeTweens) do
 			n = n + 1
@@ -54,7 +54,9 @@ return function()
 		return n
 	end
 
-	function Motion.tween(inst, props, duration, style, dir)
+	function AnimationManager.setDragMode(_) end
+
+	function AnimationManager.tween(inst, props, duration, style, dir)
 		if typeof(inst) ~= "Instance" then
 			return
 		end
@@ -67,9 +69,7 @@ return function()
 		return tween
 	end
 
-	function Motion.setDragMode(_) end
-
-	function Motion.animateWindowShow(_windUI, windWindow, onDone)
+	function AnimationManager.animateWindowShow(_windUI, windWindow, onDone)
 		local root = getRoot(windWindow)
 		if not root then
 			windowAnimating = false
@@ -77,7 +77,7 @@ return function()
 			return
 		end
 
-		Motion.cancel(windWindow)
+		AnimationManager.cancel(windWindow)
 		windowAnimating = true
 		root.Visible = true
 
@@ -90,15 +90,17 @@ return function()
 			{ Scale = 1 }
 		)
 		activeTweens[windWindow] = tween
+		if EventBus then EventBus.emit("window:showing") end
 		tween:Play()
 		tween.Completed:Connect(function()
 			activeTweens[windWindow] = nil
 			windowAnimating = false
+			if EventBus then EventBus.emit("window:visible") end
 			if onDone then onDone() end
 		end)
 	end
 
-	function Motion.animateWindowHide(_windUI, windWindow, onDone)
+	function AnimationManager.animateWindowHide(_windUI, windWindow, onDone)
 		local root = getRoot(windWindow)
 		if not root then
 			windowAnimating = false
@@ -106,7 +108,7 @@ return function()
 			return
 		end
 
-		Motion.cancel(windWindow)
+		AnimationManager.cancel(windWindow)
 		windowAnimating = true
 
 		local scale = getScale(root)
@@ -116,30 +118,32 @@ return function()
 			{ Scale = CLOSE_SCALE }
 		)
 		activeTweens[windWindow] = tween
+		if EventBus then EventBus.emit("window:hiding") end
 		tween:Play()
 		tween.Completed:Connect(function()
 			root.Visible = false
 			scale.Scale = 1
 			activeTweens[windWindow] = nil
 			windowAnimating = false
+			if EventBus then EventBus.emit("window:hidden") end
 			if onDone then onDone() end
 		end)
 	end
 
-	function Motion.cleanup()
+	function AnimationManager.cleanup()
 		for windWindow in pairs(activeTweens) do
-			Motion.cancel(windWindow)
+			AnimationManager.cancel(windWindow)
 		end
 	end
 
-	function Motion.logPerformance()
+	function AnimationManager.logPerformance()
 		pcall(function()
 			local Log = getgenv and getgenv().Alleral_Log
 			if Log and Log.info then
-				Log.info("Motion active (UIScale root only, no reparent)")
+				Log.info("Animation manager active (UIScale root only)")
 			end
 		end)
 	end
 
-	return Motion
+	return AnimationManager
 end

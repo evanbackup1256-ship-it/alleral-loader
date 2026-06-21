@@ -1,9 +1,9 @@
--- Alleral V11.6 — WindUI loader (sole UI framework)
+-- Alleral V12 — WindUI loader (unified manager architecture)
 local WINDUI_DIST = "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
 
 return function(Core, Text, GameRegistry)
 	local Bootstrap = {}
-	Bootstrap.VERSION = "11.6.0"
+	Bootstrap.VERSION = "12.0.0"
 	Bootstrap.ENGINE = "WindUI"
 	Text = Text or { sanitize = function(v, m) return tostring(v or "") end }
 	GameRegistry = GameRegistry or {}
@@ -127,9 +127,9 @@ return function(Core, Text, GameRegistry)
 		log("Tabs loaded: " .. tostring(state.tabCount or 0))
 		log("Controls loaded: " .. tostring(state.controls or 0))
 		log("Config namespace: configs/" .. gameId .. "/")
-		log("UI open/close optimized")
-		log("Dragging optimized")
-		log("Animation lag fixed")
+		log("V12 managers online")
+		log("Drag + resize + layout active")
+		log("Animation: UIScale root only")
 		log("Performance validation passed")
 	end
 

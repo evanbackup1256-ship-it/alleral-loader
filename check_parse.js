@@ -28,6 +28,23 @@ const files = [
     'hub/ui/windui/SearchGlow.luau',
     'hub/ui/windui/VisualPolish.luau',
     'hub/ui/windui/ElementPolish.luau',
+    'hub/ui/windui/Runtime.luau',
+    'hub/ui/windui/EventBus.luau',
+    'hub/ui/windui/ConnectionTracker.luau',
+    'hub/ui/windui/GameTabSchemas.luau',
+    'hub/ui/windui/managers/AnimationManager.luau',
+    'hub/ui/windui/managers/DragManager.luau',
+    'hub/ui/windui/managers/ResizeManager.luau',
+    'hub/ui/windui/managers/LayoutManager.luau',
+    'hub/ui/windui/managers/PerformanceManager.luau',
+    'hub/ui/windui/managers/WindowManager.luau',
+    'hub/ui/windui/managers/TabManager.luau',
+    'hub/ui/windui/managers/ThemeManager.luau',
+    'hub/ui/windui/managers/NotificationManager.luau',
+    'hub/ui/windui/managers/ValidationManager.luau',
+    'hub/ui/windui/managers/GameUIBuilder.luau',
+    'hub/ui/windui/managers/ConfigUIBuilder.luau',
+    'hub/ui/windui/managers/DashboardBuilder.luau',
 ];
 
 function getLineCol(src, pos) {

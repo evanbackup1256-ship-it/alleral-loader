@@ -1,5 +1,5 @@
--- Alleral V11.2 — per-game dynamic tab registry
-return function(GameRegistry, Cache)
+-- Alleral V12 — per-game dynamic tab registry (schema-driven)
+return function(GameRegistry, Cache, GameTabSchemas)
 	local Tabs = {}
 	Tabs._registry = {}
 
@@ -17,6 +17,19 @@ return function(GameRegistry, Cache)
 		local list = Tabs._registry[gameId]
 		if type(list) == "table" and #list > 0 then
 			return list
+		end
+		if GameTabSchemas and GameTabSchemas.get then
+			local schema = GameTabSchemas.get(gameId)
+			if type(schema) == "table" and #schema > 0 then
+				local out = {}
+				for _, tab in ipairs(schema) do
+					table.insert(out, {
+						Name = tab.name or tab.Name,
+						Icon = tab.icon or tab.Icon or "layout-grid",
+					})
+				end
+				return out
+			end
 		end
 		if GameRegistry and not GameRegistry.isSupported(gameId) then
 			return {
