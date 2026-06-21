@@ -91,7 +91,7 @@ return function(deps)
 			ZIndex = 501,
 			Parent = overlay,
 		})
-		Util.corner(panel, Theme.RADIUS.WINDOW)
+		Util.corner(panel, Theme.RADIUS.Window)
 		Util.stroke(panel, Theme.COLOR.BORDER_SOFT, 1, 0.35)
 
 		local glow = Util.make("Frame", {
@@ -103,7 +103,7 @@ return function(deps)
 			ZIndex = 500,
 			Parent = panel,
 		})
-		Util.corner(glow, Theme.RADIUS.WINDOW + 4)
+		Util.corner(glow, Theme.RADIUS.Window)
 
 		local topAccent = Util.make("Frame", {
 			Size = UDim2.new(1, 0, 0, 3),

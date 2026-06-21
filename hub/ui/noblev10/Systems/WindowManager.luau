@@ -63,15 +63,39 @@ return function(deps)
 		return name
 	end
 
+	local function num(value, fallback, label)
+		if Layout and Layout.num then return Layout.num(value, fallback, label) end
+		local n = tonumber(value)
+		if n == nil then
+			if label then warn("[Alleral V10] Missing numeric:", label, "→", fallback) end
+			return fallback
+		end
+		return n
+	end
+
+	local function absSize(gui, fw, fh)
+		if Layout and Layout.absSize then return Layout.absSize(gui, fw, fh) end
+		fw, fh = num(fw, 1200, nil), num(fh, 720, nil)
+		if typeof(gui) ~= "Instance" or not gui:IsA("GuiObject") then return fw, fh end
+		local w = num(gui.AbsoluteSize.X, 0, nil)
+		local h = num(gui.AbsoluteSize.Y, 0, nil)
+		if w <= 0 then w = fw end
+		if h <= 0 then h = fh end
+		return w, h
+	end
+
 	local function getViewport()
 		local cam = workspace.CurrentCamera
 		if cam then
-			return cam.ViewportSize.X, cam.ViewportSize.Y
+			local vp = cam.ViewportSize
+			return num(vp.X, 1920, "ViewportSize.X"), num(vp.Y, 1080, "ViewportSize.Y")
 		end
 		return 1920, 1080
 	end
 
 	local function computeResponsiveScale(vpX, vpY)
+		vpX = num(vpX, 1920, "vpX")
+		vpY = num(vpY, 1080, "vpY")
 		local baseW, baseH = 1180, 700
 		local scaleX = vpX / baseW
 		local scaleY = vpY / baseH
@@ -176,49 +200,31 @@ return function(deps)
 	end
 
 	local function createGroup(ctx, parent, title, columnWidth)
-		local width = columnWidth or 360
+		local width = num(columnWidth, 360, "columnWidth")
 		local card = Util.make("Frame", {
 			Size = UDim2.fromOffset(width, 0),
-			BackgroundColor3 = Theme.COLOR.BG2,
-			BackgroundTransparency = 0.04,
+			BackgroundColor3 = Theme.COLOR.Surface1,
+			BackgroundTransparency = 0.02,
 			BorderSizePixel = 0,
 			AutomaticSize = Enum.AutomaticSize.Y,
-			ClipsDescendants = false,
+			ClipsDescendants = true,
 			Parent = parent,
 		})
-		Util.corner(card, Theme.CARD.RADIUS)
-		Util.stroke(card, Theme.COLOR.BORDER, 1, 0.38)
-
-		local glow = Util.make("Frame", {
-			Size = UDim2.new(1, 10, 1, 10),
-			Position = UDim2.new(0, -5, 0, -5),
-			BackgroundColor3 = Theme.COLOR.GLOW,
-			BackgroundTransparency = 0.94,
+		Util.corner(card, Theme.RADIUS.Card)
+		if Layout and Layout.shadow then Layout.shadow(card, Theme.RADIUS.Card, 2, 0.65) end
+		Util.make("Frame", {
+			Size = UDim2.new(1, 0, 0, 1),
+			BackgroundColor3 = Theme.COLOR.Accent,
+			BackgroundTransparency = 0.6,
 			BorderSizePixel = 0,
-			ZIndex = 0,
+			ZIndex = 2,
 			Parent = card,
 		})
-		Util.corner(glow, Theme.CARD.RADIUS + 4)
-
-		local shine = Util.make("Frame", {
-			Size = UDim2.new(1, -28, 0, 3),
-			Position = UDim2.new(0, 14, 0, 0),
-			BackgroundColor3 = Theme.COLOR.ACCENT,
-			BackgroundTransparency = 0.12,
-			BorderSizePixel = 0,
-			ZIndex = 3,
-			Parent = card,
-		})
-		Util.gradient(shine, Theme.COLOR.ACCENT_LIGHT, Theme.COLOR.ACCENT, 0)
-		Util.corner(shine, 2)
-
 		card.MouseEnter:Connect(function()
-			Util.safeSprTarget(glow, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.88 })
-			Util.safeSprTarget(card, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.02 })
+			Util.safeSprTarget(card, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0 })
 		end)
 		card.MouseLeave:Connect(function()
-			Util.safeSprTarget(glow, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.94 })
-			Util.safeSprTarget(card, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.04 })
+			Util.safeSprTarget(card, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundTransparency = 0.02 })
 		end)
 
 		local titleBar = Util.make("Frame", {
@@ -256,8 +262,8 @@ return function(deps)
 		})
 
 		local function calculateHeight()
-			local contentH = list.AbsoluteContentSize.Y
-			return math.max(96, Theme.CARD.TITLE_H + contentH + Theme.CARD.PAD * 2 + 4)
+			local contentH = num(list.AbsoluteContentSize.Y, 0, "groupContentH")
+			return math.max(96, num(Theme.CARD.TITLE_H, 40, nil) + contentH + num(Theme.CARD.PAD, 16, nil) * 2 + 4)
 		end
 
 		local updateSize = debounce(function()
@@ -268,7 +274,7 @@ return function(deps)
 		list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateSize)
 		if parent and parent.GetPropertyChangedSignal then
 			parent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-				local newW = parent.AbsoluteSize.X
+				local newW = absSize(parent, width, 0)
 				if newW > 80 then
 					width = newW
 					updateSize()
@@ -395,8 +401,11 @@ return function(deps)
 		local colFrames = {}
 		local function computeColumnWidths()
 			if not contentArea or not contentArea.Parent then return end
-			local available = math.max(520, contentArea.AbsoluteSize.X - Theme.WINDOW.PADDING * 2)
-			local gapTotal = (columns - 1) * Theme.CARD.GAP
+			local areaW = absSize(contentArea, 900, 0)
+			local pad = num(Theme.WINDOW.PADDING, 16, "WINDOW.PADDING")
+			local gap = num(Theme.CARD.GAP, 14, "CARD.GAP")
+			local available = math.max(520, areaW - pad * 2)
+			local gapTotal = (columns - 1) * gap
 			local cw = math.floor((available - gapTotal) / columns)
 			cw = Util.clamp(cw, 220, 500)
 			for _, cf in ipairs(colFrames) do
@@ -404,7 +413,10 @@ return function(deps)
 			end
 		end
 
-		local initialCW = math.max(260, math.floor(((contentArea.AbsoluteSize.X > 0 and contentArea.AbsoluteSize.X or 900) - Theme.WINDOW.PADDING * 2 - (columns - 1) * Theme.CARD.GAP) / columns))
+		local areaW0 = absSize(contentArea, 900, 0)
+		local pad0 = num(Theme.WINDOW.PADDING, 16, nil)
+		local gap0 = num(Theme.CARD.GAP, 14, nil)
+		local initialCW = math.max(260, math.floor((areaW0 - pad0 * 2 - (columns - 1) * gap0) / columns))
 		for i = 1, columns do
 			local cf = Util.make("Frame", {
 				Size = UDim2.fromOffset(initialCW, 0),
@@ -444,24 +456,23 @@ return function(deps)
 			end,
 			AddLeftGroupbox = function(_, groupName)
 				if not colFrames[1] then return nil end
-				local w = colFrames[1].AbsoluteSize.X > 0 and colFrames[1].AbsoluteSize.X or initialCW
+				local w = absSize(colFrames[1], initialCW, 0)
 				return createGroup(ctx, colFrames[1], groupName, w)
 			end,
 			AddRightGroupbox = function(_, groupName)
 				local idx = math.min(2, #colFrames)
 				if not colFrames[idx] then return nil end
-				local w = colFrames[idx].AbsoluteSize.X > 0 and colFrames[idx].AbsoluteSize.X or initialCW
+				local w = absSize(colFrames[idx], initialCW, 0)
 				return createGroup(ctx, colFrames[idx], groupName, w)
 			end,
 			AddGroupbox = function(_, groupName)
-				local shortest, best = colFrames[1], 1
-				for i, cf in ipairs(colFrames) do
-					if cf.AbsoluteSize.Y < shortest.AbsoluteSize.Y then
-						shortest = cf
-						best = i
-					end
+				local shortest = colFrames[1]
+				for _, cf in ipairs(colFrames) do
+					local _, sh = absSize(shortest, 0, 9999)
+					local _, ch = absSize(cf, 0, 9999)
+					if ch < sh then shortest = cf end
 				end
-				local w = shortest.AbsoluteSize.X > 0 and shortest.AbsoluteSize.X or initialCW
+				local w = absSize(shortest, initialCW, 0)
 				return createGroup(ctx, shortest, groupName, w)
 			end,
 		}
@@ -525,62 +536,64 @@ return function(deps)
 			ZIndex = 2,
 			Parent = screen,
 		})
-		Util.corner(main, Theme.WINDOW.RADIUS)
-		Util.stroke(main, Theme.COLOR.BORDER, 1, 0.42)
+		Util.corner(main, Theme.RADIUS.Window)
+		if Layout and Layout.shadow then Layout.shadow(main, Theme.RADIUS.Window, 3, 0.5) end
+		Util.gradient(main, Theme.COLOR.BG1, Theme.COLOR.BG2, 180)
 
 		local mainScale = Util.scale(main)
 		mainScale.Scale = settings.StartHidden and 0.92 or 1
 
-		-- Top bar
+		local topH = num(Theme.TOPBAR.H, 64, "TOPBAR.H")
+		local winPad = num(Theme.WINDOW.PADDING, 16, "WINDOW.PADDING")
+
 		local topBar = Util.make("Frame", {
 			Name = "TopBar",
-			Size = UDim2.new(1, 0, 0, Theme.TOPBAR.H),
+			Size = UDim2.new(1, 0, 0, topH),
 			BackgroundColor3 = Theme.COLOR.BG1,
+			BackgroundTransparency = 0.04,
 			BorderSizePixel = 0,
 			ZIndex = 10,
 			Parent = main,
 		})
-		Util.corner(topBar, Theme.WINDOW.RADIUS)
-
 		Util.make("Frame", {
 			Size = UDim2.new(1, 0, 0, 1),
 			Position = UDim2.new(0, 0, 1, 0),
-			BackgroundColor3 = Theme.COLOR.BORDER,
-			BackgroundTransparency = 0.9,
+			BackgroundColor3 = Theme.COLOR.BorderSoft,
+			BackgroundTransparency = 0.55,
 			BorderSizePixel = 0,
 			ZIndex = 11,
 			Parent = topBar,
 		})
 
 		local logo = Util.make("Frame", {
-			Size = UDim2.fromOffset(40, 40),
-			Position = UDim2.new(0, Theme.WINDOW.PADDING, 0.5, -20),
-			BackgroundColor3 = Theme.COLOR.ACCENT,
+			Size = UDim2.fromOffset(32, 32),
+			Position = UDim2.new(0, winPad, 0.5, -16),
+			BackgroundColor3 = Theme.COLOR.Surface1,
 			BorderSizePixel = 0,
 			ZIndex = 12,
 			Parent = topBar,
 		})
-		Util.corner(logo, 12)
-		Util.gradient(logo, Theme.COLOR.ACCENT_LIGHT, Theme.COLOR.ACCENT_DARK, 135)
+		Util.corner(logo, Theme.RADIUS.Button)
+		if Layout and Layout.softStroke then Layout.softStroke(logo, Theme.COLOR.AccentSoft) end
 		Util.make("TextLabel", {
 			Size = UDim2.new(1, 0, 1, 0),
 			BackgroundTransparency = 1,
 			Text = string.sub(title, 1, 1):upper(),
-			TextColor3 = Theme.COLOR.WHITE,
+			TextColor3 = Theme.COLOR.Accent,
 			Font = Theme.FONT_BOLD,
-			TextSize = 18,
+			TextSize = 15,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextYAlignment = Enum.TextYAlignment.Center,
 			ZIndex = 13,
 			Parent = logo,
 		})
 
-		Util.make("TextLabel", {
+		local titleLabel = Util.make("TextLabel", {
 			Size = UDim2.new(0, 0, 1, 0),
-			Position = UDim2.new(0, 68, 0, 0),
+			Position = UDim2.new(0, winPad + 40, 0, 0),
 			BackgroundTransparency = 1,
 			Text = title,
-			TextColor3 = Theme.COLOR.TEXT,
+			TextColor3 = Theme.COLOR.Text,
 			Font = Theme.FONT_BOLD,
 			TextSize = Theme.TEXT_HEADER,
 			AutomaticSize = Enum.AutomaticSize.X,
@@ -591,100 +604,79 @@ return function(deps)
 		})
 
 		local verBadge = Util.make("Frame", {
-			Size = UDim2.fromOffset(68, 22),
-			Position = UDim2.new(0, 168, 0.5, -11),
-			BackgroundColor3 = Theme.COLOR.ACCENT,
+			Size = UDim2.fromOffset(46, 18),
+			Position = UDim2.new(0, winPad + 120, 0.5, -9),
+			BackgroundColor3 = Theme.COLOR.Surface2,
+			BackgroundTransparency = 0.15,
 			BorderSizePixel = 0,
 			ZIndex = 12,
 			Parent = topBar,
 		})
-		Util.corner(verBadge, Theme.RADIUS.PILL)
-		Util.gradient(verBadge, Theme.COLOR.ACCENT_LIGHT, Theme.COLOR.ACCENT, 0)
-		local verGlow = Util.make("Frame", {
-			Size = UDim2.new(1, 8, 1, 8),
-			Position = UDim2.new(0, -4, 0, -4),
-			BackgroundColor3 = Theme.COLOR.ACCENT,
-			BackgroundTransparency = 0.84,
-			BorderSizePixel = 0,
-			ZIndex = 11,
-			Parent = verBadge,
-		})
-		Util.corner(verGlow, Theme.RADIUS.PILL + 2)
+		Util.corner(verBadge, Theme.RADIUS.Pill)
 		Util.make("TextLabel", {
 			Size = UDim2.new(1, 0, 1, 0),
 			BackgroundTransparency = 1,
 			Text = "v" .. Theme.VERSION,
-			TextColor3 = Theme.COLOR.WHITE,
+			TextColor3 = Theme.COLOR.Accent,
 			Font = Theme.FONT_BOLD,
-			TextSize = 11,
+			TextSize = 10,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextYAlignment = Enum.TextYAlignment.Center,
 			ZIndex = 13,
 			Parent = verBadge,
 		})
 
-		local function createPill(parent, text, x, color)
-			local pill = Util.make("Frame", {
-				Size = UDim2.fromOffset(0, 26),
-				Position = UDim2.new(0, x, 0.5, -13),
-				BackgroundColor3 = Theme.COLOR.BG3,
-				BackgroundTransparency = 0.08,
+		local function createChip(parent, text, x, dotColor)
+			local chip = Util.make("Frame", {
+				Size = UDim2.fromOffset(0, 22),
+				Position = UDim2.new(0, num(x, 0, "chipX"), 0.5, -11),
+				BackgroundColor3 = Theme.COLOR.Surface1,
+				BackgroundTransparency = 0.2,
 				BorderSizePixel = 0,
 				AutomaticSize = Enum.AutomaticSize.X,
 				ZIndex = 12,
 				Parent = parent,
 			})
-			Util.corner(pill, Theme.RADIUS.PILL)
-			Util.stroke(pill, color or Theme.COLOR.BORDER_SOFT, 1, 0.55)
-			Util.padding(pill, 12, 12, 0, 0)
-			local dot = Util.make("Frame", {
-				Size = UDim2.fromOffset(8, 8),
-				Position = UDim2.new(0, 10, 0.5, -4),
-				BackgroundColor3 = color or Theme.COLOR.GREEN,
+			Util.corner(chip, Theme.RADIUS.Pill)
+			Util.padding(chip, 8, 10, 0, 0)
+			Util.make("Frame", {
+				Size = UDim2.fromOffset(6, 6),
+				Position = UDim2.new(0, 8, 0.5, -3),
+				BackgroundColor3 = dotColor or Theme.COLOR.Green,
 				BorderSizePixel = 0,
 				ZIndex = 13,
-				Parent = pill,
+				Parent = chip,
 			})
-			Util.corner(dot, 4)
 			local lbl = Util.make("TextLabel", {
 				Size = UDim2.new(0, 0, 1, 0),
-				Position = UDim2.new(0, 24, 0, 0),
+				Position = UDim2.new(0, 18, 0, 0),
 				BackgroundTransparency = 1,
 				Text = text,
-				TextColor3 = Theme.COLOR.TEXT2,
+				TextColor3 = Theme.COLOR.TextMuted,
 				Font = Theme.FONT,
-				TextSize = Theme.TEXT_SM,
+				TextSize = 10,
 				AutomaticSize = Enum.AutomaticSize.X,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				TextYAlignment = Enum.TextYAlignment.Center,
 				ZIndex = 13,
-				Parent = pill,
+				Parent = chip,
 			})
-			return pill, lbl, dot
+			return chip, lbl
 		end
 
-		local playerPill, playerLabel, playerDot = createPill(topBar, "0 Players", 280, Theme.COLOR.GREEN)
-		local uptimePill, uptimeLabel = createPill(topBar, "Uptime 00:00:00", 430, Theme.COLOR.BLUE)
-		local readyPill, readyLabel = createPill(topBar, "UI Ready", 590, Theme.COLOR.GREEN)
-		local readyGlow = Util.make("Frame", {
-			Size = UDim2.new(1, 6, 1, 6),
-			Position = UDim2.new(0, -3, 0, -3),
-			BackgroundColor3 = Theme.COLOR.GREEN,
-			BackgroundTransparency = 0.9,
-			BorderSizePixel = 0,
-			ZIndex = 11,
-			Parent = readyPill,
-		})
-		Util.corner(readyGlow, Theme.RADIUS.PILL + 2)
+		local chipStart = winPad + 200
+		local playerPill, playerLabel = createChip(topBar, "0 Players", chipStart, Theme.COLOR.Green)
+		local uptimePill, uptimeLabel = createChip(topBar, "00:00:00", chipStart + 108, Theme.COLOR.Blue)
+		local readyPill, readyLabel = createChip(topBar, "Ready", chipStart + 200, Theme.COLOR.Green)
 
 		local keybindLabel = Util.make("TextLabel", {
-			Size = UDim2.fromOffset(150, Theme.TOPBAR.H),
-			Position = UDim2.new(0, 250, 0, 0),
+			Size = UDim2.fromOffset(120, topH),
+			Position = UDim2.new(0, chipStart + 290, 0, 0),
 			BackgroundTransparency = 1,
-			Text = "Toggle: " .. keyName(self._toggleKey),
-			TextColor3 = Theme.COLOR.TEXT3,
+			Text = keyName(self._toggleKey),
+			TextColor3 = Theme.COLOR.TextDim,
 			Font = Theme.FONT,
-			TextSize = Theme.TEXT_SM,
+			TextSize = 10,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = Enum.TextYAlignment.Center,
 			ZIndex = 12,
@@ -692,59 +684,63 @@ return function(deps)
 		})
 
 		local closeBtn = Util.make("TextButton", {
-			Size = UDim2.fromOffset(36, 36),
-			Position = UDim2.new(1, -Theme.WINDOW.PADDING - 4, 0.5, -18),
-			BackgroundColor3 = Theme.COLOR.ACCENT,
+			Size = UDim2.fromOffset(28, 28),
+			Position = UDim2.new(1, -winPad - 4, 0.5, -14),
+			BackgroundColor3 = Theme.COLOR.Surface2,
 			BorderSizePixel = 0,
 			Text = "✕",
-			TextColor3 = Theme.COLOR.WHITE,
+			TextColor3 = Theme.COLOR.TextMuted,
+			Font = Theme.FONT_BOLD,
+			TextSize = 14,
+			AutoButtonColor = false,
+			ZIndex = 12,
+			Parent = topBar,
+		})
+		Util.corner(closeBtn, Theme.RADIUS.Button)
+		local closeScale = Util.scale(closeBtn)
+
+		local miniBtn = Util.make("TextButton", {
+			Size = UDim2.fromOffset(28, 28),
+			Position = UDim2.new(1, -winPad - 36, 0.5, -14),
+			BackgroundColor3 = Theme.COLOR.Surface1,
+			BorderSizePixel = 0,
+			Text = "–",
+			TextColor3 = Theme.COLOR.TextMuted,
 			Font = Theme.FONT_BOLD,
 			TextSize = 16,
 			AutoButtonColor = false,
 			ZIndex = 12,
 			Parent = topBar,
 		})
-		Util.corner(closeBtn, Theme.RADIUS.BUTTON)
-		Util.gradient(closeBtn, Theme.COLOR.ACCENT_LIGHT, Theme.COLOR.ACCENT, 90)
-		local closeScale = Util.scale(closeBtn)
-
-		local miniBtn = Util.make("TextButton", {
-			Size = UDim2.fromOffset(34, 34),
-			Position = UDim2.new(1, -Theme.WINDOW.PADDING - 46, 0.5, -17),
-			BackgroundColor3 = Theme.COLOR.BG3,
-			BorderSizePixel = 0,
-			Text = "–",
-			TextColor3 = Theme.COLOR.TEXT2,
-			Font = Theme.FONT_BOLD,
-			TextSize = 18,
-			AutoButtonColor = false,
-			ZIndex = 12,
-			Parent = topBar,
-		})
-		Util.corner(miniBtn, 17)
-		Util.stroke(miniBtn, Theme.COLOR.BORDER, 1, 0.55)
+		Util.corner(miniBtn, Theme.RADIUS.Button)
 		local miniScale = Util.scale(miniBtn)
 
 		closeBtn.MouseEnter:Connect(function()
-			Util.safeSprTarget(closeScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 1.08 })
+			Util.safeSprTarget(closeScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 1.04 })
+			Util.safeSprTarget(closeBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundColor3 = Theme.COLOR.Red, TextColor3 = Theme.COLOR.White })
 		end)
 		closeBtn.MouseLeave:Connect(function()
 			Util.safeSprTarget(closeScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 1 })
+			Util.safeSprTarget(closeBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundColor3 = Theme.COLOR.Surface2, TextColor3 = Theme.COLOR.TextMuted })
 		end)
 		miniBtn.MouseEnter:Connect(function()
-			Util.safeSprTarget(miniScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 1.06 })
-			Util.safeSprTarget(miniBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundColor3 = Theme.COLOR.BG4 })
+			Util.safeSprTarget(miniScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 1.03 })
+			Util.safeSprTarget(miniBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundColor3 = Theme.COLOR.Surface2 })
 		end)
 		miniBtn.MouseLeave:Connect(function()
 			Util.safeSprTarget(miniScale, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { Scale = 1 })
-			Util.safeSprTarget(miniBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundColor3 = Theme.COLOR.BG3 })
+			Util.safeSprTarget(miniBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], { BackgroundColor3 = Theme.COLOR.Surface1 })
 		end)
 
-		-- Tab strip
+		local tabH = num(Theme.TOPBAR.TAB_H, 36, "TOPBAR.TAB_H")
+		local sideW = num(Theme.SIDEBAR.W, 196, "SIDEBAR.W")
+		local statusH = num(Theme.STATUSBAR.H, 36, "STATUSBAR.H")
+		local bodyTop = topH + tabH + 12
+
 		local tabStrip = Util.make("ScrollingFrame", {
 			Name = "TabStrip",
-			Size = UDim2.new(1, -Theme.SIDEBAR.W - Theme.WINDOW.PADDING * 3, 0, Theme.TOPBAR.TAB_H + 8),
-			Position = UDim2.new(0, Theme.SIDEBAR.W + Theme.WINDOW.PADDING * 2, 0, Theme.TOPBAR.H + 8),
+			Size = UDim2.new(1, -(sideW + winPad * 3), 0, tabH + 4),
+			Position = UDim2.new(0, sideW + winPad * 2, 0, topH + 6),
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			ScrollBarThickness = 0,
@@ -764,14 +760,12 @@ return function(deps)
 		})
 		Util.padding(tabStrip, 0, 0, 4, 0)
 
-		-- Sidebar (EXE-6 64px rows)
-		local bodyTop = Theme.TOPBAR.H + Theme.TOPBAR.TAB_H + 20
 		local sidebar = Util.make("ScrollingFrame", {
 			Name = "Sidebar",
-			Size = UDim2.new(0, Theme.SIDEBAR.W, 1, -(bodyTop + Theme.STATUSBAR.H + Theme.WINDOW.PADDING)),
-			Position = UDim2.new(0, Theme.WINDOW.PADDING, 0, bodyTop),
-			BackgroundColor3 = Theme.COLOR.BG2,
-			BackgroundTransparency = 0.12,
+			Size = UDim2.new(0, sideW, 1, -(bodyTop + statusH + winPad)),
+			Position = UDim2.new(0, winPad, 0, bodyTop),
+			BackgroundColor3 = Theme.COLOR.BG1,
+			BackgroundTransparency = 0.08,
 			BorderSizePixel = 0,
 			ScrollBarThickness = 0,
 			CanvasSize = UDim2.new(0, 0, 0, 0),
@@ -781,8 +775,15 @@ return function(deps)
 			ZIndex = 7,
 			Parent = main,
 		})
-		Util.corner(sidebar, Theme.SIDEBAR.RADIUS)
-		Util.stroke(sidebar, Theme.COLOR.BORDER, 1, 0.48)
+		Util.make("Frame", {
+			Size = UDim2.new(0, 1, 1, 0),
+			Position = UDim2.new(1, 0, 0, 0),
+			BackgroundColor3 = Theme.COLOR.BorderSoft,
+			BackgroundTransparency = 0.6,
+			BorderSizePixel = 0,
+			ZIndex = 8,
+			Parent = sidebar,
+		})
 		Util.styleScroll(sidebar)
 		Util.make("UIListLayout", {
 			Padding = UDim.new(0, 8),
@@ -791,11 +792,10 @@ return function(deps)
 		})
 		Util.padding(sidebar, Theme.SIDEBAR.PAD, Theme.SIDEBAR.PAD, Theme.SIDEBAR.PAD, Theme.SIDEBAR.PAD)
 
-		-- Content area (BG0, no gray fill)
 		local contentArea = Util.make("Frame", {
 			Name = "Content",
-			Size = UDim2.new(1, -(Theme.SIDEBAR.W + Theme.WINDOW.PADDING * 3), 1, -(bodyTop + Theme.STATUSBAR.H + Theme.WINDOW.PADDING)),
-			Position = UDim2.new(0, Theme.SIDEBAR.W + Theme.WINDOW.PADDING * 2, 0, bodyTop),
+			Size = UDim2.new(1, -(sideW + winPad * 3), 1, -(bodyTop + statusH + winPad)),
+			Position = UDim2.new(0, sideW + winPad * 2, 0, bodyTop),
 			BackgroundColor3 = Theme.COLOR.Background0,
 			BackgroundTransparency = 0,
 			BorderSizePixel = 0,
@@ -803,8 +803,6 @@ return function(deps)
 			ZIndex = ZIndex and ZIndex.Cards or 20,
 			Parent = main,
 		})
-		Util.corner(contentArea, Theme.CARD.RADIUS)
-		Util.stroke(contentArea, Theme.COLOR.Border, 1, 0.55)
 
 		if not dropLayer then
 			dropLayer = Util.make("Frame", {
@@ -818,19 +816,24 @@ return function(deps)
 			})
 		end
 
-		-- Status bar
 		local statusBar = Util.make("Frame", {
 			Name = "StatusBar",
-			Size = UDim2.new(1, -Theme.WINDOW.PADDING * 2, 0, Theme.STATUSBAR.H),
-			Position = UDim2.new(0, Theme.WINDOW.PADDING, 1, -Theme.STATUSBAR.H - 8),
-			BackgroundColor3 = Theme.COLOR.BG2,
-			BackgroundTransparency = 0.1,
+			Size = UDim2.new(1, -winPad * 2, 0, statusH),
+			Position = UDim2.new(0, winPad, 1, -statusH - 6),
+			BackgroundColor3 = Theme.COLOR.BG1,
+			BackgroundTransparency = 0.12,
 			BorderSizePixel = 0,
 			ZIndex = 9,
 			Parent = main,
 		})
-		Util.corner(statusBar, Theme.RADIUS.PILL)
-		Util.stroke(statusBar, Theme.COLOR.BORDER, 1, 0.6)
+		Util.make("Frame", {
+			Size = UDim2.new(1, 0, 0, 1),
+			BackgroundColor3 = Theme.COLOR.BorderSoft,
+			BackgroundTransparency = 0.55,
+			BorderSizePixel = 0,
+			ZIndex = 10,
+			Parent = statusBar,
+		})
 
 		local statusLeft = Util.make("TextLabel", {
 			Size = UDim2.new(0.22, 0, 1, 0),
@@ -907,46 +910,48 @@ return function(deps)
 		local function styleTab(tab, active)
 			if tab._sidebarBtn then
 				Util.safeSprTarget(tab._sidebarBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
-					BackgroundColor3 = active and Theme.COLOR.BG4 or Theme.COLOR.BG3,
-					BackgroundTransparency = active and 0.06 or 0.2,
+					BackgroundColor3 = Theme.COLOR.Surface1,
+					BackgroundTransparency = active and 0.35 or 0.85,
 				})
 			end
 			if tab._sidebarBar then
 				Util.safeSprTarget(tab._sidebarBar, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
-					BackgroundTransparency = active and 0.02 or 1,
-					Size = active and UDim2.new(0, 4, 1, -16) or UDim2.new(0, 3, 1, -24),
+					BackgroundTransparency = active and 0 or 1,
+					BackgroundColor3 = Theme.COLOR.Accent,
+					Size = UDim2.new(0, 3, 1, -12),
 				})
 			end
 			if tab._sidebarGlow then
 				Util.safeSprTarget(tab._sidebarGlow, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
-					BackgroundTransparency = active and 0.86 or 1,
+					BackgroundTransparency = active and 0.92 or 1,
 				})
 			end
 			if tab._sidebarLabel then
 				Util.safeSprTarget(tab._sidebarLabel, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
-					TextColor3 = active and Theme.COLOR.TEXT or Theme.COLOR.TEXT2,
+					TextColor3 = active and Theme.COLOR.Text or Theme.COLOR.TextMuted,
 				})
 			end
 			if tab._sidebarIcon then
 				Util.safeSprTarget(tab._sidebarIcon, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
-					TextColor3 = active and Theme.COLOR.ACCENT_LIGHT or Theme.COLOR.TEXT3,
+					TextColor3 = active and Theme.COLOR.Accent or Theme.COLOR.TextDim,
 				})
 			end
 			if tab._topBtn then
 				Util.safeSprTarget(tab._topBtn, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
-					BackgroundTransparency = active and 0.04 or 0.45,
-					BackgroundColor3 = active and Theme.COLOR.BG4 or Theme.COLOR.BG3,
+					BackgroundTransparency = active and 0.25 or 0.7,
+					BackgroundColor3 = Theme.COLOR.Surface1,
 				})
 			end
 			if tab._topLabel then
 				Util.safeSprTarget(tab._topLabel, Theme.SPRING.SNAPPY[1], Theme.SPRING.SNAPPY[2], {
-					TextColor3 = active and Theme.COLOR.TEXT or Theme.COLOR.TEXT2,
+					TextColor3 = active and Theme.COLOR.Text or Theme.COLOR.TextMuted,
 				})
 			end
 			if tab._topGlow then
-				Util.safeSprTarget(tab._topGlow, Theme.SPRING.BOUNCY[1], Theme.SPRING.BOUNCY[2], {
-					BackgroundTransparency = active and 0.35 or 1,
-					Size = active and UDim2.new(0.82, 0, 0, 3) or UDim2.new(0.35, 0, 0, 2),
+				Util.safeSprTarget(tab._topGlow, Theme.SPRING.SMOOTH[1], Theme.SPRING.SMOOTH[2], {
+					BackgroundTransparency = active and 0.2 or 1,
+					BackgroundColor3 = Theme.COLOR.Accent,
+					Size = UDim2.new(0.7, 0, 0, 2),
 				})
 			end
 		end
@@ -1007,9 +1012,9 @@ return function(deps)
 			local iconText = iconId or SIDEBAR_ICONS[tostring(name)] or "•"
 
 			local topBtn = Util.make("TextButton", {
-				Size = UDim2.fromOffset(104, Theme.TOPBAR.TAB_H),
-				BackgroundColor3 = Theme.COLOR.BG3,
-				BackgroundTransparency = 0.45,
+				Size = UDim2.fromOffset(92, tabH),
+				BackgroundColor3 = Theme.COLOR.Surface1,
+				BackgroundTransparency = 0.7,
 				BorderSizePixel = 0,
 				Text = "",
 				AutoButtonColor = false,
@@ -1017,21 +1022,18 @@ return function(deps)
 				ZIndex = 9,
 				Parent = tabStrip,
 			})
-			Util.corner(topBtn, Theme.RADIUS.BUTTON)
-			Util.stroke(topBtn, Theme.COLOR.BORDER, 1, 0.55)
+			Util.corner(topBtn, Theme.RADIUS.Tab)
 
 			local topGlow = Util.make("Frame", {
-				Size = UDim2.new(0.35, 0, 0, 2),
+				Size = UDim2.new(0.6, 0, 0, 2),
 				AnchorPoint = Vector2.new(0.5, 1),
-				Position = UDim2.new(0.5, 0, 1, 5),
-				BackgroundColor3 = Theme.COLOR.ACCENT,
+				Position = UDim2.new(0.5, 0, 1, 4),
+				BackgroundColor3 = Theme.COLOR.Accent,
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				ZIndex = 8,
 				Parent = topBtn,
 			})
-			Util.corner(topGlow, 2)
-			Util.gradient(topGlow, Theme.COLOR.ACCENT_LIGHT, Theme.COLOR.ACCENT, 0)
 
 			local topLabel = Util.make("TextLabel", {
 				Size = UDim2.new(1, 0, 1, 0),
@@ -1046,10 +1048,11 @@ return function(deps)
 				Parent = topBtn,
 			})
 
+			local itemH = num(Theme.SIDEBAR.ITEM_H, 44, "SIDEBAR.ITEM_H")
 			local sidebarBtn = Util.make("TextButton", {
-				Size = UDim2.new(1, 0, 0, Theme.SIDEBAR.ITEM_H),
-				BackgroundColor3 = Theme.COLOR.BG3,
-				BackgroundTransparency = 0.2,
+				Size = UDim2.new(1, 0, 0, itemH),
+				BackgroundColor3 = Theme.COLOR.Surface1,
+				BackgroundTransparency = 0.85,
 				BorderSizePixel = 0,
 				Text = "",
 				AutoButtonColor = false,
@@ -1057,28 +1060,26 @@ return function(deps)
 				ZIndex = 8,
 				Parent = sidebar,
 			})
-			Util.corner(sidebarBtn, Theme.SIDEBAR.RADIUS)
+			Util.corner(sidebarBtn, Theme.RADIUS.Sidebar)
 
 			local sidebarGlow = Util.make("Frame", {
 				Size = UDim2.new(1, 0, 1, 0),
-				BackgroundColor3 = Theme.COLOR.ACCENT,
+				BackgroundColor3 = Theme.COLOR.Accent,
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				ZIndex = 7,
 				Parent = sidebarBtn,
 			})
-			Util.corner(sidebarGlow, Theme.SIDEBAR.RADIUS)
 
 			local sidebarBar = Util.make("Frame", {
-				Size = UDim2.new(0, 3, 1, -24),
-				Position = UDim2.new(0, 6, 0, 12),
-				BackgroundColor3 = Theme.COLOR.ACCENT,
+				Size = UDim2.new(0, 3, 1, -12),
+				Position = UDim2.new(0, 4, 0, 6),
+				BackgroundColor3 = Theme.COLOR.Accent,
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				ZIndex = 10,
 				Parent = sidebarBtn,
 			})
-			Util.corner(sidebarBar, 2)
 
 			local sidebarIcon = Util.make("TextLabel", {
 				Size = UDim2.fromOffset(32, Theme.SIDEBAR.ITEM_H),
@@ -1183,11 +1184,14 @@ return function(deps)
 			end
 		end)
 		UserInputService.InputChanged:Connect(function(input)
-			if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			if dragging and input.UserInputType == Enum.UserInputType.MouseMovement and dragStart and startPos then
 				local delta = input.Position - dragStart
 				local vpX, vpY = getViewport()
-				local newX = Util.clamp(startPos.X.Offset + delta.X, -main.AbsoluteSize.X * 0.25, vpX - main.AbsoluteSize.X * 0.75)
-				local newY = Util.clamp(startPos.Y.Offset + delta.Y, -main.AbsoluteSize.Y * 0.15, vpY - main.AbsoluteSize.Y * 0.7)
+				local mainW, mainH = absSize(main, 1200, 720)
+				local startX = num(startPos.X.Offset, 0, "dragStartX")
+				local startY = num(startPos.Y.Offset, 0, "dragStartY")
+				local newX = Util.clamp(startX + num(delta.X, 0, nil), -mainW * 0.25, vpX - mainW * 0.75)
+				local newY = Util.clamp(startY + num(delta.Y, 0, nil), -mainH * 0.15, vpY - mainH * 0.7)
 				main.Position = UDim2.new(startPos.X.Scale, newX, startPos.Y.Scale, newY)
 			end
 		end)
@@ -1212,10 +1216,12 @@ return function(deps)
 			local scale = computeResponsiveScale(vpX, vpY)
 			Util.safeSprTarget(rootScale, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { Scale = scale })
 
-			local minW = Theme.WINDOW.MIN_W * scale
-			local minH = Theme.WINDOW.MIN_H * scale
+			local minW = num(Theme.WINDOW.MIN_W, 760, nil) * scale
+			local minH = num(Theme.WINDOW.MIN_H, 520, nil) * scale
+			local defW = num(Theme.WINDOW.DEFAULT and Theme.WINDOW.DEFAULT.X.Offset, 1280, "DEFAULT.W")
+			local defH = num(Theme.WINDOW.DEFAULT and Theme.WINDOW.DEFAULT.Y.Offset, 760, "DEFAULT.H")
 			if vpX < minW or vpY < minH then
-				main.Size = UDim2.fromOffset(math.min(vpX - 24, Theme.WINDOW.DEFAULT.X.Offset), math.min(vpY - 24, Theme.WINDOW.DEFAULT.Y.Offset))
+				main.Size = UDim2.fromOffset(math.min(vpX - 24, defW), math.min(vpY - 24, defH))
 			elseif settings.Size then
 				main.Size = settings.Size
 			else
@@ -1231,7 +1237,6 @@ return function(deps)
 
 		-- Live status / pill animations
 		local pulseUp = true
-		local glowUp = true
 		local uptimeSec = 0
 		local fpsAccum, fpsFrames, fpsValue = 0, 0, 60
 
@@ -1246,7 +1251,7 @@ return function(deps)
 			end
 
 			if uptimeLabel then
-				uptimeLabel.Text = "Uptime " .. formatUptime(uptimeSec)
+				uptimeLabel.Text = formatUptime(uptimeSec)
 			end
 
 			local playerCount = #Players:GetPlayers()
@@ -1272,30 +1277,11 @@ return function(deps)
 		self._janitor:Add(heartbeat, "Disconnect")
 
 		task.spawn(function()
-			while screen.Parent do
-				if pulseUp then
-					Util.safeSprTarget(playerDot, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.15 })
-					Util.safeSprTarget(playerPill, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.02 })
-				else
-					Util.safeSprTarget(playerDot, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.45 })
-					Util.safeSprTarget(playerPill, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.1 })
-				end
+			while screen.Parent and readyPill do
+				local t = pulseUp and 0.12 or 0.22
+				Util.safeSprTarget(readyPill, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = t })
 				pulseUp = not pulseUp
-				task.wait(1)
-			end
-		end)
-
-		task.spawn(function()
-			while screen.Parent do
-				if glowUp then
-					Util.safeSprTarget(verGlow, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.68 })
-					Util.safeSprTarget(readyGlow, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.55 })
-				else
-					Util.safeSprTarget(verGlow, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.88 })
-					Util.safeSprTarget(readyGlow, Theme.SPRING.GENTLE[1], Theme.SPRING.GENTLE[2], { BackgroundTransparency = 0.9 })
-				end
-				glowUp = not glowUp
-				task.wait(1.2)
+				task.wait(1.4)
 			end
 		end)
 

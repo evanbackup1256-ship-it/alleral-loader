@@ -62,22 +62,9 @@ return function(deps)
 			ClipsDescendants = true,
 			Parent = root,
 		})
-		Util.corner(btn, Theme.RADIUS.BUTTON)
-		local stroke = Util.stroke(btn, Theme.COLOR.BORDER, 1, 0.88)
+		Util.corner(btn, Theme.RADIUS.Button)
 		local scale = Util.scale(btn)
 		scale.Scale = 1
-
-		local glow = Util.make("Frame", {
-			Size = UDim2.new(1, 8, 1, 8),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0.5, 0, 0.5, 0),
-			BackgroundColor3 = Theme.COLOR.GLOW,
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			ZIndex = 0,
-			Parent = btn,
-		})
-		Util.corner(glow, Theme.RADIUS.BUTTON + 4)
 
 		local rippleHost = Util.make("Frame", {
 			Size = UDim2.new(1, 0, 1, 0),
@@ -120,15 +107,13 @@ return function(deps)
 		local function refreshVisual()
 			if pressed then
 				spring(scale, { Scale = 0.97 })
-				spring(btn, { BackgroundColor3 = Theme.COLOR.ACCENT_DARK })
+				spring(btn, { BackgroundColor3 = Theme.COLOR.Surface0 })
 			elseif hovered then
-				spring(scale, { Scale = 1.03 })
-				spring(btn, { BackgroundColor3 = Theme.COLOR.ACCENT, TextColor3 = Theme.COLOR.WHITE })
-				spring(glow, { BackgroundTransparency = 0.78 })
+				spring(scale, { Scale = 1.025 })
+				spring(btn, { BackgroundColor3 = Theme.COLOR.Surface2, TextColor3 = Theme.COLOR.Text })
 			else
 				spring(scale, { Scale = 1 })
-				spring(btn, { BackgroundColor3 = Theme.COLOR.BG3, TextColor3 = Theme.COLOR.TEXT })
-				spring(glow, { BackgroundTransparency = 1 })
+				spring(btn, { BackgroundColor3 = Theme.COLOR.Surface1, TextColor3 = Theme.COLOR.Text })
 			end
 		end
 
@@ -519,8 +504,8 @@ return function(deps)
 			ZIndex = 3,
 			Parent = root,
 		})
-		Util.corner(trigger, Theme.RADIUS.BUTTON)
-		local triggerStroke = Util.stroke(trigger, Theme.COLOR.BORDER, 1, 0.5)
+		Util.corner(trigger, Theme.RADIUS.Input)
+		local triggerStroke = Util.stroke(trigger, Theme.COLOR.BorderSoft, 1, 0.82)
 		Util.padding(trigger, 12, 34, 0, 0)
 
 		local arrow = Util.make("TextLabel", {
@@ -539,8 +524,8 @@ return function(deps)
 
 		local panel = Util.make("Frame", {
 			Size = UDim2.fromOffset(0, 0),
-			BackgroundColor3 = Theme.COLOR.BG2,
-			BackgroundTransparency = 0.04,
+			BackgroundColor3 = Theme.COLOR.Glass,
+			BackgroundTransparency = 0.06,
 			BorderSizePixel = 0,
 			Visible = false,
 			ClipsDescendants = true,
@@ -548,17 +533,8 @@ return function(deps)
 			Parent = dropLayer,
 		})
 		janitor:Add(panel)
-		Util.corner(panel, Theme.RADIUS.DROPDOWN)
-		Util.stroke(panel, Theme.COLOR.ACCENT, 1, 0.55)
-
-		local accent = Util.make("Frame", {
-			Size = UDim2.new(1, 0, 0, 2),
-			BackgroundColor3 = Theme.COLOR.ACCENT,
-			BorderSizePixel = 0,
-			ZIndex = 42,
-			Parent = panel,
-		})
-		Util.gradient(accent, Theme.COLOR.ACCENT_LIGHT, Theme.COLOR.ACCENT, 0)
+		Util.corner(panel, Theme.RADIUS.Dropdown)
+		if deps.Layout and deps.Layout.shadow then deps.Layout.shadow(panel, Theme.RADIUS.Dropdown, 2, 0.65) end
 
 		local body = Util.make("Frame", {
 			Size = UDim2.new(1, 0, 1, 0),
@@ -567,15 +543,15 @@ return function(deps)
 			ZIndex = 41,
 			Parent = panel,
 		})
-		Util.padding(body, 6, 6, 6, 6)
+		Util.padding(body, 4, 4, 4, 4)
 
 		local searchBox
 		local searchStroke
 		local searchPad = 0
 		if searchable then
-			searchPad = 44
+			searchPad = 36
 			local searchWrap = Util.make("Frame", {
-				Size = UDim2.new(1, 0, 0, 36),
+				Size = UDim2.new(1, 0, 0, 32),
 				BackgroundTransparency = 1,
 				ZIndex = 43,
 				Parent = body,
@@ -595,9 +571,9 @@ return function(deps)
 				ZIndex = 44,
 				Parent = searchWrap,
 			})
-			Util.corner(searchBox, Theme.RADIUS.SEARCH)
-			searchStroke = Util.stroke(searchBox, Theme.COLOR.SEARCH_BORDER, 1, 0.3)
-			Util.padding(searchBox, 34, 12, 0, 0)
+			Util.corner(searchBox, Theme.RADIUS.Input)
+			searchStroke = Util.stroke(searchBox, Theme.COLOR.BorderSoft, 1, 0.82)
+			Util.padding(searchBox, 28, 10, 0, 0)
 			Util.make("TextLabel", {
 				Size = UDim2.fromOffset(18, 36),
 				Position = UDim2.new(0, 12, 0, 0),
@@ -610,11 +586,11 @@ return function(deps)
 				Parent = searchWrap,
 			})
 			janitor:Connect(searchBox.Focused, function()
-				spring(searchStroke, { Color = Theme.COLOR.ACCENT, Transparency = 0 }, Theme.SPRING.SNAPPY)
-				spring(searchBox, { BackgroundColor3 = Theme.COLOR.BG4 }, Theme.SPRING.SNAPPY)
+				spring(searchStroke, { Color = Theme.COLOR.AccentSoft, Transparency = 0.5 }, Theme.SPRING.SNAPPY)
+				spring(searchBox, { BackgroundColor3 = Theme.COLOR.Surface2 }, Theme.SPRING.SNAPPY)
 			end)
 			janitor:Connect(searchBox.FocusLost, function()
-				spring(searchStroke, { Color = Theme.COLOR.SEARCH_BORDER, Transparency = 0.3 }, Theme.SPRING.SNAPPY)
+				spring(searchStroke, { Color = Theme.COLOR.BorderSoft, Transparency = 0.82 }, Theme.SPRING.SNAPPY)
 				spring(searchBox, { BackgroundColor3 = Theme.COLOR.SEARCH_BG }, Theme.SPRING.SNAPPY)
 			end)
 		end
@@ -670,12 +646,12 @@ return function(deps)
 				end
 
 				local row = Util.make("TextButton", {
-					Size = UDim2.new(1, -4, 0, 34),
-					BackgroundColor3 = picked and Theme.COLOR.ACCENT or Theme.COLOR.BG3,
-					BackgroundTransparency = picked and 0.08 or 0.15,
+					Size = UDim2.new(1, -4, 0, 40),
+					BackgroundColor3 = picked and Theme.COLOR.AccentSoft or Theme.COLOR.Surface1,
+					BackgroundTransparency = picked and 0.55 or 0.75,
 					BorderSizePixel = 0,
 					Text = tostring(opt),
-					TextColor3 = picked and Theme.COLOR.WHITE or Theme.COLOR.TEXT2,
+					TextColor3 = picked and Theme.COLOR.Text or Theme.COLOR.TextMuted,
 					Font = Theme.FONT,
 					TextSize = Theme.TEXT_SM,
 					TextXAlignment = Enum.TextXAlignment.Left,
@@ -685,8 +661,7 @@ return function(deps)
 					ZIndex = 43,
 					Parent = scroll,
 				})
-				Util.padding(row, 12, 8, 0, 0)
-				Util.corner(row, Theme.RADIUS.LIST)
+				Util.padding(row, 10, 8, 0, 0)
 
 				if isOpen then
 					row.BackgroundTransparency = 1
@@ -703,12 +678,12 @@ return function(deps)
 
 				row.MouseEnter:Connect(function()
 					if not picked then
-						spring(row, { BackgroundColor3 = Theme.COLOR.BG4, BackgroundTransparency = 0.05 }, Theme.SPRING.SNAPPY)
+						spring(row, { BackgroundColor3 = Theme.COLOR.Surface2, BackgroundTransparency = 0.5 }, Theme.SPRING.SNAPPY)
 					end
 				end)
 				row.MouseLeave:Connect(function()
 					if not picked then
-						spring(row, { BackgroundColor3 = Theme.COLOR.BG3, BackgroundTransparency = 0.15 }, Theme.SPRING.SNAPPY)
+						spring(row, { BackgroundColor3 = Theme.COLOR.Surface1, BackgroundTransparency = 0.75 }, Theme.SPRING.SNAPPY)
 					end
 				end)
 				row.MouseButton1Click:Connect(function()
@@ -734,7 +709,7 @@ return function(deps)
 				table.insert(optionRows, row)
 			end
 
-			local listH = math.max(34, math.min(#filtered * 38 + 4, maxMenuH))
+			local listH = math.max(40, math.min(#filtered * 44 + 4, maxMenuH))
 			targetMenuH = listH + searchPad + 12
 		end
 
@@ -1034,54 +1009,30 @@ return function(deps)
 		})
 		janitor:Add(root)
 
-		local shadowFar = Util.make("Frame", {
-			Size = UDim2.new(1, 16, 1, 16),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0.5, 0, 0.5, 4),
-			BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-			BackgroundTransparency = 0.88,
-			BorderSizePixel = 0,
-			ZIndex = 0,
-			Parent = root,
-		})
-		Util.corner(shadowFar, Theme.RADIUS.CARD + 8)
-
-		local shadowNear = Util.make("Frame", {
-			Size = UDim2.new(1, 8, 1, 8),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0.5, 0, 0.5, 2),
-			BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-			BackgroundTransparency = 0.82,
-			BorderSizePixel = 0,
-			ZIndex = 1,
-			Parent = root,
-		})
-		Util.corner(shadowNear, Theme.RADIUS.CARD + 4)
+		if deps.Layout and deps.Layout.shadow then deps.Layout.shadow(root, Theme.RADIUS.Card, 2, 0.68) end
 
 		local card = Util.make("Frame", {
 			Size = UDim2.new(1, 0, 0, 0),
-			BackgroundColor3 = Theme.COLOR.GLASS,
-			BackgroundTransparency = 0.08,
+			BackgroundColor3 = Theme.COLOR.Surface1,
+			BackgroundTransparency = 0.04,
 			BorderSizePixel = 0,
 			AutomaticSize = Enum.AutomaticSize.Y,
 			ClipsDescendants = true,
 			ZIndex = 2,
 			Parent = root,
 		})
-		Util.corner(card, Theme.RADIUS.CARD)
-		Util.stroke(card, Theme.COLOR.BORDER, 1, 0.45)
-		Util.gradient(card, Theme.COLOR.BG2, Theme.COLOR.GLASS, 135)
+		Util.corner(card, Theme.RADIUS.Card)
+		Util.gradient(card, Theme.COLOR.Surface1, Theme.COLOR.Surface0, 180)
 
-		local accentBar = Util.make("Frame", {
-			Size = UDim2.new(1, -Theme.CARD.PAD * 2, 0, 3),
-			Position = UDim2.new(0, Theme.CARD.PAD, 0, 0),
-			BackgroundColor3 = Theme.COLOR.ACCENT,
+		Util.make("Frame", {
+			Size = UDim2.new(1, -24, 0, 1),
+			Position = UDim2.new(0, 12, 0, 0),
+			BackgroundColor3 = Theme.COLOR.Accent,
+			BackgroundTransparency = 0.55,
 			BorderSizePixel = 0,
 			ZIndex = 4,
 			Parent = card,
 		})
-		Util.corner(accentBar, 2)
-		Util.gradient(accentBar, Theme.COLOR.ACCENT_LIGHT, Theme.COLOR.ACCENT_DARK, 0)
 
 		local header = Util.make("TextLabel", {
 			Size = UDim2.new(1, -Theme.CARD.PAD * 2, 0, Theme.CARD.TITLE_H),

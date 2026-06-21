@@ -19,21 +19,76 @@ return function(Theme, Motion)
 		return obj
 	end
 
+	function Layout.num(value, fallback, label)
+		local n = tonumber(value)
+		if n == nil then
+			if label then warn("[Alleral V10] Missing numeric:", label, "→", fallback) end
+			return fallback
+		end
+		return n
+	end
+
+	function Layout.radius(token, fallback)
+		if type(token) == "number" then return token end
+		return fallback or Theme.RADIUS.Card or 12
+	end
+
+	function Layout.absSize(gui, fallbackW, fallbackH)
+		fallbackW = Layout.num(fallbackW, 1200, nil)
+		fallbackH = Layout.num(fallbackH, 720, nil)
+		if typeof(gui) ~= "Instance" or not gui:IsA("GuiObject") then
+			return fallbackW, fallbackH
+		end
+		local w = Layout.num(gui.AbsoluteSize.X, 0, nil)
+		local h = Layout.num(gui.AbsoluteSize.Y, 0, nil)
+		if w <= 0 then w = fallbackW end
+		if h <= 0 then h = fallbackH end
+		return w, h
+	end
+
 	function Layout.corner(obj, radius)
+		if not obj then return nil end
+		radius = Layout.radius(radius, Theme.RADIUS.Card)
+		if radius >= 900 then
+			local existing = obj:FindFirstChildOfClass("UICorner")
+			if existing then existing:Destroy() end
+			return nil
+		end
 		local existing = obj:FindFirstChildOfClass("UICorner")
 		if existing then existing:Destroy() end
-		return Layout.make("UICorner", { CornerRadius = UDim.new(0, radius or Theme.RADIUS.Medium), Parent = obj })
+		return Layout.make("UICorner", { CornerRadius = UDim.new(0, radius), Parent = obj })
 	end
 
 	function Layout.stroke(obj, color, thickness, transparency)
+		if not obj then return nil end
 		local existing = obj:FindFirstChildOfClass("UIStroke")
 		if existing then existing:Destroy() end
 		return Layout.make("UIStroke", {
 			Color = color or Theme.COLOR.Border,
-			Thickness = thickness or 1,
-			Transparency = transparency or 0.5,
+			Thickness = thickness or Theme.STROKE.Thickness or 1,
+			Transparency = transparency or Theme.STROKE.Transparency or 0.82,
 			Parent = obj,
 		})
+	end
+
+	function Layout.softStroke(obj, color)
+		return Layout.stroke(obj, color or Theme.COLOR.BorderSoft, 1, Theme.STROKE.Transparency or 0.82)
+	end
+
+	function Layout.shadow(parent, radius, offset, transparency)
+		if not parent then return nil end
+		radius = Layout.radius(radius, Theme.RADIUS.Card)
+		local shadow = Layout.make("Frame", {
+			Size = UDim2.new(1, 8, 1, 8),
+			Position = UDim2.new(0, Layout.num(offset, 2, nil), 0, Layout.num(offset, 3, nil)),
+			BackgroundColor3 = Theme.COLOR.Shadow,
+			BackgroundTransparency = Layout.num(transparency, 0.55, nil),
+			BorderSizePixel = 0,
+			ZIndex = math.max(0, (parent.ZIndex or 1) - 1),
+			Parent = parent,
+		})
+		Layout.corner(shadow, radius)
+		return shadow
 	end
 
 	function Layout.padding(obj, l, r, t, b)
@@ -141,48 +196,36 @@ return function(Theme, Motion)
 
 	function Layout.createGlassCard(parent, opts)
 		opts = opts or {}
+		local r = Layout.radius(opts.Radius or Theme.CARD.RADIUS, 12)
 		local card = Layout.make("Frame", {
 			Size = opts.Size or UDim2.new(1, 0, 0, 0),
 			AutomaticSize = opts.AutomaticSize or Enum.AutomaticSize.Y,
 			BackgroundColor3 = Theme.COLOR.Surface1,
-			BackgroundTransparency = opts.Transparency or 0.06,
+			BackgroundTransparency = opts.Transparency or 0.04,
 			BorderSizePixel = 0,
-			ClipsDescendants = false,
+			ClipsDescendants = true,
 			ZIndex = opts.ZIndex or 20,
 			Parent = parent,
 		})
-		Layout.corner(card, opts.Radius or Theme.CARD.RADIUS)
-		Layout.stroke(card, Theme.COLOR.Border, 1, 0.55)
-		local accent = Layout.make("Frame", {
-			Size = UDim2.new(1, -32, 0, 2),
-			Position = UDim2.new(0, 16, 0, 0),
+		Layout.corner(card, r)
+		Layout.shadow(card, r, 2, 0.62)
+		Layout.make("Frame", {
+			Size = UDim2.new(1, 0, 0, 1),
+			Position = UDim2.new(0, 0, 0, 0),
 			BackgroundColor3 = Theme.COLOR.Accent,
-			BackgroundTransparency = 0.2,
+			BackgroundTransparency = 0.55,
 			BorderSizePixel = 0,
 			ZIndex = card.ZIndex + 1,
 			Parent = card,
 		})
-		Layout.gradient(accent, Theme.COLOR.Accent3, Theme.COLOR.Accent, 0)
-		Layout.corner(accent, 2)
-		local glow = Layout.make("Frame", {
-			Size = UDim2.new(1, 12, 1, 12),
-			Position = UDim2.new(0, -6, 0, -6),
-			BackgroundColor3 = Theme.COLOR.Glow,
-			BackgroundTransparency = 0.94,
-			BorderSizePixel = 0,
-			ZIndex = card.ZIndex - 1,
-			Parent = card,
-		})
-		Layout.corner(glow, (opts.Radius or Theme.CARD.RADIUS) + 4)
+		Layout.gradient(card, Theme.COLOR.Surface1, Theme.COLOR.Surface0, 180)
 		card.MouseEnter:Connect(function()
-			Motion.spring(glow, { BackgroundTransparency = 0.86 })
-			Motion.spring(card, { BackgroundTransparency = 0.02 })
+			Motion.spring(card, { BackgroundTransparency = 0.01 })
 		end)
 		card.MouseLeave:Connect(function()
-			Motion.spring(glow, { BackgroundTransparency = 0.94 })
-			Motion.spring(card, { BackgroundTransparency = opts.Transparency or 0.06 })
+			Motion.spring(card, { BackgroundTransparency = opts.Transparency or 0.04 })
 		end)
-		return card, glow, accent
+		return card
 	end
 
 	return Layout

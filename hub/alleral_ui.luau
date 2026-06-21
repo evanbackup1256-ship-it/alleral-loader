@@ -13,8 +13,8 @@
 	  https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/
 ]]
 return function(Core)
-	Core.ALLERAL_UI_VERSION = "10.0.0"
-	Core.UI_VERSION = "10.0.0"
+	Core.ALLERAL_UI_VERSION = "10.0.1"
+	Core.UI_VERSION = "10.0.1"
 	Core.UI_LIBRARY = "Linoria"
 
 	local GITHUB_RAW = "https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main"
@@ -29,7 +29,7 @@ return function(Core)
 	end)()
 
 	local getGenv = getgenv or function() return ENV end
-	local NOBLE_CACHE_VERSION = "10.0.0"
+	local NOBLE_CACHE_VERSION = "10.0.1"
 	getGenv()._NobleV8Modules = nil
 	getGenv()._NobleV8CacheVersion = nil
 	if getGenv()._NobleV10CacheVersion ~= NOBLE_CACHE_VERSION then
