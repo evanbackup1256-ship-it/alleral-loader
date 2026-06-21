@@ -6,6 +6,9 @@
 ]]
 
 return function(Core)
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "7.1.0"
+	Core.UI_VERSION = Core.ALLERAL_UI_VERSION
+	Core.UI_LIBRARY = "Noble"
 	local TS = game:GetService("TweenService")
 	local UIS = game:GetService("UserInputService")
 	local Players = game:GetService("Players")
