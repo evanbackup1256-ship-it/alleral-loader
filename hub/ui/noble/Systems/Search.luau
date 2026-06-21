@@ -50,7 +50,8 @@ return function(deps)
 
 	function Search.new(options)
 		options = type(options) == "table" and options or {}
-		assert(typeof(options.parent) == "Instance", "Search.new requires parent ScreenGui")
+		local parent = options.parent
+		assert(typeof(parent) == "Instance" and parent:IsA("ScreenGui"), "Search.new requires parent ScreenGui")
 
 		local self = setmetatable({}, Search)
 		self._janitor = Janitor.new()

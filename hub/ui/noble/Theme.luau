@@ -1,6 +1,6 @@
 -- Noble V8 — design tokens (EXE-6 / Linear / Arc quality bar)
 local Theme = {
-	VERSION = "8.0.0",
+	VERSION = "8.0.1",
 	GRID = 8,
 	FONT = Enum.Font.Gotham,
 	FONT_BOLD = Enum.Font.GothamBold,

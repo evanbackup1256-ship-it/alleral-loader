@@ -75,15 +75,14 @@ return function(loadModule)
 		settings = Util.clone(type(settings) == "table" and settings or {})
 		STATE.windowCount = STATE.windowCount + 1
 
-		local search = Search.new()
-		STATE.search = search
-
-		settings.Search = search
+		-- Pass Search factory; Window.new creates the overlay after ScreenGui is parented.
+		settings.Search = Search
 		local win = Window.new(settings)
 		STATE.activeWindow = win
+		STATE.search = win._search
 
 		local notifParent = win._screen
-		if notifParent then
+		if notifParent and notifParent:IsA("ScreenGui") then
 			STATE.notifManager = NotificationManager.new(notifParent)
 		end
 
@@ -122,9 +121,10 @@ return function(loadModule)
 			if STATE.notifManager then
 				pcall(function() STATE.notifManager:clear() end)
 			end
-			if search then
-				pcall(function() search:Destroy() end)
+			if win._search then
+				pcall(function() win._search:Destroy() end)
 			end
+			STATE.search = nil
 			STATE.uiDestroyed = true
 		end
 
