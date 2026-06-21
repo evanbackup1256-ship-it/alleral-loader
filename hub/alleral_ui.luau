@@ -1,12 +1,12 @@
--- Alleral UI layer — v7.2.0 Noble (Linoria-compatible bootstrap)
+-- Alleral UI layer — v7.3.0 NobleX (Linoria-compatible bootstrap)
 --[[
 	PREMIUM DASHBOARD RENDERER — Spring animations, 8px grid, layered shadows, glass surfaces.
 ]]
 
 return function(Core)
-	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "7.2.1"
+	Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "7.3.0"
 	Core.UI_VERSION = Core.ALLERAL_UI_VERSION
-	Core.UI_LIBRARY = "Noble"
+	Core.UI_LIBRARY = "NobleX"
 
 	local TS = game:GetService("TweenService")
 	local UIS = game:GetService("UserInputService")
@@ -16,26 +16,26 @@ return function(Core)
 
 	-- 8px design grid. All spacing: 8, 16, 24, 32, 40, 48, 56, 64.
 	local C = {
-		VERSION = "7.2.1",
+		VERSION = "7.3.0",
 		GRID = 8, S = { 8, 16, 24, 32, 40, 48, 56, 64, 72, 80 },
-		WINDOW = { RADIUS = 24, SHADOW = 96 },
-		SIDEBAR = { W = 224, ICON_SIZE = 20, ITEM_H = 46, RADIUS = 14 },
-		GROUP = { PADDING = 18, GAP = 14, RADIUS = 18, TITLE_H = 44 },
-		CONTROL = { ROW_H = 42, GAP = 10, RADIUS = 12 },
-		TOGGLE = { W = 52, H = 28, THUMB = 22, RADIUS = 14 },
-		SLIDER = { TRACK_H = 6, THUMB = 18 },
-		HEADER = { H = 80 }, TABBAR = { H = 50 }, FOOTER = { H = 38 },
+		WINDOW = { RADIUS = 28, SHADOW = 110 },
+		SIDEBAR = { W = 244, ICON_SIZE = 22, ITEM_H = 52, RADIUS = 16 },
+		GROUP = { PADDING = 20, GAP = 16, RADIUS = 20, TITLE_H = 48 },
+		CONTROL = { ROW_H = 44, GAP = 12, RADIUS = 14 },
+		TOGGLE = { W = 54, H = 30, THUMB = 24, RADIUS = 15 },
+		SLIDER = { TRACK_H = 7, THUMB = 20 },
+		HEADER = { H = 86 }, TABBAR = { H = 58 }, FOOTER = { H = 44 },
 		NOTIF = { MAX = 5, W = 320, RADIUS = 16 },
 		FONT = Enum.Font.Gotham, FONT_BOLD = Enum.Font.GothamBold,
-		TEXT = 14, TEXT_SM = 12, TEXT_TITLE = 16, TEXT_HEADER = 22,
+		TEXT = 14, TEXT_SM = 12, TEXT_TITLE = 17, TEXT_HEADER = 24,
 		COLOR = {
-			BG0 = Color3.fromRGB(5, 8, 18),          -- deepest navy
-			BG1 = Color3.fromRGB(7, 11, 22),         -- window surface
-			BG2 = Color3.fromRGB(13, 19, 36),        -- card surface
-			BG3 = Color3.fromRGB(18, 27, 50),        -- card hover
-			BG4 = Color3.fromRGB(26, 36, 63),        -- interactive
-			ACCENT = Color3.fromRGB(139, 92, 246),     -- purple
-			ACCENT_LIGHT = Color3.fromRGB(192, 132, 252),
+			BG0 = Color3.fromRGB(3, 6, 14),          -- deepest navy
+			BG1 = Color3.fromRGB(6, 10, 22),         -- window surface
+			BG2 = Color3.fromRGB(9, 15, 30),        -- card surface
+			BG3 = Color3.fromRGB(16, 24, 46),        -- card hover
+			BG4 = Color3.fromRGB(24, 36, 64),        -- interactive
+			ACCENT = Color3.fromRGB(143, 84, 255),     -- purple
+			ACCENT_LIGHT = Color3.fromRGB(205, 160, 255),
 			ACCENT_DARK = Color3.fromRGB(100, 60, 220),
 			GREEN = Color3.fromRGB(52, 211, 153),      -- success
 			RED = Color3.fromRGB(248, 113, 113),       -- error
@@ -45,7 +45,7 @@ return function(Core)
 			TEXT2 = Color3.fromRGB(190, 198, 215),
 			TEXT3 = Color3.fromRGB(118, 128, 150),
 			SCROLLBAR = Color3.fromRGB(156, 163, 175),
-			GLOW = Color3.fromRGB(104, 78, 255),
+			GLOW = Color3.fromRGB(122, 92, 255),
 			BORDER = Color3.fromRGB(255, 255, 255),
 			WHITE = Color3.fromRGB(255, 255, 255),
 		},
@@ -73,7 +73,7 @@ return function(Core)
 	local Anim = {}
 	function Anim.spring(inst, props, freq, damp)
 		if typeof(inst)~="Instance" then return nil end
-		local d = nil; for k in pairs(props) do d = d or 0.35; if k=="Position" or k=="Size" then d = 0.26 elseif k=="Scale" then d = 0.22 elseif k=="BackgroundTransparency" then d = 0.18 end end
+		local d = nil; for k in pairs(props) do d = d or 0.28; if k=="Position" or k=="Size" then d = 0.32 elseif k=="Scale" then d = 0.22 elseif k=="BackgroundTransparency" then d = 0.18 end end
 		local t = TS:Create(inst, TweenInfo.new(d, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), props)
 		t:Play(); table.insert(STATE.activeTweens, t)
 		t.Completed:Connect(function() for i,tt in ipairs(STATE.activeTweens) do if tt==t then table.remove(STATE.activeTweens,i); break end end end)
@@ -139,7 +139,7 @@ return function(Core)
 	-- ========== DROPDOWN OVERLAY ==========
 	local function getDropOverlay()
 		if STATE.dropOverlay and STATE.dropOverlay.Parent then return STATE.dropOverlay end
-		local sg=make("ScreenGui",{Name="AlleralDropdownOverlay",ResetOnSpawn=false,ZIndexBehavior=Enum.ZIndexBehavior.Sibling,DisplayOrder=200,Parent=(CoreGui:FindFirstChild("RobloxGui") or CoreGui)})
+		local sg=make("ScreenGui",{Name="AlleralDropdownOverlay",ResetOnSpawn=false,IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling,DisplayOrder=10000,Parent=(CoreGui:FindFirstChild("RobloxGui") or CoreGui)})
 		local c=make("Frame",{Name="DropC",Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Parent=sg}); STATE.dropOverlay=c; return c
 	end
 
@@ -222,27 +222,27 @@ return function(Core)
 	local function createDropdown(parent, name, options, default, callback, multi, searchable)
 		options=type(options)=="table" and options or{}; multi=multi==true; searchable=searchable==true or multi==true
 		local g=make("Frame",{Size=UDim2.new(1,0,0,C.CONTROL.ROW_H),BackgroundTransparency=1,Parent=parent})
-		make("TextLabel",{Size=UDim2.new(0,96,1,0),BackgroundTransparency=1,Text=tostring(name),TextColor3=C.COLOR.TEXT2,Font=C.FONT,TextSize=C.TEXT_SM,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Center,Parent=g})
+		make("TextLabel",{Size=UDim2.new(0,108,1,0),BackgroundTransparency=1,Text=tostring(name),TextColor3=C.COLOR.TEXT2,Font=C.FONT,TextSize=C.TEXT_SM,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Center,Parent=g})
 		local selected=multi and{} or(default or(options[1] or""))
 		if multi and type(default)=="string" and default~="" then selected={default} end
 		if multi and type(default)=="table" then selected=default end
 		local function gdt() if multi then if #selected==0 then return"None selected" end; if #selected==1 then return tostring(selected[1]) end; return tostring(#selected).." selected" end; return tostring(selected) end
-		local trig=make("TextButton",{Size=UDim2.new(1,-100,1,0),Position=UDim2.new(0,100,0,0),BackgroundColor3=C.COLOR.BG3,BorderSizePixel=0,Text=gdt(),TextColor3=C.COLOR.TEXT,Font=C.FONT,TextSize=C.TEXT_SM,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,AutoButtonColor=false,Parent=g})
+		local trig=make("TextButton",{Size=UDim2.new(1,-112,1,0),Position=UDim2.new(0,112,0,0),BackgroundColor3=C.COLOR.BG3,BorderSizePixel=0,Text=gdt(),TextColor3=C.COLOR.TEXT,Font=C.FONT,TextSize=C.TEXT_SM,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,AutoButtonColor=false,Parent=g})
 		corner(trig,C.CONTROL.RADIUS); stroke(trig,C.COLOR.BORDER,nil,0.93); pad(trig,8,24,0,0)
 		make("TextLabel",{Size=UDim2.new(0,16,0,16),Position=UDim2.new(1,-20,0.5,-8),BackgroundTransparency=1,Text="v",TextColor3=C.COLOR.TEXT3,Font=C.FONT,TextSize=16,TextXAlignment=Enum.TextXAlignment.Center,TextYAlignment=Enum.TextYAlignment.Center,Parent=trig})
 		local over=getDropOverlay()
-		local dd=make("Frame",{Size=UDim2.new(0,220,0,0),BackgroundColor3=C.COLOR.BG1,BorderSizePixel=0,Visible=false,ZIndex=1000,ClipsDescendants=true,Parent=over})
+		local dd=make("Frame",{Size=UDim2.new(0,260,0,0),BackgroundColor3=C.COLOR.BG1,BackgroundTransparency=0.03,BorderSizePixel=0,Visible=false,ZIndex=10000,ClipsDescendants=true,Parent=over})
 		corner(dd,12); stroke(dd,C.COLOR.BORDER,nil,0.9)
 		-- shadow
 		local sc=make("Frame",{Size=UDim2.new(1,8,1,8),Position=UDim2.new(0,-4,0,-4),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=0.6,BorderSizePixel=0,ZIndex=-1,Parent=dd}); make("UICorner",{CornerRadius=UDim.new(0,14),Parent=sc})
-		make("Frame",{Size=UDim2.new(1,0,0,1),BackgroundColor3=C.COLOR.ACCENT,BorderSizePixel=0,ZIndex=1001,Parent=dd})
-		local scr=make("ScrollingFrame",{Size=UDim2.new(1,0,0,0),Position=UDim2.new(0,0,0,4),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,ScrollBarImageColor3=C.COLOR.SCROLLBAR,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,Active=true,ClipsDescendants=true,Visible=true,ZIndex=1001,Parent=dd})
+		make("Frame",{Size=UDim2.new(1,0,0,1),BackgroundColor3=C.COLOR.ACCENT,BorderSizePixel=0,ZIndex=10001,Parent=dd})
+		local scr=make("ScrollingFrame",{Size=UDim2.new(1,0,0,0),Position=UDim2.new(0,0,0,4),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,ScrollBarImageColor3=C.COLOR.SCROLLBAR,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,Active=true,ClipsDescendants=true,Visible=true,ZIndex=10001,Parent=dd})
 		make("UIListLayout",{Padding=UDim.new(0,2),SortOrder=Enum.SortOrder.LayoutOrder,Parent=scr})
 		pad(dd,0,0,4,4)
 
 		local sb
 		if searchable then
-			sb=make("TextBox",{Size=UDim2.new(1,-8,0,28),Position=UDim2.new(0,4,0,4),BackgroundColor3=C.COLOR.BG3,BorderSizePixel=0,PlaceholderText="Search...",PlaceholderColor3=C.COLOR.TEXT3,Text="",TextColor3=C.COLOR.TEXT,Font=C.FONT,TextSize=C.TEXT_SM,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=1002,Parent=dd})
+			sb=make("TextBox",{Size=UDim2.new(1,-8,0,28),Position=UDim2.new(0,4,0,4),BackgroundColor3=C.COLOR.BG3,BorderSizePixel=0,PlaceholderText="Search...",PlaceholderColor3=C.COLOR.TEXT3,Text="",TextColor3=C.COLOR.TEXT,Font=C.FONT,TextSize=C.TEXT_SM,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=10002,Parent=dd})
 			corner(sb,6); scr.Position=UDim2.new(0,0,0,38)
 		end
 
@@ -255,10 +255,10 @@ return function(Core)
 			for _,o in ipairs(options) do local s=tostring(o); if not filt or s:lower():find(filt,1,true) then table.insert(f2,o) end end
 			for _,o in ipairs(f2) do
 				local sel=multi and (function() for _,s in ipairs(selected) do if s==o then return true end end end)() or (selected==o)
-				local f=make("TextButton",{Size=UDim2.new(1,0,0,32),BackgroundColor3=sel and C.COLOR.ACCENT or C.COLOR.BG1,BorderSizePixel=0,Text=tostring(o),TextColor3=sel and C.COLOR.WHITE or C.COLOR.TEXT,Font=C.FONT,TextSize=C.TEXT_SM,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=1001,Parent=scr}); pad(f,8,0,0,0)
+				local f=make("TextButton",{Size=UDim2.new(1,0,0,32),BackgroundColor3=sel and C.COLOR.ACCENT or Color3.fromRGB(8,12,24),BorderSizePixel=0,Text=tostring(o),TextColor3=sel and C.COLOR.WHITE or C.COLOR.TEXT,Font=C.FONT,TextSize=C.TEXT_SM,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=10002,Parent=scr}); pad(f,8,0,0,0)
 				corner(f,6)
 				f.MouseEnter:Connect(function() if not sel then Anim.spring(f,{BackgroundColor3=C.COLOR.BG4}) end end)
-				f.MouseLeave:Connect(function() if not sel then Anim.spring(f,{BackgroundColor3=C.COLOR.BG1}) end end)
+				f.MouseLeave:Connect(function() if not sel then Anim.spring(f,{BackgroundColor3=Color3.fromRGB(8,12,24)}) end end)
 				f.MouseButton1Click:Connect(function()
 					if multi then local fd=false; for j,s in ipairs(selected) do if s==o then table.remove(selected,j); fd=true; break end end; if not fd then table.insert(selected,o) end
 					else selected=(selected==o) and"" or o; open=false; dd.Visible=false; trig.Text=gdt() end
@@ -304,12 +304,12 @@ return function(Core)
 	-- ========== GROUP CARD ==========
 	local function createGroup(parent, title, column, columnWidth)
 		local w=columnWidth or 360
-		local card=make("Frame",{Size=UDim2.new(0,w,0,0),BackgroundColor3=C.COLOR.BG2,BackgroundTransparency=0.03,BorderSizePixel=0,AutomaticSize=Enum.AutomaticSize.Y,Parent=parent,ClipsDescendants=false})
-		corner(card,C.GROUP.RADIUS); stroke(card,Color3.fromRGB(70,86,120),1,0.82)
-		gradient(card,Color3.fromRGB(16,24,44),Color3.fromRGB(8,13,26),90)
+		local card=make("Frame",{Size=UDim2.new(0,w,0,0),BackgroundColor3=C.COLOR.BG2,BackgroundTransparency=0.04,BorderSizePixel=0,AutomaticSize=Enum.AutomaticSize.Y,Parent=parent,ClipsDescendants=false})
+		corner(card,C.GROUP.RADIUS); stroke(card,Color3.fromRGB(66,82,116),1,0.74)
+		gradient(card,Color3.fromRGB(14,22,42),Color3.fromRGB(6,10,22),90)
 		local cardScale=Anim.uis(card)
 		local glow=make("Frame",{Size=UDim2.new(1,10,1,10),Position=UDim2.new(0,-5,0,-5),BackgroundColor3=C.COLOR.GLOW,BackgroundTransparency=0.93,BorderSizePixel=0,ZIndex=0,Parent=card}); corner(glow,C.GROUP.RADIUS+6)
-		local shine=make("Frame",{Size=UDim2.new(1,0,0,2),Position=UDim2.new(0,0,0,0),BackgroundColor3=C.COLOR.ACCENT,BackgroundTransparency=0.1,BorderSizePixel=0,ZIndex=3,Parent=card}); gradient(shine,C.COLOR.ACCENT_LIGHT,C.COLOR.ACCENT,0); corner(shine,2)
+		local shine=make("Frame",{Size=UDim2.new(1,-28,0,3),Position=UDim2.new(0,14,0,0),BackgroundColor3=C.COLOR.ACCENT,BackgroundTransparency=0.1,BorderSizePixel=0,ZIndex=3,Parent=card}); gradient(shine,C.COLOR.ACCENT_LIGHT,C.COLOR.ACCENT,0); corner(shine,2)
 		card.MouseEnter:Connect(function() Anim.spring(cardScale,{Scale=1.006}); Anim.spring(glow,{BackgroundTransparency=0.86}); Anim.spring(card,{BackgroundColor3=C.COLOR.BG3}) end)
 		card.MouseLeave:Connect(function() Anim.spring(cardScale,{Scale=1}); Anim.spring(glow,{BackgroundTransparency=0.93}); Anim.spring(card,{BackgroundColor3=C.COLOR.BG2}) end)
 
@@ -339,7 +339,7 @@ return function(Core)
 		columns=math.max(1,math.min(3,tonumber(columns) or 3))
 		local ca=window._contentArea
 		local panel=make("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Visible=false,Parent=ca})
-		local scroll=make("ScrollingFrame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=6,ScrollBarImageColor3=C.COLOR.SCROLLBAR,ScrollBarImageTransparency=0.35,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,Active=true,ClipsDescendants=true,Parent=panel})
+		local scroll=make("ScrollingFrame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=C.COLOR.BG1,BackgroundTransparency=0.04,BorderSizePixel=0,ScrollBarThickness=6,ScrollBarImageColor3=C.COLOR.SCROLLBAR,ScrollBarImageTransparency=0.24,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,Active=true,ClipsDescendants=true,Parent=panel})
 		pad(scroll,18,18,18,18)
 		local holder=make("Frame",{Size=UDim2.new(1,0,0,0),BackgroundTransparency=1,AutomaticSize=Enum.AutomaticSize.Y,Parent=scroll})
 		local hl=make("UIListLayout",{Padding=UDim.new(0,16),SortOrder=Enum.SortOrder.LayoutOrder,FillDirection=Enum.FillDirection.Horizontal,Parent=holder})
@@ -368,9 +368,9 @@ return function(Core)
 	local function createWindow(settings)
 		settings=settings or{}; STATE.windowCount=STATE.windowCount+1; local uid=STATE.windowCount
 		local ws=settings.Size or UDim2.new(0,1240,0,720)
-		local screen=make("ScreenGui",{Name="AlleralUI_"..uid,ResetOnSpawn=false,ZIndexBehavior=Enum.ZIndexBehavior.Sibling,DisplayOrder=100,Parent=(CoreGui:FindFirstChild("RobloxGui") or CoreGui)})
+		local screen=make("ScreenGui",{Name="AlleralUI_"..uid,ResetOnSpawn=false,IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling,DisplayOrder=100,Parent=(CoreGui:FindFirstChild("RobloxGui") or CoreGui)})
 
-		local dim=make("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=0.42,BorderSizePixel=0,ZIndex=1,Parent=screen})
+		local dim=make("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(3,6,14),BackgroundTransparency=0.34,BorderSizePixel=0,ZIndex=1,Parent=screen})
 		local main=make("Frame",{Size=ws,AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.fromScale(0.5,0.5),BackgroundColor3=C.COLOR.BG1,BorderSizePixel=0,ClipsDescendants=true,ZIndex=2,Parent=screen})
 		corner(main,C.WINDOW.RADIUS); stroke(main,Color3.fromRGB(62,78,110),1,0.62)
 		shadowLayers(main,ws,C.WINDOW.RADIUS)
@@ -392,16 +392,16 @@ return function(Core)
 		local mini=make("TextButton",{Size=UDim2.new(0,34,0,34),Position=UDim2.new(1,-98,0.5,-17),BackgroundColor3=C.COLOR.BG2,BorderSizePixel=0,Text="–",TextColor3=C.COLOR.TEXT2,Font=C.FONT_BOLD,TextSize=20,AutoButtonColor=false,ZIndex=8,Parent=header}); corner(mini,17); stroke(mini,C.COLOR.BORDER,1,0.9); animateHover(mini,C.COLOR.BG2,C.COLOR.BG3)
 
 		-- TOP TAB BAR
-		local tabbar=make("Frame",{Size=UDim2.new(1,-32,0,C.TABBAR.H),Position=UDim2.new(0,16,0,C.HEADER.H+10),BackgroundColor3=C.COLOR.BG2,BackgroundTransparency=0.18,BorderSizePixel=0,ZIndex=5,Parent=main}); corner(tabbar,14); stroke(tabbar,C.COLOR.BORDER,1,0.93)
-		local tabbarList=make("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder,FillDirection=Enum.FillDirection.Horizontal,VerticalAlignment=Enum.VerticalAlignment.Center,Parent=tabbar}); pad(tabbar,10,10,0,0)
+		local tabbar=make("ScrollingFrame",{Size=UDim2.new(1,-32,0,C.TABBAR.H),Position=UDim2.new(0,16,0,C.HEADER.H+10),BackgroundColor3=C.COLOR.BG2,BackgroundTransparency=0.18,BorderSizePixel=0,ZIndex=5,Parent=main,ClipsDescendants=true,ScrollBarThickness=0,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.X,ScrollingDirection=Enum.ScrollingDirection.X,Active=true}); corner(tabbar,16); stroke(tabbar,C.COLOR.BORDER,1,0.92)
+		local tabbarList=make("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder,FillDirection=Enum.FillDirection.Horizontal,VerticalAlignment=Enum.VerticalAlignment.Center,Parent=tabbar}); pad(tabbar,12,12,0,0)
 
 		-- SIDEBAR
 		local sideY=C.HEADER.H+C.TABBAR.H+24
-		local sidebar=make("Frame",{Size=UDim2.new(0,C.SIDEBAR.W,1,-sideY-C.FOOTER.H-12),Position=UDim2.new(0,16,0,sideY),BackgroundColor3=C.COLOR.BG2,BackgroundTransparency=0.22,BorderSizePixel=0,ZIndex=4,Parent=main}); corner(sidebar,16); stroke(sidebar,C.COLOR.BORDER,1,0.93); gradient(sidebar,Color3.fromRGB(14,18,36),Color3.fromRGB(8,12,24),90)
-		local sidebarList=make("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder,Parent=sidebar}); pad(sidebar,12,12,12,12)
+		local sidebar=make("ScrollingFrame",{Size=UDim2.new(0,C.SIDEBAR.W,1,-sideY-C.FOOTER.H-12),Position=UDim2.new(0,16,0,sideY),BackgroundColor3=C.COLOR.BG2,BackgroundTransparency=0.18,BorderSizePixel=0,ZIndex=4,Parent=main,ClipsDescendants=true,ScrollBarThickness=0,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,Active=true}); corner(sidebar,18); stroke(sidebar,C.COLOR.BORDER,1,0.90); gradient(sidebar,Color3.fromRGB(16,18,38),Color3.fromRGB(8,12,24),90)
+		local sidebarList=make("UIListLayout",{Padding=UDim.new(0,10),SortOrder=Enum.SortOrder.LayoutOrder,Parent=sidebar}); pad(sidebar,14,14,14,14)
 
 		-- CONTENT AREA
-		local ca=make("Frame",{Size=UDim2.new(1,-C.SIDEBAR.W-48,1,-sideY-C.FOOTER.H-12),Position=UDim2.new(0,C.SIDEBAR.W+32,0,sideY),BackgroundColor3=C.COLOR.BG1,BackgroundTransparency=0,BorderSizePixel=0,ZIndex=3,Parent=main}); corner(ca,16); stroke(ca,C.COLOR.BORDER,1,0.96); gradient(ca,Color3.fromRGB(9,14,28),Color3.fromRGB(6,10,20),90)
+		local ca=make("Frame",{Size=UDim2.new(1,-C.SIDEBAR.W-48,1,-sideY-C.FOOTER.H-12),Position=UDim2.new(0,C.SIDEBAR.W+32,0,sideY),BackgroundColor3=C.COLOR.BG1,BackgroundTransparency=0.02,BorderSizePixel=0,ZIndex=3,Parent=main}); corner(ca,20); stroke(ca,Color3.fromRGB(64,82,126),1,0.86); gradient(ca,Color3.fromRGB(8,14,30),Color3.fromRGB(4,7,16),90)
 
 		-- FOOTER
 		local footer=make("Frame",{Size=UDim2.new(1,-32,0,C.FOOTER.H),Position=UDim2.new(0,16,1,-C.FOOTER.H-10),BackgroundColor3=C.COLOR.BG2,BackgroundTransparency=0.16,BorderSizePixel=0,ZIndex=6,Parent=main}); corner(footer,12); stroke(footer,C.COLOR.BORDER,1,0.94)
@@ -414,6 +414,7 @@ return function(Core)
 			if tab._sidebarLabel then Anim.spring(tab._sidebarLabel,{TextColor3=on and C.COLOR.TEXT or C.COLOR.TEXT2}) end
 			if tab._topBtn then Anim.spring(tab._topBtn,{BackgroundColor3=on and C.COLOR.ACCENT or C.COLOR.BG2,BackgroundTransparency=on and 0.12 or 0.55}) end
 			if tab._topLabel then Anim.spring(tab._topLabel,{TextColor3=on and C.COLOR.TEXT or C.COLOR.TEXT2}) end
+			if tab._sidebarBar then Anim.spring(tab._sidebarBar,{BackgroundTransparency=on and 0.05 or 0.45}) end
 		end
 		local function selectTab(tab)
 			if activeTab==tab then return end
@@ -422,20 +423,20 @@ return function(Core)
 		end
 		local uiHidden=false; local wc={}
 		function wc:Hide() if uiHidden then return end; uiHidden=true; Anim.stopAll(); Anim.centerOut(main); Anim.tween(dim,{BackgroundTransparency=1},0.16) end
-		function wc:Show() if not uiHidden then return end; uiHidden=false; dim.Visible=true; dim.BackgroundTransparency=1; Anim.tween(dim,{BackgroundTransparency=0.42},0.16); Anim.stopAll(); Anim.centerIn(main) end
+		function wc:Show() if not uiHidden then return end; uiHidden=false; dim.Visible=true; dim.BackgroundTransparency=1; Anim.tween(dim,{BackgroundTransparency=0.34},0.16); Anim.stopAll(); Anim.centerIn(main) end
 		function wc:Toggle() if uiHidden then wc:Show() else wc:Hide() end end
 		closeBtn.MouseButton1Click:Connect(function() wc:Hide() end); mini.MouseButton1Click:Connect(function() wc:Hide() end)
 		local w=setmetatable({_main=main,_header=header,_sidebar=sidebar,_tabbar=tabbar,_contentArea=ca,_screen=screen,_tabs=tabs,_footer=footer,Hide=wc.Hide,Show=wc.Show,Toggle=wc.Toggle,selectTab=selectTab},{__index=wc})
 		function w:AddTab(name,iconId)
 			local to=createTab(self,name,iconId,2)
-			local top=make("TextButton",{Size=UDim2.new(0,104,0,34),BackgroundColor3=C.COLOR.BG2,BackgroundTransparency=0.55,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=6,Parent=tabbar}); corner(top,10); stroke(top,C.COLOR.BORDER,1,0.92)
+			local top=make("TextButton",{Size=UDim2.new(0,98,0,34),BackgroundColor3=C.COLOR.BG2,BackgroundTransparency=0.55,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=6,Parent=tabbar}); corner(top,10); stroke(top,C.COLOR.BORDER,1,0.92)
 			local tl=make("TextLabel",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text=tostring(name),TextColor3=C.COLOR.TEXT2,Font=C.FONT_BOLD,TextSize=C.TEXT,TextXAlignment=Enum.TextXAlignment.Center,TextYAlignment=Enum.TextYAlignment.Center,ZIndex=7,Parent=top})
 			local sb=make("TextButton",{Size=UDim2.new(1,0,0,C.SIDEBAR.ITEM_H),BackgroundColor3=C.COLOR.BG2,BackgroundTransparency=0.75,BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=5,Parent=sidebar}); corner(sb,C.SIDEBAR.RADIUS)
-			local bar=make("Frame",{Size=UDim2.new(0,3,1,-14),Position=UDim2.new(0,0,0,7),BackgroundColor3=C.COLOR.ACCENT,BorderSizePixel=0,ZIndex=7,Parent=sb}); corner(bar,2)
+			local bar=make("Frame",{Size=UDim2.new(0,3,1,-18),Position=UDim2.new(0,8,0,9),BackgroundColor3=C.COLOR.ACCENT,BackgroundTransparency=0.25,BorderSizePixel=0,ZIndex=7,Parent=sb}); corner(bar,2)
 			local icoText=({Kick="⌂",Plot="▷",Events="▣",Inventory="🛒",Misc="⚙",Settings="⚙",Configs="◈",Dashboard="◌",Tools="✦"})[tostring(name)] or "•"
 			make("TextLabel",{Size=UDim2.new(0,32,1,0),Position=UDim2.new(0,12,0,0),BackgroundTransparency=1,Text=icoText,TextColor3=C.COLOR.TEXT2,Font=C.FONT_BOLD,TextSize=20,TextXAlignment=Enum.TextXAlignment.Center,TextYAlignment=Enum.TextYAlignment.Center,ZIndex=7,Parent=sb})
 			local sl=make("TextLabel",{Size=UDim2.new(1,-56,1,0),Position=UDim2.new(0,54,0,0),BackgroundTransparency=1,Text=tostring(name),TextColor3=C.COLOR.TEXT2,Font=C.FONT,TextSize=C.TEXT,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Center,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=7,Parent=sb})
-			to._sidebarBtn=sb; to._sidebarLabel=sl; to._topBtn=top; to._topLabel=tl
+			to._sidebarBtn=sb; to._sidebarLabel=sl; to._sidebarBar=bar; to._topBtn=top; to._topLabel=tl
 			local function hover(btn,on) if activeTab~=to then Anim.spring(btn,{BackgroundTransparency=on and 0.42 or 0.75}) end end
 			sb.MouseEnter:Connect(function() hover(sb,true) end); sb.MouseLeave:Connect(function() hover(sb,false) end); sb.MouseButton1Click:Connect(function() selectTab(to) end)
 			top.MouseEnter:Connect(function() if activeTab~=to then Anim.spring(top,{BackgroundTransparency=0.38}) end end); top.MouseLeave:Connect(function() if activeTab~=to then Anim.spring(top,{BackgroundTransparency=0.55}) end end); top.MouseButton1Click:Connect(function() selectTab(to) end)
@@ -488,7 +489,7 @@ return function(Core)
 
 	-- ========== LIBRARY ==========
 	local Library={Version=C.VERSION}
-	function Library:GetLayoutInfo() return{profile="noble",engine="Alleral Noble",version=C.VERSION} end
+	function Library:GetLayoutInfo() return{profile="noble",engine="Alleral NobleX",version=C.VERSION} end
 	function Library:CreateWindow(settings)
 		settings=clone(type(settings)=="table" and settings or{})
 		local win=createWindow(settings)
@@ -518,7 +519,7 @@ return function(Core)
 	end
 	function Core.preloadUi() return Core.loadUi() end
 	function Core.uiLibrary(b) if type(b)~="table" then return nil end; return b.Alleral or b.Library end
-	function Core.uiWindowSettings(extra) extra=type(extra)=="table" and extra or{}; return{Title=extra.Title or extra.Name or"Alleral",Name=extra.Title or extra.Name or"Alleral",Subtitle=extra.Subtitle or extra.Author or"",Icon=extra.Icon or"sparkles",Theme=extra.Theme or"Noble",Size=extra.Size or UDim2.new(0,1240,0,720),TabWidth=tonumber(extra.TabWidth) or C.SIDEBAR.W,FileSettings={RootFolder=extra.configFolder or"Alleral_Configs",ConfigFolder=extra.FileName or"Interface"}} end
+	function Core.uiWindowSettings(extra) extra=type(extra)=="table" and extra or{}; return{Title=extra.Title or extra.Name or"Alleral",Name=extra.Title or extra.Name or"Alleral",Subtitle=extra.Subtitle or extra.Author or"",Icon=extra.Icon or"sparkles",Theme=extra.Theme or"NobleX",Size=extra.Size or UDim2.new(0,1220,0,720),TabWidth=tonumber(extra.TabWidth) or C.SIDEBAR.W,FileSettings={RootFolder=extra.configFolder or"Alleral_Configs",ConfigFolder=extra.FileName or"Interface"}} end
 
 	-- ========== GROUPBOX WRAPPER ==========
 	local function createGroupbox(section,uiBundle)
