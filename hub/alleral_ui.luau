@@ -84,15 +84,18 @@ return function(Core)
 		t.Completed:Connect(function() for j,tt in ipairs(STATE.activeTweens) do if tt==t then table.remove(STATE.activeTweens,j); break end end end)
 		return t
 	end
-	function Anim.fadeIn(i,d) if typeof(i)~="Instance" or not i:IsA("GuiObject") then return nil end; d=d or 0.15; i.Visible=true; i.BackgroundTransparency=1; if i:IsA("TextLabel") or i:IsA("TextButton") then i.TextTransparency=1 end; local p={BackgroundTransparency=0}; if i:IsA("TextLabel") or i:IsA("TextButton") then p.TextTransparency=0 end; return Anim.tween(i,p,d) end
+	function Anim.fadeIn(i,d) if typeof(i)~="Instance" or not i:IsA("GuiObject") then return nil end; d=d or 0.15; i.Visible=true; i.BackgroundTransparency=1; if i:IsA("TextLabel") or i:IsA("TextButton") then i.TextTransparency=1 end; local p={BackgroundTransparency=0}; if i:IsA("TextLabel") or i:IsA("TextButton") then p.TextTransparency=0 end; local s=i:FindFirstChildOfClass("UIStroke"); if s then s.Transparency=1; p.Transparency=0 end; return Anim.tween(i,p,d) end
 	function Anim.uis(o) local u=o:FindFirstChildOfClass("UIScale"); if not u then u=Instance.new("UIScale"); u.Parent=o end; return u end
 	function Anim.centerIn(inst)
 		if typeof(inst)~="Instance" then return nil end; inst.AnchorPoint=Vector2.new(0.5,0.5); inst.Position=UDim2.fromScale(0.5,0.5); inst.Visible=true
-		local u=Anim.uis(inst); u.Scale=0.96; Anim.spring(u,{Scale=1}); return Anim.tween(inst,{BackgroundTransparency=0},0.18)
+		local u=Anim.uis(inst); u.Scale=0.96; Anim.spring(u,{Scale=1})
+		local stroke1=inst:FindFirstChildOfClass("UIStroke"); if stroke1 then stroke1.Transparency=1; Anim.spring(stroke1,{Transparency=0.95}) end
+		return Anim.spring(inst,{BackgroundTransparency=0})
 	end
 	function Anim.centerOut(inst, hide)
 		if typeof(inst)~="Instance" then return nil end; inst.AnchorPoint=Vector2.new(0.5,0.5); inst.Position=UDim2.fromScale(0.5,0.5)
 		local u=Anim.uis(inst); u.Scale=1; Anim.tween(u,{Scale=0.97},0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.In)
+		local stroke1=inst:FindFirstChildOfClass("UIStroke"); if stroke1 then Anim.tween(stroke1,{Transparency=1},0.12) end
 		local t=Anim.tween(inst,{BackgroundTransparency=1},0.12); if hide~=false then t.Completed:Connect(function() inst.Visible=false end) end; return t
 	end
 	function Anim.stopAll() for _,t in ipairs(STATE.activeTweens) do pcall(function() t:Cancel() end) end; STATE.activeTweens={} end
@@ -325,14 +328,6 @@ return function(Core)
 		settings=settings or{}; STATE.windowCount=STATE.windowCount+1; local uid=STATE.windowCount
 		local ws=settings.Size or UDim2.new(0,780,0,540)
 		local screen=make("ScreenGui",{Name="AlleralUI_"..uid,ResetOnSpawn=false,ZIndexBehavior=Enum.ZIndexBehavior.Sibling,DisplayOrder=100,Parent=(CoreGui:FindFirstChild("RobloxGui") or CoreGui)})
-
-		-- layered background
-		make("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=C.COLOR.BG0,BorderSizePixel=0,Parent=screen})
-		make("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=C.COLOR.BG1,BackgroundTransparency=0.3,BorderSizePixel=0,Parent=screen})
-		local radial=make("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,BorderSizePixel=0,Parent=screen})
-		make("UIGradient",{Color=ColorSequence.new({ColorSequenceKeypoint.new(0,C.COLOR.ACCENT),ColorSequenceKeypoint.new(1,Color3.fromRGB(0,0,0))}),Rotation=45,Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0.92),NumberSequenceKeypoint.new(1,1)}),Parent=radial})
-		-- noise (subtle grain overlay via semi-transparent gradient checkerboard approach)
-		make("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(255,255,255),BackgroundTransparency=0.98,BorderSizePixel=0,Parent=screen})
 
 		-- MAIN WINDOW
 		local main=make("Frame",{Size=ws,AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.fromScale(0.5,0.5),BackgroundColor3=C.COLOR.BG1,BorderSizePixel=0,ClipsDescendants=true,ZIndex=2,Parent=screen})
