@@ -87,7 +87,7 @@ function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
 	addRow("Script", status.name)
 	addRow("Version", status.version)
 	addRow("Executor", (Core.executorProfile().displayName))
-	addRow("Access", "Public Â· no key required")
+	addRow("Access", "Public • no key required")
 	local weao = Core.fetchWeaoExecutorStatus()
 	if weao then
 		addRow("WEAO", Core.weaoStatusLabel(weao))
@@ -110,7 +110,7 @@ function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
 			Callback = function(value)
 				ENV.Alleral_ForceLoad = value == true
 				getgenv().Alleral_ForceLoad = value == true
-				Core.notify("Alleral", value and "force load on â€” reload to use it" or "force load off", 4)
+				Core.notify("Alleral", value and "force load on — reload to use it" or "force load off", 4)
 			end,
 		}, "ForceLoadToggle")
 	end
@@ -159,7 +159,7 @@ function Core.buildHubActionsGroup(tab, column)
 			Core.notify("Alleral", "reloading...", 3)
 			task.defer(reload)
 		else
-			Core.notify("Alleral", "can't reload here â€” use getgenv().Alleral_Reload()", 5)
+			Core.notify("Alleral", "can't reload here — use getgenv().Alleral_Reload()", 5)
 		end
 	end, "Runs getgenv().Alleral_Reload().")
 
@@ -827,7 +827,7 @@ function Core.buildPerformanceControls(group, options)
 	local saveFn = options.saveFn or options.saveSettings
 	Core.mergePerformanceDefaults(state)
 
-	group:CreateToggle("FPS boost", state.AFPSBoost == true, "Lowest quality, no shadows â€” best for weak PCs.", function(value)
+	group:CreateToggle("FPS boost", state.AFPSBoost == true, "Lowest quality, no shadows — best for weak PCs.", function(value)
 		state.AFPSBoost = value
 		if value then
 			state.ARTXMod = false
@@ -851,7 +851,7 @@ function Core.buildPerformanceControls(group, options)
 		end
 	end, "ARTXMod")
 
-	group:CreateToggle("Black screen mode", state.ABlackScreen == true, "Hides the 3D world with a black overlay â€” UI stays visible.", function(value)
+	group:CreateToggle("Black screen mode", state.ABlackScreen == true, "Hides the 3D world with a black overlay — UI stays visible.", function(value)
 		state.ABlackScreen = value
 		pcall(Core.setBlackScreen, value)
 		if type(saveFn) == "function" then
@@ -1108,7 +1108,7 @@ function Core.syncWeaoConfigNow()
 		)
 		return ok
 	end
-	Core.notify("Alleral", "WEAO sync unavailable â€” reload the loader.", 5)
+	Core.notify("Alleral", "WEAO sync unavailable — reload the loader.", 5)
 	return false
 end
 
@@ -1358,7 +1358,7 @@ function Core.buildSettingsBackupGroup(tab, options)
 		end
 		local raw = readFile(backupPath)
 		pcall(writeFile, settingsPath, raw)
-		Core.notify("Alleral", "Backup restored â€” reload the script.", 5)
+		Core.notify("Alleral", "Backup restored — reload the script.", 5)
 	end, "Overwrites your current settings file.")
 
 	group:CreateButton("Backup now", function()
@@ -1500,7 +1500,7 @@ function Core.buildAutomationStatusGroup(tab, options)
 				active = active + 1
 			end
 			local loopState = loops[entry.key] or loops[entry.label]
-			local pulse = on and (loopState and loopState.enabled ~= false and "â—" or "â—‹") or "Â·"
+			local pulse = on and (loopState and loopState.enabled ~= false and "●" or "○") or "•"
 			table.insert(lines, pulse .. " " .. entry.label)
 		end
 		status:Update("Active", tostring(active))
@@ -1723,7 +1723,7 @@ function Core.buildCustomizationStudioGroup(tab, options)
 		end
 		local info = type(uiRuntime.GetLayoutInfo) == "function" and uiRuntime:GetLayoutInfo() or nil
 		if info and info.profile then
-			Core.notify("Alleral", "Fit: " .. tostring(info.profile) .. " Â· " .. string.format("%.0f%%", (info.scale or 1) * 100), 2, "info")
+			Core.notify("Alleral", "Fit: " .. tostring(info.profile) .. " • " .. string.format("%.0f%%", (info.scale or 1) * 100), 2, "info")
 		end
 	end)
 
@@ -1745,7 +1745,7 @@ function Core.buildCustomizationStudioGroup(tab, options)
 			if ok and info then
 				Core.notify(
 					"Alleral",
-					string.format("%s Â· %dx%d Â· scale %.0f%%", tostring(profile or info.profile), info.viewport.X, info.viewport.Y, (info.scale or 1) * 100),
+					string.format("%s • %dx%d • scale %.0f%%", tostring(profile or info.profile), info.viewport.X, info.viewport.Y, (info.scale or 1) * 100),
 					3,
 					"success"
 				)
@@ -1979,16 +1979,24 @@ function Core.buildExecutorIntelGroup(tab, column)
 	local group = Core.buildUiGroup(tab, "Executor intel", column or 1, nil, nil, "ExecutorIntel")
 	local profile = type(Core.executorProfile) == "function" and Core.executorProfile() or {}
 	local execName = profile.displayName or Core.getExecutorDisplayName()
-	group:CreateLabel("Executor Â· " .. execName)
+	group:CreateLabel("Executor • " .. execName)
 	if profile.tier then
-		group:CreateLabel("Tier Â· " .. tostring(profile.tier))
+		local tier = tostring(profile.tier or "")
+		if tier ~= "" then
+			tier = tier:sub(1, 1):upper() .. tier:sub(2):lower()
+		end
+		group:CreateLabel("Tier • " .. tier)
 	end
 	if profile.layoutMode then
-		group:CreateLabel("UI layout Â· " .. tostring(profile.layoutMode))
+		local layout = tostring(profile.layoutMode or "")
+		if layout ~= "" then
+			layout = layout:sub(1, 1):upper() .. layout:sub(2):lower()
+		end
+		group:CreateLabel("UI Layout • " .. layout)
 	end
-	group:CreateLabel("PlaceId Â· " .. tostring(game.PlaceId))
-	group:CreateLabel("JobId Â· " .. tostring(game.JobId):sub(1, 20) .. "...")
-	group:CreateLabel("UserId Â· " .. tostring(game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.UserId or "?"))
+	group:CreateLabel("PlaceId • " .. tostring(game.PlaceId))
+	group:CreateLabel("JobId • " .. tostring(game.JobId):sub(1, 20) .. "...")
+	group:CreateLabel("UserId • " .. tostring(game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.UserId or "?"))
 	local caps = {}
 	for key, label in pairs({
 		hasClipboard = "clipboard",
@@ -2003,7 +2011,7 @@ function Core.buildExecutorIntelGroup(tab, column)
 			table.insert(caps, label)
 		end
 	end
-	group:CreateLabel("Caps Â· " .. (#caps > 0 and table.concat(caps, ", ") or "sandboxed"))
+	group:CreateLabel("Caps • " .. (#caps > 0 and table.concat(caps, ", ") or "sandboxed"))
 	group:CreateButton("Copy JobId", Core.copyJobId, "Copy this server's JobId.")
 	group:CreateButton("Copy join link", Core.copyPlaceJoinLink, "Roblox app join link.")
 	return group
@@ -2639,7 +2647,7 @@ function Core.buildConfigProfileGroup(tab, options)
 			return
 		end
 		pcall(setClipboard, HttpService:JSONEncode(collectSnapshot()))
-		Core.notify("Alleral", "Profile copied â€” paste to share.", 4)
+		Core.notify("Alleral", "Profile copied — paste to share.", 4)
 	end)
 
 	group:CreateButton("Paste from clipboard", function()
@@ -2742,7 +2750,7 @@ function Core.buildCloudConfigStudio(tab, options)
 
 	local function formatBrowseLabel(entry)
 		return string.format(
-			"[%s] %s Â· %s Â· %s dl",
+			"[%s] %s • %s • %s dl",
 			tostring(entry.code or "??????"),
 			tostring(entry.name or "Untitled"),
 			tostring(entry.author or "?"),
@@ -2786,7 +2794,7 @@ function Core.buildCloudConfigStudio(tab, options)
 		cloudStatus:Update("Downloads", tostring(decoded.downloads or 0))
 		cloudStatus:SetSummary(
 			string.format(
-				"%s by %s Â· v%s Â· DNA %s Â· %s keys would change",
+				"%s by %s • v%s • DNA %s • %s keys would change",
 				tostring(decoded.name or "Untitled"),
 				tostring(decoded.author or "?"),
 				tostring(decoded.scriptVersion or "?"),
@@ -2856,7 +2864,7 @@ function Core.buildCloudConfigStudio(tab, options)
 		cloudStatus:Update("Code", shareCode)
 		cloudStatus:Update("DNA", tostring(decoded.dna or "?"))
 		cloudStatus:Update("Diff", "0 keys")
-		cloudStatus:SetSummary("Uploaded " .. shareCode .. " Â· DNA " .. tostring(decoded.dna or "?"))
+		cloudStatus:SetSummary("Uploaded " .. shareCode .. " • DNA " .. tostring(decoded.dna or "?"))
 		setStatus("Uploaded " .. shareCode, "success")
 		if Core.setClipboard then
 			pcall(Core.setClipboard, shareCode)
@@ -3093,7 +3101,7 @@ end
 function Core.discordField(name, value, inline)
 	local text = trimText(value)
 	if text == "" then
-		text = "â€”"
+		text = "—"
 	end
 	if #text > 1024 then
 		text = text:sub(1, 1021) .. "..."
@@ -3108,7 +3116,7 @@ end
 function Core.discordLinkField(name, label, url, inline)
 	url = trimText(url)
 	if url == "" then
-		return Core.discordField(name, "â€”", inline)
+		return Core.discordField(name, "—", inline)
 	end
 	return {
 		name = tostring(name or "Link"),

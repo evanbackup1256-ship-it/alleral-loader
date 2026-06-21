@@ -1,12 +1,17 @@
 -- Alleral V11 — WindUI framework entry (sole UI stack)
 return function(loadModule, Core)
-	local Bootstrap = loadModule("Bootstrap")(Core)
+	local Text = loadModule("Text")()
+	local Bootstrap = loadModule("Bootstrap")(Core, Text)
 	local WindUI = Bootstrap.loadWindUI()
+	local Theme = loadModule("Theme")(WindUI, Bootstrap)
+	local Motion = loadModule("Motion")()
 	local Notifications = loadModule("Notifications")(WindUI, Bootstrap)
-	local Controls = loadModule("Controls")(Bootstrap)
-	local WindowMod = loadModule("Window")(WindUI, Bootstrap, Controls, Notifications)
+	local Controls = loadModule("Controls")(Bootstrap, Motion, Text)
+	local WindowMod = loadModule("Window")(WindUI, Bootstrap, Controls, Notifications, Theme, Motion)
 	local Configs = loadModule("Configs")(Bootstrap)
 	local Tabs = loadModule("Tabs")()
+
+	pcall(function() Theme.register() end)
 
 	local STATE = {
 		tabCount = 0,
@@ -23,6 +28,7 @@ return function(loadModule, Core)
 		Version = Bootstrap.VERSION,
 		Engine = Bootstrap.ENGINE,
 		WindUI = WindUI,
+		Theme = Theme.NAME,
 	}
 
 	function Library:CreateWindow(settings)
@@ -50,7 +56,7 @@ return function(loadModule, Core)
 		info = type(info) == "table" and info or {}
 		return Notifications.push(
 			WindUI,
-			info.Title or info.Name or "Alleral",
+			Bootstrap.sanitize(info.Title or info.Name or "Alleral", 80),
 			info.Description or info.Content or info.Text or "",
 			info.Type or "info",
 			info.Duration or info.Lifetime or 4
@@ -66,24 +72,41 @@ return function(loadModule, Core)
 		Notifications.clear()
 	end
 
+	function Library:SetTheme(name)
+		pcall(function()
+			if WindUI.SetTheme then WindUI:SetTheme(Bootstrap.sanitize(name, 32)) end
+		end)
+	end
+
 	function Library:GetLayoutInfo()
 		return {
-			profile = "windui-v11",
+			profile = "windui-v11-premium",
 			engine = Bootstrap.ENGINE,
 			version = Bootstrap.VERSION,
 			stack = "WindUI",
+			theme = Theme.NAME,
 		}
 	end
 
-	function Library:OpenSearch() end
+	function Library:OpenSearch()
+		pcall(function()
+			if STATE.activeWindow and STATE.activeWindow._wind and STATE.activeWindow._wind.OpenSearch then
+				STATE.activeWindow._wind:OpenSearch()
+			end
+		end)
+	end
 
 	return {
 		Library = Library,
 		STATE = STATE,
 		Bootstrap = Bootstrap,
+		Text = Text,
+		Theme = Theme,
+		Motion = Motion,
 		Configs = Configs,
 		Tabs = Tabs,
 		WindUI = WindUI,
+		sanitize = Bootstrap.sanitize,
 		log = function(lvl, msg)
 			warn("[Alleral] [" .. tostring(lvl) .. "] " .. tostring(msg))
 		end,

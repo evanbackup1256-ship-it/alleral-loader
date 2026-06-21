@@ -1,14 +1,18 @@
--- Alleral V11 — WindUI window shell
-return function(WindUI, Bootstrap, Controls, Notifications)
+-- Alleral V11 — WindUI window shell (premium layout)
+return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion)
 	local WindowMod = {}
 
 	function WindowMod.create(settings, state)
 		settings = type(settings) == "table" and settings or {}
 		state = state or {}
 
-		local title = Bootstrap.safeText(settings.Title or settings.Name or "Alleral", 64)
+		local title = Bootstrap.sanitize(settings.Title or settings.Name or "Alleral", 64)
 		local keybind = settings.Keybind or Enum.KeyCode.RightShift
 		local folder = settings.ConfigFolder or Bootstrap.configFolder()
+
+		if Theme and Theme.register then
+			pcall(Theme.register)
+		end
 
 		local windWindow
 		local ok, err = pcall(function()
@@ -16,13 +20,18 @@ return function(WindUI, Bootstrap, Controls, Notifications)
 				Title = title,
 				Folder = folder,
 				Icon = "sparkles",
+				Theme = Theme and Theme.NAME or "Violet",
 				NewElements = true,
-				HideSearchBar = true,
+				HideSearchBar = false,
+				Transparent = true,
+				Acrylic = true,
+				Size = settings.Size or UDim2.fromOffset(1200, 740),
 				OpenButton = { Enabled = false },
 				Topbar = {
-					Height = 44,
+					Height = 48,
 					ButtonsType = "Mac",
 				},
+				SideBarWidth = 244,
 			})
 		end)
 		if not ok or not windWindow then
@@ -35,6 +44,16 @@ return function(WindUI, Bootstrap, Controls, Notifications)
 			end
 		end)
 
+		if Theme then
+			pcall(function() Theme.applyToWindow(windWindow) end)
+		end
+		if Motion then
+			pcall(function() Motion.openWindow(WindUI) end)
+		end
+		pcall(function()
+			if WindUI.ToggleAcrylic then WindUI:ToggleAcrylic(true) end
+		end)
+
 		local self = {
 			_wind = windWindow,
 			_windUI = WindUI,
@@ -45,6 +64,14 @@ return function(WindUI, Bootstrap, Controls, Notifications)
 			_settings = settings,
 			_gameId = Bootstrap.resolveGameId(),
 		}
+
+		function self:SetTheme(name)
+			pcall(function()
+				if WindUI.SetTheme then
+					WindUI:SetTheme(Bootstrap.sanitize(name, 32))
+				end
+			end)
+		end
 
 		function self:Hide()
 			self._hidden = true
@@ -70,6 +97,9 @@ return function(WindUI, Bootstrap, Controls, Notifications)
 					self._wind:SetVisible(true)
 				end
 			end)
+			if Motion then
+				pcall(function() Motion.openWindow(WindUI) end)
+			end
 		end
 
 		function self:Toggle()
@@ -87,7 +117,7 @@ return function(WindUI, Bootstrap, Controls, Notifications)
 		end
 
 		function self:AddTab(name, iconId, _columns)
-			name = Bootstrap.safeText(name, 48)
+			name = Bootstrap.sanitize(name, 48)
 			local icon = Bootstrap.mapIcon(iconId)
 
 			local windTab
@@ -95,14 +125,16 @@ return function(WindUI, Bootstrap, Controls, Notifications)
 				windTab = self._wind:Tab({
 					Title = name,
 					Icon = icon,
+					IconColor = Color3.fromHex("#8B5CF6"),
 					Border = true,
+					Desc = "",
+					FontWeight = "Medium",
 				})
 			end)
 			if not windTab then
 				return nil
 			end
 
-			local groupCount = 0
 			local tab = {
 				_windTab = windTab,
 				_window = self,
@@ -113,7 +145,6 @@ return function(WindUI, Bootstrap, Controls, Notifications)
 			}
 
 			function tab:AddLeftGroupbox(groupName)
-				groupCount = groupCount + 1
 				return Controls.createGroup(windTab, groupName)
 			end
 			tab.AddRightGroupbox = tab.AddLeftGroupbox
@@ -157,7 +188,6 @@ return function(WindUI, Bootstrap, Controls, Notifications)
 			return #self._tabs > 0
 		end
 
-		-- Close button hides, never destroys (WindUI Mac buttons)
 		pcall(function()
 			if self._wind.OnClose then
 				self._wind:OnClose(function()

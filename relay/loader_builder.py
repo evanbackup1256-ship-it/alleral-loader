@@ -28,6 +28,9 @@ LOADER_MODULES = (
     "hub/ui/windui/Controls.luau",
     "hub/ui/windui/Configs.luau",
     "hub/ui/windui/Notifications.luau",
+    "hub/ui/windui/Text.luau",
+    "hub/ui/windui/Theme.luau",
+    "hub/ui/windui/Motion.luau",
     "cfg/release.json",
 )
 

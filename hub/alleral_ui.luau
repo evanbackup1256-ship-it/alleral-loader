@@ -1,4 +1,4 @@
--- Alleral UI layer — v11.0.0 WindUI (sole framework)
+-- Alleral UI layer — v11.0.1 WindUI (sole framework)
 --[[
 	WindUI bootstrap — https://github.com/Footagesus/WindUI
 	No Noble, Fusion, Spr, Linoria, or legacy renderers.
@@ -10,8 +10,8 @@
 	  GITHUB_RAW remote fallback via Core.httpGet
 ]]
 return function(Core)
-	Core.ALLERAL_UI_VERSION = "11.0.0"
-	Core.UI_VERSION = "11.0.0"
+	Core.ALLERAL_UI_VERSION = "11.0.1"
+	Core.UI_VERSION = "11.0.1"
 	Core.UI_LIBRARY = "WindUI"
 
 	local GITHUB_RAW = "https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main"
@@ -25,7 +25,7 @@ return function(Core)
 	end)()
 
 	local getGenv = getgenv or function() return ENV end
-	local WINDUI_CACHE_VERSION = "11.0.0"
+	local WINDUI_CACHE_VERSION = "11.0.1"
 	getGenv()._NobleV8Modules = nil
 	getGenv()._NobleV8CacheVersion = nil
 	getGenv()._NobleV10Modules = nil
@@ -144,7 +144,19 @@ return function(Core)
 	local Library = windui.Library
 	local STATE = windui.STATE
 	local Bootstrap = windui.Bootstrap
-	local Util = { textOf = function(v) return v == nil and "" or tostring(v) end }
+	local sanitizeFn = windui.sanitize
+		or (Bootstrap and Bootstrap.sanitize)
+		or function(v, m)
+			if v == nil then return "" end
+			return tostring(v)
+		end
+
+	local Util = {
+		textOf = function(v, maxLen)
+			return sanitizeFn(v, maxLen or 240)
+		end,
+		sanitize = sanitizeFn,
+	}
 
 	local function log(lvl, msg)
 		if type(windui.log) == "function" then
@@ -154,9 +166,9 @@ return function(Core)
 		end
 	end
 
-	local function textOf(v)
+	local function textOf(v, maxLen)
 		if Util and type(Util.textOf) == "function" then
-			return Util.textOf(v)
+			return Util.textOf(v, maxLen)
 		end
 		if v == nil then return "" end
 		return tostring(v)
@@ -291,7 +303,7 @@ return function(Core)
 			if type(section.AddLabel) ~= "function" then
 				return { Set = function() end, SetText = function() end, SetVisible = function() end }
 			end
-			local t = type(st) == "table" and (st.Name or st.Text) or tostring(st or "")
+			local t = textOf(type(st) == "table" and (st.Name or st.Text) or st, 200)
 			local r = sc("CreateLabel", function()
 				return section:AddLabel(t)
 			end)
@@ -299,7 +311,7 @@ return function(Core)
 			return {
 				Set = function(_, ns)
 					if not r then return end
-					local nt = type(ns) == "table" and (ns.Name or ns.Text) or tostring(ns or "")
+					local nt = textOf(type(ns) == "table" and (ns.Name or ns.Text) or ns, 200)
 					if r.SetText then r.SetText(nil, nt) end
 					if r.Set then r.Set(nil, { Text = nt, Name = nt }) end
 				end,
@@ -321,7 +333,7 @@ return function(Core)
 			local fl = ni(st.Name, id)
 			local r = sc("Toggle:" .. tostring(st.Name), function()
 				return section:AddToggle(fl, {
-					Text = st.Name or st.Title or "Toggle",
+					Text = textOf(st.Name or st.Title or "Toggle", 80),
 					Default = cv == true,
 					Callback = st.Callback or function() end,
 				})
@@ -342,7 +354,7 @@ return function(Core)
 				table.insert(STATE.missingBindings, "Button:" .. tostring(st.Name or "?"))
 				return wc(function() end, {})
 			end
-			local nm = st.Name or st.Title or st.Text or "Button"
+			local nm = textOf(st.Name or st.Title or st.Text or "Button", 80)
 			local r = sc("Button:" .. nm, function()
 				return section:AddButton({ Text = nm, Func = st.Callback or function() end })
 			end)
@@ -361,11 +373,11 @@ return function(Core)
 			local cv = tonumber(st.Default) or tonumber(st.CurrentValue) or tonumber(st.Value) or rn[1]
 			local r = sc("Slider:" .. tostring(st.Name), function()
 				return section:AddSlider(fl, {
-					Text = st.Name or st.Title or "Slider",
+					Text = textOf(st.Name or st.Title or "Slider", 80),
 					Default = cv,
 					Min = rn[1] or 0,
 					Max = rn[2] or 100,
-					Suffix = st.Suffix or "",
+					Suffix = textOf(st.Suffix or "", 16),
 					Rounding = tonumber(st.Increment) or 1,
 					Callback = st.Callback or function() end,
 				})
@@ -389,9 +401,9 @@ return function(Core)
 			local cv = tostring(st.CurrentValue or st.Default or st.Value or "")
 			local r = sc("Input:" .. tostring(st.Name), function()
 				return section:AddInput(fl, {
-					Text = st.Name or st.Title or "Input",
-					Default = cv,
-					Placeholder = st.PlaceholderText or st.Placeholder or "Enter...",
+					Text = textOf(st.Name or st.Title or "Input", 80),
+					Default = textOf(cv, 120),
+					Placeholder = textOf(st.PlaceholderText or st.Placeholder or "Enter...", 80),
 					Callback = st.Callback or function() end,
 				})
 			end)
@@ -416,7 +428,7 @@ return function(Core)
 			local fl = ni(st.Name, id)
 			local r = sc("Dropdown:" .. tostring(st.Name), function()
 				return section:AddDropdown(fl, {
-					Text = st.Name or st.Title or "Dropdown",
+					Text = textOf(st.Name or st.Title or "Dropdown", 80),
 					Values = op,
 					Default = mu and (type(cu) == "table" and cu[1] or cu) or (type(cu) == "table" and cu[1] or cu or op[1] or ""),
 					Multi = mu,
@@ -728,6 +740,13 @@ return function(Core)
 			end
 			return false
 		end
+		function w:SetTheme(name)
+			if rw and type(rw.SetTheme) == "function" then
+				pcall(function() rw:SetTheme(name) end)
+			elseif lib and type(lib.SetTheme) == "function" then
+				pcall(function() lib:SetTheme(name) end)
+			end
+		end
 		ENV.Alleral_UiWindow = w
 		if type(Core.registerUiWindow) == "function" then
 			Core.registerUiWindow(w)
@@ -925,5 +944,5 @@ return function(Core)
 	Core._NobleV10 = nil
 	Core._NobleV8 = nil
 
-	log("INFO", "Alleral WindUI v11.0.0 — sole UI framework loaded")
+	log("INFO", "Alleral WindUI v11.0.1 — sole UI framework loaded")
 end
