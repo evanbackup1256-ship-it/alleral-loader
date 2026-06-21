@@ -1,4 +1,4 @@
--- Alleral UI layer — v7.5.0 NobleX Enhanced (Linoria-compatible bootstrap)
+-- Alleral UI layer — v7.5.1 NobleX Enhanced (Linoria-compatible bootstrap)
 --[[
 	PREMIUM DASHBOARD RENDERER — Spring animations, 8px grid, layered shadows, glass surfaces.
 	
@@ -14,7 +14,7 @@
 ]]
 
 return function(Core)
-	Core.ALLERAL_UI_VERSION = "7.5.0"
+	Core.ALLERAL_UI_VERSION = "7.5.1"
 	Core.UI_VERSION = Core.ALLERAL_UI_VERSION
 	Core.UI_LIBRARY = "NobleX"
 
@@ -27,7 +27,7 @@ return function(Core)
 
 	-- 8px design grid. All spacing multiples of 8 for perfect rhythm.
 	local C = {
-		VERSION = "7.5.0",
+		VERSION = "7.5.1",
 		GRID = 8,
 		S = {8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96},
 		WINDOW = { RADIUS = 24, SHADOW = 120 },
@@ -1222,7 +1222,7 @@ return function(Core)
 		cl:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(debouncedUpdateSize)
 
 		-- Reactive width: if parent column changes size, adapt (huge for robustness)
-		if parent and parent:GetPropertyChangedSignal then
+		if parent and parent.GetPropertyChangedSignal then
 			parent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 				local newW = parent.AbsoluteSize.X
 				if newW > 80 then

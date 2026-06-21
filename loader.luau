@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.12.1"
+local LOADER_VERSION = "8.12.2"
 local BOOTSTRAP_VERSION = "2.1.0"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
@@ -26,7 +26,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.12.1",
+	loader = "8.12.2",
 	core = "2.9.10",
 	ui = "Linoria",
 	uiVersion = "5.1.0",
@@ -1718,10 +1718,7 @@ local function alleralUiValid(src)
 	if not src:find("Linoria", 1, true) then
 		return false
 	end
-	if compileCoreSource(src, "Alleral/alleral_ui") then
-		return true
-	end
-	return looksLikeLua(src)
+	return compileCoreSource(src, "Alleral/alleral_ui")
 end
 
 local function coreValid(src)
