@@ -502,10 +502,8 @@ return function(Core)
 		STATE.windowCount = STATE.windowCount + 1
 		local uid = STATE.windowCount
 
-		local screen = make("ScreenGui", { Name = "AlleralUI_" .. uid, ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 100 })
-		local bg = make("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = C.COLOR.BG0, BackgroundTransparency = 0.4, Visible = true, ZIndex = 0, Parent = screen })
+		local screen = make("ScreenGui", { Name = "AlleralUI_" .. uid, ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 100, Parent = (CoreGui:FindFirstChild("RobloxGui") or CoreGui) })
 		local winSize = settings.Size or UDim2.fromOffset(C.WINDOW.W, C.WINDOW.H)
-		screen.Parent = CoreGui:FindFirstChild("RobloxGui") or CoreGui
 
 		local main = make("Frame", {
 			Size = winSize, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
@@ -557,8 +555,9 @@ return function(Core)
 		local sbList = make("UIListLayout", { Padding = UDim.new(0, 2), SortOrder = Enum.SortOrder.LayoutOrder, Parent = sidebar })
 		padding(sidebar, 6, 6, 6, 6)
 
-		-- Content area
-		local contentArea = make("Frame", { Size = UDim2.new(1, -C.SIDEBAR.W, 1, -C.HEADER.H), Position = UDim2.new(0, C.SIDEBAR.W, 0, C.HEADER.H), BackgroundColor3 = C.COLOR.BG1, BorderSizePixel = 0, ZIndex = 0, Parent = main })
+		-- Content area (below header, above footer)
+		local contentH = C.HEADER.H + C.FOOTER.H
+		local contentArea = make("Frame", { Size = UDim2.new(1, -C.SIDEBAR.W, 1, -contentH), Position = UDim2.new(0, C.SIDEBAR.W, 0, C.HEADER.H), BackgroundColor3 = C.COLOR.BG1, BorderSizePixel = 0, ZIndex = 0, Parent = main })
 
 		-- Footer
 		local footer = make("Frame", { Size = UDim2.new(1, -C.SIDEBAR.W, 0, C.FOOTER.H), Position = UDim2.new(0, C.SIDEBAR.W, 1, -C.FOOTER.H), BackgroundColor3 = C.COLOR.BG0, BorderSizePixel = 0, ZIndex = 2, Parent = main })
@@ -574,9 +573,6 @@ return function(Core)
 			Font = C.FONT, TextSize = C.TEXT_SM - 1, TextXAlignment = Enum.TextXAlignment.Right,
 			TextYAlignment = Enum.TextYAlignment.Center, ZIndex = 3, Parent = footer,
 		})
-		-- Resize content area for footer
-		contentArea.Size = UDim2.new(1, -C.SIDEBAR.W, 1, -C.HEADER.H - C.FOOTER.H)
-
 		-- Tab system
 		local tabs = {}; local activeTab = nil
 		local function selectTab(tab)
@@ -757,9 +753,9 @@ return function(Core)
 
 		-- Keybind + show/hide api
 		setupKeybind(win)
-		window.Hide = function() win:Hide() end
-		window.Show = function() win:Show() end
-		window.Toggle = function() win:Toggle() end
+		window.Hide = function() if win then win:Hide() end end
+		window.Show = function() if win then win:Show() end end
+		window.Toggle = function() if win then win:Toggle() else if ENV.Alleral_UiWindow and type(ENV.Alleral_UiWindow.Toggle) == "function" then ENV.Alleral_UiWindow:Toggle() end end end
 
 		ENV.Alleral_UiWindow = window
 		return window
