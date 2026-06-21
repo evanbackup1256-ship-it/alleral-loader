@@ -13,7 +13,7 @@ from typing import Any
 
 BOM = b"\xef\xbb\xbf"
 
-# Core boot chain + Linoria UI runtime
+# Core boot chain + WindUI runtime
 LOADER_MODULES = (
     "bootstrap.luau",
     "loader.luau",
@@ -21,17 +21,13 @@ LOADER_MODULES = (
     "hub/core_ui.luau",
     "hub/alleral_ui.luau",
     "hub/core_hub_ui.luau",
-    "hub/ui/noble/init.luau",
-    "hub/ui/noble/Theme.luau",
-    "hub/ui/noble/Util.luau",
-    "hub/ui/noble/Fusion.luau",
-    "hub/ui/noble/Components.luau",
-    "hub/ui/noble/Vendor/Spr.luau",
-    "hub/ui/noble/Vendor/Janitor.luau",
-    "hub/ui/noble/Vendor/Signal.luau",
-    "hub/ui/noble/Systems/Window.luau",
-    "hub/ui/noble/Systems/Search.luau",
-    "hub/ui/noble/Systems/NotificationManager.luau",
+    "hub/ui/windui/Init.luau",
+    "hub/ui/windui/Bootstrap.luau",
+    "hub/ui/windui/Window.luau",
+    "hub/ui/windui/Tabs.luau",
+    "hub/ui/windui/Controls.luau",
+    "hub/ui/windui/Configs.luau",
+    "hub/ui/windui/Notifications.luau",
     "cfg/release.json",
 )
 
