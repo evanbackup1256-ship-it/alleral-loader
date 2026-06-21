@@ -43,20 +43,36 @@ export function SupportForm() {
 
   if (done) {
     return (
-      <div className="glass-premium rounded-2xl p-8 text-center">
-        <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-5">
-          <CheckCircle className="h-8 w-8 text-accent" />
+      <div className="surface-card p-8 text-center">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-violet/10">
+          <CheckCircle className="h-8 w-8 text-violet-bright" />
         </div>
-        <h3 className="text-xl font-bold text-text mb-2">Ticket created</h3>
-        <p className="text-muted text-sm mb-5">We&apos;ll get back to you on Discord.</p>
-        <div className="glass-premium rounded-xl p-4 inline-block mb-5">
-          <code className="font-mono text-lg text-accent-bright">{ticketId}</code>
+        <h3 className="text-xl font-bold text-text-strong">Ticket created</h3>
+        <p className="mb-5 mt-2 text-sm text-muted">We&apos;ll get back to you on Discord.</p>
+        <div className="surface-card mb-5 inline-block px-5 py-3">
+          <code className="font-mono text-lg text-cyan-bright">{ticketId}</code>
         </div>
         <div className="flex justify-center gap-3">
-          <button className="btn btn-primary" onClick={copyId}>
-            {copied ? "Copied" : <><Copy className="h-4 w-4" /> Copy ID</>}
+          <button type="button" className="btn btn-primary" onClick={copyId}>
+            {copied ? "Copied" : (
+              <>
+                <Copy className="h-4 w-4" /> Copy ID
+              </>
+            )}
           </button>
-          <button className="btn btn-ghost" onClick={() => { setDone(false); setName(""); setEmail(""); setDiscord(""); setRoblox(""); setIssueType("Bug Report"); setMessage(""); }}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              setDone(false);
+              setName("");
+              setEmail("");
+              setDiscord("");
+              setRoblox("");
+              setIssueType("Bug Report");
+              setMessage("");
+            }}
+          >
             New ticket
           </button>
         </div>
@@ -65,53 +81,61 @@ export function SupportForm() {
   }
 
   return (
-    <form onSubmit={submit} className="glass-premium rounded-2xl p-6 md:p-8">
-      <div className="grid gap-4 md:grid-cols-2 mb-4">
+    <form onSubmit={submit} className="surface-card p-6 md:p-8">
+      <div className="mb-4 grid gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-xs font-mono text-muted-2 uppercase tracking-wider mb-1.5">Name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-bg-0/80 px-4 py-2.5 text-sm text-text outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/20" />
+          <label className="mb-1.5 block font-mono text-xs uppercase tracking-wider text-muted-2">Name</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} className="input-field" />
         </div>
         <div>
-          <label className="block text-xs font-mono text-muted-2 uppercase tracking-wider mb-1.5">Email</label>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email"
-            className="w-full rounded-lg border border-white/10 bg-bg-0/80 px-4 py-2.5 text-sm text-text outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/20" />
+          <label className="mb-1.5 block font-mono text-xs uppercase tracking-wider text-muted-2">Email</label>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" className="input-field" />
         </div>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 mb-4">
+      <div className="mb-4 grid gap-4 md:grid-cols-2">
         <div>
-          <label className="block text-xs font-mono text-muted-2 uppercase tracking-wider mb-1.5">Discord</label>
-          <input value={discord} onChange={(e) => setDiscord(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-bg-0/80 px-4 py-2.5 text-sm text-text outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/20" />
+          <label className="mb-1.5 block font-mono text-xs uppercase tracking-wider text-muted-2">Discord</label>
+          <input value={discord} onChange={(e) => setDiscord(e.target.value)} className="input-field" />
         </div>
         <div>
-          <label className="block text-xs font-mono text-muted-2 uppercase tracking-wider mb-1.5">Roblox Username</label>
-          <input value={roblox} onChange={(e) => setRoblox(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-bg-0/80 px-4 py-2.5 text-sm text-text outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/20" />
+          <label className="mb-1.5 block font-mono text-xs uppercase tracking-wider text-muted-2">Roblox Username</label>
+          <input value={roblox} onChange={(e) => setRoblox(e.target.value)} className="input-field" />
         </div>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 mb-4">
+      <div className="mb-4 grid gap-4 md:grid-cols-2">
         <SupportSelect value={issueType} onChange={setIssueType} label="Issue Type" />
         <div>
-          <label className="block text-xs font-mono text-muted-2 uppercase tracking-wider mb-1.5">Game / Script</label>
-          <input className="w-full rounded-lg border border-white/10 bg-bg-0/80 px-4 py-2.5 text-sm text-text outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/20" />
+          <label className="mb-1.5 block font-mono text-xs uppercase tracking-wider text-muted-2">Game / Script</label>
+          <input className="input-field" />
         </div>
       </div>
       <div className="mb-4">
-        <label className="block text-xs font-mono text-muted-2 uppercase tracking-wider mb-1.5">Message</label>
-        <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4}
-          className="w-full rounded-lg border border-white/10 bg-bg-0/80 px-4 py-2.5 text-sm text-text outline-none transition focus:border-accent/40 focus:ring-1 focus:ring-accent/20 resize-none" />
+        <label className="mb-1.5 block font-mono text-xs uppercase tracking-wider text-muted-2">Message</label>
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={4}
+          className="input-field resize-none"
+        />
       </div>
 
-      {err && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg bg-red/10 border border-red/20 px-4 py-3">
-          <AlertTriangle className="h-4 w-4 text-red shrink-0" />
+      {err ? (
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-red/20 bg-red/10 px-4 py-3">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-red" />
           <p className="text-xs text-red/90">{err}</p>
         </div>
-      )}
+      ) : null}
 
       <button type="submit" className="btn btn-primary w-full" disabled={sending}>
-        {sending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</> : <><Send className="h-4 w-4" /> Submit <ArrowRight className="h-4 w-4" /></>}
+        {sending ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" /> Sending...
+          </>
+        ) : (
+          <>
+            <Send className="h-4 w-4" /> Submit <ArrowRight className="h-4 w-4" />
+          </>
+        )}
       </button>
     </form>
   );
