@@ -1,4 +1,4 @@
--- Alleral UI layer — v11.5.0 WindUI (sole framework)
+-- Alleral UI layer — v11.6.0 WindUI (sole framework)
 --[[
 	WindUI bootstrap — https://github.com/Footagesus/WindUI
 	No Noble, Fusion, Spr, Linoria, or legacy renderers.
@@ -10,8 +10,8 @@
 	  GITHUB_RAW remote fallback via Core.httpGet
 ]]
 return function(Core)
-	Core.ALLERAL_UI_VERSION = "11.5.0"
-	Core.UI_VERSION = "11.5.0"
+	Core.ALLERAL_UI_VERSION = "11.6.0"
+	Core.UI_VERSION = "11.6.0"
 	Core.UI_LIBRARY = "WindUI"
 
 	local GITHUB_RAW = "https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main"
@@ -25,7 +25,7 @@ return function(Core)
 	end)()
 
 	local getGenv = getgenv or function() return ENV end
-	local WINDUI_CACHE_VERSION = "11.5.0"
+	local WINDUI_CACHE_VERSION = "11.6.0"
 	getGenv()._NobleV8Modules = nil
 	getGenv()._NobleV8CacheVersion = nil
 	getGenv()._NobleV10Modules = nil
@@ -1010,5 +1010,5 @@ return function(Core)
 	Core._NobleV10 = nil
 	Core._NobleV8 = nil
 
-	log("INFO", "Alleral WindUI v11.5.0 — sole UI framework loaded")
+	log("INFO", "Alleral WindUI v11.6.0 — sole UI framework loaded")
 end

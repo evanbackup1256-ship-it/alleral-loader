@@ -1,9 +1,9 @@
--- Alleral V11.5 — WindUI loader (sole UI framework)
+-- Alleral V11.6 — WindUI loader (sole UI framework)
 local WINDUI_DIST = "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
 
 return function(Core, Text, GameRegistry)
 	local Bootstrap = {}
-	Bootstrap.VERSION = "11.5.0"
+	Bootstrap.VERSION = "11.6.0"
 	Bootstrap.ENGINE = "WindUI"
 	Text = Text or { sanitize = function(v, m) return tostring(v or "") end }
 	GameRegistry = GameRegistry or {}

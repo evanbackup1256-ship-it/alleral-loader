@@ -1,8 +1,6 @@
--- Alleral V11.5 — ambient window polish (border glow, sidebar accent, depth layers)
+-- Alleral V11.6 — window frame polish (no backdrop overflow)
 return function(Theme)
 	local VisualPolish = {}
-	local TweenService = game:GetService("TweenService")
-
 	local bound = {}
 
 	local function colors()
@@ -10,10 +8,9 @@ return function(Theme)
 			return Theme.colors()
 		end
 		return {
-			Accent = "#8B5CF6",
-			Cyan = "#22D3EE",
-			Glow = "#6366F1",
-			Background = "#030508",
+			Accent = "#7C3AED",
+			Cyan = "#06B6D4",
+			Background = "#020308",
 		}
 	end
 
@@ -32,82 +29,50 @@ return function(Theme)
 	local function ensureCorner(frame, radius)
 		local corner = frame:FindFirstChild("AlleralCorner")
 		if corner and corner:IsA("UICorner") then
+			corner.CornerRadius = UDim.new(0, radius or 14)
 			return corner
 		end
 		corner = Instance.new("UICorner")
 		corner.Name = "AlleralCorner"
-		corner.CornerRadius = UDim.new(0, radius or 10)
+		corner.CornerRadius = UDim.new(0, radius or 14)
 		corner.Parent = frame
 		return corner
 	end
 
-	local function addAmbientGlow(root, C)
-		if root:FindFirstChild("AlleralAmbientGlow") then
-			return
+	local function removeOverflowLayers(root)
+		local glow = root:FindFirstChild("AlleralAmbientGlow")
+		if glow then
+			glow:Destroy()
 		end
-		local glow = Instance.new("Frame")
-		glow.Name = "AlleralAmbientGlow"
-		glow.AnchorPoint = Vector2.new(0.5, 0.5)
-		glow.Position = UDim2.fromScale(0.5, 0.5)
-		glow.Size = UDim2.new(1, 48, 1, 48)
-		glow.BackgroundColor3 = hex(C.Glow)
-		glow.BackgroundTransparency = 0.82
-		glow.BorderSizePixel = 0
-		glow.ZIndex = math.max(0, (root.ZIndex or 1) - 2)
-		glow.Parent = root
-
-		local grad = Instance.new("UIGradient")
-		grad.Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, hex(C.Accent)),
-			ColorSequenceKeypoint.new(0.5, hex(C.Glow)),
-			ColorSequenceKeypoint.new(1, hex(C.Cyan)),
-		})
-		grad.Rotation = 135
-		grad.Parent = glow
-
-		ensureCorner(glow, 14)
-
-		local pulse = TweenService:Create(
-			glow,
-			TweenInfo.new(3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-			{ BackgroundTransparency = 0.9 }
-		)
-		pulse:Play()
+		local sheen = root:FindFirstChild("AlleralContentSheen", true)
+		if sheen then
+			sheen:Destroy()
+		end
 	end
 
 	local function addWindowBorder(root, C)
-		if root:FindFirstChild("AlleralWindowBorder") then
-			return
+		local stroke = root:FindFirstChild("AlleralWindowBorder")
+		if not stroke or not stroke:IsA("UIStroke") then
+			stroke = Instance.new("UIStroke")
+			stroke.Name = "AlleralWindowBorder"
+			stroke.Parent = root
 		end
-		local stroke = Instance.new("UIStroke")
-		stroke.Name = "AlleralWindowBorder"
 		stroke.Color = hex(C.Accent)
-		stroke.Thickness = 1.4
-		stroke.Transparency = 0.55
+		stroke.Thickness = 1
+		stroke.Transparency = 0.62
 		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		stroke.LineJoinMode = Enum.LineJoinMode.Round
-		stroke.Parent = root
-
-		local shimmer = TweenService:Create(
-			stroke,
-			TweenInfo.new(2.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-			{
-				Transparency = 0.72,
-				Color = hex(C.Cyan),
-			}
-		)
-		shimmer:Play()
 	end
 
 	local function addSidebarAccent(root, C)
-		if root:FindFirstChild("AlleralSidebarAccent") then
+		if root:FindFirstChild("AlleralSidebarAccent", true) then
 			return
 		end
 		local sidebar
 		for _, desc in ipairs(root:GetDescendants()) do
 			if desc:IsA("GuiObject") then
 				local name = desc.Name:lower()
-				if name:find("sidebar", 1, true) or name:find("side bar", 1, true) then
+				if name:find("sidebar", 1, true) or name == "side" then
 					sidebar = desc
 					break
 				end
@@ -120,10 +85,10 @@ return function(Theme)
 		local accent = Instance.new("Frame")
 		accent.Name = "AlleralSidebarAccent"
 		accent.AnchorPoint = Vector2.new(1, 0)
-		accent.Position = UDim2.new(1, 0, 0, 12)
-		accent.Size = UDim2.new(0, 2, 1, -24)
-		accent.BackgroundColor3 = hex(C.Accent)
-		accent.BackgroundTransparency = 0.35
+		accent.Position = UDim2.new(1, -1, 0, 8)
+		accent.Size = UDim2.new(0, 1, 1, -16)
+		accent.BackgroundColor3 = hex(C.Cyan)
+		accent.BackgroundTransparency = 0.55
 		accent.BorderSizePixel = 0
 		accent.ZIndex = (sidebar.ZIndex or 1) + 2
 		accent.Parent = sidebar
@@ -132,50 +97,30 @@ return function(Theme)
 		grad.Color = ColorSequence.new({
 			ColorSequenceKeypoint.new(0, hex(C.Cyan)),
 			ColorSequenceKeypoint.new(0.5, hex(C.Accent)),
-			ColorSequenceKeypoint.new(1, hex(C.Glow)),
+			ColorSequenceKeypoint.new(1, hex(C.Accent)),
 		})
 		grad.Rotation = 90
 		grad.Parent = accent
-
-		ensureCorner(accent, 2)
 	end
 
-	local function addContentSheen(root, C)
-		if root:FindFirstChild("AlleralContentSheen") then
-			return
-		end
-		local panel
+	local function solidifyPanels(root, C)
 		for _, desc in ipairs(root:GetDescendants()) do
-			if desc:IsA("GuiObject") then
+			if desc:IsA("Frame") or desc:IsA("ImageLabel") then
 				local name = desc.Name:lower()
-				if name:find("content", 1, true) or name:find("mainpanel", 1, true) or name:find("tabcontent", 1, true) then
-					panel = desc
-					break
+				if name:find("background", 1, true)
+					or name:find("panel", 1, true)
+					or name == "main"
+					or name:find("window", 1, true) then
+					if desc.BackgroundTransparency > 0.35 then
+						desc.BackgroundTransparency = math.min(desc.BackgroundTransparency, 0.12)
+					end
+					if desc.BackgroundTransparency > 0.08 and desc.BackgroundTransparency <= 0.35 then
+						desc.BackgroundColor3 = hex(C.Panel)
+						desc.BackgroundTransparency = 0.04
+					end
 				end
 			end
 		end
-		if not panel then
-			panel = root
-		end
-
-		local sheen = Instance.new("Frame")
-		sheen.Name = "AlleralContentSheen"
-		sheen.AnchorPoint = Vector2.new(0.5, 0)
-		sheen.Position = UDim2.fromScale(0.5, 0)
-		sheen.Size = UDim2.new(1, 0, 0, 120)
-		sheen.BackgroundColor3 = hex(C.Cyan)
-		sheen.BackgroundTransparency = 0.94
-		sheen.BorderSizePixel = 0
-		sheen.ZIndex = (panel.ZIndex or 1) + 1
-		sheen.Parent = panel
-
-		local grad = Instance.new("UIGradient")
-		grad.Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.2),
-			NumberSequenceKeypoint.new(1, 1),
-		})
-		grad.Rotation = 90
-		grad.Parent = sheen
 	end
 
 	local function applyLayers(windWindow)
@@ -184,11 +129,12 @@ return function(Theme)
 			return false
 		end
 		local C = colors()
-		pcall(function() addAmbientGlow(root, C) end)
-		pcall(function() addWindowBorder(root, C) end)
-		pcall(function() addSidebarAccent(root, C) end)
-		pcall(function() addContentSheen(root, C) end)
-		ensureCorner(root, 10)
+		pcall(removeOverflowLayers, root)
+		pcall(solidifyPanels, root, C)
+		pcall(addWindowBorder, root, C)
+		pcall(addSidebarAccent, root, C)
+		ensureCorner(root, 14)
+		root.ClipsDescendants = true
 		return true
 	end
 
@@ -204,7 +150,7 @@ return function(Theme)
 					pcall(function()
 						local Log = getgenv and getgenv().Alleral_Log
 						if Log and Log.info then
-							Log.info("Visual polish active (aurora glass)")
+							Log.info("Visual polish active (EXE-6 frame, no backdrop overflow)")
 						end
 					end)
 					return

@@ -1,4 +1,4 @@
--- Alleral V11.5 — window motion (UIScale + single CanvasGroup fade)
+-- Alleral V11.6 — window motion (UIScale + light fade)
 return function()
 	local Motion = {}
 	local TweenService = game:GetService("TweenService")
@@ -7,8 +7,8 @@ return function()
 	local CLOSE_DURATION = 0.16
 	local OPEN_SCALE = 0.92
 	local CLOSE_SCALE = 0.95
-	local OPEN_FADE = 0.18
-	local CLOSE_FADE = 0.14
+	local OPEN_FADE = 0.08
+	local CLOSE_FADE = 0.06
 
 	local activeTweens = {}
 	local windowAnimating = false

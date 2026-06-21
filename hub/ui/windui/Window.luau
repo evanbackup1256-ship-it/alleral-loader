@@ -1,5 +1,5 @@
--- Alleral V11.5 — WindUI window (aurora glass polish, search glow, no tooltips)
-return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, _TooltipManager, Cache, Patch, SearchGlow, VisualPolish)
+-- Alleral V11.6 — WindUI window (EXE-6 polish, 1080p fit, no tooltips)
+return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, _TooltipManager, Cache, Patch, SearchGlow, VisualPolish, ElementPolish)
 	local WindowMod = {}
 
 	local STATES = {
@@ -40,15 +40,15 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			Theme = Theme and Theme.NAME or "Dark",
 			NewElements = true,
 			HideSearchBar = false,
-			Transparent = settings.Transparent ~= false,
+			Transparent = false,
 			Acrylic = false,
-			Size = settings.Size or UDim2.fromOffset(1240, 720),
+			Size = settings.Size or UDim2.fromOffset(1080, 620),
 			OpenButton = { Enabled = false },
 			Topbar = {
-				Height = 52,
+				Height = 48,
 				ButtonsType = "Mac",
 			},
-			SideBarWidth = settings.SideBarWidth or 248,
+			SideBarWidth = settings.SideBarWidth or 228,
 		}
 		if type(windowConfig) ~= "table" then
 			error("[WindUI] windowConfig missing")
@@ -338,6 +338,9 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 		end
 		if VisualPolish and VisualPolish.bind then
 			pcall(VisualPolish.bind, windWindow)
+		end
+		if ElementPolish and ElementPolish.bind then
+			pcall(ElementPolish.bind, windWindow)
 		end
 
 		if Cache then

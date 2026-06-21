@@ -1,4 +1,4 @@
--- Alleral V11.5 — WindUI framework entry (sole UI stack)
+-- Alleral V11.6 — WindUI framework entry (sole UI stack)
 return function(loadModule, Core)
 	local Text = loadModule("Text")()
 	local Guards = loadModule("Guards")()
@@ -12,11 +12,12 @@ return function(loadModule, Core)
 	local TooltipManager = loadModule("TooltipManager")()
 	local SearchGlow = loadModule("SearchGlow")(Theme)
 	local VisualPolish = loadModule("VisualPolish")(Theme)
+	local ElementPolish = loadModule("ElementPolish")(Theme, Motion)
 	local Drag = loadModule("Drag")(Motion, TooltipManager)
 	local Validate = loadModule("Validate")(Bootstrap, GameRegistry)
 	local Notifications = loadModule("Notifications")(WindUI, Bootstrap)
 	local Controls = loadModule("Controls")(Bootstrap, Motion, Text, Guards, TooltipManager, Theme)
-	local WindowMod = loadModule("Window")(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, TooltipManager, Cache, Patch, SearchGlow, VisualPolish)
+	local WindowMod = loadModule("Window")(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, TooltipManager, Cache, Patch, SearchGlow, VisualPolish, ElementPolish)
 	local Configs = loadModule("Configs")(Bootstrap, GameRegistry)
 	local Tabs = loadModule("Tabs")(GameRegistry, Cache)
 
@@ -136,7 +137,7 @@ return function(loadModule, Core)
 
 	function Library:GetLayoutInfo()
 		return {
-			profile = "windui-v11.5-aurora",
+			profile = "windui-v11.6-exe6",
 			engine = Bootstrap.ENGINE,
 			version = Bootstrap.VERSION,
 			stack = "WindUI",
