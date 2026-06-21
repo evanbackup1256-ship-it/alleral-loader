@@ -25,7 +25,7 @@ return function(Core)
 	end)()
 
 	local getGenv = getgenv or function() return ENV end
-	local WINDUI_CACHE_VERSION = "11.5.0"
+	local WINDUI_CACHE_VERSION = "11.5.0-c3e9ff9"
 	getGenv()._NobleV8Modules = nil
 	getGenv()._NobleV8CacheVersion = nil
 	getGenv()._NobleV10Modules = nil
