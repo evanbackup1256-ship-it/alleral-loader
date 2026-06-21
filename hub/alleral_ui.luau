@@ -1,21 +1,20 @@
--- Alleral UI layer — v8.0.2 Noble V8 (Fusion + Spr + Janitor + Signal)
+-- Alleral UI layer — v10.0.0 Noble V10 (Fusion + Spr + Janitor + Signal)
 --[[
-	Noble V8 bootstrap — Linoria-compatible bootstrap for loader/verify scripts.
-	Fusion reactive state, Spr spring motion, Janitor lifecycle, Signal events.
-	No TweenService; all motion via Spr.target / Spr.stop.
+	Noble V10 bootstrap — Linoria-compatible bootstrap for loader/verify scripts.
+	Premium EXE-6 inspired desktop UI. Single framework — no legacy renderers.
 
 	Module roots (resolved in order):
-	  hub/ui/noble/{path}.luau
-	  kick/hub/ui/noble/{path}.luau
-	  .alleral/cache/hub/ui/noble/{path}.luau
+	  hub/ui/noblev10/{path}.luau
+	  kick/hub/ui/noblev10/{path}.luau
+	  .alleral/cache/hub/ui/noblev10/{path}.luau
 	  GITHUB_RAW remote fallback via Core.httpGet
 
-	Linoria CDN shim (compat only — Noble V8 is the active renderer):
+	Linoria CDN shim (compat only — Noble V10 is the active renderer):
 	  https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/
 ]]
 return function(Core)
-	Core.ALLERAL_UI_VERSION = "8.0.2"
-	Core.UI_VERSION = "8.0.2"
+	Core.ALLERAL_UI_VERSION = "10.0.0"
+	Core.UI_VERSION = "10.0.0"
 	Core.UI_LIBRARY = "Linoria"
 
 	local GITHUB_RAW = "https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main"
@@ -30,15 +29,17 @@ return function(Core)
 	end)()
 
 	local getGenv = getgenv or function() return ENV end
-	local NOBLE_CACHE_VERSION = "8.0.2"
-	if getGenv()._NobleV8CacheVersion ~= NOBLE_CACHE_VERSION then
-		getGenv()._NobleV8Modules = nil
-		getGenv()._NobleV8CacheVersion = NOBLE_CACHE_VERSION
+	local NOBLE_CACHE_VERSION = "10.0.0"
+	getGenv()._NobleV8Modules = nil
+	getGenv()._NobleV8CacheVersion = nil
+	if getGenv()._NobleV10CacheVersion ~= NOBLE_CACHE_VERSION then
+		getGenv()._NobleV10Modules = nil
+		getGenv()._NobleV10CacheVersion = NOBLE_CACHE_VERSION
 	end
-	local moduleCache = getGenv()._NobleV8Modules
+	local moduleCache = getGenv()._NobleV10Modules
 	if type(moduleCache) ~= "table" then
 		moduleCache = {}
-		getGenv()._NobleV8Modules = moduleCache
+		getGenv()._NobleV10Modules = moduleCache
 	end
 
 	-- ========== LINORIA COMPAT SHIM ==========
@@ -58,7 +59,7 @@ return function(Core)
 
 	Core.loadLinoriaSource = Core.loadLinoriaSource or loadLinoriaSource
 
-	-- ========== NOBLE V8 MODULE LOADER ==========
+	-- ========== NOBLE V10 MODULE LOADER ==========
 	local function resolveReadfile()
 		if Core and type(Core.execFunction) == "function" then
 			local rf = Core.execFunction("readfile")
@@ -78,7 +79,7 @@ return function(Core)
 	end
 
 	local function modulePaths(path)
-		local rel = "hub/ui/noble/" .. path .. ".luau"
+		local rel = "hub/ui/noblev10/" .. path .. ".luau"
 		return {
 			rel,
 			"kick/" .. rel,
@@ -104,7 +105,7 @@ return function(Core)
 			end
 		end
 
-		local remote = GITHUB_RAW .. "/hub/ui/noble/" .. path .. ".luau"
+		local remote = GITHUB_RAW .. "/hub/ui/noblev10/" .. path .. ".luau"
 		if Core and type(Core.httpGet) == "function" then
 			local ok, src = pcall(Core.httpGet, remote)
 			if ok and type(src) == "string" and #src > 32 then
@@ -132,7 +133,7 @@ return function(Core)
 		if type(loadFn) ~= "function" then
 			error("loadstring unavailable for Noble module: " .. tostring(path))
 		end
-		local chunkName = "@NobleV8/" .. tostring(path)
+		local chunkName = "@NobleV10/" .. tostring(path)
 		local chunk, compileErr = loadFn(src, chunkName)
 		if not chunk then
 			error("[" .. chunkName .. "] " .. tostring(compileErr))
@@ -145,10 +146,10 @@ return function(Core)
 		return result
 	end
 
-	-- Bootstrap Noble framework (init.luau returns factory(loadModule))
-	local nobleFactory = loadModule("init")
+	-- Bootstrap Noble V10 framework (Init.luau returns factory(loadModule))
+	local nobleFactory = loadModule("Init")
 	if type(nobleFactory) ~= "function" then
-		error("Noble init.luau must return function(loadModule)")
+		error("Noble Init.luau must return function(loadModule)")
 	end
 	local noble = nobleFactory(loadModule)
 	if type(noble) ~= "table" then
@@ -703,7 +704,7 @@ return function(Core)
 		function tab:BuildThemeGroupbox(col)
 			local g2 = Core.buildUiGroup(tab, "Appearance", col or 1)
 			if g2 and type(g2.CreateLabel) == "function" then
-				g2:CreateLabel("Alleral Noble Engine v8")
+				g2:CreateLabel("Alleral Noble Engine v10")
 			end
 			return g2
 		end
@@ -803,7 +804,7 @@ return function(Core)
 		if options.notify ~= false and type(Core.notifyBootReady) == "function" then
 			Core.notifyBootReady({ Name = options.Name or "Alleral", Subtitle = options.Subtitle })
 		end
-		log("INFO", "=== Noble Engine v" .. (Theme and Theme.VERSION or "8.0.0") .. " ===")
+		log("INFO", "=== Alleral Noble v" .. (Theme and Theme.VERSION or "10.0.0") .. " ===")
 		log("INFO", "Tabs: " .. tostring(STATE.tabCount or 0) .. " | Groups: " .. tostring(STATE.groupCount or 0) .. " | Controls: " .. tostring(STATE.controls or 0))
 		if type(STATE.missingBindings) == "table" and #STATE.missingBindings > 0 then
 			log("WARN", "Missing bindings: " .. #STATE.missingBindings)
@@ -935,8 +936,10 @@ return function(Core)
 	ENV.AnimatedNotification = showNotification
 
 	-- Expose Noble bundle for diagnostics / hot reload
-	ENV._NobleV8Bundle = noble
-	Core._NobleV8 = noble
+	ENV._NobleV10Bundle = noble
+	Core._NobleV10 = noble
+	ENV._NobleV8Bundle = nil
+	Core._NobleV8 = nil
 
-	log("INFO", "Alleral Noble v8.0.2 — Fusion+Spr framework ready")
+	log("INFO", "Alleral Noble v10.0.0 — premium desktop UI ready")
 end
