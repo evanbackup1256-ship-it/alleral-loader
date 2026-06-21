@@ -33,6 +33,10 @@ LOADER_MODULES = (
     "hub/ui/windui/Motion.luau",
     "hub/ui/windui/Guards.luau",
     "hub/ui/windui/Validate.luau",
+    "hub/ui/windui/GameRegistry.luau",
+    "hub/ui/windui/Cache.luau",
+    "hub/ui/windui/TooltipManager.luau",
+    "hub/ui/windui/Drag.luau",
     "cfg/release.json",
 )
 

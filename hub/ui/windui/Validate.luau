@@ -1,5 +1,5 @@
--- Alleral V11.1 — page build validation (no false "validation passed")
-return function(Bootstrap)
+-- Alleral V11.2 — page build + game-specific validation
+return function(Bootstrap, GameRegistry)
 	local Validate = {}
 
 	function Validate.inspect(window, state)
@@ -8,6 +8,7 @@ return function(Bootstrap)
 			issues = {},
 			tabs = 0,
 			controls = 0,
+			gameId = tostring(state and state.gameId or "unsupported"),
 		}
 		state = type(state) == "table" and state or {}
 		report.controls = tonumber(state.controls) or 0
@@ -29,6 +30,13 @@ return function(Bootstrap)
 		if report.controls < 1 then
 			report.ok = false
 			table.insert(report.issues, "No visible controls rendered")
+		end
+
+		if GameRegistry and not GameRegistry.isSupported(report.gameId) then
+			if report.tabs < 1 then
+				report.ok = false
+				table.insert(report.issues, "Unsupported game has no fallback tabs")
+			end
 		end
 
 		if type(state.missingBindings) == "table" and #state.missingBindings > 8 then

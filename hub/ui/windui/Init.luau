@@ -1,20 +1,31 @@
--- Alleral V11.1 — WindUI framework entry (sole UI stack)
+-- Alleral V11.2 — WindUI framework entry (sole UI stack)
 return function(loadModule, Core)
 	local Text = loadModule("Text")()
 	local Guards = loadModule("Guards")()
-	local Bootstrap = loadModule("Bootstrap")(Core, Text)
+	local GameRegistry = loadModule("GameRegistry")(Core)
+	local Cache = loadModule("Cache")()
+	local Bootstrap = loadModule("Bootstrap")(Core, Text, GameRegistry)
 	local WindUI = Bootstrap.loadWindUI()
 	local Theme = loadModule("Theme")(WindUI, Bootstrap)
 	local Motion = loadModule("Motion")()
-	local Validate = loadModule("Validate")(Bootstrap)
+	local Drag = loadModule("Drag")(Motion)
+	local TooltipManager = loadModule("TooltipManager")(Bootstrap, Motion, Text)
+	local Validate = loadModule("Validate")(Bootstrap, GameRegistry)
 	local Notifications = loadModule("Notifications")(WindUI, Bootstrap)
-	local Controls = loadModule("Controls")(Bootstrap, Motion, Text, Guards)
-	local WindowMod = loadModule("Window")(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate)
-	local Configs = loadModule("Configs")(Bootstrap)
-	local Tabs = loadModule("Tabs")()
+	local Controls = loadModule("Controls")(Bootstrap, Motion, Text, Guards, TooltipManager)
+	local WindowMod = loadModule("Window")(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, TooltipManager, Cache)
+	local Configs = loadModule("Configs")(Bootstrap, GameRegistry)
+	local Tabs = loadModule("Tabs")(GameRegistry, Cache)
+
+	local gameId, gameMeta = GameRegistry.resolve({})
+	gameId = tostring(gameId or Bootstrap.resolveGameId(Core) or "unsupported")
+	Cache.setGame(gameId)
 
 	pcall(function() Theme.register() end)
 	pcall(function() Motion.logPerformance() end)
+	pcall(function() Drag.logReady() end)
+	warn("[WindUI] UI cached; toggles will not rebuild")
+	warn("[WindUI] Tab cache active")
 
 	local STATE = {
 		tabCount = 0,
@@ -24,7 +35,9 @@ return function(loadModule, Core)
 		missingBindings = {},
 		activeWindow = nil,
 		uiDestroyed = false,
-		gameId = Bootstrap.resolveGameId(Core),
+		gameId = gameId,
+		gameName = gameMeta and gameMeta.name or "Unsupported",
+		placeId = game.PlaceId,
 	}
 
 	local Library = {
@@ -35,6 +48,34 @@ return function(loadModule, Core)
 	}
 
 	function Library:CreateWindow(settings)
+		settings = type(settings) == "table" and settings or {}
+		local resolvedId = tostring(settings.GameId or GameRegistry.resolve({}) or STATE.gameId or "unsupported")
+		if STATE.gameId and STATE.gameId ~= resolvedId then
+			if STATE.activeWindow then
+				pcall(function() STATE.activeWindow:Unload() end)
+			end
+			Cache.clearGame(STATE.gameId)
+			STATE.tabCount = 0
+			STATE.groupCount = 0
+			STATE.controls = 0
+			STATE.groupRegistry = {}
+			STATE.missingBindings = {}
+			if Core and type(Core.clearUiStateBindings) == "function" then
+				pcall(Core.clearUiStateBindings)
+			end
+			if Core then
+				Core._UiTabRegistry = {}
+			end
+		end
+		STATE.gameId = resolvedId
+		Cache.setGame(resolvedId)
+		local meta = GameRegistry.get(resolvedId)
+		STATE.gameName = meta and meta.name or "Unsupported"
+		STATE.placeId = game.PlaceId
+
+		if STATE.activeWindow and STATE.activeWindow._gameId == resolvedId and STATE.activeWindow._built then
+			return STATE.activeWindow
+		end
 		if STATE.activeWindow then
 			pcall(function() STATE.activeWindow:Unload() end)
 			STATE.activeWindow = nil
@@ -44,8 +85,8 @@ return function(loadModule, Core)
 		STATE.controls = 0
 		STATE.uiDestroyed = false
 
-		settings = type(settings) == "table" and settings or {}
-		settings.ConfigFolder = settings.ConfigFolder or Configs.getNamespace(STATE.gameId)
+		settings.GameId = resolvedId
+		settings.ConfigFolder = settings.ConfigFolder or Configs.getNamespace(resolvedId)
 
 		local win = WindowMod.create(settings, STATE)
 		STATE.activeWindow = win
@@ -87,11 +128,13 @@ return function(loadModule, Core)
 
 	function Library:GetLayoutInfo()
 		return {
-			profile = "windui-v11.1-premium",
+			profile = "windui-v11.2-premium",
 			engine = Bootstrap.ENGINE,
 			version = Bootstrap.VERSION,
 			stack = "WindUI",
 			theme = Theme.NAME,
+			gameId = STATE.gameId,
+			gameName = STATE.gameName,
 		}
 	end
 
@@ -103,6 +146,14 @@ return function(loadModule, Core)
 		end)
 	end
 
+	function Library:GetPerfStats()
+		return {
+			cache = Cache.stats(),
+			tooltips = TooltipManager.getStats and TooltipManager.getStats() or {},
+			dragging = Drag.isDragging and Drag.isDragging() or false,
+		}
+	end
+
 	return {
 		Library = Library,
 		STATE = STATE,
@@ -110,10 +161,14 @@ return function(loadModule, Core)
 		Text = Text,
 		Theme = Theme,
 		Motion = Motion,
+		Drag = Drag,
+		TooltipManager = TooltipManager,
 		Guards = Guards,
 		Validate = Validate,
 		Configs = Configs,
 		Tabs = Tabs,
+		Cache = Cache,
+		GameRegistry = GameRegistry,
 		WindUI = WindUI,
 		sanitize = Bootstrap.sanitize,
 		log = function(lvl, msg)

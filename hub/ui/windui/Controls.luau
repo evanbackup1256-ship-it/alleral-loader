@@ -1,5 +1,5 @@
--- Alleral V11.1 — WindUI control builders (compact, guarded, no empty rows)
-return function(Bootstrap, Motion, Text, Guards)
+-- Alleral V11.2 — WindUI control builders (compact, guarded, tooltips)
+return function(Bootstrap, Motion, Text, Guards, TooltipManager)
 	local Controls = {}
 	Text = Text or Bootstrap
 	Guards = Guards or { wrap = function(fn) return fn or function() end end }
@@ -128,9 +128,25 @@ return function(Bootstrap, Motion, Text, Guards)
 
 		local group = { _controlCount = 0 }
 
-		local function track(el, kind, flag)
+		local function bindTooltip(el, kind, title, props, flagKey)
+			if not TooltipManager or not el then
+				return
+			end
+			local meta = type(props.TooltipMeta) == "table" and props.TooltipMeta or {
+				title = title,
+				description = props.Tooltip or props.Description or props.Desc or "",
+				configKey = flagKey,
+				value = props.Default,
+			}
+			pcall(function()
+				TooltipManager.attach(el, meta, kind, groupName, title)
+			end)
+		end
+
+		local function track(el, kind, flag, title, props)
 			if el then
 				group._controlCount = group._controlCount + 1
+				bindTooltip(el, kind, title, props or {}, flag)
 			end
 			return wrapElement(el, kind, flag)
 		end
@@ -149,7 +165,7 @@ return function(Bootstrap, Motion, Text, Guards)
 					})
 				end
 			end)
-			return track(el, "label", text)
+			return track(el, "label", text, text, {})
 		end
 
 		function group:AddDivider()
@@ -173,7 +189,7 @@ return function(Bootstrap, Motion, Text, Guards)
 					Callback = Guards.wrap(props.Callback or function() end, "toggle:" .. flagKey),
 				})
 			end)
-			return track(el, "toggle", flagKey)
+			return track(el, "toggle", flagKey, title, props)
 		end
 
 		function group:AddButton(props)
@@ -192,7 +208,7 @@ return function(Bootstrap, Motion, Text, Guards)
 					Callback = Guards.wrap(props.Func or props.Callback or function() end, "button:" .. title),
 				})
 			end)
-			return track(el, "button", title)
+			return track(el, "button", title, title, props)
 		end
 
 		function group:AddSlider(flag, props)
@@ -225,7 +241,7 @@ return function(Bootstrap, Motion, Text, Guards)
 					Callback = Guards.wrap(props.Callback or function() end, "slider:" .. flagKey),
 				})
 			end)
-			return track(el, "slider", flagKey)
+			return track(el, "slider", flagKey, title, props)
 		end
 
 		function group:AddInput(flag, props)
@@ -246,7 +262,7 @@ return function(Bootstrap, Motion, Text, Guards)
 					Callback = Guards.wrap(props.Callback or function() end, "input:" .. flagKey),
 				})
 			end)
-			return track(el, "input", flagKey)
+			return track(el, "input", flagKey, title, props)
 		end
 
 		function group:AddDropdown(flag, props)
@@ -287,7 +303,7 @@ return function(Bootstrap, Motion, Text, Guards)
 					end
 				end)
 			end
-			local w = track(el, "dropdown", flagKey)
+			local w = track(el, "dropdown", flagKey, title, props)
 			function w:Refresh(_, newValues)
 				pcall(function()
 					local clean = Text.sanitizeList and Text.sanitizeList(newValues) or newValues

@@ -53,6 +53,18 @@ Core.GAME_REGISTRY = {
 		name = "Survive a Zombie Arena",
 		placeIds = { 114204398207377 },
 	},
+	sell_lemons = {
+		name = "Sell Lemons",
+		placeIds = { 79268393072444 },
+	},
+	grow_a_garden_2 = {
+		name = "Grow a Garden 2",
+		placeIds = { 95204935687527 },
+	},
+	blox_fruit = {
+		name = "Blox Fruit",
+		placeIds = { 2753915549 },
+	},
 }
 
 function Core.resolveActiveGameId(options)
@@ -60,9 +72,6 @@ function Core.resolveActiveGameId(options)
 	local explicit = options.scriptId or options.gameId or options.id
 	if explicit and tostring(explicit) ~= "" then
 		return tostring(explicit)
-	end
-	if ENV.Alleral_ActiveScriptId and tostring(ENV.Alleral_ActiveScriptId) ~= "" then
-		return tostring(ENV.Alleral_ActiveScriptId)
 	end
 	local placeId = game.PlaceId
 	local universeId = game.GameId
@@ -81,6 +90,9 @@ function Core.resolveActiveGameId(options)
 				end
 			end
 		end
+	end
+	if ENV.Alleral_ActiveScriptId and tostring(ENV.Alleral_ActiveScriptId) ~= "" then
+		return tostring(ENV.Alleral_ActiveScriptId)
 	end
 	return nil
 end

@@ -67,7 +67,10 @@ function Core.buildStatusDisplay(group, label, fields)
 end
 
 function Core.buildScriptStatusGroupbox(tab, column, scriptId, profileVersion)
-	scriptId = scriptId or ENV.Alleral_ActiveScriptId
+	scriptId = scriptId
+		or (type(Core.resolveActiveGameId) == "function" and Core.resolveActiveGameId())
+		or (ENV and ENV.Alleral_ActiveScriptId)
+		or "unsupported"
 	local evaluation = Core.evaluateScriptStatus(scriptId, profileVersion)
 	local status = evaluation.status
 	local groupbox = tab:CreateGroupbox({

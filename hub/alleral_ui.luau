@@ -1,4 +1,4 @@
--- Alleral UI layer — v11.1.0 WindUI (sole framework)
+-- Alleral UI layer — v11.2.0 WindUI (sole framework)
 --[[
 	WindUI bootstrap — https://github.com/Footagesus/WindUI
 	No Noble, Fusion, Spr, Linoria, or legacy renderers.
@@ -10,8 +10,8 @@
 	  GITHUB_RAW remote fallback via Core.httpGet
 ]]
 return function(Core)
-	Core.ALLERAL_UI_VERSION = "11.1.0"
-	Core.UI_VERSION = "11.1.0"
+	Core.ALLERAL_UI_VERSION = "11.2.0"
+	Core.UI_VERSION = "11.2.0"
 	Core.UI_LIBRARY = "WindUI"
 
 	local GITHUB_RAW = "https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main"
@@ -25,7 +25,7 @@ return function(Core)
 	end)()
 
 	local getGenv = getgenv or function() return ENV end
-	local WINDUI_CACHE_VERSION = "11.1.0"
+	local WINDUI_CACHE_VERSION = "11.2.0"
 	getGenv()._NobleV8Modules = nil
 	getGenv()._NobleV8CacheVersion = nil
 	getGenv()._NobleV10Modules = nil
@@ -719,10 +719,44 @@ return function(Core)
 		return tab
 	end
 
+	function Core.resetGameUiState(gameId)
+		gameId = tostring(gameId or (Bootstrap and Bootstrap.resolveGameId and Bootstrap.resolveGameId(Core)) or "unsupported")
+		if type(Core.clearUiStateBindings) == "function" then
+			pcall(Core.clearUiStateBindings)
+		end
+		Core._UiTabRegistry = {}
+		if STATE then
+			if STATE.gameId and STATE.gameId ~= gameId and STATE.activeWindow then
+				pcall(function() STATE.activeWindow:Unload() end)
+				STATE.activeWindow = nil
+			end
+			STATE.gameId = gameId
+			STATE.tabCount = 0
+			STATE.groupCount = 0
+			STATE.controls = 0
+			STATE.groupRegistry = {}
+			STATE.missingBindings = {}
+		end
+		if windui and windui.Cache and windui.Cache.setGame then
+			pcall(function() windui.Cache.setGame(gameId) end)
+		end
+		if windui and windui.Tabs and windui.Tabs.clear then
+			pcall(function() windui.Tabs.clear(STATE and STATE.gameId) end)
+		end
+		return gameId
+	end
+
 	function Core.buildUiWindow(ui, settings)
 		settings = settings or {}
 		local lib = ui and ui.Library
 		if not lib or type(lib.CreateWindow) ~= "function" then return nil end
+		local gameId = Core.resolveActiveGameId(settings) or settings.scriptId or settings.gameId
+		if not gameId and Bootstrap then
+			gameId = Bootstrap.resolveGameId(Core)
+		end
+		gameId = Core.resetGameUiState(gameId)
+		settings.GameId = gameId
+		settings.ConfigFolder = settings.ConfigFolder or ("configs/" .. gameId)
 		local rw = lib:CreateWindow(settings)
 		if not rw then return nil end
 		local w = {
@@ -838,6 +872,10 @@ return function(Core)
 		if type(STATE.missingBindings) == "table" and #STATE.missingBindings > 0 then
 			log("WARN", "Missing bindings: " .. #STATE.missingBindings)
 		end
+		if STATE and STATE.gameId then
+			log("INFO", "Active game: " .. tostring(STATE.gameId))
+			log("INFO", "Config namespace: configs/" .. tostring(STATE.gameId) .. "/")
+		end
 		return window
 	end
 
@@ -900,7 +938,10 @@ return function(Core)
 
 	function Core.uiWindowSettings(extra)
 		extra = type(extra) == "table" and extra or {}
-		local gameId = STATE and STATE.gameId or (Bootstrap and Bootstrap.resolveGameId(Core)) or "alleral"
+		local gameId = Core.resolveActiveGameId(extra)
+			or (STATE and STATE.gameId)
+			or (Bootstrap and Bootstrap.resolveGameId(Core))
+			or "unsupported"
 		return {
 			Title = extra.Title or extra.Name or "Alleral",
 			Name = extra.Title or extra.Name or "Alleral",
@@ -963,5 +1004,5 @@ return function(Core)
 	Core._NobleV10 = nil
 	Core._NobleV8 = nil
 
-	log("INFO", "Alleral WindUI v11.1.0 — sole UI framework loaded")
+	log("INFO", "Alleral WindUI v11.2.0 — sole UI framework loaded")
 end

@@ -1,10 +1,16 @@
--- Alleral V11.1 — WindUI window shell (guarded, validated)
-return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate)
+-- Alleral V11.2 — WindUI window (cached show/hide, drag, tooltips)
+return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, TooltipManager, Cache)
 	local WindowMod = {}
 
 	function WindowMod.create(settings, state)
 		settings = type(settings) == "table" and settings or {}
 		state = state or {}
+
+		local gameId = tostring(settings.GameId or state.gameId or Bootstrap.resolveGameId() or "unsupported")
+		state.gameId = gameId
+		if Cache then
+			Cache.setGame(gameId)
+		end
 
 		local title = Bootstrap.sanitize(settings.Title or settings.Name or "Alleral", 64)
 		local keybind = settings.Keybind or Enum.KeyCode.RightShift
@@ -47,25 +53,25 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 		if Theme then
 			pcall(function() Theme.applyToWindow(windWindow) end)
 		end
-		if Motion then
-			pcall(function() Motion.openWindow(WindUI) end)
+		if Drag then
+			pcall(function() Drag.bind(windWindow) end)
 		end
-		pcall(function()
-			if WindUI.ToggleAcrylic then
-				WindUI:ToggleAcrylic(true)
-			end
-		end)
+		if TooltipManager and TooltipManager.init then
+			pcall(TooltipManager.init)
+		end
 
 		local self = {
 			_wind = windWindow,
 			_windUI = WindUI,
 			_tabs = {},
 			_activeTab = nil,
-			_hidden = false,
+			_hidden = true,
 			_keybind = keybind,
 			_settings = settings,
-			_gameId = Bootstrap.resolveGameId(),
+			_gameId = gameId,
 			_validated = false,
+			_built = true,
+			_openedOnce = false,
 		}
 
 		function self:SetTheme(name)
@@ -76,32 +82,35 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			end)
 		end
 
-		function self:Hide()
-			self._hidden = true
+		function self:_setVisible(show)
 			pcall(function()
-				if self._wind.Close then
+				if self._wind.SetVisible then
+					self._wind:SetVisible(show)
+				elseif show and self._wind.Open then
+					self._wind:Open()
+				elseif not show and self._wind.Close then
 					self._wind:Close()
-				elseif self._wind.Hide then
+				elseif show and self._wind.Show then
+					self._wind:Show()
+				elseif not show and self._wind.Hide then
 					self._wind:Hide()
-				elseif self._wind.SetVisible then
-					self._wind:SetVisible(false)
 				end
 			end)
 		end
 
+		function self:Hide()
+			self._hidden = true
+			self:_setVisible(false)
+		end
+
 		function self:Show()
 			self._hidden = false
-			pcall(function()
-				if self._wind.Open then
-					self._wind:Open()
-				elseif self._wind.Show then
-					self._wind:Show()
-				elseif self._wind.SetVisible then
-					self._wind:SetVisible(true)
+			self:_setVisible(true)
+			if not self._openedOnce then
+				self._openedOnce = true
+				if Motion then
+					pcall(function() Motion.openWindow(WindUI, true) end)
 				end
-			end)
-			if Motion then
-				pcall(function() Motion.openWindow(WindUI) end)
 			end
 		end
 
@@ -164,6 +173,9 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 
 			table.insert(self._tabs, tab)
 			state.tabCount = (state.tabCount or 0) + 1
+			if Cache then
+				Cache.trackTab(self._gameId, tab)
+			end
 
 			if #self._tabs == 1 then
 				task.defer(function()
@@ -186,8 +198,14 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 		end
 
 		function self:Unload()
+			if Drag and Drag.cleanup then
+				pcall(Drag.cleanup)
+			end
 			if Motion and Motion.cleanup then
 				pcall(Motion.cleanup)
+			end
+			if TooltipManager and TooltipManager.hide then
+				pcall(TooltipManager.hide)
 			end
 			pcall(function()
 				if self._wind.Destroy then
@@ -211,7 +229,7 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 				passed = false
 			end
 			if passed then
-				Bootstrap.runValidation()
+				Bootstrap.runValidation(state)
 				self._validated = true
 			end
 			return passed
@@ -226,6 +244,11 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			end
 		end)
 
+		if Cache then
+			Cache.setWindow(gameId, self)
+		end
+
+		self:Hide()
 		return self
 	end
 

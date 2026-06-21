@@ -4,6 +4,7 @@ return function()
 	local Motion = {}
 	local ACTIVE = {}
 	local BOUND = {}
+	local DRAG_MODE = false
 
 	local function findGui(el)
 		if typeof(el) == "Instance" and el:IsA("GuiObject") then
@@ -47,7 +48,14 @@ return function()
 		return tw
 	end
 
+	function Motion.setDragMode(enabled)
+		DRAG_MODE = enabled == true
+	end
+
 	function Motion.bindHover(el, opts)
+		if DRAG_MODE then
+			return
+		end
 		opts = opts or {}
 		local gui = findGui(el)
 		if not gui or not gui:IsA("GuiButton") then
@@ -82,12 +90,15 @@ return function()
 		end)
 	end
 
-	function Motion.openWindow(WindUI)
+	function Motion.openWindow(WindUI, force)
+		if DRAG_MODE and not force then
+			return
+		end
 		pcall(function()
 			local scaleObj = WindUI and WindUI.UIScaleObj
 			if scaleObj then
-				scaleObj.Scale = 0.97
-				Motion.tween(scaleObj, { Scale = 1 }, 0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+				scaleObj.Scale = 0.98
+				Motion.tween(scaleObj, { Scale = 1 }, 0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 			end
 		end)
 	end
@@ -105,6 +116,7 @@ return function()
 	function Motion.logPerformance()
 		warn("[WindUI] Animation connections cleaned")
 		warn("[WindUI] Duplicate connection guard active")
+		warn("[WindUI] Animation cleanup active")
 		warn("[WindUI] Animation performance pass complete")
 	end
 
