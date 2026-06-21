@@ -62,6 +62,7 @@ return function(WindUI)
 		pcall(function()
 			if WindUIRef.TooltipGui then
 				WindUIRef.TooltipGui.Enabled = false
+				WindUIRef.TooltipGui.Visible = false
 			end
 		end)
 

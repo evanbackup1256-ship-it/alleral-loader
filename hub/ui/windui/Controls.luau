@@ -1,5 +1,5 @@
--- Alleral V11.3 — WindUI control builders (compact, guarded, tooltips)
-return function(Bootstrap, Motion, Text, Guards, TooltipManager)
+-- Alleral V11.4 — WindUI control builders (compact, guarded, no tooltips)
+return function(Bootstrap, Motion, Text, Guards, _TooltipManager)
 	local Controls = {}
 	Text = Text or Bootstrap
 	Guards = Guards or { wrap = function(fn) return fn or function() end end }
@@ -124,31 +124,9 @@ return function(Bootstrap, Motion, Text, Guards, TooltipManager)
 
 		local group = { _controlCount = 0 }
 
-		local function bindTooltip(el, kind, title, props, flagKey)
-			if not TooltipManager or not el then
-				return
-			end
-			local desc = props.Tooltip or props.Description or props.Desc or ""
-			if desc == "" and title ~= "" then
-				desc = "Toggle, adjust, or interact with " .. title .. "."
-			end
-			local meta = type(props.TooltipMeta) == "table" and props.TooltipMeta or {
-				title = title,
-				description = desc,
-				configKey = flagKey,
-				value = props.Default,
-			}
-			task.defer(function()
-				pcall(function()
-					TooltipManager.attach(el, meta, kind, groupName, title)
-				end)
-			end)
-		end
-
 		local function track(el, kind, flag, title, props)
 			if el then
 				group._controlCount = group._controlCount + 1
-				bindTooltip(el, kind, title, props or {}, flag)
 			end
 			return wrapElement(el, kind, flag)
 		end

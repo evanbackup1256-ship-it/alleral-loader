@@ -1,5 +1,5 @@
--- Alleral V11.3 — WindUI window (state machine show/hide, no rebuild)
-return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, TooltipManager, Cache, Patch)
+-- Alleral V11.4 — WindUI window (animated show/hide, search glow, no tooltips)
+return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, _TooltipManager, Cache, Patch, SearchGlow)
 	local WindowMod = {}
 
 	local STATES = {
@@ -146,11 +146,19 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			end
 			self._windowState = STATES.Hiding
 			self._lastClose = tick()
-			if TooltipManager and TooltipManager.suppressDuringDrag then
-				pcall(TooltipManager.suppressDuringDrag)
+			if Motion and Motion.animateWindowHide then
+				Motion.animateWindowHide(self._windUI, self._wind, function()
+					pcall(function()
+						if self._wind then
+							self._wind.Closed = true
+						end
+					end)
+					self._windowState = STATES.Hidden
+				end)
+			else
+				setRootVisible(false)
+				self._windowState = STATES.Hidden
 			end
-			setRootVisible(false)
-			self._windowState = STATES.Hidden
 		end
 
 		function self:Show()
@@ -162,8 +170,19 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			end
 			self._windowState = STATES.Showing
 			self._lastOpen = tick()
-			setRootVisible(true)
-			self._windowState = STATES.Visible
+			pcall(function()
+				if self._wind then
+					self._wind.Closed = false
+				end
+			end)
+			if Motion and Motion.animateWindowShow then
+				Motion.animateWindowShow(self._windUI, self._wind, function()
+					self._windowState = STATES.Visible
+				end)
+			else
+				setRootVisible(true)
+				self._windowState = STATES.Visible
+			end
 		end
 
 		function self:Toggle()
@@ -208,12 +227,6 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			end)
 			if not windTab then
 				return nil
-			end
-
-			if TooltipManager and TooltipManager.attachTab then
-				pcall(function()
-					TooltipManager.attachTab(windTab, name)
-				end)
 			end
 
 			local tab = {
@@ -264,9 +277,6 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			end
 			if Motion and Motion.cleanup then
 				pcall(Motion.cleanup)
-			end
-			if TooltipManager and TooltipManager.hide then
-				pcall(TooltipManager.hide)
 			end
 			pcall(function()
 				if self._wind.Destroy then
@@ -321,8 +331,8 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 		if Drag then
 			pcall(function() Drag.bind(windWindow) end)
 		end
-		if TooltipManager and TooltipManager.init then
-			pcall(TooltipManager.init)
+		if SearchGlow and SearchGlow.bind then
+			pcall(SearchGlow.bind, windWindow)
 		end
 
 		if Cache then

@@ -25,6 +25,7 @@ const files = [
     'hub/ui/windui/TooltipManager.luau',
     'hub/ui/windui/Patch.luau',
     'hub/ui/windui/Drag.luau',
+    'hub/ui/windui/SearchGlow.luau',
 ];
 
 function getLineCol(src, pos) {
