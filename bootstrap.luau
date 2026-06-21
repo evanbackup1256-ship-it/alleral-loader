@@ -191,10 +191,19 @@ for _, entry in ipairs(urls) do
 		if release and release.loader then
 			local ver = loaderVersion(body)
 			if ver and ver ~= release.loader then
-				-- Try the release-pinned loader directly from GitHub before accepting a stale mirror.
-				local pinUrl = "https://raw.githubusercontent.com/" .. REPO .. "/" .. (release.commit or "main") .. "/loader.luau"
-				local pinned = fetchUrl(pinUrl, LOADER_MIN_BYTES)
-				if acceptLoader(pinned) then body = pinned end
+				-- Mirrors (Railway/jsDelivr) often lag GitHub; pin to release commit, then main.
+				local pinRefs = { "main" }
+				if type(release.commit) == "string" and release.commit ~= "" and release.commit ~= "main" then
+					table.insert(pinRefs, 1, release.commit)
+				end
+				for _, pinRef in ipairs(pinRefs) do
+					local pinUrl = "https://raw.githubusercontent.com/" .. REPO .. "/" .. pinRef .. "/loader.luau"
+					local pinned = fetchUrl(pinUrl, LOADER_MIN_BYTES)
+					if acceptLoader(pinned) and loaderVersion(pinned) == release.loader then
+						body = pinned
+						break
+					end
+				end
 			end
 		end
 		if body then
