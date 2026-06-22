@@ -552,6 +552,8 @@ def gate_authorized() -> bool:
     if not API_KEY or len(API_KEY) < MIN_API_KEY_LEN:
         return False
     provided = request.headers.get("X-Alleral-Key", "")
+    if not provided:
+        provided = request.args.get("aller_key", "") or request.args.get("key", "")
     return secure_compare(provided, API_KEY)
 
 
@@ -2059,7 +2061,11 @@ def protected_game_script(script_id: str):
     if entry and str(entry.get("status") or "").lower() == "disabled":
         return jsonify({"ok": False, "error": "disabled"}), 403
     text = None
-    if AUTO_SYNC is not None and hasattr(AUTO_SYNC, "_fetch_text"):
+    try:
+        text, _err = read_module(f"games/{clean_id}.luau", resolve_loader_root())
+    except Exception:
+        text = None
+    if not text and AUTO_SYNC is not None and hasattr(AUTO_SYNC, "_fetch_text"):
         try:
             text = AUTO_SYNC._fetch_text(f"games/{clean_id}.luau")
         except Exception as exc:

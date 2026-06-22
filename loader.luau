@@ -450,6 +450,11 @@ local HTTP_TRANSPORTS
 
 local function httpFetch(url, headers)
 	headers = headers or {}
+	local authKey = headers["X-Alleral-Key"] or headers["x-alleral-key"]
+	if type(authKey) == "string" and authKey ~= "" then
+		local sep = url:find("?") and "&" or "?"
+		url = url .. sep .. "aller_key=" .. authKey
+	end
 	local bust = url .. (url:find("?") and "&" or "?") .. "t=" .. tostring(tick())
 
 	if HTTP_TRANSPORTS then
@@ -2053,18 +2058,29 @@ end
 local function fetchProtectedGameScript(profile, minBytes, gameVersion)
 	local apiKey = ENV.Alleral_TelemetryApiKey or (getgenv and getgenv().Alleral_TelemetryApiKey)
 	if trim(apiKey or "") == "" then
-		return nil, "protected: missing api key"
+		return nil, "protected: missing api key (bootstrap /api/bootstrap did not return apiKey)"
 	end
 	local headers = { ["X-Alleral-Key"] = apiKey }
+	local lastReason = "protected fetch unavailable"
 	for _, base in ipairs(gameRelayBases()) do
 		local url = base .. "/api/games/script/" .. tostring(profile.id) .. ".luau"
 		local body, via = httpFetch(url, headers)
-		if type(body) == "string" and #body >= minBytes and gameScriptValid(body, profile, gameVersion) then
+		if type(body) ~= "string" or body == "" then
+			lastReason = tostring(via or "http failed") .. " @ " .. base
+		elseif body:find('"unauthorized"', 1, true) or body:find('"error"%s*:%s*"unauthorized"', 1, false) then
+			lastReason = "unauthorized (bad api key) via " .. tostring(via) .. " @ " .. base
+		elseif body:find('"not_found"', 1, true) or body:find('"error"%s*:%s*"not_found"', 1, false) then
+			lastReason = "script not on relay @ " .. base
+		elseif #body < minBytes then
+			lastReason = "too small (" .. tostring(#body) .. "b, need " .. tostring(minBytes) .. "+) via " .. tostring(via)
+		elseif not gameScriptValid(body, profile, gameVersion) then
+			lastReason = gameScriptRejectReason(body, profile, gameVersion) .. " via " .. tostring(via)
+		else
 			cacheRemote(profile.scriptUrl, body)
 			return body, base .. "/api/games/script via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
 		end
 	end
-	return nil, "protected fetch unavailable"
+	return nil, lastReason
 end
 
 local function fetchGameScript(profile)
@@ -2091,7 +2107,9 @@ local function fetchGameScript(profile)
 		end
 	end
 
-	ensureRelayCredentials()
+	if not ensureRelayCredentials() then
+		lastReason = "relay credentials unavailable (no apiKey from /api/bootstrap)"
+	end
 	local protectedSrc, protectedLabel = fetchProtectedGameScript(profile, minBytes, gameVersion)
 	if protectedSrc then
 		return protectedSrc, protectedLabel
@@ -2697,21 +2715,28 @@ ensureRelayCredentials = function()
 	if not listHas(bases, DEFAULT_RELAY_BASE) then
 		appendList(bases, DEFAULT_RELAY_BASE)
 	end
-	for _, base in ipairs(bases) do
-		local boot = decodeJson(select(1, httpFetch(base .. "/api/bootstrap?t=" .. tick())))
-		if type(boot) == "table" and boot.ok then
-			if trim(boot.apiKey or "") ~= "" then
-				ENV.Alleral_TelemetryApiKey = boot.apiKey
-				if getgenv then
-					getgenv().Alleral_TelemetryApiKey = boot.apiKey
+	for attempt = 1, 3 do
+		for _, base in ipairs(bases) do
+			local boot = decodeJson(select(1, httpFetch(base .. "/api/bootstrap?t=" .. tick())))
+			if type(boot) == "table" and boot.ok then
+				if trim(boot.apiKey or "") ~= "" then
+					ENV.Alleral_TelemetryApiKey = boot.apiKey
+					if getgenv then
+						getgenv().Alleral_TelemetryApiKey = boot.apiKey
+					end
+				end
+				if trim(boot.loaderCdnBase or "") ~= "" then
+					ENV._Alleral_LoaderCdnBase = normalizeHttps(boot.loaderCdnBase)
+				else
+					ENV._Alleral_LoaderCdnBase = base
+				end
+				if trim(ENV.Alleral_TelemetryApiKey or "") ~= "" then
+					return true
 				end
 			end
-			if trim(boot.loaderCdnBase or "") ~= "" then
-				ENV._Alleral_LoaderCdnBase = normalizeHttps(boot.loaderCdnBase)
-			else
-				ENV._Alleral_LoaderCdnBase = base
-			end
-			return trim(ENV.Alleral_TelemetryApiKey or "") ~= ""
+		end
+		if attempt < 3 then
+			task.wait(0.35)
 		end
 	end
 	return false

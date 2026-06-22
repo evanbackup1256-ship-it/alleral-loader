@@ -48,6 +48,16 @@
   "changelog": [
     {
       "date": "2026-06-22",
+      "title": "Loader 8.13.0 — fix protected game scripts relay unavailable",
+      "items": [
+        "HttpGet auth: append aller_key query param (executors cannot send X-Alleral-Key headers)",
+        "Relay serves games from bundled loader_src/games/ (no GitHub fetch required)",
+        "Bootstrap credentials retry 3x; protected fetch reports exact failure reason",
+        "gate_authorized accepts aller_key query param for protected /api/games/script"
+      ]
+    },
+    {
+      "date": "2026-06-22",
       "title": "Loader 8.12.9 — fix table.insert executor compat in relay bases",
       "items": [
         "Replaced table.insert(list, value) with list[#list+1] in gameRelayBases (Xeno/Synapse compat)",
