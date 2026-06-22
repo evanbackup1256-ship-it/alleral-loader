@@ -10,8 +10,8 @@
 	  GITHUB_RAW remote fallback via Core.httpGet
 ]]
 return function(Core)
-	Core.ALLERAL_UI_VERSION = "11.5.2"
-	Core.UI_VERSION = "11.5.2"
+	Core.ALLERAL_UI_VERSION = "11.5.3"
+	Core.UI_VERSION = "11.5.3"
 	Core.UI_LIBRARY = "WindUI"
 
 	local GITHUB_RAW = "https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main"
@@ -25,7 +25,7 @@ return function(Core)
 	end)()
 
 	local getGenv = getgenv or function() return ENV end
-	local WINDUI_CACHE_VERSION = "11.5.2-fast"
+	local WINDUI_CACHE_VERSION = "11.5.3-fast"
 	getGenv()._NobleV8Modules = nil
 	getGenv()._NobleV8CacheVersion = nil
 	getGenv()._NobleV10Modules = nil

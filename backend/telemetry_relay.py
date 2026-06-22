@@ -2045,6 +2045,34 @@ def loader_file(rel_path: str):
     return text, 200, {"Content-Type": content_type, "Cache-Control": "no-store"}
 
 
+@app.get("/api/games/script/<script_id>.luau")
+def protected_game_script(script_id: str):
+    if not gate_authorized():
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    client_ip = resolve_client_ip(request)
+    if not gate_allow_ip(client_ip):
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
+    clean_id = "".join(ch for ch in str(script_id or "").lower() if ch.isalnum() or ch == "_")
+    if not clean_id:
+        return jsonify({"ok": False, "error": "invalid_script"}), 400
+    entry = SCRIPT_REGISTRY.get_script(clean_id)
+    if entry and str(entry.get("status") or "").lower() == "disabled":
+        return jsonify({"ok": False, "error": "disabled"}), 403
+    text = None
+    if AUTO_SYNC is not None and hasattr(AUTO_SYNC, "_fetch_text"):
+        try:
+            text = AUTO_SYNC._fetch_text(f"games/{clean_id}.luau")
+        except Exception as exc:
+            print(f"[games/script] fetch failed for {clean_id}: {exc}", file=sys.stderr)
+    if not text:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    return text, 200, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Alleral-Script": clean_id,
+    }
+
+
 @app.get("/api/bootstrap")
 def client_bootstrap():
     client_ip = resolve_client_ip(request)

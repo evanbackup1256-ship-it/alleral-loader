@@ -1,6 +1,6 @@
 --!nocheck
-local LOADER_VERSION = "8.12.2"
-local BOOTSTRAP_VERSION = "2.1.0"
+local LOADER_VERSION = "8.12.3"
+local BOOTSTRAP_VERSION = "2.2.0"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -26,17 +26,17 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.12.2",
-	core = "2.9.10",
+	loader = "8.12.3",
+	core = "2.9.11",
 	ui = "WindUI",
-	uiVersion = "11.5.0",
+	uiVersion = "11.5.3",
 	analytics = "1.2",
-	telemetry = "3.5",
-	helpers = "1.8",
+	telemetry = "3.6",
+	helpers = "1.9",
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "3b0fa07",
+	commit = "76b7c97",
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
 }
 local WORKSPACE_ROOTS = {
@@ -62,7 +62,7 @@ local BOOTSTRAP_LOCAL_PATHS = {
 	"alleral_bootstrap.luau",
 }
 local BOOTSTRAP_LOADSTRING =
-	'loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/bootstrap.luau?t=" .. tick(), true))()'
+	'loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/loader.luau?t=" .. tick(), true))()'
 local LEGACY_LOADER_MARKERS = {
 	"[Alleral Loader v",
 	"Alleral loader 3.",
@@ -1435,6 +1435,31 @@ local function hashBootstrapAttest(placeId, jobId, at, commit)
 	return string.format("ab_%x_%x", h1, h2)
 end
 
+-- Merged bootstrap attestation (bootstrap.luau is thin — edit loader.luau)
+local function runMergedBootstrapGate()
+	if ENV._Alleral_BootstrapGateDone then
+		return
+	end
+	ENV._Alleral_BootstrapGateDone = true
+	if ENV._Alleral_Bootstrapped == true and ENV._Alleral_MergedBootstrapEntry ~= true then
+		return
+	end
+	local at = tick()
+	ENV._Alleral_BootstrapVersion = BOOTSTRAP_VERSION
+	ENV._Alleral_Bootstrapped = true
+	ENV._Alleral_BootstrapAt = at
+	local releaseCommit = ""
+	pcall(function()
+		local release = decodeJson(select(1, httpFetch(GITHUB_RAW .. "/" .. CFG .. "/release.json?t=" .. tostring(tick()))))
+		if type(release) == "table" and type(release.commit) == "string" then
+			releaseCommit = release.commit
+		end
+	end)
+	ENV._Alleral_BootstrapCommit = releaseCommit
+	ENV._Alleral_BootstrapToken = hashBootstrapAttest(game.PlaceId, game.JobId, at, releaseCommit)
+	ENV._Alleral_BootstrapTokenAt = at
+end
+
 local function checkGamePlaceUpdate()
 	local placeId = game.PlaceId
 	local placeVersion = tonumber(game.PlaceVersion) or 0
@@ -1979,6 +2004,39 @@ local function sourceVersionStale(src, kind, expectedVersion)
 	return type(found) == "string" and found ~= expectedVersion
 end
 
+local function gameRelayBases()
+	local bases = {}
+	local cdn = ENV._Alleral_LoaderCdnBase
+	if type(cdn) == "string" and trim(cdn) ~= "" then
+		table.insert(bases, cdn:gsub("/+$", ""))
+	end
+	local owner = ENV.Alleral_OwnerTelemetry
+	if type(owner) == "table" and trim(owner.relayUrl or "") ~= "" then
+		local base = owner.relayUrl:gsub("/+$", ""):gsub("/ingest$", "")
+		if not table.find(bases, base) then
+			table.insert(bases, base)
+		end
+	end
+	return bases
+end
+
+local function fetchProtectedGameScript(profile, minBytes, gameVersion)
+	local apiKey = ENV.Alleral_TelemetryApiKey or (getgenv and getgenv().Alleral_TelemetryApiKey)
+	if trim(apiKey or "") == "" then
+		return nil, "protected: missing api key"
+	end
+	local headers = { ["X-Alleral-Key"] = apiKey }
+	for _, base in ipairs(gameRelayBases()) do
+		local url = base .. "/api/games/script/" .. tostring(profile.id) .. ".luau"
+		local body, via = httpFetch(url, headers)
+		if type(body) == "string" and #body >= minBytes and gameScriptValid(body, profile, gameVersion) then
+			cacheRemote(profile.scriptUrl, body)
+			return body, base .. "/api/games/script via " .. tostring(via) .. " (" .. tostring(#body) .. "b)"
+		end
+	end
+	return nil, "protected fetch unavailable"
+end
+
 local function fetchGameScript(profile)
 	local minBytes = profile.minBytes or 40000
 	local gameVersion = expectedGameVersion(profile)
@@ -2002,6 +2060,12 @@ local function fetchGameScript(profile)
 			return src, "local:" .. tostring(path)
 		end
 	end
+
+	local protectedSrc, protectedLabel = fetchProtectedGameScript(profile, minBytes, gameVersion)
+	if protectedSrc then
+		return protectedSrc, protectedLabel
+	end
+	lastReason = protectedLabel or lastReason
 
 	for _, base in ipairs(REMOTE_BASES) do
 		local body, via = httpGet(base .. "/" .. profile.scriptUrl, minBytes)
@@ -2850,7 +2914,7 @@ local GAMES = {
 	{
 		id = "kick_a_lucky_block",
 		name = "Kick a Lucky Block",
-		version = "7.3.2",
+		version = "7.3.3",
 		placeIds = { 89469502395769 },
 		universeIds = { 10004244222 },
 		scriptFiles = { "games/kick_a_lucky_block.luau", "kick_a_lucky_block.luau" },
@@ -2875,7 +2939,7 @@ local GAMES = {
 	{
 		id = "speed_keyboard_escape",
 		name = "Speed Keyboard Escape",
-		version = "1.5.1",
+		version = "1.5.3",
 		placeIds = { 95082159892680 },
 		scriptFiles = { "games/speed_keyboard_escape.luau", "speed_keyboard_escape.luau" },
 		scriptUrl = "games/speed_keyboard_escape.luau",
@@ -2892,7 +2956,7 @@ local GAMES = {
 	{
 		id = "slime_rng",
 		name = "Slime RNG",
-		version = "1.5.2",
+		version = "1.5.3",
 		placeIds = { 92416421522960 },
 		universeIds = { 9792947201 },
 		scriptFiles = { "games/slime_rng.luau", "slime_rng.luau" },
@@ -2910,7 +2974,7 @@ local GAMES = {
 	{
 		id = "build_a_ring_farm",
 		name = "Build A Ring Farm",
-		version = "1.4.2",
+		version = "1.4.3",
 		placeIds = { 107646426076756 },
 		scriptFiles = { "games/build_a_ring_farm.luau", "build_a_ring_farm.luau" },
 		scriptUrl = "games/build_a_ring_farm.luau",
@@ -2929,7 +2993,7 @@ local GAMES = {
 	{
 		id = "survive_a_zombie_arena",
 		name = "Survive a Zombie Arena",
-		version = "2.3.2",
+		version = "2.3.3",
 		placeIds = { 114204398207377 },
 		scriptFiles = { "games/survive_a_zombie_arena.luau", "survive_a_zombie_arena.luau" },
 		scriptUrl = "games/survive_a_zombie_arena.luau",
@@ -2946,7 +3010,7 @@ local GAMES = {
 	{
 		id = "sell_lemons",
 		name = "Sell Lemons",
-		version = "2.1.0",
+		version = "2.2.1",
 		placeIds = { 79268393072444 },
 		scriptFiles = { "games/sell_lemons.luau", "sell_lemons.luau" },
 		scriptUrl = "games/sell_lemons.luau",
@@ -2962,7 +3026,7 @@ local GAMES = {
 	{
 		id = "grow_a_garden_2",
 		name = "Grow a Garden 2",
-		version = "2.2.0",
+		version = "2.2.1",
 		placeIds = { 95204935687527 },
 		scriptFiles = { "games/grow_a_garden_2.luau", "grow_a_garden_2.luau" },
 		scriptUrl = "games/grow_a_garden_2.luau",
@@ -2978,7 +3042,7 @@ local GAMES = {
 	{
 		id = "blox_fruit",
 		name = "Blox Fruit",
-		version = "0.1.1",
+		version = "0.1.2",
 		placeIds = { 2753915549 },
 		scriptFiles = { "games/blox_fruit.luau", "blox_fruit.luau" },
 		scriptUrl = "games/blox_fruit.luau",
@@ -3929,6 +3993,7 @@ local function detectGame()
 end
 
 local function main()
+	runMergedBootstrapGate()
 	if ENV.Alleral_LoaderRunning then
 		log("Already running — use getgenv().Alleral_Reload()", true)
 		return

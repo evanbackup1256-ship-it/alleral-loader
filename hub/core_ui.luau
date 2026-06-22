@@ -166,6 +166,9 @@ return function(Core)
 	end
 
 	function Core.initSettings(state, defaults, filename, exclude)
+		if type(Core.mergeGameDefaults) == "function" then
+			defaults = Core.mergeGameDefaults(defaults)
+		end
 		if type(Core.mergePerformanceDefaults) == "function" then
 			Core.mergePerformanceDefaults(defaults)
 		end

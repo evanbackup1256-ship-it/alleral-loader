@@ -1,8 +1,10 @@
--- Alleral V11.5 — WindUI control builders (aurora accents, no tooltips)
+-- Alleral V11.5.3 — WindUI control builders (aurora accents, ripple press)
 return function(Bootstrap, Motion, Text, Guards, _TooltipManager, Theme)
 	local Controls = {}
 	Text = Text or Bootstrap
 	Guards = Guards or { wrap = function(fn) return fn or function() end end }
+	local TweenService = game:GetService("TweenService")
+	local rippleTargets = {}
 
 	local LAYOUT = {
 		SLIDER_WIDTH = 240,
@@ -40,6 +42,86 @@ return function(Bootstrap, Motion, Text, Guards, _TooltipManager, Theme)
 	local function shouldSkipText(text)
 		text = Bootstrap.sanitize(text, 200)
 		return text == "" or text == "--" or text == "—"
+	end
+
+	local function findRippleHost(el)
+		if typeof(el) ~= "Instance" then
+			if type(el) == "table" and el.UIElements then
+				local main = el.UIElements.Main or el.UIElements.Button
+				if typeof(main) == "Instance" then
+					return main
+				end
+			end
+			return nil
+		end
+		if el:IsA("GuiButton") then
+			return el
+		end
+		return el:FindFirstChildWhichIsA("GuiButton", true) or el:FindFirstChildWhichIsA("TextButton", true) or el:FindFirstChildWhichIsA("ImageButton", true)
+	end
+
+	local function attachRipple(el)
+		local host = findRippleHost(el)
+		if not host or rippleTargets[host] then
+			return
+		end
+		rippleTargets[host] = true
+		pcall(function()
+			if not host:FindFirstChild("AlleralRipple") then
+				local ripple = Instance.new("Frame")
+				ripple.Name = "AlleralRipple"
+				ripple.BackgroundColor3 = ACCENT_BRIGHT
+				ripple.BackgroundTransparency = 0.55
+				ripple.BorderSizePixel = 0
+				ripple.Size = UDim2.fromScale(0, 0)
+				ripple.AnchorPoint = Vector2.new(0.5, 0.5)
+				ripple.Position = UDim2.fromScale(0.5, 0.5)
+				ripple.ZIndex = (host.ZIndex or 1) + 2
+				ripple.Visible = false
+				ripple.Parent = host
+				local corner = Instance.new("UICorner")
+				corner.CornerRadius = UDim.new(1, 0)
+				corner.Parent = ripple
+			end
+			host.InputBegan:Connect(function(input)
+				if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+					return
+				end
+				local ripple = host:FindFirstChild("AlleralRipple")
+				if not ripple then
+					return
+				end
+				local rel = Vector2.new(0.5, 0.5)
+				pcall(function()
+					rel = Vector2.new(
+						(input.Position.X - host.AbsolutePosition.X) / math.max(host.AbsoluteSize.X, 1),
+						(input.Position.Y - host.AbsolutePosition.Y) / math.max(host.AbsoluteSize.Y, 1)
+					)
+				end)
+				ripple.Position = UDim2.fromScale(rel.X, rel.Y)
+				ripple.Size = UDim2.fromScale(0, 0)
+				ripple.Visible = true
+				ripple.BackgroundTransparency = 0.45
+				local grow = TweenService:Create(ripple, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					Size = UDim2.fromScale(2.4, 2.4),
+					BackgroundTransparency = 1,
+				})
+				grow:Play()
+				grow.Completed:Connect(function()
+					ripple.Visible = false
+				end)
+				TweenService:Create(host, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					Size = host.Size - UDim2.fromOffset(1, 1),
+				}):Play()
+				task.delay(0.08, function()
+					if host.Parent then
+						TweenService:Create(host, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+							Size = host.Size + UDim2.fromOffset(1, 1),
+						}):Play()
+					end
+				end)
+			end)
+		end)
 	end
 
 	local function wrapElement(el, kind, flag)
@@ -145,6 +227,9 @@ return function(Bootstrap, Motion, Text, Guards, _TooltipManager, Theme)
 		local function track(el, kind, flag, title, props)
 			if el then
 				group._controlCount = group._controlCount + 1
+				if kind == "button" then
+					attachRipple(el)
+				end
 			end
 			return wrapElement(el, kind, flag)
 		end

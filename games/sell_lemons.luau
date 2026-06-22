@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "2.1.0"
+local VERSION = "2.2.1"
 local PLACE_ID = 79268393072444
 local state = getgenv().Alleral_State
 local G = (Core and Core.Game) or getgenv().Alleral_GameHelpers or {}
@@ -74,6 +74,7 @@ local defaults = {
 	TargetManage = { "Any" },
 	TargetUpgrades = { "Any" },
 }
+defaults = Core.mergeGameDefaults(defaults)
 
 local savedKeys
 local saveSettings
@@ -163,20 +164,15 @@ local REMOTE_ALIASES = {
 }
 
 local function refreshRemotes()
-	runtime.remotes = G.indexRemotes and G.indexRemotes(ReplicatedStorage, runtime.remotes) or runtime.remotes
-	local folder = waitChild(ReplicatedStorage, "Remotes", 3)
-		or waitChild(ReplicatedStorage, "RemoteEvents", 3)
-		or waitChild(ReplicatedStorage, "RemoteFunctions", 3)
-	if not folder then
+	if G.bindRemoteAliases then
+		runtime.remotes = G.bindRemoteAliases(ReplicatedStorage, runtime.remotes, REMOTE_ALIASES)
 		return
 	end
+	runtime.remotes = G.indexRemotes and G.indexRemotes(ReplicatedStorage, runtime.remotes) or runtime.remotes
 	for key, names in pairs(REMOTE_ALIASES) do
-		for _, name in ipairs(names) do
-			local remote = folder:FindFirstChild(name)
-			if remote then
-				runtime.remotes[key] = remote
-				break
-			end
+		local remote = G.findRemote and G.findRemote(runtime.remotes, names)
+		if remote then
+			runtime.remotes[key] = remote
 		end
 	end
 end
@@ -244,10 +240,9 @@ local function touchCollect(patterns)
 	for _, part in ipairs(partsMatching(Workspace, patterns, state.CollectRadius)) do
 		local target = part:IsA("Model") and (part.PrimaryPart or part:FindFirstChildWhichIsA("BasePart")) or part
 		if target then
-			if G.touchPart then
+			local clicked = G.fireClickDetector and G.fireClickDetector(part)
+			if not clicked and G.touchPart then
 				G.touchPart(root, target)
-			elseif G.fireClickDetector then
-				G.fireClickDetector(target)
 			end
 		end
 	end
@@ -378,6 +373,7 @@ local function runAutomation()
 			fireKey("LemonTrade")
 		end)
 	end
+	Core.tickAutoRejoin(state, runtime)
 end
 
 Core.makeSupervisor(state, loops, loopControllers, "mainLoop", 0.25, runAutomation)
@@ -486,6 +482,7 @@ moveGroup:CreateToggle("Custom walk speed", state.WalkSpeedEnabled, "Overrides l
 moveGroup:CreateSlider("Walk speed", 16, 120, state.WalkSpeed, function(v) state.WalkSpeed = v end, "Local movement speed.")
 moveGroup:CreateToggle("Infinite jump", state.InfiniteJump, "Jump again while airborne.", function(v) state.InfiniteJump = v end)
 
+utilGroup:CreateToggle("Auto rejoin server", state.AutoRejoin, "Rejoins same server after updates.", function(v) state.AutoRejoin = v end)
 utilGroup:CreateToggle("Anti AFK", state.AntiAFK ~= false, "Prevents idle kicks.", function(v)
 	state.AntiAFK = v
 	if v then Core.setupAntiAfk(LocalPlayer) end

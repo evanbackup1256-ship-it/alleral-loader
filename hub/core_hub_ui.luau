@@ -1268,8 +1268,9 @@ function Core.buildQuickTogglesGroup(tab, options)
 	return group
 end
 
-function Core.buildServerToolsGroup(tab, column)
-	local group = Core.buildUiGroup(tab, "Server tools", column or 1, nil, nil, "ServerTools")
+function Core.buildServerToolsGroup(tab, column, options)
+	options = type(options) == "table" and options or {}
+	local group = Core.buildUiGroup(tab, "Server tools", column or 1, options.saveWrap, nil, "ServerTools")
 	group:CreateButton("Copy JobId", Core.copyJobId, "Copy this server's instance id.")
 	group:CreateButton("Copy join link", Core.copyPlaceJoinLink, "Share a direct join link.")
 	group:CreateButton("Rejoin server", Core.rejoinServer, "Reconnect to this exact server.")
@@ -1282,6 +1283,15 @@ function Core.buildServerToolsGroup(tab, column)
 			Core.notify("Alleral", tostring(game.PlaceId), 5)
 		end
 	end, "Copy the experience PlaceId.")
+	if type(options.state) == "table" then
+		local state = options.state
+		group:CreateToggle("Auto rejoin server", state.AutoRejoin == true, "Rejoins this server after a game update.", function(v)
+			state.AutoRejoin = v
+			if type(options.saveFn) == "function" then
+				options.saveFn()
+			end
+		end)
+	end
 	return group
 end
 
@@ -2466,7 +2476,11 @@ function Core.buildStandardSettingsExtras(tab, options)
 		end
 	end
 	Core.buildSessionStatsGroup(tab, options.sessionColumn or 1)
-	Core.buildServerToolsGroup(tab, options.serverColumn or 1)
+	Core.buildServerToolsGroup(tab, options.serverColumn or 1, {
+		state = options.state,
+		saveFn = options.saveFn or options.saveSettings,
+		saveWrap = options.saveWrap,
+	})
 	Core.buildThemeStudioGroup(tab, options)
 	Core.buildCustomizationStudioGroup(tab, options)
 	Core.buildSystemPanelGroup(tab, options)

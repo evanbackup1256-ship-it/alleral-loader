@@ -36,7 +36,7 @@ getgenv().Alleral_Boot = nil
 
 print("[Kick] Script executing")
 
-local VERSION = "7.3.2"
+local VERSION = "7.3.3"
 getgenv().Alleral_ActiveScriptVersion = VERSION
 
 local state = getgenv().Alleral_State
@@ -251,6 +251,7 @@ local defaults = {
 	ABlackScreen = false,
 	AAutoEquipBestWeight = false,
 }
+defaults = Core.mergeGameDefaults(defaults)
 
 local savedKeys = {
 	"AFarm",

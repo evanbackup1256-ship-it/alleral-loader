@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "2.2.0"
+local VERSION = "2.2.1"
 local PLACE_ID = 95204935687527
 local state = getgenv().Alleral_State
 local G = (Core and Core.Game) or getgenv().Alleral_GameHelpers or {}
@@ -90,6 +90,7 @@ local defaults = {
 	TargetSellMutations = { "Any" },
 	SprinklerVariant = "Any",
 }
+defaults = Core.mergeGameDefaults(defaults)
 
 local savedKeys
 local saveSettings
@@ -137,16 +138,15 @@ local REMOTE_ALIASES = {
 }
 
 local function refreshRemotes()
+	if G.bindRemoteAliases then
+		runtime.remotes = G.bindRemoteAliases(ReplicatedStorage, runtime.remotes, REMOTE_ALIASES)
+		return
+	end
 	runtime.remotes = G.indexRemotes and G.indexRemotes(ReplicatedStorage, runtime.remotes) or runtime.remotes
-	local folder = waitChild(ReplicatedStorage, "Remotes", 3)
-	if not folder then return end
 	for key, names in pairs(REMOTE_ALIASES) do
-		for _, name in ipairs(names) do
-			local remote = folder:FindFirstChild(name)
-			if remote then
-				runtime.remotes[key] = remote
-				break
-			end
+		local remote = G.findRemote and G.findRemote(runtime.remotes, names)
+		if remote then
+			runtime.remotes[key] = remote
 		end
 	end
 end
@@ -513,10 +513,7 @@ local function runAutomation()
 	if state.AutoWeatherPredictor or state.AutoSeedPredictor or state.AutoGearPredictor then
 		tickEvery("predictors", state.PredictorInterval or 10, predictorTick)
 	end
-	if state.AutoRejoin and not runtime.rejoinQueued then
-		runtime.rejoinQueued = true
-		task.delay(1, rejoinCurrentServer)
-	end
+	Core.tickAutoRejoin(state, runtime, 1)
 end
 
 Core.makeSupervisor(state, loops, loopControllers, "mainLoop", 0.25, runAutomation)

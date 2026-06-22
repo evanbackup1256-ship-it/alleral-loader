@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "1.5.2"
+local VERSION = "1.5.3"
 local state = getgenv().Alleral_State
 local connections = {}
 local loops = {}
@@ -89,6 +89,7 @@ local defaults = {
 	LastTeleportedZone = nil,
 	PreviousKnownMaxZone = nil,
 }
+defaults = Core.mergeGameDefaults(defaults)
 
 local savedKeys
 local saveSettings

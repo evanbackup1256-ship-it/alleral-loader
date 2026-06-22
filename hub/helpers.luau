@@ -1,5 +1,5 @@
 local Helpers = {}
-Helpers.VERSION = "1.8"
+Helpers.VERSION = "1.9"
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -128,17 +128,125 @@ function Helpers.indexRemotes(root, cache)
 	return cache
 end
 
+local function normalizeRemoteName(name)
+	name = string.lower(tostring(name or ""))
+	return name:gsub("[%s_%-%.]", "")
+end
+
 function Helpers.findRemote(cache, names)
 	if not cache then
 		return nil
 	end
+	names = type(names) == "table" and names or { names }
 	for _, name in ipairs(names) do
 		local remote = cache[name]
 		if remote then
 			return remote
 		end
 	end
+	local wanted = {}
+	for _, name in ipairs(names) do
+		wanted[normalizeRemoteName(name)] = true
+	end
+	for key, remote in pairs(cache) do
+		if type(key) == "string" and wanted[normalizeRemoteName(key)] then
+			return remote
+		end
+	end
+	for key, remote in pairs(cache) do
+		if type(key) == "string" then
+			local normalized = normalizeRemoteName(key)
+			for want in pairs(wanted) do
+				if normalized:find(want, 1, true) or want:find(normalized, 1, true) then
+					return remote
+				end
+			end
+		end
+	end
 	return nil
+end
+
+function Helpers.bindRemoteAliases(root, cache, aliasMap)
+	cache = Helpers.indexRemotes(root, cache or {})
+	if type(aliasMap) ~= "table" then
+		return cache
+	end
+	for key, names in pairs(aliasMap) do
+		local remote = Helpers.findRemote(cache, names)
+		if remote then
+			cache[key] = remote
+		end
+	end
+	return cache
+end
+
+function Helpers.touchPart(root, part)
+	if not root or not part then
+		return false
+	end
+	local env = getgenv and getgenv() or {}
+	local fireTouch = env.firetouchinterest or env.FireTouchInterest or env.touchinterest
+	if type(fireTouch) == "function" then
+		local ok = pcall(fireTouch, root, part, 0)
+		if ok then
+			pcall(fireTouch, root, part, 1)
+			return true
+		end
+	end
+	pcall(function()
+		root.CFrame = part.CFrame + Vector3.new(0, 2, 0)
+	end)
+	return true
+end
+
+function Helpers.fireClickDetector(target)
+	if not target then
+		return false
+	end
+	local part = target
+	if target:IsA("Model") then
+		part = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart", true)
+	end
+	if not part then
+		return false
+	end
+	local detector = part:FindFirstChildWhichIsA("ClickDetector", true)
+		or (target:IsA("ClickDetector") and target)
+	if detector then
+		local env = getgenv and getgenv() or {}
+		local fireSignal = env.firesignal or env.FireSignal
+		if type(fireSignal) == "function" then
+			return pcall(fireSignal, detector.MouseClick)
+		end
+		return pcall(function()
+			for _, conn in ipairs(getconnections and getconnections(detector.MouseClick) or {}) do
+				if conn.Function then
+					conn.Function()
+				end
+			end
+		end)
+	end
+	local prompt = part:FindFirstChildWhichIsA("ProximityPrompt", true)
+		or target:FindFirstChildWhichIsA("ProximityPrompt", true)
+	if prompt then
+		return Helpers.fireProximityPrompt(prompt)
+	end
+	return false
+end
+
+function Helpers.fireProximityPrompt(prompt)
+	if not prompt or not prompt:IsA("ProximityPrompt") then
+		return false
+	end
+	local env = getgenv and getgenv() or {}
+	if type(env.fireproximityprompt) == "function" then
+		return pcall(env.fireproximityprompt, prompt)
+	end
+	return pcall(function()
+		prompt:InputHoldBegin()
+		task.wait(0.05)
+		prompt:InputHoldEnd()
+	end)
 end
 
 local MODULE_CACHE = {}

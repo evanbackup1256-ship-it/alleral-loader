@@ -1,8 +1,8 @@
 local Core = {}
-Core.VERSION = "2.9.10"
+Core.VERSION = "2.9.11"
 Core._CORE_ARTIFACT = "base"
 Core.UI_LIBRARY = "WindUI"
-Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "11.5.2"
+Core.ALLERAL_UI_VERSION = Core.ALLERAL_UI_VERSION or "11.5.3"
 Core.UI_VERSION = Core.ALLERAL_UI_VERSION
 
 local HttpService = game:GetService("HttpService")
@@ -182,6 +182,9 @@ function Core.boot(state)
 	local core, ui, msg = Core.prepareGame(state)
 	if not core then
 		core = priorCore or ENV.Alleral_Core or getgenv().Alleral_Core
+	end
+	if core and state and type(Core.startAutoRejoinWatcher) == "function" then
+		Core.startAutoRejoinWatcher(state)
 	end
 	return core, ui, msg
 end
@@ -1528,6 +1531,75 @@ function Core.stopLiveStatsSampler()
 end
 
 Core.installResilience()
+
+function Core.mergeGameDefaults(defaults)
+	defaults = type(defaults) == "table" and defaults or {}
+	if defaults.HubRunning == nil then defaults.HubRunning = true end
+	if defaults.AntiAFK == nil then defaults.AntiAFK = true end
+	if defaults.ABoostFPS == nil then defaults.ABoostFPS = false end
+	if defaults.ARTXMod == nil then defaults.ARTXMod = false end
+	if defaults.ABlackScreen == nil then defaults.ABlackScreen = false end
+	if defaults.AutoRejoin == nil then defaults.AutoRejoin = false end
+	if defaults.AAutoLoadConfig == nil then defaults.AAutoLoadConfig = false end
+	if defaults.AutoLoadProfile == nil then defaults.AutoLoadProfile = "default" end
+	return defaults
+end
+
+function Core.rejoinCurrentServer()
+	local TeleportService = game:GetService("TeleportService")
+	local Players = game:GetService("Players")
+	local lp = Players.LocalPlayer
+	if not lp then return false end
+	return pcall(function()
+		TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, lp)
+	end)
+end
+
+function Core.tickAutoRejoin(state, runtime, delaySec)
+	if type(state) ~= "table" or state.AutoRejoin ~= true then
+		return
+	end
+	local placeChange = ENV._Alleral_PlaceVersionChange
+	if ENV._Alleral_GameRecentlyUpdated ~= true and not (type(placeChange) == "table" and placeChange.changed) then
+		return
+	end
+	runtime = type(runtime) == "table" and runtime or {}
+	if runtime.rejoinQueued then
+		return
+	end
+	runtime.rejoinQueued = true
+	task.delay(tonumber(delaySec) or 2, function()
+		Core.rejoinCurrentServer()
+	end)
+end
+
+function Core.startAutoRejoinWatcher(state)
+	if Core._autoRejoinWatcherStarted or type(state) ~= "table" then
+		return
+	end
+	Core._autoRejoinWatcherStarted = true
+	local runtime = {}
+	task.spawn(function()
+		while state.HubRunning ~= false do
+			Core.tickAutoRejoin(state, runtime, 1.5)
+			task.wait(5)
+		end
+	end)
+end
+
+function Core.leaderstat(player, names)
+	player = player or game:GetService("Players").LocalPlayer
+	names = type(names) == "table" and names or { names }
+	local folder = player and player:FindFirstChild("leaderstats")
+	if not folder then return "?" end
+	for _, name in ipairs(names) do
+		local value = folder:FindFirstChild(name)
+		if value and (value:IsA("IntValue") or value:IsA("NumberValue") or value:IsA("StringValue")) then
+			return tostring(value.Value)
+		end
+	end
+	return "?"
+end
 
 ENV.Alleral_Core = Core
 return Core

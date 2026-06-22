@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "2.3.2"
+local VERSION = "2.3.3"
 local state = getgenv().Alleral_State
 local G = (Core and Core.Game) or getgenv().Alleral_GameHelpers or {}
 local connections = {}
@@ -82,6 +82,7 @@ local defaults = {
 	MineInterval = 6,
 	GodModeInterval = 0.25,
 }
+defaults = Core.mergeGameDefaults(defaults)
 
 local savedKeys
 local saveSettings

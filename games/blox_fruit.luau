@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "0.1.1"
+local VERSION = "0.1.2"
 local PLACE_ID = 2753915549
 local SCRIPT_STATUS = "broken"
 local state = getgenv().Alleral_State
@@ -40,6 +40,7 @@ local defaults = {
 	AntiAFK = true,
 	MaintenanceAcknowledged = false,
 }
+defaults = Core.mergeGameDefaults(defaults)
 
 local savedKeys
 local saveSettings

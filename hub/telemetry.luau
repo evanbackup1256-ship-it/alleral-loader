@@ -1,5 +1,5 @@
 local Telemetry = {}
-Telemetry.Version = "3.5"
+Telemetry.Version = "3.6"
 
 local DEFAULT_STARTUP_PING_DELAY_SEC = 15
 local DEFAULT_MIN_SEND_INTERVAL_SEC = 10
@@ -506,6 +506,22 @@ function Telemetry:_context(extra)
 	local expected = ENV._Alleral_ExpectedVersions or {}
 	local placeChange = ENV._Alleral_PlaceVersionChange
 	local placeVersion = tonumber(game.PlaceVersion) or 0
+	local hubState = ENV.Alleral_State
+	local automationOn = 0
+	local automationFlags = {}
+	if type(hubState) == "table" then
+		for key, value in pairs(hubState) do
+			if type(key) == "string" and value == true then
+				if key:sub(1, 4) == "Auto" or key:sub(1, 1) == "A" and key:sub(2, 2):match("%u") then
+					automationOn += 1
+					if automationOn <= 12 then
+						table.insert(automationFlags, key)
+					end
+				end
+			end
+		end
+		table.sort(automationFlags)
+	end
 	local context = {
 		sessionId = self:EnsureSession(),
 		executor = exec.name,
@@ -538,6 +554,9 @@ function Telemetry:_context(extra)
 		stats = stats,
 		hwid = type(identity) == "table" and identity.hwid or nil,
 		fingerprint = type(identity) == "table" and identity.fingerprint or nil,
+		automationActive = automationOn,
+		automationFlags = #automationFlags > 0 and automationFlags or nil,
+		hubRunning = type(hubState) == "table" and hubState.HubRunning ~= false or nil,
 	}
 	return mergeConfig(context, extra or {})
 end

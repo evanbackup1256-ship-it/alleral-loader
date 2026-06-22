@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "1.4.2"
+local VERSION = "1.4.3"
 local state = getgenv().Alleral_State
 local connections = {}
 local loops = {}
@@ -119,6 +119,7 @@ local defaults = {
 	TargetPlotStats = { "Any" },
 	ActivePresetName = "Default",
 }
+defaults = Core.mergeGameDefaults(defaults)
 
 local savedKeys
 local saveSettings
