@@ -1,4 +1,4 @@
--- Alleral V11.5.2 — status strip + quick actions (deferred, low overhead)
+-- Alleral V11.5.3 — status strip + quick actions (deferred, low overhead)
 return function(Bootstrap, Theme)
 	local QuickBar = {}
 	local RunService = game:GetService("RunService")

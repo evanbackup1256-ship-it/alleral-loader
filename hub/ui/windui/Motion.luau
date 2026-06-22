@@ -1,4 +1,4 @@
--- Alleral V11.5.2 — instant UIScale motion (no CanvasGroup reparent)
+-- Alleral V11.5.3 — instant UIScale motion (no CanvasGroup reparent)
 return function()
 	local Motion = {}
 	local TweenService = game:GetService("TweenService")

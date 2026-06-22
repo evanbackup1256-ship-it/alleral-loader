@@ -1,4 +1,4 @@
--- Alleral V11.5.2 — WindUI window (fast load, no backdrop, quick bar)
+-- Alleral V11.5.3 — WindUI window (fast load, no backdrop, quick bar)
 return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, _TooltipManager, Cache, Patch, SearchGlow, VisualPolish, QuickBar)
 	local WindowMod = {}
 

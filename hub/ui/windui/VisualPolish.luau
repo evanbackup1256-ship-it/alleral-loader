@@ -1,4 +1,4 @@
--- Alleral V11.5.2 — lightweight border polish (no backdrop, no loops)
+-- Alleral V11.5.3 — lightweight border polish (no backdrop, no loops)
 return function(Theme)
 	local VisualPolish = {}
 	local bound = {}

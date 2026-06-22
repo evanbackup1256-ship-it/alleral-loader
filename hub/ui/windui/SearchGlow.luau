@@ -1,4 +1,4 @@
--- Alleral V11.5.2 — search focus stroke (one-shot, no idle loops)
+-- Alleral V11.5.3 — search focus stroke (one-shot, no idle loops)
 return function(Theme)
 	local SearchGlow = {}
 	local TweenService = game:GetService("TweenService")

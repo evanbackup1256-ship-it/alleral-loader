@@ -1,4 +1,4 @@
--- Alleral UI layer — v11.5.0 WindUI (sole framework)
+-- Alleral UI layer — v11.5.3 WindUI (sole framework)
 --[[
 	WindUI bootstrap — https://github.com/Footagesus/WindUI
 	No Noble, Fusion, Spr, Linoria, or legacy renderers.
@@ -1042,5 +1042,5 @@ return function(Core)
 	Core._NobleV10 = nil
 	Core._NobleV8 = nil
 
-	log("INFO", "Alleral WindUI v11.5.0 — sole UI framework loaded")
+	log("INFO", "Alleral WindUI v11.5.3 — sole UI framework loaded")
 end
