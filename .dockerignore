@@ -34,8 +34,7 @@ Dockerfile
 docker-compose*.yml
 railway.toml
 
-# Large directories
-games/
+# Large directories (games/ is required in the Docker image for /api/games/script)
 maint/
 scripts/
 Alleral-Private/
