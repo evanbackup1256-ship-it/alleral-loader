@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-22T01:58:56Z",
+  "updatedAt": "2026-06-22T02:04:00Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
-  "loaderVersion": "8.12.5",
+  "loaderVersion": "8.12.6",
   "coreVersion": "2.9.11",
   "uiLibrary": "WindUI",
   "uiVersion": "11.5.3",
@@ -13,7 +13,7 @@
   "branch": "main",
   "features": [
     "Picks the right game script when you inject",
-    "Linoria UI main menu with one active runtime",
+    "WindUI main menu with ripple press, window motion, and one active runtime",
     "Site and scripts pull straight from GitHub",
     "Game status comes from real injects, not guesses",
     "Updates show up within about a minute of a push",
@@ -46,6 +46,17 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-22",
+      "title": "Release 8.12.6 — all scripts, UI, and animations release-ready",
+      "items": [
+        "WindUI v11.5.3 unified across Bootstrap, Motion, Controls, Window, and polish modules",
+        "Button ripple press + UIScale window open/close animations verified",
+        "verify_ui_compat.ps1 updated for WindUI (replaces legacy Linoria checks)",
+        "All 8 game scripts version-synced with scripts_manifest.json",
+        "Script protection, merged bootstrap gate, and GitHub-first loader pin confirmed"
+      ]
+    },
     {
       "date": "2026-06-22",
       "title": "Loader 8.12.5 — fix stale Railway CDN, GitHub-first bootstrap",
