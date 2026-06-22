@@ -2089,6 +2089,8 @@ def client_bootstrap():
         "banApiUrl": f"{base}/api/ban",
         "loaderCdnBase": base,
         "loaderManifestUrl": f"{base}/api/loader/manifest",
+        "gameScriptBase": f"{base}/api/games/script",
+        "protectScripts": True,
         "apiKey": API_KEY,
         "brand": BRAND,
     })

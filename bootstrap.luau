@@ -1,9 +1,12 @@
--- Alleral entry v2.2.0 — thin wrapper (bootstrap logic lives in loader.luau)
--- Edit loader.luau only; this file just fetches and runs it.
-local BOOTSTRAP_VERSION = "2.2.0"
+-- Alleral entry v2.3.0 — thin bootstrap (gate + release pin live in loader.luau)
+-- Edit loader.luau for logic; this file fetches release.json, pins loader commit, runs loader.
+local BOOTSTRAP_VERSION = "2.3.0"
 local REPO = "evanbackup1256-ship-it/-kick-loader"
 local BRANCH = "main"
+local CFG = "cfg"
 local LOADER_MIN_BYTES = 50000
+local DEFAULT_RELAY = "https://alleral-telemetry-production.up.railway.app"
+local GITHUB_RAW = "https://raw.githubusercontent.com/" .. REPO
 
 local function genv()
 	local ok, env = pcall(function()
@@ -37,8 +40,6 @@ if not game then
 	error("[Alleral Bootstrap] Run inside a Roblox game, not the executor menu.")
 end
 ENV.game = game
-
-print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Fetching merged loader...")
 
 local loadFn = ENV.loadstring or ENV.LoadString or ENV.load or loadstring or load
 if type(loadFn) ~= "function" then
@@ -95,16 +96,64 @@ local function fetchUrl(url, minBytes)
 	return nil
 end
 
+local function parseRelease(body)
+	if type(body) ~= "string" then
+		return nil
+	end
+	local commit = body:match('"commit"%s*:%s*"([^"]+)"')
+	local loader = body:match('"loader"%s*:%s*"([^"]+)"')
+	local protect = body:match('"protectScripts"%s*:%s*true') ~= nil
+	return {
+		commit = commit,
+		loader = loader,
+		protectScripts = protect,
+	}
+end
+
+local releaseBody = fetchUrl(GITHUB_RAW .. "/" .. BRANCH .. "/" .. CFG .. "/release.json", 20)
+local release = parseRelease(releaseBody) or {}
+local pin = (type(release.commit) == "string" and release.commit ~= "") and release.commit or BRANCH
+
+ENV._Alleral_BootstrapVersion = BOOTSTRAP_VERSION
+ENV._Alleral_ReleaseCommit = pin
+ENV._Alleral_ProtectScripts = release.protectScripts == true
+
+print("[Alleral Bootstrap v" .. BOOTSTRAP_VERSION .. "] Pin commit " .. pin .. " · fetching loader...")
+
+local relayBase = DEFAULT_RELAY
+local bootBody = fetchUrl(relayBase .. "/api/bootstrap", 20)
+if type(bootBody) == "string" then
+	local relayUrl = bootBody:match('"relayUrl"%s*:%s*"([^"]+)"')
+	local loaderCdn = bootBody:match('"loaderCdnBase"%s*:%s*"([^"]+)"')
+	local apiKey = bootBody:match('"apiKey"%s*:%s*"([^"]+)"')
+	if type(loaderCdn) == "string" and loaderCdn ~= "" then
+		relayBase = loaderCdn:gsub("/+$", "")
+		ENV._Alleral_LoaderCdnBase = relayBase
+	end
+	if type(apiKey) == "string" and apiKey ~= "" then
+		ENV.Alleral_TelemetryApiKey = apiKey
+		if getgenv then
+			getgenv().Alleral_TelemetryApiKey = apiKey
+		end
+	end
+	if type(relayUrl) == "string" and relayUrl ~= "" then
+		ENV.Alleral_OwnerTelemetry = ENV.Alleral_OwnerTelemetry or {}
+		ENV.Alleral_OwnerTelemetry.relayUrl = relayUrl
+	end
+end
+
 local sources = {
-	"https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/loader.luau",
-	"https://alleral-telemetry-production.up.railway.app/api/loader/file/loader.luau",
-	"https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. BRANCH .. "/loader.luau",
+	relayBase .. "/api/loader/file/loader.luau",
+	GITHUB_RAW .. "/" .. pin .. "/loader.luau",
+	"https://github.com/" .. REPO .. "/raw/" .. pin .. "/loader.luau",
+	"https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. pin .. "/loader.luau",
+	GITHUB_RAW .. "/" .. BRANCH .. "/loader.luau",
 }
 
 local src
 for _, url in ipairs(sources) do
 	local body = fetchUrl(url, LOADER_MIN_BYTES)
-	if type(body) == "string" and body:find("LOADER_VERSION", 1, true) then
+	if type(body) == "string" and body:find("LOADER_VERSION", 1, true) and body:find("runMergedBootstrapGate", 1, true) then
 		src = body
 		break
 	end
@@ -112,10 +161,11 @@ end
 
 if not src then
 	ENV._Alleral_BootstrapRunning = false
-	error("[Alleral Bootstrap] Could not download loader.luau — enable HTTP and retry.")
+	error("[Alleral Bootstrap] Could not download loader.luau (commit " .. pin .. ") — enable HTTP and retry.")
 end
 
 ENV._Alleral_MergedBootstrapEntry = true
+ENV._Alleral_Bootstrapped = true
 local chunk = loadFn(src, "@Alleral/loader")
 if type(chunk) ~= "function" then
 	ENV._Alleral_BootstrapRunning = false

@@ -48,6 +48,18 @@
   "changelog": [
     {
       "date": "2026-06-22",
+      "title": "Loader 8.12.4 — GitHub sync, merged bootstrap gate, script protection",
+      "items": [
+        "Bootstrap v2.3.0 pins loader.luau to release.json commit (fixes stale GitHub CDN)",
+        "Bootstrap fetches Railway /api/bootstrap first for API key + loader CDN",
+        "Loader runMergedBootstrapGate() runs on every boot (thin bootstrap + merged gate)",
+        "Game scripts load from Railway /api/games/script/{id}.luau only when protectScripts is on",
+        "Public GitHub games/ folder no longer used by loader when protection is enabled",
+        "Removed dead Loader/ legacy module fetches from boot chain"
+      ]
+    },
+    {
+      "date": "2026-06-22",
       "title": "Major Grow A Garden 2 Expansion & +1 Speed Keyboard Escape Update",
       "items": [
         "Grow A Garden 2: Added Blacklist Seed Filter",

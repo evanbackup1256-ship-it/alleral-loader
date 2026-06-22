@@ -1,6 +1,6 @@
 --!nocheck
-local LOADER_VERSION = "8.12.3"
-local BOOTSTRAP_VERSION = "2.2.0"
+local LOADER_VERSION = "8.12.4"
+local BOOTSTRAP_VERSION = "2.3.0"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -26,7 +26,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.12.3",
+	loader = "8.12.4",
 	core = "2.9.11",
 	ui = "WindUI",
 	uiVersion = "11.5.3",
@@ -36,9 +36,12 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "227a762",
-	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,	autoUpdate = true,
+	commit = "c9aa43b",
+	protectScripts = true,
+	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
+	autoUpdate = true,
 }
+local DEFAULT_RELAY_BASE = "https://alleral-telemetry-production.up.railway.app"
 local WORKSPACE_ROOTS = {
 	"",
 	"kick/",
@@ -2061,11 +2064,16 @@ local function fetchGameScript(profile)
 		end
 	end
 
+	ensureRelayCredentials()
 	local protectedSrc, protectedLabel = fetchProtectedGameScript(profile, minBytes, gameVersion)
 	if protectedSrc then
 		return protectedSrc, protectedLabel
 	end
 	lastReason = protectedLabel or lastReason
+
+	if protectGameScriptsEnabled() then
+		return nil, "protected scripts required — relay unavailable (" .. tostring(lastReason) .. ")"
+	end
 
 	for _, base in ipairs(REMOTE_BASES) do
 		local body, via = httpGet(base .. "/" .. profile.scriptUrl, minBytes)
@@ -2640,6 +2648,50 @@ local function normalizeHttps(url)
 	return value
 end
 
+local function ensureRelayCredentials()
+	if trim(ENV.Alleral_TelemetryApiKey or "") ~= "" and trim(ENV._Alleral_LoaderCdnBase or "") ~= "" then
+		return true
+	end
+	local bases = {}
+	if trim(ENV._Alleral_LoaderCdnBase or "") ~= "" then
+		table.insert(bases, ENV._Alleral_LoaderCdnBase:gsub("/+$", ""))
+	end
+	local owner = ENV.Alleral_OwnerTelemetry
+	if type(owner) == "table" and trim(owner.relayUrl or "") ~= "" then
+		table.insert(bases, owner.relayUrl:gsub("/+$", ""):gsub("/ingest$", ""))
+	end
+	table.insert(bases, DEFAULT_RELAY_BASE)
+	for _, base in ipairs(bases) do
+		local boot = decodeJson(select(1, httpFetch(base .. "/api/bootstrap?t=" .. tick())))
+		if type(boot) == "table" and boot.ok then
+			if trim(boot.apiKey or "") ~= "" then
+				ENV.Alleral_TelemetryApiKey = boot.apiKey
+				if getgenv then
+					getgenv().Alleral_TelemetryApiKey = boot.apiKey
+				end
+			end
+			if trim(boot.loaderCdnBase or "") ~= "" then
+				ENV._Alleral_LoaderCdnBase = normalizeHttps(boot.loaderCdnBase)
+			else
+				ENV._Alleral_LoaderCdnBase = base
+			end
+			return trim(ENV.Alleral_TelemetryApiKey or "") ~= ""
+		end
+	end
+	return false
+end
+
+local function protectGameScriptsEnabled()
+	if ENV._Alleral_ProtectScripts == true then
+		return true
+	end
+	local expected = ENV._Alleral_ExpectedVersions
+	if type(expected) == "table" and expected.protectScripts == true then
+		return true
+	end
+	return RELEASE_FALLBACK.protectScripts == true
+end
+
 local function loadTelemetryConfig(deferBootstrap)
 	local cfg = nil
 	local raw = readLocal({ CFG .. "/telemetry.json", "config/telemetry.json" }, 20)
@@ -2651,13 +2703,16 @@ local function loadTelemetryConfig(deferBootstrap)
 		cfg = decodeJson(raw)
 	end
 	cfg = type(cfg) == "table" and cfg or { enabled = false }
+	if trim(cfg.relayUrl or "") == "" then
+		cfg.relayUrl = DEFAULT_RELAY_BASE .. "/ingest"
+	end
 	cfg = mergeTables(
 		cfg,
 		loadReturnTable({ CFG .. "/owner_telemetry.luau", "config/owner_telemetry.luau" }, CFG .. "/owner_telemetry.luau")
 	)
 	local function applyBootstrap()
-		if trim(cfg.apiKey or "") == "" and trim(cfg.relayUrl or "") ~= "" then
-			local base = cfg.relayUrl:gsub("/+$", ""):gsub("/ingest$", "")
+		if trim(cfg.apiKey or "") == "" then
+			local base = trim(cfg.relayUrl or "") ~= "" and cfg.relayUrl:gsub("/+$", ""):gsub("/ingest$", "") or DEFAULT_RELAY_BASE
 			local boot = decodeJson(select(1, httpFetch(base .. "/api/bootstrap?t=" .. tick())))
 			if type(boot) == "table" and boot.ok then
 				if trim(boot.apiKey or "") ~= "" then
@@ -3098,6 +3153,7 @@ local function fetchExpectedVersionsFast()
 		uiVersion = RELEASE_FALLBACK.uiVersion,
 		ui = RELEASE_FALLBACK.ui,
 		commit = RELEASE_FALLBACK.commit,
+		protectScripts = RELEASE_FALLBACK.protectScripts == true,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
 		minCore = MIN_CORE,
@@ -3145,6 +3201,7 @@ fetchExpectedVersions = function(forceRefresh)
 		uiVersion = RELEASE_FALLBACK.uiVersion,
 		ui = RELEASE_FALLBACK.ui,
 		commit = RELEASE_FALLBACK.commit,
+		protectScripts = RELEASE_FALLBACK.protectScripts == true,
 		updatedAt = "",
 		minLoader = LOADER_VERSION,
 		minCore = MIN_CORE,
@@ -3177,6 +3234,9 @@ fetchExpectedVersions = function(forceRefresh)
 		end
 		if release.autoUpdate ~= nil then
 			expected.autoUpdate = release.autoUpdate == true
+		end
+		if release.protectScripts ~= nil then
+			expected.protectScripts = release.protectScripts == true
 		end
 	end
 
@@ -4256,14 +4316,6 @@ local function main()
 			end
 		end,
 	})
-	-- Load Loader/ diagnostic and support modules
-	task.spawn(function()
-		pcall(loadModule, { "Loader/Diagnostics.luau" }, "Loader/Diagnostics.luau", "Alleral_Diagnostics", "Alleral/Diagnostics")
-		pcall(loadModule, { "Loader/Validation.luau" }, "Loader/Validation.luau", "Alleral_Validation", "Alleral/Validation")
-		pcall(loadModule, { "Loader/ErrorHandler.luau" }, "Loader/ErrorHandler.luau", "Alleral_ErrorHandler", "Alleral/ErrorHandler")
-		pcall(loadModule, { "Loader/Animations.luau" }, "Loader/Animations.luau", "Alleral_Animations", "Alleral/Animations")
-		pcall(loadModule, { "Loader/FeatureRegistry.luau" }, "Loader/FeatureRegistry.luau", "Alleral_FeatureRegistry", "Alleral/FeatureRegistry")
-	end)
 	local gameSrc, gameLabel = fetchGameScript(profile)
 	ensureTelemetryLoaded()
 
