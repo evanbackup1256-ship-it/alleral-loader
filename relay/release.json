@@ -3,7 +3,7 @@
   "core": "2.9.10",
   "weao": "1.1",
   "ui": "WindUI",
-  "commit": "c3e9ff9",
+  "commit": "7e9744e",
   "updatedAt": "2026-06-22T18:00:00Z",
   "updatePollSeconds": 120,
   "autoUpdate": true,
