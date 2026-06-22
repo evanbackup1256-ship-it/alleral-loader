@@ -12,11 +12,12 @@ return function(loadModule, Core)
 	local TooltipManager = loadModule("TooltipManager")()
 	local SearchGlow = loadModule("SearchGlow")(Theme)
 	local VisualPolish = loadModule("VisualPolish")(Theme)
+	local QuickBar = loadModule("QuickBar")(Bootstrap, Theme)
 	local Drag = loadModule("Drag")(Motion, TooltipManager)
 	local Validate = loadModule("Validate")(Bootstrap, GameRegistry)
 	local Notifications = loadModule("Notifications")(WindUI, Bootstrap)
 	local Controls = loadModule("Controls")(Bootstrap, Motion, Text, Guards, TooltipManager, Theme)
-	local WindowMod = loadModule("Window")(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, TooltipManager, Cache, Patch, SearchGlow, VisualPolish)
+	local WindowMod = loadModule("Window")(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, TooltipManager, Cache, Patch, SearchGlow, VisualPolish, QuickBar)
 	local Configs = loadModule("Configs")(Bootstrap, GameRegistry)
 	local Tabs = loadModule("Tabs")(GameRegistry, Cache)
 
@@ -136,7 +137,7 @@ return function(loadModule, Core)
 
 	function Library:GetLayoutInfo()
 		return {
-			profile = "windui-v11.5-aurora",
+			profile = "windui-v11.5.2-fast",
 			engine = Bootstrap.ENGINE,
 			version = Bootstrap.VERSION,
 			stack = "WindUI",
@@ -187,6 +188,7 @@ return function(loadModule, Core)
 		Cache = Cache,
 		GameRegistry = GameRegistry,
 		Patch = Patch,
+		QuickBar = QuickBar,
 		WindUI = WindUI,
 		sanitize = Bootstrap.sanitize,
 		log = function(lvl, msg)

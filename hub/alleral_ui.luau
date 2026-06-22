@@ -10,8 +10,8 @@
 	  GITHUB_RAW remote fallback via Core.httpGet
 ]]
 return function(Core)
-	Core.ALLERAL_UI_VERSION = "11.5.0"
-	Core.UI_VERSION = "11.5.0"
+	Core.ALLERAL_UI_VERSION = "11.5.2"
+	Core.UI_VERSION = "11.5.2"
 	Core.UI_LIBRARY = "WindUI"
 
 	local GITHUB_RAW = "https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main"
@@ -25,7 +25,7 @@ return function(Core)
 	end)()
 
 	local getGenv = getgenv or function() return ENV end
-	local WINDUI_CACHE_VERSION = "11.5.0-c3e9ff9"
+	local WINDUI_CACHE_VERSION = "11.5.2-fast"
 	getGenv()._NobleV8Modules = nil
 	getGenv()._NobleV8CacheVersion = nil
 	getGenv()._NobleV10Modules = nil
@@ -717,8 +717,40 @@ return function(Core)
 		end
 		function tab:BuildThemeGroupbox(col)
 			local g2 = Core.buildUiGroup(tab, "Appearance", col or 1)
-			if g2 and type(g2.CreateLabel) == "function" then
-				g2:CreateLabel("Alleral WindUI v11")
+			if g2 then
+				if type(g2.CreateLabel) == "function" then
+					g2:CreateLabel("Alleral WindUI v" .. tostring(Library and Library.Version or "11.5.2"))
+				end
+				if type(g2.CreateButton) == "function" then
+					g2:CreateButton("Open search (S)", function()
+						pcall(function()
+							if Library and Library.OpenSearch then
+								Library:OpenSearch()
+							end
+						end)
+					end)
+					g2:CreateButton("Reload UI", function()
+						local env = getgenv and getgenv() or {}
+						if env.Alleral_Reload then
+							pcall(env.Alleral_Reload)
+						elseif Library and Library.Notify then
+							Library:Notify("Re-execute the loader to reload", 4)
+						end
+					end)
+					g2:CreateButton("Strip backdrop", function()
+						local qb = windui and windui.QuickBar
+						local win = STATE and STATE.activeWindow
+						if qb and qb.stripBackdrop and win and win._wind then
+							pcall(qb.stripBackdrop, win._wind)
+						end
+						if Library and Library.Notify then
+							Library:Notify("Backdrop removed", 2)
+						end
+					end)
+				end
+				if type(g2.CreateToggle) == "function" then
+					g2:CreateToggle("Fast animations", true, "Shorter open/close tween", function() end)
+				end
 			end
 			return g2
 		end

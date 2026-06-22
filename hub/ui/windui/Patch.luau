@@ -51,6 +51,27 @@ return function(WindUI)
 		end
 
 		hideMain(windWindow)
+		Patch.stripBackdrop(windWindow)
+	end
+
+	function Patch.stripBackdrop(windWindow)
+		pcall(function()
+			if type(windWindow) == "table" then
+				windWindow.Transparent = false
+			end
+			local main = windWindow and windWindow.UIElements and windWindow.UIElements.Main
+			if typeof(main) == "Instance" then
+				for _, child in ipairs(main:GetChildren()) do
+					local n = child.Name:lower()
+					if n:find("overlay", 1, true) or n:find("backdrop", 1, true) or n:find("dim", 1, true) then
+						child.Visible = false
+						if child:IsA("GuiObject") then
+							child.BackgroundTransparency = 1
+						end
+					end
+				end
+			end
+		end)
 	end
 
 	function Patch.applyLibrary(WindUIRef)
@@ -81,6 +102,7 @@ return function(WindUI)
 				win.Toggle = function() end
 				win.Closed = true
 				hideMain(win)
+				Patch.stripBackdrop(win)
 			end
 			return win
 		end

@@ -3,7 +3,7 @@ local WINDUI_DIST = "https://raw.githubusercontent.com/Footagesus/WindUI/main/di
 
 return function(Core, Text, GameRegistry)
 	local Bootstrap = {}
-	Bootstrap.VERSION = "11.5.0"
+	Bootstrap.VERSION = "11.5.2"
 	Bootstrap.ENGINE = "WindUI"
 	Text = Text or { sanitize = function(v, m) return tostring(v or "") end }
 	GameRegistry = GameRegistry or {}

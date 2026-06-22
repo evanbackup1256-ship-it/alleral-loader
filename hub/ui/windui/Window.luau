@@ -1,5 +1,5 @@
--- Alleral V11.5 — WindUI window (aurora glass polish, search glow, no tooltips)
-return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, _TooltipManager, Cache, Patch, SearchGlow, VisualPolish)
+-- Alleral V11.5.2 — WindUI window (fast load, no backdrop, quick bar)
+return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Validate, Drag, _TooltipManager, Cache, Patch, SearchGlow, VisualPolish, QuickBar)
 	local WindowMod = {}
 
 	local STATES = {
@@ -40,9 +40,9 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 			Theme = Theme and Theme.NAME or "Dark",
 			NewElements = true,
 			HideSearchBar = false,
-			Transparent = settings.Transparent ~= false,
+			Transparent = false,
 			Acrylic = false,
-			Size = settings.Size or UDim2.fromOffset(1240, 720),
+			Size = settings.Size or UDim2.fromOffset(1080, 640),
 			OpenButton = { Enabled = false },
 			Topbar = {
 				Height = 52,
@@ -70,6 +70,9 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 		end)
 		if not ok or not windWindow then
 			error("WindUI CreateWindow failed: " .. tostring(err))
+		end
+		if Patch and Patch.stripBackdrop then
+			pcall(Patch.stripBackdrop, windWindow)
 		end
 		pcall(logFn, "INFO", "WindUI window created")
 
@@ -274,6 +277,9 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 		end
 
 		function self:Unload()
+			if QuickBar and QuickBar.cleanup then
+				pcall(QuickBar.cleanup, self._wind)
+			end
 			if Drag and Drag.cleanup then
 				pcall(Drag.cleanup)
 			end
@@ -333,12 +339,44 @@ return function(WindUI, Bootstrap, Controls, Notifications, Theme, Motion, Valid
 		if Drag then
 			pcall(function() Drag.bind(windWindow) end)
 		end
-		if SearchGlow and SearchGlow.bind then
-			pcall(SearchGlow.bind, windWindow)
+		if QuickBar and QuickBar.bind then
+			pcall(QuickBar.bind, windWindow, {
+				onSearch = function()
+					pcall(function()
+						if windWindow.OpenSearch then
+							windWindow:OpenSearch()
+						end
+					end)
+				end,
+				onReload = function()
+					local env = getgenv and getgenv() or {}
+					if env.Alleral_Reload then
+						pcall(env.Alleral_Reload)
+					elseif Notifications then
+						Notifications.push(WindUI, "Alleral", "Re-execute loader to reload UI", "info", 3)
+					end
+				end,
+				onTheme = function()
+					pcall(function()
+						if WindUI.SetTheme then
+							local nextTheme = Theme and Theme.NAME or "Alleral"
+							WindUI:SetTheme(nextTheme)
+						end
+					end)
+				end,
+			})
 		end
-		if VisualPolish and VisualPolish.bind then
-			pcall(VisualPolish.bind, windWindow)
-		end
+		task.defer(function()
+			if SearchGlow and SearchGlow.bind then
+				pcall(SearchGlow.bind, windWindow)
+			end
+			if VisualPolish and VisualPolish.bind then
+				pcall(VisualPolish.bind, windWindow)
+			end
+			if QuickBar and QuickBar.stripBackdrop then
+				pcall(QuickBar.stripBackdrop, windWindow)
+			end
+		end)
 
 		if Cache then
 			Cache.setWindow(gameId, self)
