@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-22T02:12:41Z",
+  "updatedAt": "2026-06-22T02:14:00Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
-  "loaderVersion": "8.12.6",
+  "loaderVersion": "8.12.7",
   "coreVersion": "2.9.11",
   "uiLibrary": "WindUI",
   "uiVersion": "11.5.3",
