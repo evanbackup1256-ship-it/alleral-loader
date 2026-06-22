@@ -28,3 +28,6 @@ runtime_secrets.json
 .cursor/
 
 # Single public repo — no obfuscation
+
+terminals/
+
