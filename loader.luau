@@ -2013,6 +2013,11 @@ local function sourceVersionStale(src, kind, expectedVersion)
 	return type(found) == "string" and found ~= expectedVersion
 end
 
+local trim
+local normalizeHttps
+local ensureRelayCredentials
+local protectGameScriptsEnabled
+
 local function gameRelayBases()
 	local bases = {}
 	local cdn = ENV._Alleral_LoaderCdnBase
@@ -2640,14 +2645,14 @@ local function mergeTables(base, extra)
 	return base
 end
 
-local function trim(value)
+trim = function(value)
 	if value == nil then
 		return ""
 	end
 	return tostring(value):match("^%s*(.-)%s*$") or ""
 end
 
-local function normalizeHttps(url)
+normalizeHttps = function(url)
 	if type(url) ~= "string" or url == "" then
 		return url
 	end
@@ -2658,7 +2663,7 @@ local function normalizeHttps(url)
 	return value
 end
 
-local function ensureRelayCredentials()
+ensureRelayCredentials = function()
 	if trim(ENV.Alleral_TelemetryApiKey or "") ~= "" and trim(ENV._Alleral_LoaderCdnBase or "") ~= "" then
 		return true
 	end
@@ -2691,7 +2696,7 @@ local function ensureRelayCredentials()
 	return false
 end
 
-local function protectGameScriptsEnabled()
+protectGameScriptsEnabled = function()
 	if ENV._Alleral_ProtectScripts == true then
 		return true
 	end
