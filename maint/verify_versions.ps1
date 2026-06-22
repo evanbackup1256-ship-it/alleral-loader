@@ -24,7 +24,7 @@ if ($bootstrapBytes.Length -ge 3 -and $bootstrapBytes[0] -eq 0xEF -and $bootstra
 } else {
     Pass "bootstrap.luau has no UTF-8 BOM"
 }
-$HashBumpMessagePattern = '^Update release commit hash'
+$HashBumpMessagePattern = '^(Update release commit hash|release: sync commit)'
 
 $head = (git -C $root rev-parse --short HEAD).Trim()
 $parent = ""
