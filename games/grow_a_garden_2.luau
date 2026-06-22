@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "2.2.1"
+local VERSION = "2.3.0"
 local PLACE_ID = 95204935687527
 local state = getgenv().Alleral_State
 local G = (Core and Core.Game) or getgenv().Alleral_GameHelpers or {}
@@ -116,7 +116,37 @@ local function leaderstat(name)
 	return "?"
 end
 
-local runtime = { remotes = {}, timers = {}, playerPlot = nil }
+local DEFAULT_CATALOG = {
+	seeds = {
+		"Any", "Carrot", "Strawberry", "Blueberry", "Tomato", "Corn", "Pumpkin", "Watermelon",
+		"Cactus", "Sunflower", "Mushroom", "Bamboo", "Coconut", "Mango", "Grape", "Pepper",
+		"Eggplant", "Rose", "Daffodil", "Lotus", "Dragon Fruit", "Sugar Apple", "Beanstalk",
+	},
+	mutations = {
+		"Any", "Normal", "Gold", "Rainbow", "Wet", "Shiny", "Frozen", "Moonlit", "Chilled",
+		"Sundried", "Celestial", "Pollinated", "Voidtouched",
+	},
+	rarities = {
+		"Any", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Divine", "Prismatic",
+	},
+	gears = {
+		"Any", "Shovel", "Watering Can", "Sprinkler", "Backpack", "Speed Boots", "Harvest Tool",
+		"Golden Shovel", "Advanced Sprinkler",
+	},
+	pets = {
+		"Any", "Common Egg", "Rare Egg", "Legendary Egg", "Dog", "Cat", "Bunny", "Dragon", "Fox", "Owl",
+	},
+	crates = { "Any", "Basic", "Premium", "Golden", "Diamond", "Mythic", "Seed Pack" },
+	sprinklers = { "Any", "Basic", "Advanced", "Golden", "Diamond" },
+}
+
+local runtime = {
+	remotes = {},
+	timers = {},
+	playerPlot = nil,
+	catalog = nil,
+	dropdowns = {},
+}
 
 local REMOTE_ALIASES = {
 	PlantSeed = { "PlantSeed", "Plant", "PlantCrop", "PlantAll" },
@@ -231,6 +261,157 @@ local function selectionValues(selected)
 	return values
 end
 
+local function uniqueList(base, extra)
+	local seen = {}
+	local out = {}
+	for _, name in ipairs(base or {}) do
+		local key = string.lower(tostring(name))
+		if not seen[key] then
+			seen[key] = true
+			table.insert(out, tostring(name))
+		end
+	end
+	if type(extra) == "table" then
+		for _, name in ipairs(extra) do
+			local text = tostring(name or "")
+			if text ~= "" then
+				local key = string.lower(text)
+				if not seen[key] then
+					seen[key] = true
+					table.insert(out, text)
+				end
+			end
+		end
+	end
+	table.sort(out, function(a, b)
+		if a == "Any" then return true end
+		if b == "Any" then return false end
+		return a < b
+	end)
+	if out[1] ~= "Any" then
+		table.insert(out, 1, "Any")
+	end
+	return out
+end
+
+local function namesFromData(data)
+	local names = {}
+	if type(data) ~= "table" then
+		return names
+	end
+	for key, value in pairs(data) do
+		if type(key) == "string" and key ~= "" then
+			table.insert(names, key)
+		elseif type(value) == "table" then
+			local label = value.Name or value.DisplayName or value.Id or value.id
+			if type(label) == "string" and label ~= "" then
+				table.insert(names, label)
+			end
+		end
+	end
+	return names
+end
+
+local function tryModuleData(...)
+	for i = 1, select("#", ...) do
+		local mod = select(i, ...)
+		if typeof(mod) == "Instance" and mod:IsA("ModuleScript") then
+			local data
+			if G.registryGameModule then
+				data = G.registryGameModule(mod, 6)
+			else
+				local ok, result = pcall(require, mod)
+				data = ok and result or nil
+			end
+			if type(data) == "table" then
+				return data
+			end
+		end
+	end
+	return nil
+end
+
+local function syncGameCatalog()
+	local catalog = {
+		seeds = table.clone(DEFAULT_CATALOG.seeds),
+		mutations = table.clone(DEFAULT_CATALOG.mutations),
+		rarities = table.clone(DEFAULT_CATALOG.rarities),
+		gears = table.clone(DEFAULT_CATALOG.gears),
+		pets = table.clone(DEFAULT_CATALOG.pets),
+		crates = table.clone(DEFAULT_CATALOG.crates),
+		sprinklers = table.clone(DEFAULT_CATALOG.sprinklers),
+	}
+	local roots = {
+		ReplicatedStorage:FindFirstChild("SeedData"),
+		ReplicatedStorage:FindFirstChild("Seeds"),
+		ReplicatedStorage:FindFirstChild("Data"),
+		ReplicatedStorage:FindFirstChild("Shared") and ReplicatedStorage.Shared:FindFirstChild("Seeds"),
+		ReplicatedStorage:FindFirstChild("Modules") and ReplicatedStorage.Modules:FindFirstChild("SeedData"),
+		ReplicatedStorage:FindFirstChild("Modules") and ReplicatedStorage.Modules:FindFirstChild("GearData"),
+		ReplicatedStorage:FindFirstChild("Modules") and ReplicatedStorage.Modules:FindFirstChild("PetData"),
+	}
+	local seedData = tryModuleData(table.unpack(roots))
+	if seedData then
+		catalog.seeds = uniqueList(DEFAULT_CATALOG.seeds, namesFromData(seedData.Seeds or seedData.seeds or seedData))
+	end
+	local gearData = tryModuleData(
+		ReplicatedStorage:FindFirstChild("GearData"),
+		ReplicatedStorage:FindFirstChild("Modules") and ReplicatedStorage.Modules:FindFirstChild("GearData")
+	)
+	if gearData then
+		catalog.gears = uniqueList(DEFAULT_CATALOG.gears, namesFromData(gearData.Gears or gearData.gears or gearData))
+	end
+	local petData = tryModuleData(
+		ReplicatedStorage:FindFirstChild("PetData"),
+		ReplicatedStorage:FindFirstChild("Modules") and ReplicatedStorage.Modules:FindFirstChild("PetData")
+	)
+	if petData then
+		catalog.pets = uniqueList(DEFAULT_CATALOG.pets, namesFromData(petData.Pets or petData.pets or petData.Eggs or petData))
+	end
+	runtime.catalog = catalog
+	return catalog
+end
+
+local function refreshCatalogDropdowns()
+	local catalog = runtime.catalog or syncGameCatalog()
+	local function refresh(dropdown, values, current)
+		if not dropdown then
+			return
+		end
+		pcall(function()
+			if dropdown.Refresh then
+				dropdown:Refresh(values)
+			elseif dropdown.SetValues then
+				dropdown:SetValues(values)
+			end
+		end)
+		if type(current) == "table" and dropdown.SetValue then
+			pcall(function()
+				dropdown:SetValue(current)
+			end)
+		end
+	end
+	refresh(runtime.dropdowns.plantSeeds, catalog.seeds, state.TargetSeeds)
+	refresh(runtime.dropdowns.plantRarities, catalog.rarities, state.TargetRarities)
+	refresh(runtime.dropdowns.plantMutations, catalog.mutations, state.TargetMutations)
+	refresh(runtime.dropdowns.sprinklerSeeds, catalog.seeds, state.TargetSprinklerSeeds)
+	refresh(runtime.dropdowns.seedShop, catalog.seeds, state.TargetSeedShop)
+	refresh(runtime.dropdowns.crateShop, catalog.crates, state.TargetCrates)
+	refresh(runtime.dropdowns.gearShop, catalog.gears, state.TargetGearShop)
+	refresh(runtime.dropdowns.petShop, catalog.pets, state.TargetPets)
+	refresh(runtime.dropdowns.blacklistSeeds, catalog.seeds, state.BlacklistSeeds)
+	refresh(runtime.dropdowns.blacklistMutations, catalog.mutations, state.BlacklistMutations)
+	refresh(runtime.dropdowns.blacklistRarities, catalog.rarities, state.BlacklistRarities)
+	refresh(runtime.dropdowns.sellSeeds, catalog.seeds, state.TargetSellSeeds)
+	refresh(runtime.dropdowns.sellRarities, catalog.rarities, state.TargetSellRarities)
+	refresh(runtime.dropdowns.sellMutations, catalog.mutations, state.TargetSellMutations)
+end
+
+local function plotContext()
+	local plot = resolvePlayerPlot()
+	return plot and plot.Name or nil
+end
+
 local function partPosition(inst)
 	if inst:IsA("BasePart") then
 		return inst.Position
@@ -343,6 +524,9 @@ local function autoSellTick()
 		fireKey("SellFruit", "All")
 		return
 	end
+	if not state.AutoSellSelectedFruits then
+		return
+	end
 	local seeds = selectionValues(state.TargetSellSeeds)
 	local rarities = selectionValues(state.TargetSellRarities)
 	local mutations = selectionValues(state.TargetSellMutations)
@@ -406,19 +590,65 @@ local function rejoinCurrentServer()
 	end)
 end
 
+local function plantWithFilters(seed, rarity, mutation)
+	local plotName = plotContext()
+	if plotName then
+		return fireKey("PlantSeed", seed, rarity, mutation, plotName)
+			or fireKey("PlantSeed", seed, plotName)
+			or fireKey("PlantSeed", plotName)
+	end
+	return fireKey("PlantSeed", seed, rarity, mutation) or fireKey("PlantSeed", seed)
+end
+
+local function collectSeedsOnPlot()
+	local plot = resolvePlayerPlot()
+	local root = characterRoot()
+	if plot and root then
+		local scanned = 0
+		for _, inst in ipairs(plot:GetDescendants()) do
+			scanned += 1
+			if scanned > 500 then
+				break
+			end
+			if inst:IsA("BasePart") or inst:IsA("Model") then
+				local name = string.lower(inst.Name)
+				if name:find("seed", 1, true) or name:find("fruit", 1, true) or name:find("drop", 1, true) then
+					local pos = partPosition(inst)
+					if pos and (pos - root.Position).Magnitude <= 140 then
+						if fireKey("CollectSeed", inst.Name) or fireKey("CollectDrop", inst.Name) then
+							return true
+						end
+						touchOrMoveTo(inst)
+						return true
+					end
+				end
+			end
+		end
+	end
+	return fireKey("CollectSeed") or fireKey("CollectDrop")
+end
+
 local function plantTick()
 	if not (state.AutoPlantSeed or state.AutoPlantAllSeeds) then return end
 	local interval = math.max(0.25, (state.PlantInterval or 1) / math.max(state.PlantSpeed or 1, 0.1))
 	tickEvery("plant", interval, function()
 		if state.AutoPlantAllSeeds then
-			fireKey("PlantSeed", "All")
+			fireKey("PlantSeed", "All", plotContext())
 			return
 		end
-		local seeds = Core.normalizeMultiSelection(state.TargetSeeds)
-		if #seeds == 0 or seeds[1] == "Any" then
-			fireKey("PlantSeed")
-		else
-			for _, seed in ipairs(seeds) do fireKey("PlantSeed", seed) end
+		local seeds = selectionValues(state.TargetSeeds)
+		local rarities = selectionValues(state.TargetRarities)
+		local mutations = selectionValues(state.TargetMutations)
+		if seeds[1] == "Any" and rarities[1] == "Any" and mutations[1] == "Any" then
+			plantWithFilters(nil, nil, nil)
+			return
+		end
+		for _, seed in ipairs(seeds) do
+			for _, rarity in ipairs(rarities) do
+				for _, mutation in ipairs(mutations) do
+					plantWithFilters(seed == "Any" and nil or seed, rarity == "Any" and nil or rarity, mutation == "Any" and nil or mutation)
+				end
+			end
 		end
 	end)
 end
@@ -429,12 +659,20 @@ local function runAutomation()
 	plantTick()
 
 	if state.AutoShovelSeed then
-		tickEvery("shovel", state.ShovelInterval or 2, function() fireKey("ShovelSeed") end)
+		tickEvery("shovel", state.ShovelInterval or 2, function()
+			local plot = resolvePlayerPlot()
+			if plot then
+				for _, slot in ipairs(plot:GetChildren()) do
+					fireKey("ShovelSeed", slot.Name, plot.Name)
+				end
+			end
+			fireKey("ShovelSeed", plotContext())
+		end)
 	end
 	if state.AutoCollectSeeds then
 		tickEvery("collect", state.CollectInterval or 0.75, function()
 			if state.StopCollectWhenFull and inventoryFull() then return end
-			fireKey("CollectSeed")
+			collectSeedsOnPlot()
 		end)
 	end
 	if state.AutoCollectGoldSeeds then
@@ -448,18 +686,32 @@ local function runAutomation()
 	end
 	if state.AutoWateringCan then
 		tickEvery("water", state.WaterDelay or 1.5, function()
+			local plotName = plotContext()
 			for _ = 1, math.max(1, math.floor(state.WaterAmount or 1)) do
-				fireKey("Water")
+				if plotName then
+					fireKey("Water", plotName) or fireKey("Water", state.WaterAmount, plotName)
+				else
+					fireKey("Water")
+				end
 			end
 		end)
 	end
 	if state.AutoSprinklerSystem then
 		tickEvery("sprinkler", state.SprinklerDelay or 2, function()
-			local seeds = Core.normalizeMultiSelection(state.TargetSprinklerSeeds)
+			local seeds = selectionValues(state.TargetSprinklerSeeds)
 			local variant = state.SprinklerVariant or "Any"
+			local plotName = plotContext()
 			for _ = 1, math.max(1, math.floor(state.SprinklerAmount or 1)) do
-				if seeds[1] and seeds[1] ~= "Any" then
-					for _, seed in ipairs(seeds) do fireKey("Sprinkler", seed, variant) end
+				if seeds[1] ~= "Any" then
+					for _, seed in ipairs(seeds) do
+						if plotName then
+							fireKey("Sprinkler", seed, variant, plotName)
+						else
+							fireKey("Sprinkler", seed, variant)
+						end
+					end
+				elseif plotName then
+					fireKey("Sprinkler", variant, plotName)
 				else
 					fireKey("Sprinkler", variant)
 				end
@@ -484,9 +736,13 @@ local function runAutomation()
 	end
 	if state.AutoBuyGearShop then
 		tickEvery("gear", state.ShopInterval or 3, function()
-			local targets = Core.normalizeMultiSelection(state.TargetGearShop)
-			if targets[1] == "Any" or #targets == 0 then fireKey("BuyGear") else
-				for _, gear in ipairs(targets) do fireKey("BuyGear", gear) end
+			local targets = selectionValues(state.TargetGearShop)
+			if targets[1] == "Any" then
+				fireKey("BuyGear") or fireKey("BuyGear", "Any")
+			else
+				for _, gear in ipairs(targets) do
+					fireKey("BuyGear", gear)
+				end
 			end
 		end)
 	end
@@ -542,17 +798,26 @@ Core.buildExploitHub(section, {
 	automationFlags = {
 		{ key = "AutoPlantSeed", label = "Plant" },
 		{ key = "AutoCollectSeeds", label = "Collect seeds" },
+		{ key = "AutoCollectAllDrops", label = "All drops" },
+		{ key = "AutoBlacklist", label = "Blacklist" },
+		{ key = "AutoSellSelectedFruits", label = "Sell fruits" },
+		{ key = "AutoStealFruits", label = "Steal" },
+		{ key = "AutoBuyPet", label = "Buy pet" },
 		{ key = "AutoWateringCan", label = "Water" },
 		{ key = "AutoSprinklerSystem", label = "Sprinkler" },
 	},
 	saveFn = saveSettings,
-	onRemoteScan = refreshRemotes,
+	onRemoteScan = function()
+		refreshRemotes()
+		syncGameCatalog()
+		refreshCatalogDropdowns()
+	end,
 })
 
 local farmTab = Core.buildUiTab(section, "Farm", 10734923214, 2, "farm")
 local waterTab = Core.buildUiTab(section, "Water", 10723407389, 1, "water")
 local shopTab = Core.buildUiTab(section, "Shop", 10734952479, 1, "shop")
-local updateTab = Core.buildUiTab(section, "v5.1", 10709788505, 2, "update")
+local updateTab = Core.buildUiTab(section, "LuxyHub", 10709788505, 2, "update")
 local settingsTab = Core.buildUiTab(section, "Settings", 10734950309, 1, "settings")
 local saveWrap = Core.onUiSave(saveSettings)
 
@@ -572,21 +837,22 @@ local predictGroup = Core.buildUiGroup(updateTab, "Predictors", 2, saveWrap, nil
 plantGroup:CreateToggle("Auto plant seed", state.AutoPlantSeed, "Plants selected seeds on open slots.", function(v) state.AutoPlantSeed = v end)
 plantGroup:CreateToggle("Auto plant all seeds", state.AutoPlantAllSeeds, "Plants every seed in inventory.", function(v) state.AutoPlantAllSeeds = v end)
 plantGroup:CreateToggle("Auto shovel seed", state.AutoShovelSeed, "Removes unwanted planted seeds.", function(v) state.AutoShovelSeed = v end)
-plantGroup:AddDropdown("Seed filter", {
+syncGameCatalog()
+runtime.dropdowns.plantSeeds = plantGroup:AddDropdown("Seed filter", {
 	Text = "Seeds to plant",
-	Values = { "Any", "Carrot", "Corn", "Tomato", "Wheat", "Pumpkin", "Common", "Rare", "Legendary" },
+	Values = runtime.catalog.seeds,
 	Default = state.TargetSeeds, Multi = true,
 	Callback = function(s) state.TargetSeeds = Core.normalizeMultiSelection(s) if #state.TargetSeeds == 0 then state.TargetSeeds = { "Any" } end end,
 })
-plantGroup:AddDropdown("Rarity filter", {
+runtime.dropdowns.plantRarities = plantGroup:AddDropdown("Rarity filter", {
 	Text = "Rarity",
-	Values = { "Any", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic" },
+	Values = runtime.catalog.rarities,
 	Default = state.TargetRarities, Multi = true,
 	Callback = function(s) state.TargetRarities = Core.normalizeMultiSelection(s) if #state.TargetRarities == 0 then state.TargetRarities = { "Any" } end end,
 })
-plantGroup:AddDropdown("Mutation filter", {
+runtime.dropdowns.plantMutations = plantGroup:AddDropdown("Mutation filter", {
 	Text = "Mutation",
-	Values = { "Any", "Normal", "Gold", "Rainbow", "Wet", "Shiny", "Frozen", "Moonlit" },
+	Values = runtime.catalog.mutations,
 	Default = state.TargetMutations, Multi = true,
 	Callback = function(s) state.TargetMutations = Core.normalizeMultiSelection(s) if #state.TargetMutations == 0 then state.TargetMutations = { "Any" } end end,
 })
@@ -605,45 +871,45 @@ waterGroup:CreateSlider("Water amount", 1, 10, state.WaterAmount, function(v) st
 waterGroup:CreateSlider("Water delay", 0.5, 10, state.WaterDelay, function(v) state.WaterDelay = v end, "Seconds between watering passes.")
 
 sprinklerGroup:CreateToggle("Auto sprinkler system", state.AutoSprinklerSystem, "Places sprinklers on your plot.", function(v) state.AutoSprinklerSystem = v end)
-sprinklerGroup:AddDropdown("Sprinkler seeds", {
+runtime.dropdowns.sprinklerSeeds = sprinklerGroup:AddDropdown("Sprinkler seeds", {
 	Text = "Seed selection",
-	Values = { "Any", "Carrot", "Corn", "Tomato", "Wheat", "Pumpkin" },
+	Values = runtime.catalog.seeds,
 	Default = state.TargetSprinklerSeeds, Multi = true,
 	Callback = function(s) state.TargetSprinklerSeeds = Core.normalizeMultiSelection(s) if #state.TargetSprinklerSeeds == 0 then state.TargetSprinklerSeeds = { "Any" } end end,
 })
-sprinklerGroup:CreateDropdown("Sprinkler variant", { "Any", "Basic", "Advanced", "Golden", "Diamond" }, state.SprinklerVariant, function(v) state.SprinklerVariant = v end, "Sprinkler type to place.")
+sprinklerGroup:CreateDropdown("Sprinkler variant", runtime.catalog.sprinklers, state.SprinklerVariant, function(v) state.SprinklerVariant = v end, "Sprinkler type to place.")
 sprinklerGroup:CreateSlider("Sprinkler amount", 1, 10, state.SprinklerAmount, function(v) state.SprinklerAmount = v end, "Placements per pass.")
 sprinklerGroup:CreateSlider("Sprinkler delay", 0.5, 15, state.SprinklerDelay, function(v) state.SprinklerDelay = v end, "Seconds between sprinkler passes.")
 
 seedShop:CreateToggle("Auto buy seed shop", state.AutoBuySeedShop, "Purchases seeds from the shop.", function(v) state.AutoBuySeedShop = v end)
-seedShop:AddDropdown("Target seeds", {
+runtime.dropdowns.seedShop = seedShop:AddDropdown("Target seeds", {
 	Text = "Seeds to buy",
-	Values = { "Any", "Carrot", "Corn", "Tomato", "Wheat", "Pumpkin" },
+	Values = runtime.catalog.seeds,
 	Default = state.TargetSeedShop, Multi = true,
 	Callback = function(s) state.TargetSeedShop = Core.normalizeMultiSelection(s) if #state.TargetSeedShop == 0 then state.TargetSeedShop = { "Any" } end end,
 })
 
 crateShop:CreateToggle("Auto buy crate", state.AutoBuyCrate, "Purchases crates from the shop.", function(v) state.AutoBuyCrate = v end)
-crateShop:AddDropdown("Target crates", {
+runtime.dropdowns.crateShop = crateShop:AddDropdown("Target crates", {
 	Text = "Crates to buy",
-	Values = { "Any", "Basic", "Premium", "Golden", "Diamond" },
+	Values = runtime.catalog.crates,
 	Default = state.TargetCrates, Multi = true,
 	Callback = function(s) state.TargetCrates = Core.normalizeMultiSelection(s) if #state.TargetCrates == 0 then state.TargetCrates = { "Any" } end end,
 })
 
 gearShop:CreateToggle("Auto buy gear shop", state.AutoBuyGearShop, "Purchases gear upgrades.", function(v) state.AutoBuyGearShop = v end)
-gearShop:AddDropdown("Target gear", {
+runtime.dropdowns.gearShop = gearShop:AddDropdown("Target gear", {
 	Text = "Gear to buy",
-	Values = { "Any", "Shovel", "WateringCan", "Sprinkler", "Backpack", "Speed" },
+	Values = runtime.catalog.gears,
 	Default = state.TargetGearShop, Multi = true,
 	Callback = function(s) state.TargetGearShop = Core.normalizeMultiSelection(s) if #state.TargetGearShop == 0 then state.TargetGearShop = { "Any" } end end,
 })
 gearShop:CreateSlider("Shop delay", 1, 15, state.ShopInterval, function(v) state.ShopInterval = v end, "Seconds between shop purchase attempts.")
 
 petShop:CreateToggle("Auto buy pet", state.AutoBuyPet, "Purchases selected pets from the pet shop.", function(v) state.AutoBuyPet = v end)
-petShop:AddDropdown("Pet selection", {
+runtime.dropdowns.petShop = petShop:AddDropdown("Pet selection", {
 	Text = "Pets to buy",
-	Values = { "Any", "Common Egg", "Rare Egg", "Legendary Egg", "Dog", "Cat", "Bunny", "Dragon" },
+	Values = runtime.catalog.pets,
 	Default = state.TargetPets, Multi = true,
 	Callback = function(s) state.TargetPets = Core.normalizeMultiSelection(s) if #state.TargetPets == 0 then state.TargetPets = { "Any" } end end,
 })
@@ -652,42 +918,42 @@ petShop:CreateSlider("Pet buy delay", 1, 30, state.PetBuyInterval, function(v) s
 blacklistGroup:CreateToggle("Auto blacklist", state.AutoBlacklist, "Blacklists selected seed/mutation/rarity combos.", function(v) state.AutoBlacklist = v end)
 blacklistGroup:CreateToggle("Auto blacklist all", state.AutoBlacklistAll, "Runs the game's all-blacklist action.", function(v) state.AutoBlacklistAll = v end)
 blacklistGroup:CreateToggle("Auto blacklist best", state.AutoBlacklistBest, "Runs the game's best-blacklist action.", function(v) state.AutoBlacklistBest = v end)
-blacklistGroup:AddDropdown("Blacklist seeds", {
+runtime.dropdowns.blacklistSeeds = blacklistGroup:AddDropdown("Blacklist seeds", {
 	Text = "Seeds",
-	Values = { "Any", "Carrot", "Corn", "Tomato", "Wheat", "Pumpkin", "Gold", "Rainbow" },
+	Values = runtime.catalog.seeds,
 	Default = state.BlacklistSeeds, Multi = true,
 	Callback = function(s) state.BlacklistSeeds = Core.normalizeMultiSelection(s) if #state.BlacklistSeeds == 0 then state.BlacklistSeeds = { "Any" } end end,
 })
-blacklistGroup:AddDropdown("Blacklist mutation", {
+runtime.dropdowns.blacklistMutations = blacklistGroup:AddDropdown("Blacklist mutation", {
 	Text = "Mutation",
-	Values = { "Any", "Normal", "Gold", "Rainbow", "Wet", "Shiny", "Frozen", "Moonlit" },
+	Values = runtime.catalog.mutations,
 	Default = state.BlacklistMutations, Multi = true,
 	Callback = function(s) state.BlacklistMutations = Core.normalizeMultiSelection(s) if #state.BlacklistMutations == 0 then state.BlacklistMutations = { "Any" } end end,
 })
-blacklistGroup:AddDropdown("Blacklist rarity", {
+runtime.dropdowns.blacklistRarities = blacklistGroup:AddDropdown("Blacklist rarity", {
 	Text = "Rarity",
-	Values = { "Any", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic" },
+	Values = runtime.catalog.rarities,
 	Default = state.BlacklistRarities, Multi = true,
 	Callback = function(s) state.BlacklistRarities = Core.normalizeMultiSelection(s) if #state.BlacklistRarities == 0 then state.BlacklistRarities = { "Any" } end end,
 })
 
 sellGroup:CreateToggle("Auto sell selected fruits", state.AutoSellSelectedFruits, "Sells fruits matching selected filters.", function(v) state.AutoSellSelectedFruits = v end)
 sellGroup:CreateToggle("Auto sell all seeds", state.AutoSellAllSeeds, "Runs the game's sell-all seeds action.", function(v) state.AutoSellAllSeeds = v end)
-sellGroup:AddDropdown("Seed sell filter", {
+runtime.dropdowns.sellSeeds = sellGroup:AddDropdown("Seed sell filter", {
 	Text = "Seeds",
-	Values = { "Any", "Carrot", "Corn", "Tomato", "Wheat", "Pumpkin", "Gold", "Rainbow" },
+	Values = runtime.catalog.seeds,
 	Default = state.TargetSellSeeds, Multi = true,
 	Callback = function(s) state.TargetSellSeeds = Core.normalizeMultiSelection(s) if #state.TargetSellSeeds == 0 then state.TargetSellSeeds = { "Any" } end end,
 })
-sellGroup:AddDropdown("Rarity sell filter", {
+runtime.dropdowns.sellRarities = sellGroup:AddDropdown("Rarity sell filter", {
 	Text = "Rarity",
-	Values = { "Any", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic" },
+	Values = runtime.catalog.rarities,
 	Default = state.TargetSellRarities, Multi = true,
 	Callback = function(s) state.TargetSellRarities = Core.normalizeMultiSelection(s) if #state.TargetSellRarities == 0 then state.TargetSellRarities = { "Any" } end end,
 })
-sellGroup:AddDropdown("Mutation sell filter", {
+runtime.dropdowns.sellMutations = sellGroup:AddDropdown("Mutation sell filter", {
 	Text = "Mutation",
-	Values = { "Any", "Normal", "Gold", "Rainbow", "Wet", "Shiny", "Frozen", "Moonlit" },
+	Values = runtime.catalog.mutations,
 	Default = state.TargetSellMutations, Multi = true,
 	Callback = function(s) state.TargetSellMutations = Core.normalizeMultiSelection(s) if #state.TargetSellMutations == 0 then state.TargetSellMutations = { "Any" } end end,
 })
@@ -712,6 +978,15 @@ Core.buildStandardSettingsExtras(settingsTab, Core.settingsExtrasOptions(window,
 
 Core.finalizeGameUi(window, ui, { Subtitle = "Grow a Garden 2 · v" .. VERSION })
 saveSettings()
+
+task.spawn(function()
+	task.wait(4)
+	if G.invalidateGameRequire then
+		G.invalidateGameRequire()
+	end
+	syncGameCatalog()
+	refreshCatalogDropdowns()
+end)
 
 state.Alleral_Unload = function()
 	state.HubRunning = false

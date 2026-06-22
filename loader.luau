@@ -2939,7 +2939,7 @@ local GAMES = {
 	{
 		id = "speed_keyboard_escape",
 		name = "Speed Keyboard Escape",
-		version = "1.5.3",
+		version = "1.5.4",
 		placeIds = { 95082159892680 },
 		scriptFiles = { "games/speed_keyboard_escape.luau", "speed_keyboard_escape.luau" },
 		scriptUrl = "games/speed_keyboard_escape.luau",
@@ -3026,7 +3026,7 @@ local GAMES = {
 	{
 		id = "grow_a_garden_2",
 		name = "Grow a Garden 2",
-		version = "2.2.1",
+		version = "2.3.0",
 		placeIds = { 95204935687527 },
 		scriptFiles = { "games/grow_a_garden_2.luau", "grow_a_garden_2.luau" },
 		scriptUrl = "games/grow_a_garden_2.luau",

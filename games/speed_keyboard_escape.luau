@@ -5,7 +5,7 @@ if not Core or not Core.assertLoader or not Core.assertLoader() then
 	return
 end
 
-local VERSION = "1.5.3"
+local VERSION = "1.5.4"
 local state = getgenv().Alleral_State
 local connections = {}
 local loops = {}

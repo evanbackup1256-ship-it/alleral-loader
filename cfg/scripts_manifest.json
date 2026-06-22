@@ -1,37 +1,37 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-22T20:00:00Z",
+  "updatedAt": "2026-06-22T21:00:00Z",
   "scripts": {
     "kick_a_lucky_block": {
       "name": "Kick a Lucky Block",
       "status": "working",
       "version": "7.3.3",
-      "message": "Full kick automation with plot tools, roll filters, and economy loops.",
-      "updatedAt": "2026-06-22T20:00:00Z",
+      "message": "LuxyHub v5.0 parity: FPS/RTX/black screen, ball farm, train, webhook, and server join fixes.",
+      "updatedAt": "2026-06-22T21:00:00Z",
       "updatedBy": "codex"
     },
     "sell_lemons": {
       "name": "Sell Lemons",
       "status": "working",
       "version": "2.2.1",
-      "message": "Deep remote scan, click/touch collect fallbacks, and shared hub defaults.",
-      "updatedAt": "2026-06-22T20:00:00Z",
+      "message": "Full farming automation with offers, evolution, events, movement, and config profiles.",
+      "updatedAt": "2026-06-22T21:00:00Z",
       "updatedBy": "codex"
     },
     "grow_a_garden_2": {
       "name": "Grow a Garden 2",
       "status": "working",
-      "version": "2.2.1",
-      "message": "LuxyHub parity with fuzzy remote binding and auto-rejoin watcher.",
-      "updatedAt": "2026-06-22T20:00:00Z",
+      "version": "2.3.0",
+      "message": "LuxyHub major expansion: blacklist/sell/pet/drop/steal/predictor filters, live seed DB, plot-scoped fixes.",
+      "updatedAt": "2026-06-22T21:00:00Z",
       "updatedBy": "codex"
     },
     "speed_keyboard_escape": {
       "name": "Speed Keyboard Escape",
       "status": "working",
-      "version": "1.5.3",
-      "message": "Shared game defaults, World 2 targets, and performance toggles.",
-      "updatedAt": "2026-06-22T20:00:00Z",
+      "version": "1.5.4",
+      "message": "World 2 Wins 60M and 100M routes plus full win-farm automation.",
+      "updatedAt": "2026-06-22T21:00:00Z",
       "updatedBy": "codex"
     },
     "slime_rng": {
@@ -39,7 +39,7 @@
       "status": "working",
       "version": "1.5.3",
       "message": "Module bootstrap with registry require and full automation supervisors.",
-      "updatedAt": "2026-06-22T20:00:00Z",
+      "updatedAt": "2026-06-22T21:00:00Z",
       "updatedBy": "codex"
     },
     "build_a_ring_farm": {
@@ -47,7 +47,7 @@
       "status": "working",
       "version": "1.4.3",
       "message": "Farm automation supervisors with shared hub defaults.",
-      "updatedAt": "2026-06-22T20:00:00Z",
+      "updatedAt": "2026-06-22T21:00:00Z",
       "updatedBy": "codex"
     },
     "blox_fruit": {
@@ -55,7 +55,7 @@
       "status": "maintenance",
       "version": "0.1.2",
       "message": "Maintenance shell — automation disabled pending game remap.",
-      "updatedAt": "2026-06-22T20:00:00Z",
+      "updatedAt": "2026-06-22T21:00:00Z",
       "updatedBy": "codex"
     },
     "survive_a_zombie_arena": {
@@ -63,7 +63,7 @@
       "status": "working",
       "version": "2.3.3",
       "message": "Kill aura, ESP, safe zones, and zombie remote binding.",
-      "updatedAt": "2026-06-22T20:00:00Z",
+      "updatedAt": "2026-06-22T21:00:00Z",
       "updatedBy": "codex"
     }
   }
