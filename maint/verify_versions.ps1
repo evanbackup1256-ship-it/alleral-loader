@@ -96,6 +96,18 @@ foreach ($field in @("telemetry", "analytics", "helpers", "security", "access", 
 
 $corePath = Join-Path $root "hub/core_base.luau"
 $core = Get-Content $corePath -Raw
+$coreBytes = (Get-Item $corePath).Length
+$coreMaxMatch = [regex]::Match($loader, 'CORE_BASE_MAX_BYTES = (\d+)')
+if ($coreMaxMatch.Success) {
+    $coreMax = [int]$coreMaxMatch.Groups[1].Value
+    if ($coreBytes -gt $coreMax) {
+        Fail "hub/core_base.luau ($coreBytes b) exceeds loader CORE_BASE_MAX_BYTES ($coreMax)"
+    } else {
+        Pass "core_base size ${coreBytes}b within cap ${coreMax}b"
+    }
+} else {
+    Fail "loader.luau missing CORE_BASE_MAX_BYTES"
+}
 if ($core -match 'Core\.VERSION = "([^"]+)"')
 {
     $coreVer = $Matches[1]

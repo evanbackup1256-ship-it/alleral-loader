@@ -6,7 +6,7 @@ local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
 local COMPILE_VALIDATE_CACHE = {}
 local CORE_BASE_MIN_BYTES = 30000
-local CORE_BASE_MAX_BYTES = 45000
+local CORE_BASE_MAX_BYTES = 55000
 local CORE_UI_MIN_BYTES = 8000
 local CORE_HUB_UI_MIN_BYTES = 75000
 local CORE_ALLERAL_UI_MIN_BYTES = 16000
@@ -1744,7 +1744,7 @@ local function coreBaseValid(src)
 	if type(src) ~= "string" or #src < CORE_BASE_MIN_BYTES then
 		return false
 	end
-	if #src > CORE_BASE_MAX_BYTES then
+	if src:find("function Core.loadUi", 1, true) then
 		return false
 	end
 	if not src:find("applyUiLayer", 1, true) then
@@ -1753,7 +1753,7 @@ local function coreBaseValid(src)
 	if not src:find('Core._CORE_ARTIFACT = "base"', 1, true) then
 		return false
 	end
-	if src:find("function Core.loadUi", 1, true) then
+	if #src > CORE_BASE_MAX_BYTES then
 		return false
 	end
 	local ver = src:match('Core%.VERSION%s*=%s*"([%d%.]+)"')
@@ -1832,7 +1832,13 @@ local function coreRejectReason(src)
 		return "valid"
 	end
 	if #src > CORE_BASE_MAX_BYTES and #src < CORE_MONOLITH_MIN_BYTES then
-		return "stale cached core (" .. tostring(#src) .. "b)"
+		if src:find("function Core.loadUi", 1, true) and not src:find('Core._CORE_ARTIFACT = "base"', 1, true) then
+			return "stale cached core (" .. tostring(#src) .. "b)"
+		end
+		if not src:find('Core._CORE_ARTIFACT = "base"', 1, true) then
+			return "stale cached core (" .. tostring(#src) .. "b)"
+		end
+		return "core base too large (" .. tostring(#src) .. "b, max " .. tostring(CORE_BASE_MAX_BYTES) .. "b)"
 	end
 	if #src < CORE_BASE_MIN_BYTES and #src < CORE_MONOLITH_MIN_BYTES then
 		return tostring(#src) .. "b, need " .. tostring(CORE_BASE_MIN_BYTES) .. "b+ base"
@@ -2220,9 +2226,13 @@ local function purgeStaleCorePaths()
 			if okExists and exists then
 				local okRead, src = pcall(readFile, path)
 				if okRead and type(src) == "string" and src ~= "" then
-					local stale = #src > CORE_BASE_MAX_BYTES
-					if path:find("core.luau", 1, true) and not path:find("core_base", 1, true) then
+					local stale = false
+					if path:find("core_base", 1, true) then
+						stale = src:find("function Core.loadUi", 1, true) ~= nil
+					elseif path:find("core.luau", 1, true) and not path:find("core_base", 1, true) then
 						stale = true
+					elseif #src > CORE_BASE_MAX_BYTES then
+						stale = src:find("function Core.loadUi", 1, true) ~= nil
 					end
 					if type(expectedCore) == "string" and expectedCore ~= "" then
 						local cachedVersion = extractFileVersion(src, "core")

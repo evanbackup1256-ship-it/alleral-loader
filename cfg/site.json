@@ -48,6 +48,15 @@
   "changelog": [
     {
       "date": "2026-06-22",
+      "title": "Loader 8.12.7 — fix stale cached core base fetch",
+      "items": [
+        "Raised core_base size cap from 45KB to 55KB (core grew to ~48KB with auto-rejoin)",
+        "core_base validation no longer rejects valid split core as stale monolith",
+        "Stale cache purge only removes core_base files that contain monolithic loadUi"
+      ]
+    },
+    {
+      "date": "2026-06-22",
       "title": "Release 8.12.6 — all scripts, UI, and animations release-ready",
       "items": [
         "WindUI v11.5.3 unified across Bootstrap, Motion, Controls, Window, and polish modules",
