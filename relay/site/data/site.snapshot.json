@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-22T02:20:04Z",
+  "updatedAt": "2026-06-22T02:24:18Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
-  "loaderVersion": "8.12.8",
+  "loaderVersion": "8.12.9",
   "coreVersion": "2.9.11",
   "uiLibrary": "WindUI",
   "uiVersion": "11.5.3",
@@ -46,6 +46,15 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-22",
+      "title": "Loader 8.12.9 — fix table.insert executor compat in relay bases",
+      "items": [
+        "Replaced table.insert(list, value) with list[#list+1] in gameRelayBases (Xeno/Synapse compat)",
+        "Removed table.find dependency — manual listHas helper for executor sandboxes",
+        "gameRelayBases falls back to DEFAULT_RELAY_BASE when CDN unset"
+      ]
+    },
     {
       "date": "2026-06-22",
       "title": "Loader 8.12.8 — fix nil ensureRelayCredentials on game script fetch",
