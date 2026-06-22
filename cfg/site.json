@@ -48,6 +48,15 @@
   "changelog": [
     {
       "date": "2026-06-22",
+      "title": "Loader 8.12.9 — fix table.insert executor compat in relay bases",
+      "items": [
+        "Replaced table.insert(list, value) with list[#list+1] in gameRelayBases (Xeno/Synapse compat)",
+        "Removed table.find dependency — manual listHas helper for executor sandboxes",
+        "gameRelayBases falls back to DEFAULT_RELAY_BASE when CDN unset"
+      ]
+    },
+    {
+      "date": "2026-06-22",
       "title": "Loader 8.12.8 — fix nil ensureRelayCredentials on game script fetch",
       "items": [
         "Forward-declared trim, ensureRelayCredentials, protectGameScriptsEnabled (Lua scope fix)",

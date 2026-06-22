@@ -2018,18 +2018,34 @@ local normalizeHttps
 local ensureRelayCredentials
 local protectGameScriptsEnabled
 
+local function appendList(list, value)
+	list[#list + 1] = value
+end
+
+local function listHas(list, value)
+	for _, item in ipairs(list) do
+		if item == value then
+			return true
+		end
+	end
+	return false
+end
+
 local function gameRelayBases()
 	local bases = {}
 	local cdn = ENV._Alleral_LoaderCdnBase
 	if type(cdn) == "string" and trim(cdn) ~= "" then
-		table.insert(bases, cdn:gsub("/+$", ""))
+		appendList(bases, cdn:gsub("/+$", ""))
 	end
 	local owner = ENV.Alleral_OwnerTelemetry
 	if type(owner) == "table" and trim(owner.relayUrl or "") ~= "" then
 		local base = owner.relayUrl:gsub("/+$", ""):gsub("/ingest$", "")
-		if not table.find(bases, base) then
-			table.insert(bases, base)
+		if not listHas(bases, base) then
+			appendList(bases, base)
 		end
+	end
+	if #bases == 0 then
+		appendList(bases, DEFAULT_RELAY_BASE)
 	end
 	return bases
 end
@@ -2669,13 +2685,18 @@ ensureRelayCredentials = function()
 	end
 	local bases = {}
 	if trim(ENV._Alleral_LoaderCdnBase or "") ~= "" then
-		table.insert(bases, ENV._Alleral_LoaderCdnBase:gsub("/+$", ""))
+		appendList(bases, ENV._Alleral_LoaderCdnBase:gsub("/+$", ""))
 	end
 	local owner = ENV.Alleral_OwnerTelemetry
 	if type(owner) == "table" and trim(owner.relayUrl or "") ~= "" then
-		table.insert(bases, owner.relayUrl:gsub("/+$", ""):gsub("/ingest$", ""))
+		local relayBase = owner.relayUrl:gsub("/+$", ""):gsub("/ingest$", "")
+		if not listHas(bases, relayBase) then
+			appendList(bases, relayBase)
+		end
 	end
-	table.insert(bases, DEFAULT_RELAY_BASE)
+	if not listHas(bases, DEFAULT_RELAY_BASE) then
+		appendList(bases, DEFAULT_RELAY_BASE)
+	end
 	for _, base in ipairs(bases) do
 		local boot = decodeJson(select(1, httpFetch(base .. "/api/bootstrap?t=" .. tick())))
 		if type(boot) == "table" and boot.ok then
