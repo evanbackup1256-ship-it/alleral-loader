@@ -1,6 +1,6 @@
 --!nocheck
-local LOADER_VERSION = "8.12.4"
-local BOOTSTRAP_VERSION = "2.3.0"
+local LOADER_VERSION = "8.12.5"
+local BOOTSTRAP_VERSION = "2.3.1"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
 local EXPECTED_VERSIONS_CACHE_SECONDS = 300
@@ -26,7 +26,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.12.4",
+	loader = "8.12.5",
 	core = "2.9.11",
 	ui = "WindUI",
 	uiVersion = "11.5.3",
@@ -36,7 +36,7 @@ local RELEASE_FALLBACK = {
 	weao = "1.1",
 	security = "1.3",
 	access = "1.1",
-	commit = "89de61a",
+	commit = "f0d84c4",
 	protectScripts = true,
 	updatePollSeconds = DEFAULT_UPDATE_POLL_SECONDS,
 	autoUpdate = true,

@@ -1,6 +1,6 @@
--- Alleral entry v2.3.0 — thin bootstrap (gate + release pin live in loader.luau)
+-- Alleral entry v2.3.1 — thin bootstrap (gate + release pin live in loader.luau)
 -- Edit loader.luau for logic; this file fetches release.json, pins loader commit, runs loader.
-local BOOTSTRAP_VERSION = "2.3.0"
+local BOOTSTRAP_VERSION = "2.3.1"
 local REPO = "evanbackup1256-ship-it/-kick-loader"
 local BRANCH = "main"
 local CFG = "cfg"
@@ -110,6 +110,50 @@ local function parseRelease(body)
 	}
 end
 
+local function versionParts(ver)
+	local parts = {}
+	for num in tostring(ver or ""):gmatch("%d+") do
+		table.insert(parts, tonumber(num) or 0)
+	end
+	return parts
+end
+
+local function versionGte(left, right)
+	if type(left) ~= "string" or left == "" or type(right) ~= "string" or right == "" then
+		return true
+	end
+	local a = versionParts(left)
+	local b = versionParts(right)
+	local maxLen = math.max(#a, #b)
+	for i = 1, maxLen do
+		local av = a[i] or 0
+		local bv = b[i] or 0
+		if av > bv then
+			return true
+		end
+		if av < bv then
+			return false
+		end
+	end
+	return true
+end
+
+local function loaderBodyAccepts(body, minLoader)
+	if type(body) ~= "string" then
+		return false
+	end
+	if not body:find("LOADER_VERSION", 1, true) or not body:find("runMergedBootstrapGate", 1, true) then
+		return false
+	end
+	if type(minLoader) == "string" and minLoader ~= "" then
+		local found = body:match('LOADER_VERSION%s*=%s*"([^"]+)"')
+		if type(found) == "string" and found ~= "" and not versionGte(found, minLoader) then
+			return false
+		end
+	end
+	return true
+end
+
 local releaseBody = fetchUrl(GITHUB_RAW .. "/" .. BRANCH .. "/" .. CFG .. "/release.json", 20)
 local release = parseRelease(releaseBody) or {}
 local pin = (type(release.commit) == "string" and release.commit ~= "") and release.commit or BRANCH
@@ -140,20 +184,25 @@ if type(bootBody) == "string" then
 		ENV.Alleral_OwnerTelemetry = ENV.Alleral_OwnerTelemetry or {}
 		ENV.Alleral_OwnerTelemetry.relayUrl = relayUrl
 	end
+	local relayProtect = bootBody:match('"protectScripts"%s*:%s*true') ~= nil
+	if relayProtect then
+		ENV._Alleral_ProtectScripts = true
+	end
 end
 
+local minLoader = release.loader
 local sources = {
-	relayBase .. "/api/loader/file/loader.luau",
 	GITHUB_RAW .. "/" .. pin .. "/loader.luau",
 	"https://github.com/" .. REPO .. "/raw/" .. pin .. "/loader.luau",
 	"https://cdn.jsdelivr.net/gh/" .. REPO .. "@" .. pin .. "/loader.luau",
 	GITHUB_RAW .. "/" .. BRANCH .. "/loader.luau",
+	relayBase .. "/api/loader/file/loader.luau",
 }
 
 local src
 for _, url in ipairs(sources) do
 	local body = fetchUrl(url, LOADER_MIN_BYTES)
-	if type(body) == "string" and body:find("LOADER_VERSION", 1, true) and body:find("runMergedBootstrapGate", 1, true) then
+	if loaderBodyAccepts(body, minLoader) then
 		src = body
 		break
 	end

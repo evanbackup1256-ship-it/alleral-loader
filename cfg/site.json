@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-22T01:55:33Z",
+  "updatedAt": "2026-06-22T01:57:50Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
-  "loaderVersion": "8.12.4",
+  "loaderVersion": "8.12.5",
   "coreVersion": "2.9.11",
   "uiLibrary": "WindUI",
   "uiVersion": "11.5.3",
@@ -46,6 +46,16 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-22",
+      "title": "Loader 8.12.5 — fix stale Railway CDN, GitHub-first bootstrap",
+      "items": [
+        "Bootstrap v2.3.1 prefers GitHub commit-pinned loader over Railway CDN",
+        "Bootstrap rejects loader versions older than release.json (fixes 8.12.3 CDN lag)",
+        "Railway redeploy picks up protectScripts + /api/games/script protection endpoint",
+        "Merged bootstrap gate + script protection now load reliably on fresh inject"
+      ]
+    },
     {
       "date": "2026-06-22",
       "title": "Loader 8.12.4 — GitHub sync, merged bootstrap gate, script protection",
