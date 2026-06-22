@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-22T01:45:39Z",
+  "updatedAt": "2026-06-22T01:52:39Z",
   "brand": "Alleral",
   "tagline": "Roblox scripts that stay updated without you redoing the loadstring.",
   "loaderVersion": "8.12.3",
@@ -46,6 +46,66 @@
     }
   ],
   "changelog": [
+    {
+      "date": "2026-06-22",
+      "title": "Major Grow A Garden 2 Expansion & +1 Speed Keyboard Escape Update",
+      "items": [
+        "Grow A Garden 2: Added Blacklist Seed Filter",
+        "Grow A Garden 2: Added Blacklist Mutation Filter",
+        "Grow A Garden 2: Added Blacklist Rarity Filter",
+        "Grow A Garden 2: Added Auto Blacklist",
+        "Grow A Garden 2: Added Auto Blacklist All",
+        "Grow A Garden 2: Added Auto Blacklist Best",
+        "Grow A Garden 2: Added Auto Buy Pet",
+        "Grow A Garden 2: Added Pet Purchase Selection",
+        "Grow A Garden 2: Added Auto Sell Delay Slider",
+        "Grow A Garden 2: Added Seed Sell Filter",
+        "Grow A Garden 2: Added Rarity Sell Filter",
+        "Grow A Garden 2: Added Mutation Sell Filter",
+        "Grow A Garden 2: Added Auto Sell Selected Fruits",
+        "Grow A Garden 2: Added Auto Sell All Seeds",
+        "Grow A Garden 2: Added Auto Collect Gold Seeds",
+        "Grow A Garden 2: Added Auto Collect Rainbow Seeds",
+        "Grow A Garden 2: Added Auto Collect All Drops",
+        "Grow A Garden 2: Added Auto Steal Fruits",
+        "Grow A Garden 2: Added Return After Slider",
+        "Grow A Garden 2: Added Weather Predictor",
+        "Grow A Garden 2: Added Seed Predictor",
+        "Grow A Garden 2: Added Gear Predictor",
+        "Grow A Garden 2: Improved Auto Collect Fruits",
+        "Grow A Garden 2: Fixed Auto Plant Seed",
+        "Grow A Garden 2: Fixed Auto Sprinkler",
+        "Grow A Garden 2: Fixed Auto Watering Can",
+        "Grow A Garden 2: Fixed Auto Buy Gear",
+        "Grow A Garden 2: Improved Auto Sell Performance",
+        "Grow A Garden 2: Fixed Auto Collect Seed and Item Drops",
+        "Grow A Garden 2: Fixed Auto Shovel",
+        "Grow A Garden 2: Updated Seed and Gear Database",
+        "Grow A Garden 2: Fixed Seed, Mutation and Rarity Dropdowns",
+        "Grow A Garden 2: Fixed Auto Rejoin",
+        "+1 Speed Keyboard Escape: Added Wins 60M (World 2)",
+        "+1 Speed Keyboard Escape: Added Wins 100M (World 2)"
+      ]
+    },
+    {
+      "date": "2026-06-16",
+      "title": "Kick A Lucky Blox v5.0 — Performance Update, Visual Improvements & Major System Fixes",
+      "items": [
+        "Added FPS Boost",
+        "Added RTX Mod",
+        "Added Black Screen Mode",
+        "Added Auto Equip Best Weight",
+        "Fixed Auto Collect Ball",
+        "Fixed and Improved Auto Train System",
+        "Fixed and Improved Auto Place Brainrots",
+        "Fixed Auto Kick and Brainrot Filters",
+        "Fixed and Improved Auto Collect Cash",
+        "Fixed and Improved Webhook Notifier",
+        "Fixed and Improved Server Joiner Stability",
+        "Removed Deprecated Features",
+        "General Performance and Stability Improvements"
+      ]
+    },
     {
       "date": "2026-06-16",
       "title": "Grow A Garden 2 2.2.0 + Speed Keyboard 1.5.2 — LuxyHub v5.1 parity",
@@ -546,6 +606,7 @@
         "Farm",
         "Water",
         "Shop",
+        "LuxyHub",
         "Settings"
       ],
       "scriptFeatures": [
