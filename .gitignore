@@ -30,4 +30,5 @@ runtime_secrets.json
 # Single public repo — no obfuscation
 
 terminals/
+mcps/
 
