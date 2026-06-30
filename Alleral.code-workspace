@@ -1,0 +1,21 @@
+{
+  "folders": [
+    {
+      "name": "Alleral",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "terminal.integrated.cwd": "${workspaceFolder}",
+    "files.exclude": {
+      "**/node_modules/**": true,
+      "**/.next/**": true,
+      "**/dist/**": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/relay/site/out": true,
+      "**/backend/site": true
+    }
+  }
+}

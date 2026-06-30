@@ -1,7 +1,8 @@
+# Alleral workspace — deploy from repo root (C:\Users\evanm\OneDrive\Desktop\Alleral)
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
-watchPatterns = ["relay/**", "cfg/**", "go/**", "docker/**", "Dockerfile", "railway.toml", "hub/**", "games/**", "bootstrap.luau", "loader.luau"]
+watchPatterns = ["relay/**", "cfg/**", "go/**", "docker/**", "Dockerfile", "railway.toml", "hub/**", "games/**", "bootstrap.luau", "loader.luau", ".vscode/**", "maint/**"]
 
 [deploy]
 healthcheckPath = "/health"

@@ -1,6 +1,16 @@
 {
   "luau-lsp.studioPlugin.enabled": true,
+  "terminal.integrated.cwd": "${workspaceFolder}",
   "files.exclude": {
-    "**/dist/**": true
+    "**/dist/**": true,
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/__pycache__/**": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/relay/site/out": true,
+    "**/backend/site": true,
+    "**/maint/archive/**": true
   }
 }
