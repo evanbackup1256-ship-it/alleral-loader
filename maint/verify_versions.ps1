@@ -360,7 +360,7 @@ foreach ($pattern in $legacyPatterns)
 }
 
 $trackedTextFiles = git -C $root ls-files -- '*.luau' '*.lua' '*.json' '*.md' '*.ps1' |
-    Where-Object { $_ -notmatch '^Alleral/' -and $_ -notmatch '^kick/' -and $_ -notmatch '^node_modules/' -and $_ -notmatch '\.next/' -and $_ -notmatch '^backend/site/' }
+    Where-Object { $_ -notmatch '^Alleral/' -and $_ -notmatch '^node_modules/' -and $_ -notmatch '\.next/' -and $_ -notmatch '^backend/site/' }
 
 $trackedTextFiles |
     ForEach-Object {
@@ -373,9 +373,9 @@ $trackedTextFiles |
         if (-not $text)
         { return
         }
-        if ($name -ne 'loader.luau' -and $name -ne 'bootstrap.luau' -and $text -match 'kick@main')
+        if ($name -ne 'loader.luau' -and $name -ne 'bootstrap.luau' -and $text -match '-kick-loader')
         {
-            Fail "$rel contains legacy mirror path kick@main"
+            Fail "$rel contains legacy repo slug -kick-loader"
         }
         if ($name -ne 'loader.luau' -and $name -ne 'bootstrap.luau' -and $text -match '\.net/gh/')
         {

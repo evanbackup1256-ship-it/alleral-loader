@@ -1,5 +1,5 @@
 -- Back-compat redirect — forwards to root bootstrap.luau (thin entry, merged gate in loader.luau)
-local REPO = "evanbackup1256-ship-it/-kick-loader"
+local REPO = "evanbackup1256-ship-it/alleral-loader"
 local MERGED_URLS = {
 	"https://raw.githubusercontent.com/" .. REPO .. "/main/bootstrap.luau",
 	"https://alleral-telemetry-production.up.railway.app/api/loader/file/bootstrap.luau",

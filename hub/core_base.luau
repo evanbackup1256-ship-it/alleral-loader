@@ -1209,8 +1209,8 @@ function Core.defaultScriptManifestUrls()
 			table.insert(urls, relay .. "/scripts")
 		end
 	end
-	table.insert(urls, "https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/cfg/scripts_manifest.json")
-	table.insert(urls, "https://github.com/evanbackup1256-ship-it/-kick-loader/raw/main/cfg/scripts_manifest.json")
+	table.insert(urls, "https://raw.githubusercontent.com/evanbackup1256-ship-it/alleral-loader/main/cfg/scripts_manifest.json")
+	table.insert(urls, "https://github.com/evanbackup1256-ship-it/alleral-loader/raw/main/cfg/scripts_manifest.json")
 	return urls
 end
 

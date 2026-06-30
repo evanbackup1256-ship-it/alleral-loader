@@ -1,7 +1,7 @@
 -- Alleral entry v2.3.1 — thin bootstrap (gate + release pin live in loader.luau)
 -- Edit loader.luau for logic; this file fetches release.json, pins loader commit, runs loader.
 local BOOTSTRAP_VERSION = "2.3.1"
-local REPO = "evanbackup1256-ship-it/-kick-loader"
+local REPO = "evanbackup1256-ship-it/alleral-loader"
 local BRANCH = "main"
 local CFG = "cfg"
 local LOADER_MIN_BYTES = 50000

@@ -21,7 +21,7 @@ backend/data/
 .alleral/
 runtime_secrets.json
 
-# Old public-repo mirror checkout. The live repo is -kick-loader.
+# Legacy local mirror checkout (do not commit).
 /kick/
 
 # Cursor IDE — local debug logs, agent sessions, temp dumps (never commit)

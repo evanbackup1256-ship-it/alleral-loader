@@ -14,7 +14,7 @@ return function(Core)
 	Core.UI_VERSION = "11.5.3"
 	Core.UI_LIBRARY = "WindUI"
 
-	local GITHUB_RAW = "https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main"
+	local GITHUB_RAW = "https://raw.githubusercontent.com/evanbackup1256-ship-it/alleral-loader/main"
 
 	local ENV = (function()
 		local ok, e = pcall(function()

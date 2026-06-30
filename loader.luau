@@ -1,5 +1,5 @@
 --!nocheck
-local LOADER_VERSION = "8.13.1"
+local LOADER_VERSION = "8.14.0"
 local BOOTSTRAP_VERSION = "2.3.1"
 local MIN_CORE = "2.7.0"
 local DEFAULT_UPDATE_POLL_SECONDS = 120
@@ -26,7 +26,7 @@ local CP = {
 }
 
 local RELEASE_FALLBACK = {
-	loader = "8.13.1",
+	loader = "8.14.0",
 	core = "2.9.11",
 	ui = "WindUI",
 	uiVersion = "11.5.3",
@@ -45,7 +45,6 @@ local DEFAULT_RELAY_BASE = "https://alleral-telemetry-production.up.railway.app"
 local WORKSPACE_ROOTS = {
 	"",
 	"Alleral/",
-	"kick/",
 	"workspace/",
 	"scripts/",
 	"autoexec/",
@@ -57,7 +56,6 @@ local INSTALL_MANIFEST = ".alleral/versions.json"
 local LOADER_LOCAL_PATHS = {
 	"loader.luau",
 	"Alleral/loader.luau",
-	"kick/loader.luau",
 }
 local BOOTSTRAP_REMOTE_PATH = "bootstrap.luau"
 local BOOTSTRAP_LOCAL_PATHS = {
@@ -66,7 +64,7 @@ local BOOTSTRAP_LOCAL_PATHS = {
 	"alleral_bootstrap.luau",
 }
 local BOOTSTRAP_LOADSTRING =
-	'loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/-kick-loader/main/loader.luau?t=" .. tick(), true))()'
+	'loadstring(game:HttpGet("https://raw.githubusercontent.com/evanbackup1256-ship-it/alleral-loader/main/bootstrap.luau?t=" .. tick(), true))()'
 local LEGACY_LOADER_MARKERS = {
 	"[Alleral Loader v",
 	"Alleral loader 3.",
@@ -100,9 +98,8 @@ local SCAN_DIRS = {
 	"AutoExecute",
 	"workspace",
 	"scripts",
-	"kick",
 }
-local REPO = "evanbackup1256-ship-it/-kick-loader"
+local REPO = "evanbackup1256-ship-it/alleral-loader"
 local BRANCH = "main"
 local GITHUB_RAW = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH
 local GITHUB_WEB = "https://github.com/" .. REPO .. "/raw/" .. BRANCH
@@ -3886,7 +3883,7 @@ local function purgeAlleralWorkspace(opts)
 		end
 	end
 
-	for _, dir in ipairs({ ".alleral", HUB, UI, CFG, "core", "games", "Alleral", "kick" }) do
+	for _, dir in ipairs({ ".alleral", HUB, UI, CFG, "core", "games", "Alleral" }) do
 		purgeDirectoryTree(dir, deleteOpts, removedCounter)
 	end
 

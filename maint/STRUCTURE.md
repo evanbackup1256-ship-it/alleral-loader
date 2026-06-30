@@ -24,7 +24,7 @@ Bumps the release stamp, builds the Next.js site, then verifies the loader/site 
 ## Deploy
 
 - **Railway** — root `Dockerfile` + `railway.toml`
-- **GitHub Pages** — `.github/workflows/deploy-site.yml` publishes the `-kick-loader` site mirror
+- **GitHub Pages** — `.github/workflows/deploy-site.yml` publishes the `alleral-loader` site mirror
 
 ## Rules
 
