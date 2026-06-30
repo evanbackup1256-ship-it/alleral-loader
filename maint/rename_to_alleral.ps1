@@ -14,8 +14,11 @@ if (-not (Test-Path $kick)) {
 }
 
 if (Test-Path $alleral) {
-    Write-Host "Removing incomplete Alleral copy..."
-    Remove-Item -LiteralPath $alleral -Recurse -Force
+    Write-Host "Removing old Alleral folder..."
+    cmd /c "rmdir /s /q `"$alleral`"" | Out-Null
+    if (Test-Path $alleral) {
+        Remove-Item -LiteralPath $alleral -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 Write-Host "Renaming kick -> Alleral..."
