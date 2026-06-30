@@ -1228,8 +1228,8 @@ function Core.fetchScriptManifest(forceRefresh)
 	for _, path in ipairs({
 		"cfg/scripts_manifest.json",
 		"config/scripts_manifest.json",
-		"kick/cfg/scripts_manifest.json",
-		"kick/config/scripts_manifest.json",
+		"Alleral/cfg/scripts_manifest.json",
+		"Alleral/config/scripts_manifest.json",
 	}) do
 		if type(readFileFn) == "function" and type(isFileFn) == "function" and isFileFn(path) then
 			local ok, raw = pcall(readFileFn, path)

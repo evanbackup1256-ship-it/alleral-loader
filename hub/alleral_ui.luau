@@ -5,7 +5,7 @@
 
 	Module roots:
 	  hub/ui/windui/{path}.luau
-	  kick/hub/ui/windui/{path}.luau
+	  Alleral/hub/ui/windui/{path}.luau
 	  .alleral/cache/hub/ui/windui/{path}.luau
 	  GITHUB_RAW remote fallback via Core.httpGet
 ]]
@@ -67,7 +67,7 @@ return function(Core)
 		local rel = "hub/ui/windui/" .. path .. ".luau"
 		return {
 			rel,
-			"kick/" .. rel,
+			"Alleral/" .. rel,
 			".alleral/cache/" .. rel,
 		}
 	end

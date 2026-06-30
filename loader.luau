@@ -44,6 +44,7 @@ local RELEASE_FALLBACK = {
 local DEFAULT_RELAY_BASE = "https://alleral-telemetry-production.up.railway.app"
 local WORKSPACE_ROOTS = {
 	"",
+	"Alleral/",
 	"kick/",
 	"workspace/",
 	"scripts/",
@@ -55,13 +56,13 @@ local WORKSPACE_ROOTS = {
 local INSTALL_MANIFEST = ".alleral/versions.json"
 local LOADER_LOCAL_PATHS = {
 	"loader.luau",
-	"kick/loader.luau",
 	"Alleral/loader.luau",
+	"kick/loader.luau",
 }
 local BOOTSTRAP_REMOTE_PATH = "bootstrap.luau"
 local BOOTSTRAP_LOCAL_PATHS = {
 	"bootstrap.luau",
-	"kick/bootstrap.luau",
+	"Alleral/bootstrap.luau",
 	"alleral_bootstrap.luau",
 }
 local BOOTSTRAP_LOADSTRING =
@@ -261,7 +262,7 @@ local function installLogModule()
 	end
 	local paths = {
 		HUB .. "/log.luau",
-		"kick/" .. HUB .. "/log.luau",
+		"Alleral/" .. HUB .. "/log.luau",
 		".alleral/cache/" .. HUB .. "/log.luau",
 	}
 	if readFile and isFile then
@@ -673,7 +674,7 @@ local function bootExecutorRuntime()
 	end
 	local paths = {
 		HUB .. "/executor_runtime.luau",
-		"kick/" .. HUB .. "/executor_runtime.luau",
+		"Alleral/" .. HUB .. "/executor_runtime.luau",
 		".alleral/cache/" .. HUB .. "/executor_runtime.luau",
 	}
 	for _, path in ipairs(paths) do
@@ -3474,7 +3475,7 @@ local function buildManagedFiles()
 		{
 			paths = {
 				"loader.luau",
-				"kick/loader.luau",
+				"Alleral/loader.luau",
 				"workspace/loader.luau",
 				"autoexec/loader.luau",
 				"Autoexec/loader.luau",
@@ -3487,7 +3488,7 @@ local function buildManagedFiles()
 		{
 			paths = {
 				BOOTSTRAP_REMOTE_PATH,
-				"kick/" .. BOOTSTRAP_REMOTE_PATH,
+				"Alleral/" .. BOOTSTRAP_REMOTE_PATH,
 				".alleral/cache/" .. BOOTSTRAP_REMOTE_PATH,
 			},
 			expectedKey = "bootstrap",
@@ -3496,7 +3497,7 @@ local function buildManagedFiles()
 		{
 			paths = {
 				"load.luau",
-				"kick/load.luau",
+				"Alleral/load.luau",
 				"launch.luau",
 				"run.luau",
 				"autoexec/load.luau",

@@ -360,7 +360,7 @@ foreach ($pattern in $legacyPatterns)
 }
 
 $trackedTextFiles = git -C $root ls-files -- '*.luau' '*.lua' '*.json' '*.md' '*.ps1' |
-    Where-Object { $_ -notmatch '^kick/' -and $_ -notmatch '^node_modules/' -and $_ -notmatch '\.next/' -and $_ -notmatch '^backend/site/' }
+    Where-Object { $_ -notmatch '^Alleral/' -and $_ -notmatch '^kick/' -and $_ -notmatch '^node_modules/' -and $_ -notmatch '\.next/' -and $_ -notmatch '^backend/site/' }
 
 $trackedTextFiles |
     ForEach-Object {
